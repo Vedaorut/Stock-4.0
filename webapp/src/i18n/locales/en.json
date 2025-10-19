@@ -1,0 +1,137 @@
+{
+  "common": {
+    "back": "Back",
+    "close": "Close",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "add": "Add",
+    "edit": "Edit",
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "retry": "Try again",
+    "clear": "Clear"
+  },
+
+  "tabs": {
+    "subscriptions": "Subscriptions",
+    "catalog": "Catalog",
+    "settings": "Settings"
+  },
+
+  "settings": {
+    "title": "Settings",
+    "account": "Account",
+    "myWallet": "My Wallet",
+    "myOrders": "My Orders",
+    "language": "Language",
+    "russian": "Русский",
+    "version": "Version"
+  },
+
+  "wallet": {
+    "title": "My Wallets",
+    "empty": "You don't have any saved wallets yet",
+    "add": "Add Wallet",
+    "placeholder": "Enter BTC or ETH/USDT address",
+    "detected": "Detected: {type}",
+    "invalid": "Invalid wallet format",
+    "exists": "This wallet is already added",
+    "saved": "Saved wallets",
+    "added": "Added {date}",
+    "addressLabel": "Wallet address",
+    "confirmRemove": "Are you sure you want to remove this wallet?"
+  },
+
+  "orders": {
+    "title": "My Orders",
+    "empty": "You don't have any orders yet",
+    "emptyDesc": "Add products from catalog",
+    "order": "Order",
+    "items": "{count} item(s)",
+    "itemsCount": "Items:",
+    "amount": "Amount:",
+    "crypto": "Cryptocurrency",
+    "status": {
+      "pending": "Pending payment",
+      "paid": "Paid",
+      "completed": "Completed",
+      "cancelled": "Cancelled"
+    }
+  },
+
+  "language": {
+    "title": "Language",
+    "russian": "Русский",
+    "english": "English",
+    "comingSoon": "Coming soon",
+    "info": "Currently only Russian language is available. English version will be available soon."
+  },
+
+  "catalog": {
+    "title": "Catalog",
+    "selectShop": "Select a shop",
+    "selectShopDesc": "Go to \"Subscriptions\" section and select a shop to view products",
+    "goToSubscriptions": "Go to subscriptions",
+    "products": "products",
+    "product": "product",
+    "addToCart": "Add to cart",
+    "inCart": "In cart",
+    "empty": "No products found",
+    "emptyDesc": "Try selecting another shop",
+    "price": "Price"
+  },
+
+  "cart": {
+    "title": "Cart",
+    "empty": "Cart is empty",
+    "emptyDesc": "Add products from catalog",
+    "total": "Total:",
+    "checkout": "Checkout",
+    "clear": "Clear",
+    "items": "{count} items",
+    "item": "item"
+  },
+
+  "subscriptions": {
+    "title": "My Subscriptions",
+    "empty": "You are not subscribed to any shops",
+    "emptyDesc": "Find shops in catalog",
+    "unsubscribe": "Unsubscribe",
+    "products": "products"
+  },
+
+  "shop": {
+    "products": "products",
+    "subscribe": "Subscribe",
+    "subscribed": "Subscribed"
+  },
+
+  "payment": {
+    "selectCrypto": "Select cryptocurrency",
+    "selectMethod": "Select order payment method",
+    "payWith": "Pay with {crypto}",
+    "sendExact": "Send exact amount to this address",
+    "iPaid": "I paid",
+    "txHashTitle": "Transaction hash",
+    "txHashDesc": "Enter your payment TX ID",
+    "txHashPlaceholder": "Paste transaction hash...",
+    "txHashMin": "Minimum 40 characters. Find TX ID in your wallet history.",
+    "txHashHow": "How to find TX ID?",
+    "txHashHowDesc": "Open transaction history in your crypto wallet and copy transaction identifier (Transaction ID / TX Hash).",
+    "txHashInvalid": "Transaction hash must contain at least 40 characters",
+    "confirmPayment": "Confirm payment",
+    "waitingConfirmation": "Waiting for confirmation",
+    "orderAccepted": "Your order has been accepted and awaiting payment verification",
+    "orderNumber": "Order number",
+    "checkingPayment": "Checking payment",
+    "checkingDesc": "This may take a few minutes",
+    "blockchainInfo": "We will send a notification once the transaction is confirmed on the blockchain. This usually takes 5 to 30 minutes.",
+    "address": "Address",
+    "amount": "Amount",
+    "copyAddress": "Copy address",
+    "addressCopied": "Address copied",
+    "orderDetails": "Order details"
+  }
+}

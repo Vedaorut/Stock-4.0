@@ -1,0 +1,128 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  background-color: #0A0A0A;
+  color: #F5F5F5;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+/* Safe area для iOS (notch) */
+@supports (padding: max(0px)) {
+  body {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+}
+
+/* Glassmorphism utility classes - Premium quality */
+.glass-card {
+  background: rgba(23, 33, 43, 0.6);
+  backdrop-filter: blur(12px) saturate(180%);
+  -webkit-backdrop-filter: blur(12px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.glass-elevated {
+  background: rgba(23, 33, 43, 0.7);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+/* Tabular numbers utility */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0A0A0A;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #FF6B00;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #FF8533;
+}
+
+/* Smooth scroll */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Button reset */
+button {
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+/* Input reset */
+input, textarea {
+  font-family: inherit;
+  border: none;
+  outline: none;
+}
+
+/* Touch-friendly minimum sizes */
+.touch-target {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* Premium multi-layer shadows */
+.shadow-premium-sm {
+  box-shadow: 0.5px 1px 1px hsl(0deg 0% 0% / 0.7);
+}
+
+.shadow-premium-md {
+  box-shadow:
+    1px 2px 2px hsl(0deg 0% 0% / 0.333),
+    2px 4px 4px hsl(0deg 0% 0% / 0.333),
+    3px 6px 6px hsl(0deg 0% 0% / 0.333);
+}
+
+.shadow-premium-lg {
+  box-shadow:
+    1px 2px 2px hsl(0deg 0% 0% / 0.2),
+    2px 4px 4px hsl(0deg 0% 0% / 0.2),
+    4px 8px 8px hsl(0deg 0% 0% / 0.2),
+    8px 16px 16px hsl(0deg 0% 0% / 0.2),
+    16px 32px 32px hsl(0deg 0% 0% / 0.2);
+}
+
+/* Orange gradient utilities */
+.gradient-orange {
+  background: linear-gradient(135deg, #FF6B00 0%, #FF8C42 100%);
+}
+
+.gradient-orange-hover {
+  background: linear-gradient(135deg, #FF8C42 0%, #FFB366 100%);
+}
