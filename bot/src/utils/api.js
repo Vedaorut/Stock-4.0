@@ -32,9 +32,22 @@ api.interceptors.response.use(
   (error) => {
     if (error.response) {
       // Log full error details including validation errors and request body
+      let requestBody = null;
+      if (error.config?.data) {
+        if (typeof error.config.data === 'string') {
+          try {
+            requestBody = JSON.parse(error.config.data);
+          } catch {
+            requestBody = error.config.data;
+          }
+        } else {
+          requestBody = error.config.data;
+        }
+      }
+
       logger.error(`API Error: ${error.response.status} ${error.response.config.url}`, {
         responseData: error.response.data,
-        requestBody: error.config.data ? JSON.parse(error.config.data) : null,
+        requestBody,
         validationErrors: error.response.data?.details || null
       });
     } else if (error.request) {
@@ -64,6 +77,17 @@ export const authApi = {
     });
     // Unwrap response: return data.data instead of data
     return data.data || data;
+  },
+
+  // Update user role
+  async updateRole(role, token) {
+    const { data } = await api.patch('/auth/role',
+      { role },
+      {
+        headers: { Authorization: `Bearer ${token}` }
+      }
+    );
+    return data.data || data;
   }
 };
 
@@ -73,8 +97,8 @@ export const shopApi = {
     const { data } = await api.get('/shops/my', {
       headers: { Authorization: `Bearer ${token}` }
     });
-    // Unwrap response: return data.data (array of shops) instead of wrapper
-    return data.data || data;
+    const shops = data.data || data;
+    return Array.isArray(shops) ? shops : [];
   },
 
   // Create new shop
@@ -87,12 +111,18 @@ export const shopApi = {
   },
 
   // Search shops
-  async searchShops(query) {
-    const { data } = await api.get('/shops/search', {
+  async searchShops(query, token = null) {
+    const config = {
       params: { q: query }
-    });
-    // Unwrap response: return data.data (array of shops) instead of wrapper
-    return data.data || data;
+    };
+
+    if (token) {
+      config.headers = { Authorization: `Bearer ${token}` };
+    }
+
+    const { data } = await api.get('/shops/search', config);
+    const shops = data.data || data;
+    return Array.isArray(shops) ? shops : [];
   },
 
   // Get shop by ID
@@ -115,9 +145,34 @@ export const productApi = {
 
   // Get shop products
   async getShopProducts(shopId) {
-    const { data } = await api.get(`/products/shop/${shopId}`);
+    const { data } = await api.get('/products', {
+      params: { shopId }
+    });
     // Unwrap response: return data.data (array of products) instead of wrapper
     return data.data || data;
+  }
+};
+
+export const orderApi = {
+  // Get buyer orders
+  async getMyOrders(token) {
+    const { data } = await api.get('/orders/my', {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    // Unwrap response: return data.data (array of orders) instead of wrapper
+    const orders = data.data || data;
+    return Array.isArray(orders) ? orders : [];
+  },
+
+  // Get shop orders (sales)
+  async getShopOrders(shopId, token) {
+    const { data } = await api.get('/orders', {
+      params: { shopId },
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    // Unwrap response: return data.data (array of orders) instead of wrapper
+    const orders = data.data || data;
+    return Array.isArray(orders) ? orders : [];
   }
 };
 
@@ -143,23 +198,69 @@ export const paymentApi = {
 };
 
 export const subscriptionApi = {
-  // Subscribe to shop
-  async subscribe(shopId, token) {
-    const { data } = await api.post(`/subscriptions/${shopId}`, {}, {
+  // Check if user is subscribed to shop
+  async checkSubscription(shopId, token) {
+    const { data } = await api.get(`/subscriptions/check/${shopId}`, {
       headers: { Authorization: `Bearer ${token}` }
     });
+    // Unwrap response: return data.data (object with isSubscribed and subscription) instead of wrapper
+    return data.data || data;
+  },
+
+  // Subscribe to shop
+  async subscribe(shopId, token) {
+    const { data } = await api.post(
+      '/subscriptions',
+      { shopId: Number(shopId) },
+      {
+        headers: { Authorization: `Bearer ${token}` }
+      }
+    );
     // Unwrap response: return data.data (subscription object) instead of wrapper
     return data.data || data;
   },
 
   // Get user subscriptions
   async getMySubscriptions(token) {
-    const { data } = await api.get('/subscriptions/my', {
+    const { data } = await api.get('/subscriptions', {
       headers: { Authorization: `Bearer ${token}` }
     });
     // Unwrap response: return data.data (array of subscriptions) instead of wrapper
     return data.data || data;
+  },
+
+  // Unsubscribe from shop
+  async unsubscribe(shopId, token) {
+    const { data } = await api.delete(`/subscriptions/${shopId}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    // Unwrap response: return data.data instead of wrapper
+    return data.data || data;
   }
 };
 
+export const walletApi = {
+  // Get shop wallets
+  async getWallets(shopId, token) {
+    const { data } = await api.get(`/shops/${shopId}/wallets`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    return data.data || data;
+  },
+
+  // Update shop wallets
+  async updateWallets(shopId, wallets, token) {
+    const { data } = await api.put(
+      `/shops/${shopId}/wallets`,
+      wallets,
+      {
+        headers: { Authorization: `Bearer ${token}` }
+      }
+    );
+    return data.data || data;
+  }
+};
+
+// Export named api instance for testing
+export { api };
 export default api;

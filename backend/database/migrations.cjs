@@ -138,6 +138,105 @@ async function runSeed() {
 }
 
 /**
+ * Run incremental migration: Add selected_role to users table
+ */
+async function addSelectedRoleColumn() {
+  log.header('Running Incremental Migration: Add selected_role Column');
+  const client = await pool.connect();
+  try {
+    // Check if column already exists
+    log.info('Checking if selected_role column exists...');
+    const checkResult = await client.query(`
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_name = 'users'
+      AND column_name = 'selected_role'
+    `);
+
+    if (checkResult.rows.length > 0) {
+      log.warning('Column selected_role already exists, skipping migration');
+      return;
+    }
+
+    // Add the column
+    log.info('Adding selected_role column to users table...');
+    await client.query(`
+      ALTER TABLE users
+      ADD COLUMN selected_role VARCHAR(20)
+      CHECK (selected_role IN ('buyer', 'seller'))
+    `);
+    log.success('Column selected_role added successfully');
+
+    // Add the index
+    log.info('Creating index on selected_role...');
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_users_selected_role ON users(selected_role)
+    `);
+    log.success('Index idx_users_selected_role created successfully');
+
+    log.success('Migration completed: selected_role column added');
+  } catch (error) {
+    log.error(`Migration failed: ${error.message}`);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Run incremental migration: Migrate products to USD-only pricing
+ * - Add wallet_ton to shops table
+ * - Remove currency constraint from products (products now in USD only)
+ */
+async function migrateProductsToUSD() {
+  log.header('Running Incremental Migration: Products to USD-only pricing');
+  const client = await pool.connect();
+  try {
+    // Step 1: Add wallet_ton to shops table
+    log.info('Checking if wallet_ton column exists in shops...');
+    const checkWalletTon = await client.query(`
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_name = 'shops'
+      AND column_name = 'wallet_ton'
+    `);
+
+    if (checkWalletTon.rows.length === 0) {
+      log.info('Adding wallet_ton column to shops table...');
+      await client.query(`
+        ALTER TABLE shops
+        ADD COLUMN wallet_ton VARCHAR(255)
+      `);
+      log.success('Column wallet_ton added successfully');
+    } else {
+      log.warning('Column wallet_ton already exists, skipping');
+    }
+
+    // Step 2: Remove NOT NULL constraint from products.currency
+    log.info('Removing NOT NULL constraint from products.currency...');
+    await client.query(`
+      ALTER TABLE products
+      ALTER COLUMN currency DROP NOT NULL
+    `);
+    log.success('NOT NULL constraint removed from products.currency');
+
+    // Step 3: Update comment for products.price
+    log.info('Updating comment for products.price...');
+    await client.query(`
+      COMMENT ON COLUMN products.price IS 'Product price in USD (8 decimal precision)'
+    `);
+    log.success('Comment updated for products.price');
+
+    log.success('Migration completed: Products migrated to USD-only pricing');
+  } catch (error) {
+    log.error(`Migration failed: ${error.message}`);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+/**
  * Enable required PostgreSQL extensions
  */
 async function enableExtensions() {
@@ -273,6 +372,7 @@ async function migrate(options = {}) {
     extensions = true,
     verify = true,
     stats = false,
+    addSelectedRole = false,
   } = options;
 
   try {
@@ -311,6 +411,15 @@ async function migrate(options = {}) {
       await runSeed();
     }
 
+    // Run incremental migrations
+    if (addSelectedRole) {
+      await addSelectedRoleColumn();
+    }
+
+    if (options.migrateToUSD) {
+      await migrateProductsToUSD();
+    }
+
     // Verify tables
     if (verify) {
       await verifyTables();
@@ -344,6 +453,8 @@ function parseArgs() {
     extensions: !args.includes('--no-extensions'),
     verify: !args.includes('--no-verify'),
     stats: args.includes('--stats'),
+    addSelectedRole: args.includes('--add-selected-role'),
+    migrateToUSD: args.includes('--migrate-to-usd'),
   };
 
   // Show help
@@ -354,20 +465,24 @@ Database Migration Tool
 Usage: node migrations.js [options]
 
 Options:
-  --drop              Drop all tables before migration (destructive!)
-  --seed              Seed test data after migration
-  --stats             Show database statistics after migration
-  --no-schema         Skip schema migration
-  --no-indexes        Skip index creation
-  --no-extensions     Skip extension setup
-  --no-verify         Skip table verification
-  -h, --help          Show this help message
+  --drop                 Drop all tables before migration (destructive!)
+  --seed                 Seed test data after migration
+  --stats                Show database statistics after migration
+  --add-selected-role    Run incremental migration: Add selected_role column to users table
+  --migrate-to-usd       Run incremental migration: Migrate products to USD-only pricing
+  --no-schema            Skip schema migration
+  --no-indexes           Skip index creation
+  --no-extensions        Skip extension setup
+  --no-verify            Skip table verification
+  -h, --help             Show this help message
 
 Examples:
-  node migrations.js                    # Run basic migration
-  node migrations.js --drop --seed      # Fresh install with test data
-  node migrations.js --seed --stats     # Add test data and show stats
-  node migrations.js --no-indexes       # Run without indexes
+  node migrations.js                          # Run basic migration
+  node migrations.js --drop --seed            # Fresh install with test data
+  node migrations.js --seed --stats           # Add test data and show stats
+  node migrations.js --add-selected-role      # Add selected_role column (incremental)
+  node migrations.js --migrate-to-usd         # Migrate products to USD-only pricing
+  node migrations.js --no-indexes             # Run without indexes
     `);
     process.exit(0);
   }
@@ -391,4 +506,6 @@ module.exports = {
   verifyTables,
   showStats,
   dropAllTables,
+  addSelectedRoleColumn,
+  migrateProductsToUSD,
 };

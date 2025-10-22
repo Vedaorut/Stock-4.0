@@ -11,6 +11,7 @@ import errorMiddleware from './middleware/error.js';
 import createShopScene from './scenes/createShop.js';
 import addProductScene from './scenes/addProduct.js';
 import searchShopScene from './scenes/searchShop.js';
+import manageWalletsScene from './scenes/manageWallets.js';
 
 // Handlers
 import { handleStart } from './handlers/start.js';
@@ -33,7 +34,8 @@ const bot = new Telegraf(config.botToken);
 const stage = new Scenes.Stage([
   createShopScene,
   addProductScene,
-  searchShopScene
+  searchShopScene,
+  manageWalletsScene
 ]);
 
 bot.use(session());

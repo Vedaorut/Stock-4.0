@@ -1,4 +1,5 @@
 import { orderQueries, productQueries, shopQueries } from '../models/db.js';
+import { dbErrorHandler } from '../middleware/errorHandler.js';
 import telegramService from '../services/telegram.js';
 import logger from '../utils/logger.js';
 
@@ -74,6 +75,15 @@ export const orderController = {
       });
 
     } catch (error) {
+      if (error.code) {
+        const handledError = dbErrorHandler(error);
+        return res.status(handledError.statusCode).json({
+          success: false,
+          error: handledError.message,
+          ...(handledError.details ? { details: handledError.details } : {})
+        });
+      }
+
       logger.error('Create order error', { error: error.message, stack: error.stack });
       return res.status(500).json({
         success: false,
@@ -112,6 +122,15 @@ export const orderController = {
       });
 
     } catch (error) {
+      if (error.code) {
+        const handledError = dbErrorHandler(error);
+        return res.status(handledError.statusCode).json({
+          success: false,
+          error: handledError.message,
+          ...(handledError.details ? { details: handledError.details } : {})
+        });
+      }
+
       logger.error('Get order error', { error: error.message, stack: error.stack });
       return res.status(500).json({
         success: false,
@@ -160,6 +179,15 @@ export const orderController = {
       });
 
     } catch (error) {
+      if (error.code) {
+        const handledError = dbErrorHandler(error);
+        return res.status(handledError.statusCode).json({
+          success: false,
+          error: handledError.message,
+          ...(handledError.details ? { details: handledError.details } : {})
+        });
+      }
+
       logger.error('Get my orders error', { error: error.message, stack: error.stack });
       return res.status(500).json({
         success: false,
@@ -221,6 +249,15 @@ export const orderController = {
       });
 
     } catch (error) {
+      if (error.code) {
+        const handledError = dbErrorHandler(error);
+        return res.status(handledError.statusCode).json({
+          success: false,
+          error: handledError.message,
+          ...(handledError.details ? { details: handledError.details } : {})
+        });
+      }
+
       logger.error('Update order status error', { error: error.message, stack: error.stack });
       return res.status(500).json({
         success: false,

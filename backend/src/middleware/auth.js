@@ -99,7 +99,7 @@ export const optionalAuth = async (req, res, next) => {
  */
 export const requireShopOwner = async (req, res, next) => {
   try {
-    const shops = await shopQueries.findBySellerId(req.user.id);
+    const shops = await shopQueries.findByOwnerId(req.user.id);
 
     if (!shops || shops.length === 0) {
       return res.status(403).json({

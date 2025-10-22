@@ -24,6 +24,7 @@ CREATE TABLE users (
   username VARCHAR(255),
   first_name VARCHAR(255),
   last_name VARCHAR(255),
+  selected_role VARCHAR(20) CHECK (selected_role IN ('buyer', 'seller')),
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
 );
@@ -40,9 +41,11 @@ CREATE TABLE shops (
   registration_paid BOOLEAN DEFAULT false,
   name VARCHAR(255) UNIQUE NOT NULL,
   description TEXT,
+  logo TEXT,
   wallet_btc VARCHAR(255),
   wallet_eth VARCHAR(255),
   wallet_usdt VARCHAR(255),
+  wallet_ton VARCHAR(255),
   is_active BOOLEAN DEFAULT true,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
@@ -61,16 +64,17 @@ CREATE TABLE products (
   shop_id INT NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
   name VARCHAR(255) NOT NULL,
   description TEXT,
-  price DECIMAL(10, 8) NOT NULL CHECK (price > 0),
-  currency VARCHAR(10) CHECK (currency IN ('BTC', 'ETH', 'USDT')) NOT NULL,
+  price DECIMAL(18, 8) NOT NULL CHECK (price > 0),
+  currency VARCHAR(10) CHECK (currency IN ('BTC', 'ETH', 'USDT', 'TON')),
   stock_quantity INT DEFAULT 0 CHECK (stock_quantity >= 0),
-  is_available BOOLEAN DEFAULT true,
+  is_active BOOLEAN DEFAULT true,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
 );
 
 COMMENT ON TABLE products IS 'Stores products for each shop';
-COMMENT ON COLUMN products.price IS 'Product price in cryptocurrency (8 decimal precision)';
+COMMENT ON COLUMN products.price IS 'Product price in USD (8 decimal precision)';
+COMMENT ON COLUMN products.currency IS 'Legacy field - products are priced in USD only';
 COMMENT ON COLUMN products.stock_quantity IS 'Available stock quantity';
 
 -- ============================================
@@ -79,12 +83,14 @@ COMMENT ON COLUMN products.stock_quantity IS 'Available stock quantity';
 CREATE TABLE orders (
   id SERIAL PRIMARY KEY,
   buyer_id INT REFERENCES users(id) ON DELETE SET NULL,
-  shop_id INT REFERENCES shops(id) ON DELETE SET NULL,
-  total_amount DECIMAL(10, 8) NOT NULL CHECK (total_amount > 0),
+  product_id INT REFERENCES products(id) ON DELETE SET NULL,
+  quantity INT NOT NULL DEFAULT 1 CHECK (quantity > 0),
+  total_price DECIMAL(18, 8) NOT NULL CHECK (total_price > 0),
   currency VARCHAR(10) NOT NULL,
+  delivery_address VARCHAR(255),
   payment_hash VARCHAR(255),
   payment_address VARCHAR(255),
-  status VARCHAR(20) CHECK (status IN ('pending', 'paid', 'completed', 'cancelled')) DEFAULT 'pending',
+  status VARCHAR(20) CHECK (status IN ('pending', 'confirmed', 'shipped', 'delivered', 'cancelled')) DEFAULT 'pending',
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW(),
   paid_at TIMESTAMP,
@@ -93,7 +99,7 @@ CREATE TABLE orders (
 
 COMMENT ON TABLE orders IS 'Stores customer orders';
 COMMENT ON COLUMN orders.payment_hash IS 'Blockchain transaction hash';
-COMMENT ON COLUMN orders.status IS 'Order status: pending, paid, completed, cancelled';
+COMMENT ON COLUMN orders.status IS 'Order status: pending, confirmed, shipped, delivered, cancelled';
 
 -- ============================================
 -- Order items table
@@ -104,7 +110,7 @@ CREATE TABLE order_items (
   product_id INT REFERENCES products(id) ON DELETE SET NULL,
   product_name VARCHAR(255) NOT NULL,
   quantity INT DEFAULT 1 CHECK (quantity > 0),
-  price DECIMAL(10, 8) NOT NULL CHECK (price > 0),
+  price DECIMAL(18, 8) NOT NULL CHECK (price > 0),
   currency VARCHAR(10) NOT NULL,
   created_at TIMESTAMP DEFAULT NOW()
 );
@@ -132,7 +138,7 @@ CREATE TABLE shop_payments (
   id SERIAL PRIMARY KEY,
   user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   shop_id INT REFERENCES shops(id) ON DELETE SET NULL,
-  amount DECIMAL(10, 8) NOT NULL CHECK (amount > 0),
+  amount DECIMAL(18, 8) NOT NULL CHECK (amount > 0),
   currency VARCHAR(10) NOT NULL,
   payment_hash VARCHAR(255) UNIQUE,
   payment_address VARCHAR(255),
@@ -192,3 +198,16 @@ CREATE TRIGGER update_orders_updated_at BEFORE UPDATE ON orders
 
 CREATE TRIGGER update_payments_updated_at BEFORE UPDATE ON payments
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- ============================================
+-- Indexes to improve query performance
+-- ============================================
+CREATE INDEX IF NOT EXISTS idx_users_selected_role ON users(selected_role);
+CREATE INDEX IF NOT EXISTS idx_shops_owner ON shops(owner_id);
+CREATE INDEX IF NOT EXISTS idx_products_shop ON products(shop_id);
+CREATE INDEX IF NOT EXISTS idx_products_shop_active ON products(shop_id, is_active);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_user ON subscriptions(user_id);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_shop ON subscriptions(shop_id);
+CREATE INDEX IF NOT EXISTS idx_orders_buyer ON orders(buyer_id);
+CREATE INDEX IF NOT EXISTS idx_orders_product ON orders(product_id);
+CREATE INDEX IF NOT EXISTS idx_payments_order_status ON payments(order_id, status);

@@ -24,6 +24,7 @@ import productRoutes from './routes/products.js';
 import orderRoutes from './routes/orders.js';
 import paymentRoutes from './routes/payments.js';
 import subscriptionRoutes from './routes/subscriptions.js';
+import walletRoutes from './routes/wallets.js';
 
 /**
  * Initialize Express app
@@ -96,6 +97,7 @@ app.use('/api/products', productRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
+app.use('/api/wallets', walletRoutes);
 
 /**
  * 404 handler
@@ -235,3 +237,4 @@ const startServer = async () => {
 startServer();
 
 export default app;
+

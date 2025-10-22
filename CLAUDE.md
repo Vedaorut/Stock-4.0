@@ -61,51 +61,155 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Основные команды
 
-Проект использует **Makefile** для управления всеми операциями:
-
-### Разработка
+### NPM команды (рекомендуется для разработки)
 ```bash
-make setup                 # Полная установка (env + dependencies)
-make install              # Установить зависимости во всех сервисах
-make dev                  # Запустить всё в dev режиме
+# Быстрый старт
+npm start                 # Backend + WebApp одновременно (concurrently)
+npm run dev               # То же что npm start
+
+# Отдельные сервисы
+npm run dev:backend       # Только backend:3000
+npm run dev:webapp        # Только webapp:5173
+npm run bot               # Запустить бота
+
+# Установка
+npm run install:all       # Установить зависимости (root + backend + webapp + bot)
+npm run clean             # Удалить все node_modules
+
+# База данных
+npm run db:migrate        # Выполнить миграции (backend/database/migrations.js)
+npm run db:setup          # createdb + миграции
+
+# Build
+npm run build:webapp      # Production build webapp
+```
+
+### Makefile команды (альтернатива)
+```bash
+# Разработка
+make setup                # env + dependencies
+make install              # Зависимости всех сервисов
+make dev                  # Все сервисы (Docker postgres + npm dev)
 make dev-backend          # Только backend
 make dev-bot              # Только bot
 make dev-webapp           # Только webapp
+
+# Docker
+make build                # Docker images
+make start                # Все сервисы через Docker Compose
+make stop                 # Остановить
+make logs                 # Логи всех сервисов
+make status               # Статус контейнеров
+
+# База данных
+make migrate              # Миграции
+make seed                 # Тестовые данные
+make db-reset             # DROP + CREATE + migrate
+make db-shell             # psql shell
+make db-backup            # Бэкап в backups/
+
+# Production
+make prod-build           # Build
+make prod-start           # Production режим
 ```
 
-### Docker
+## Тестирование Bot (Integration Tests)
+
+**Статус:** ✅ 100% integration tests passing (22/22)
+**Локация:** `bot/tests/`
+
+### Запуск тестов
 ```bash
-make build                # Собрать Docker images
-make start                # Запустить все сервисы
-make stop                 # Остановить сервисы
-make restart              # Перезапустить
-make logs                 # Показать логи
-make logs-backend         # Логи backend
-make logs-bot             # Логи bot
-make status               # Статус сервисов
+cd bot
+npm run test:integration        # Все integration тесты
+npm run test:unit              # Unit тесты
+npm test                       # Все тесты + coverage
 ```
 
-### База данных
-```bash
-make migrate              # Выполнить миграции
-make seed                 # Добавить тестовые данные
-make db-reset             # Сбросить и пересоздать БД
-make db-shell             # PostgreSQL shell
-make db-backup            # Создать backup
+### Структура тестов
+```
+bot/tests/
+├── integration/              # Тесты user flows (ГЛАВНЫЕ!)
+│   ├── addProduct.flow.test.js
+│   ├── createShop.flow.test.js
+│   ├── subscriptions.flow.test.js
+│   └── ...
+├── unit/                     # Тесты отдельных функций
+├── helpers/                  # testBot.js, callsCaptor.js
+└── fixtures/                 # Моковые данные
 ```
 
-### Тестирование
-```bash
-make test                 # Все тесты
-make test-backend         # Backend тесты
-make health               # Проверка здоровья сервисов
+### Когда писать новые тесты
+
+**ОБЯЗАТЕЛЬНО** при добавлении:
+- Новых callback handlers (`bot.action(...)`)
+- Wizard scenes (multi-step flows)
+- API интеграций
+- Валидаций данных
+
+**Минимум для новой фичи:**
+```javascript
+it('happy path - основной сценарий работает', async () => {
+  mock.onGet('/endpoint').reply(200, { data: mockData });
+  await testBot.handleUpdate(callbackUpdate('new_button'));
+  await new Promise(resolve => setImmediate(resolve)); // async delay
+
+  const text = testBot.getLastReplyText();
+  expect(text).toContain('Ожидаемый текст');
+});
+
+it('error case - API упал → показать ошибку', async () => {
+  mock.onGet('/endpoint').reply(500);
+  await testBot.handleUpdate(callbackUpdate('new_button'));
+  await new Promise(resolve => setImmediate(resolve));
+
+  const text = testBot.getLastReplyText();
+  expect(text).toContain('Ошибка');
+});
 ```
 
-### Production
-```bash
-make prod-build           # Production build
-make prod-start           # Запуск production
-```
+### Важные правила тестов
+
+1. **Всегда импортировать реальный API instance:**
+   ```javascript
+   import { api } from '../../src/utils/api.js';  // ✅ ПРАВИЛЬНО
+   mock = new MockAdapter(api);
+   ```
+
+2. **Добавлять delay после async операций:**
+   ```javascript
+   await testBot.handleUpdate(...);
+   await new Promise(resolve => setImmediate(resolve)); // ✅ КРИТИЧНО!
+   const text = testBot.getLastReplyText();
+   ```
+
+3. **Middleware order критичен** (уже настроен в testBot.js):
+   ```
+   session → mockSession → lastContext → captor → stage → handlers
+   ```
+
+4. **Mock API endpoints точно как в коде:**
+   ```javascript
+   // Если код делает: api.get('/products', { params: { shopId } })
+   mock.onGet('/products').reply(200, { data: [] });  // ✅
+   // НЕ: mock.onGet('/products/shop/123')  // ❌
+   ```
+
+### Troubleshooting
+
+**Тест падает с `null` или `undefined`:**
+- Добавь `await new Promise(resolve => setImmediate(resolve))` после `handleUpdate()`
+- Проверь что mock endpoint совпадает с реальным API call
+
+**"Cannot read properties of null":**
+- Проверь middleware order в testBot.js
+- Убедись что captor.reset() не вызывается слишком рано
+
+**404 в тестах:**
+- Mock endpoint не совпадает с реальным
+- Проверь `bot/src/utils/api.js` какой endpoint используется
+
+**Подробнее:** `bot/DIAGNOSTIC_REPORT.md`
 
 ## Важные правила разработки
 
@@ -116,9 +220,10 @@ make prod-start           # Запуск production
 - При перезагрузке страницы состояние сбрасывается
 
 ### 2. База данных
-- Используются **чистые SQL запросы**, НЕ ORM
-- Миграции запускаются через `make migrate`
-- Schema находится в `/backend/database/schema.sql`
+- Используются **чистые SQL запросы**, НЕ ORM (pg библиотека напрямую)
+- Миграции: `backend/database/migrations.js` (запускается через `npm run db:migrate` или `make migrate`)
+- Schema: `backend/database/schema.sql` (определяет таблицы и индексы)
+- Важно: при изменении схемы обновляй migrations.js И schema.sql
 
 ### 3. Криптовалютные платежи
 - Верификация через blockchain APIs (Etherscan, blockchain.info, TONCenter)
@@ -195,64 +300,53 @@ VITE_API_URL=http://localhost:3000/api
 ## Структура кода
 
 ### Backend (`/backend/src/`)
-```
-server.js              # Express app + WebSocket
-config/
-  database.js          # PostgreSQL connection
-routes/
-  auth.js             # Auth endpoints
-  shops.js            # Shop endpoints
-  products.js         # Product endpoints
-  orders.js           # Order endpoints
-  payments.js         # Payment endpoints
-controllers/          # Business logic
-models/db.js          # SQL queries
-middleware/
-  auth.js             # JWT verification
-  validation.js       # Input validation
-services/
-  crypto.js           # Crypto verification
-  telegram.js         # Telegram API
-```
+- **server.js** - Express app + WebSocket сервер, точка входа
+- **config/** - database.js (pg pool), env.js (переменные окружения)
+- **routes/** - Express роуты для API endpoints (auth, shops, products, orders, payments, subscriptions)
+- **controllers/** - Бизнес-логика обработки запросов
+- **models/db.js** - SQL queries (прямые запросы к PostgreSQL)
+- **middleware/** - auth.js (JWT), validation.js (express-validator), error.js
+- **services/** - crypto.js (blockchain verification), telegram.js (Telegram API)
+- **utils/** - logger.js (winston), constants.js
 
-### Bot (`/bot/`)
-```
-bot.js                # Главный файл бота
-handlers/
-  start.js            # /start, роли
-  seller.js           # Флоу продавца
-  buyer.js            # Флоу покупателя
-  shop.js             # Управление магазином
-keyboards/            # Telegram keyboards
-utils/api.js          # Backend API client
-```
+### Bot (`/bot/src/`)
+- **bot.js** - Telegraf инициализация, регистрация handlers и scenes
+- **handlers/** - start.js (роли), seller/ (управление магазином), buyer/ (покупки), common.js
+- **scenes/** - createShop.js, addProduct.js, searchShop.js (Telegraf Scenes для многошаговых диалогов)
+- **keyboards/** - seller.js, buyer.js (Telegram inline keyboards)
+- **middleware/** - auth.js (регистрация пользователя через Backend API), error.js
+- **utils/api.js** - axios клиент для Backend API
 
 ### WebApp (`/webapp/src/`)
-```
-components/
-  Layout/             # Header, TabBar
-  Shop/               # ShopCard, ShopList
-  Product/            # ProductCard, ProductGrid
-  Cart/               # CartSheet, CartItem
-  Payment/            # CryptoSelector
-pages/                # Страницы приложения
-hooks/                # Custom hooks (useApi, useTelegram)
-store/                # Zustand store
-utils/                # Утилиты
-```
+- **App.jsx** - Главный компонент, роутинг страниц через activeTab
+- **components/** - Layout/ (TabBar), Shop/, Product/, Cart/ (CartSheet), Payment/ (CryptoSelector, PaymentFlowManager)
+- **pages/** - Subscriptions.jsx, Catalog.jsx, Settings.jsx
+- **hooks/** - useApi.js (fetch wrapper), useTelegram.js (Telegram WebApp SDK)
+- **store/useStore.js** - Zustand store (НЕ ПЕРСИСТЕНТНЫЙ, только in-memory!)
+- **styles/globals.css** - TailwindCSS + кастомные стили
+- **i18n/** - Мультиязычность (ru/en)
 
-## Специализированные субагенты
+## Архитектурные особенности
 
-Проект настроен на использование специализированных субагентов через `.claude/agents/`:
+### Backend
+- **WebSocket сервер** интегрирован в server.js для real-time уведомлений
+- **global.broadcastUpdate()** - функция для отправки обновлений всем WebSocket клиентам
+- **Graceful shutdown** - обработка SIGTERM/SIGINT с закрытием соединений
+- **Winston logger** - структурированное логирование (см. backend/src/utils/logger.js)
+- **Rate limiting** - 100 req/15 min на /api/* endpoints
 
-- **design-researcher** - для UI/UX дизайна, visual inspiration
-- **backend-architect** - для архитектурных решений, API design
-- **frontend-developer** - для React, TailwindCSS, Telegram Mini App
-- **telegram-bot-expert** - для Telegram bot, Grammy/Telegraf
-- **crypto-integration-specialist** - для крипто-платежей, blockchain APIs
-- **database-designer** - для PostgreSQL, схемы, миграции
+### Bot
+- **Telegraf Scenes** - многошаговые диалоги (createShop, addProduct, searchShop)
+- **Session middleware** - хранит состояние пользователя (роль, shopId, token)
+- **Backend API интеграция** - все данные через axios calls к Backend API
+- **Двойная авторизация** - auth middleware регистрирует пользователя и получает JWT
 
-**Рекомендация:** Используй Task tool с соответствующим субагентом для специализированных задач.
+### WebApp
+- **Telegram WebApp SDK** - интеграция через @twa-dev/sdk
+- **Zustand store** - КРИТИЧНО: без persist, только in-memory state
+- **Роутинг через state** - activeTab в store определяет текущую страницу
+- **Framer Motion** - AnimatePresence для плавных переходов страниц
+- **Payment flow** - многошаговый процесс (выбор крипты -> QR -> верификация)
 
 ## Security
 
@@ -266,36 +360,53 @@ utils/                # Утилиты
 
 ## Development Workflow
 
-1. **Настройка:**
-   ```bash
-   make setup
-   # Отредактируй .env файлы
-   make migrate
-   ```
+### Первый запуск
+```bash
+# 1. Установить зависимости
+npm run install:all
 
-2. **Разработка:**
-   ```bash
-   make dev              # Все сервисы
-   # ИЛИ
-   make dev-backend &
-   make dev-bot &
-   make dev-webapp &
-   ```
+# 2. Создать .env файлы (или make env)
+cp backend/.env.example backend/.env
+cp bot/.env.example bot/.env
+cp webapp/.env.example webapp/.env
+# Отредактируй .env файлы (BOT_TOKEN, JWT_SECRET, etc.)
 
-3. **Проверка логов:**
-   ```bash
-   make logs
-   # ИЛИ отдельно:
-   make logs-backend
-   make logs-bot
-   ```
+# 3. Создать БД и выполнить миграции
+npm run db:setup
+# ИЛИ вручную:
+# createdb telegram_shop
+# npm run db:migrate
 
-4. **База данных:**
-   ```bash
-   make db-shell         # SQL консоль
-   make migrate          # Миграции
-   make db-reset         # Пересоздать БД
-   ```
+# 4. Запустить проект
+npm start
+```
+
+### Ежедневная разработка
+```bash
+# Запустить backend + webapp
+npm start
+
+# В отдельном терминале запустить бота (опционально)
+npm run bot
+
+# URLs:
+# - Backend API: http://localhost:3000
+# - WebApp: http://localhost:5173
+# - Health: http://localhost:3000/health
+```
+
+### Проверка логов после запуска
+После запуска ВСЕГДА проверяй логи на ошибки:
+- Backend: смотри вывод в терминале или `backend/logs/`
+- Bot: смотри вывод или `bot/logs/`
+- Docker: `make logs` или `docker-compose logs`
+
+### Работа с БД
+```bash
+npm run db:migrate        # Выполнить миграции
+make db-shell             # PostgreSQL shell (если через Docker)
+make db-reset             # Сбросить и пересоздать (ОСТОРОЖНО!)
+```
 
 ## Debugging
 
@@ -338,22 +449,228 @@ make prod-start       # Запуск в production режиме
 
 ## Troubleshooting
 
-1. **База данных не запускается:**
-   ```bash
-   make stop
-   make start
-   make migrate
-   ```
+### База данных
+```bash
+# Проверить подключение
+psql -U admin -d telegram_shop
 
-2. **Ошибки миграций:**
-   ```bash
-   make db-reset
-   ```
+# Пересоздать БД (ОСТОРОЖНО - удалит данные!)
+make db-reset
 
-3. **Bot не подключается:**
-   - Проверь `BOT_TOKEN` в `.env`
-   - Проверь доступность Backend: `make health`
+# Если миграции падают
+npm run db:migrate
+# Если не помогло - проверь backend/database/migrations.js
+```
 
-4. **WebApp не загружается:**
-   - Проверь `VITE_API_URL` в `webapp/.env`
-   - Проверь CORS настройки в backend
+### Backend не стартует
+- Проверь `backend/.env` (DATABASE_URL, JWT_SECRET)
+- Проверь подключение к PostgreSQL
+- Смотри логи: `backend/logs/error.log` или вывод в терминале
+- Health check: `curl http://localhost:3000/health`
+
+### Bot не работает
+- Проверь `BOT_TOKEN` в `bot/.env`
+- Проверь `BACKEND_URL` (должен быть доступен)
+- Проверь логи: `bot/logs/` или терминал
+- Тест Backend API: `curl http://localhost:3000/health`
+
+### WebApp
+- Проверь `VITE_API_URL` в `webapp/.env`
+- CORS должен разрешать frontend URL в backend config
+- Dev server: `http://localhost:5173`
+- Telegram WebApp требует HTTPS для production
+
+### Docker
+```bash
+make status           # Статус контейнеров
+make logs             # Логи всех сервисов
+make restart          # Перезапуск
+docker-compose down -v && docker-compose up -d  # Полный рестарт
+```
+
+---
+
+## Claude Code — Правила работы (ОБЯЗАТЕЛЬНО)
+
+### Режим работы
+- **PLAN MODE** по умолчанию → анализ через MCP FS (Read/Grep/Glob) → план → ExitPlanMode → ждать approval
+- **IMPLEMENT** только после "APPROVED" → минимальные дiffs (точные файлы + строки)
+- После реализации → проверка логов + тесты + отчёт
+
+### Инструменты (MUST)
+**MCP File System обязателен** для всех операций с файлами:
+- `mcp__filesystem__read_text_file` - чтение файлов
+- `mcp__filesystem__write_file` - запись (только после approval)
+- `mcp__filesystem__edit_file` - редактирование (только после approval)
+- `mcp__filesystem__search_files` - поиск файлов
+- Grep/Glob - для поиска в коде
+
+**Bash ограничен**:
+- ✅ Разрешено: `npm run test:*`, `npm run dev`, проверка логов
+- ✅ Разрешено: Read-only SQL (`psql -c "SELECT ..."`)
+- ❌ Запрещено: Деструктивные команды, изменение .env
+
+### Субагенты (проактивно использовать)
+- **telegram-bot-expert** - Telegraf, handlers, scenes, keyboards
+- **backend-architect** - API design, идемпотентность, endpoints
+- **database-designer** - схема, миграции, индексы
+- **frontend-developer** - React, TailwindCSS, Telegram Mini App
+- **debug-master** - тесты, логи, SQL snapshots, debugging
+- **Explorer** - глубокий анализ кода, web_search при необходимости
+
+### Процесс (non-negotiable)
+1. **Map code** через MCP FS → sequence diagrams → гипотезы → minimal patch plan (files+lines)
+2. **Implement** минимальные diffs после approval
+3. **Verify**: тесты ✅ + логи ✅ + SQL snapshots ✅
+4. **Deliverables**: `PROJECT_AUDIT.md` + `DIFF_SUMMARY.md` + rollback plan
+
+### Evidence (доказательства)
+**Любое "fixed" требует подтверждения:**
+- ✅ Зелёные тесты (юнит/интеграция/E2E)
+- ✅ Релевантные логи без ошибок
+- ✅ SQL-снимок (если затронута БД)
+- ❌ Без доказательств = считать невыполненным
+
+### UX Acceptance Criteria
+- **Единая верхняя кнопка "Открыть приложение"** у обеих ролей всегда первой
+- **Память роли**: /start идемпотентен; роль персистентна (БД); одна кнопка-тоггл для смены
+- **Подписки**: upsert `(user_id, shop_id)`, явные сообщения (успех/уже подписан), мгновенное обновление markup
+- **Buyer без магазина**: CTA "Создать магазин ($25)" → оплата → seller доступ
+
+### Safety Rules
+- ❌ НЕ редактировать `.env` и секреты
+- ❌ НЕ ломать API контракты (backward compatible)
+- ❌ НЕ деструктивные bash команды
+- ✅ Минимальные diffs (точные строки)
+
+---
+
+## Telegraf.js — Критические особенности (ВАЖНО!)
+
+### 1. Context геттеры НЕ копируются через spread
+**Проблема**: `...ctx` НЕ копирует геттеры (`ctx.from`, `ctx.message`, `ctx.chat`)
+
+```javascript
+// ❌ НЕПРАВИЛЬНО
+const fakeCtx = { ...ctx };
+// fakeCtx.from = undefined (getter не скопировался!)
+
+// ✅ ПРАВИЛЬНО
+const fakeCtx = {
+  ...ctx,
+  from: ctx.from,        // Явно копируем значение геттера
+  message: ctx.message,
+  chat: ctx.chat,
+  session: ctx.session
+};
+```
+
+### 2. answerCbQuery() можно вызвать ОДИН РАЗ
+**Проблема**: Telegram разрешает только один `answerCbQuery()` на callback query
+
+```javascript
+// ❌ НЕПРАВИЛЬНО - infinite spinner
+await ctx.answerCbQuery('Loading...');  // ← First call
+await api.doSomething();  // throws error
+await ctx.answerCbQuery('Error');  // ← Ignored! Spinner не остановится
+
+// ✅ ПРАВИЛЬНО
+try {
+  await api.doSomething();
+  await ctx.answerCbQuery('Success!');  // ← Only one call
+} catch (error) {
+  await ctx.answerCbQuery('Error!');   // ← Only one call
+}
+```
+
+### 3. Backend error parsing обязателен
+**Проблема**: Generic errors не информативны для пользователя
+
+```javascript
+// ❌ НЕПРАВИЛЬНО
+} catch (error) {
+  await ctx.answerCbQuery('Ошибка');  // Что за ошибка?
+}
+
+// ✅ ПРАВИЛЬНО
+} catch (error) {
+  const errorMsg = error.response?.data?.error;
+
+  if (errorMsg === 'Cannot subscribe to your own shop') {
+    await ctx.answerCbQuery('❌ Нельзя подписаться на свой магазин');
+  } else if (errorMsg === 'Already subscribed') {
+    await ctx.answerCbQuery('ℹ️ Вы уже подписаны');
+  } else {
+    await ctx.answerCbQuery('❌ Ошибка подписки');
+  }
+}
+```
+
+### 4. Callback query vs Text command
+**Различие**: `/start` это TEXT, кнопка это CALLBACK
+
+```javascript
+// Callback query (inline button click)
+bot.action('main_menu', async (ctx) => {
+  await ctx.answerCbQuery();           // ✅ Обязательно
+  await ctx.editMessageText(...);      // ✅ Редактирует существующее сообщение
+});
+
+// Text command (/start)
+bot.start(async (ctx) => {
+  // await ctx.answerCbQuery();        // ❌ НЕТ callback query!
+  await ctx.reply(...);                // ✅ Отправляет новое сообщение
+});
+```
+
+### 5. fakeCtx для redirect из /start
+**Когда нужно**: Перенаправить из `/start` в role handler (который ожидает callback query)
+
+```javascript
+// ✅ Полный fakeCtx шаблон
+const fakeCtx = {
+  ...ctx,
+  from: ctx.from,          // CRITICAL: геттеры явно
+  message: ctx.message,
+  chat: ctx.chat,
+  session: ctx.session,    // CRITICAL: сессия
+  answerCbQuery: async () => {},  // Mock callback query
+  editMessageText: async (text, keyboard) => {
+    return await ctx.reply(text, keyboard);  // → reply вместо edit
+  }
+};
+```
+
+---
+
+## Проверка логов — После любого запуска (MUST)
+
+**После запуска ЛЮБОГО сервиса проверь логи:**
+
+```bash
+# Backend
+tail -f backend/logs/combined.log
+# Ищи: [error], [warn], "Failed", "Connection refused"
+
+# Bot
+tail -f bot/logs/bot.log
+# Ищи: [error], "Error in handler", "Cannot read properties"
+
+# Или через npm/make
+npm run dev         # Смотри вывод в терминале
+make logs-backend   # Docker logs
+```
+
+**Критерии здоровья**:
+- ✅ Нет `[error]` после старта
+- ✅ "Server started successfully" / "Bot started successfully"
+- ✅ "Database connected" / "Database: Connected ✓"
+- ❌ Если есть ошибки → НЕ ПРОДОЛЖАЙ, сначала исправь
+
+---
+
+## Если застрял
+1. Используй **Explorer subagent** с `thorughness: very thorough`
+2. Используй **WebSearch** для поиска решений
+3. Верни краткий cited-summary в `PROJECT_AUDIT.md`
+4. Продолжай по плану с найденным решением

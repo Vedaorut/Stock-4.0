@@ -21,7 +21,7 @@ const config = {
     { code: 'BTC', name: 'Bitcoin', symbol: '₿', emoji: '₿' },
     { code: 'ETH', name: 'Ethereum', symbol: 'Ξ', emoji: 'Ξ' },
     { code: 'USDT', name: 'USDT', symbol: '₮', emoji: '₮' },
-    { code: 'LTC', name: 'Litecoin', symbol: 'Ł', emoji: 'Ł' }
+    { code: 'TON', name: 'Toncoin', symbol: 'TON', emoji: '🔷' }
   ],
 
   // Shop registration fee

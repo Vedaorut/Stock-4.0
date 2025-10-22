@@ -2,24 +2,20 @@
  * Application-wide constants
  */
 
-// Order statuses
+// Order statuses (align with database constraint & validation)
 export const ORDER_STATUS = {
   PENDING: 'pending',
-  AWAITING_PAYMENT: 'awaiting_payment',
-  PAID: 'paid',
-  PROCESSING: 'processing',
-  COMPLETED: 'completed',
-  CANCELLED: 'cancelled',
-  REFUNDED: 'refunded'
+  CONFIRMED: 'confirmed',
+  SHIPPED: 'shipped',
+  DELIVERED: 'delivered',
+  CANCELLED: 'cancelled'
 };
 
-// Payment statuses
+// Payment statuses (align with database constraint)
 export const PAYMENT_STATUS = {
   PENDING: 'pending',
-  CONFIRMING: 'confirming',
-  COMPLETED: 'completed',
-  FAILED: 'failed',
-  EXPIRED: 'expired'
+  CONFIRMED: 'confirmed',
+  FAILED: 'failed'
 };
 
 // Supported cryptocurrencies

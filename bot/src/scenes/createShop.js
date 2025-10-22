@@ -13,8 +13,10 @@ import logger from '../utils/logger.js';
 // Step 1: Enter shop name
 const enterShopName = async (ctx) => {
   try {
-    await ctx.editMessageText(
-      'Создание магазина\n\nВведите название магазина:',
+    logger.info('shop_create_step:name', { userId: ctx.from.id });
+    
+    await ctx.reply(
+      'Название магазина:',
       cancelButton
     );
 
@@ -28,11 +30,6 @@ const enterShopName = async (ctx) => {
 // Step 2: Handle shop name and create
 const handleShopName = async (ctx) => {
   try {
-    // Skip callback queries
-    if (ctx.callbackQuery) {
-      return;
-    }
-
     // Get shop name from message
     if (!ctx.message || !ctx.message.text) {
       await ctx.reply('Введите название магазина', cancelButton);
@@ -42,18 +39,33 @@ const handleShopName = async (ctx) => {
     const shopName = ctx.message.text.trim();
 
     if (shopName.length < 3) {
-      await ctx.reply('Название должно быть минимум 3 символа', cancelButton);
+      await ctx.reply('Минимум 3 символа', cancelButton);
       return;
     }
 
     if (shopName.length > 100) {
-      await ctx.reply('Название слишком длинное (макс 100 символов)', cancelButton);
+      await ctx.reply('Макс 100 символов', cancelButton);
       return;
     }
 
-    logger.info(`User ${ctx.from.id} creating shop: ${shopName}`);
+    logger.info('shop_create_step:save', {
+      userId: ctx.from.id,
+      shopName: shopName
+    });
 
-    await ctx.reply('Создаём магазин...');
+    await ctx.reply('Сохраняем...');
+
+    if (!ctx.session.token) {
+      logger.error('Missing auth token when creating shop', {
+        userId: ctx.from.id,
+        session: ctx.session
+      });
+      await ctx.reply(
+        'Ошибка авторизации. Попробуйте снова через главное меню',
+        successButtons
+      );
+      return await ctx.scene.leave();
+    }
 
     // Create shop via backend (NO PAYMENT)
     const shop = await shopApi.createShop({
@@ -69,6 +81,7 @@ const handleShopName = async (ctx) => {
 
     // Update session
     ctx.session.shopId = shop.id;
+    ctx.session.shopName = shop.name;
 
     // Validate session save
     if (!ctx.session.shopId) {
@@ -76,7 +89,7 @@ const handleShopName = async (ctx) => {
       throw new Error('Session save failed');
     }
 
-    logger.info('Shop created successfully:', {
+    logger.info('shop_created', {
       shopId: shop.id,
       shopName: shop.name,
       userId: ctx.from.id,
@@ -93,7 +106,7 @@ const handleShopName = async (ctx) => {
   } catch (error) {
     logger.error('Error creating shop:', error);
     await ctx.reply(
-      'Не удалось создать магазин\n\nПопробуйте позже',
+      'Ошибка. Попробуйте позже',
       successButtons
     );
     return await ctx.scene.leave();
@@ -111,6 +124,27 @@ const createShopScene = new Scenes.WizardScene(
 createShopScene.leave(async (ctx) => {
   ctx.wizard.state = {};
   logger.info(`User ${ctx.from?.id} left createShop scene`);
+});
+
+// Handle cancel action within scene
+createShopScene.action('cancel_scene', async (ctx) => {
+  try {
+    await ctx.answerCbQuery();
+    logger.info('shop_create_cancelled', { userId: ctx.from.id });
+    await ctx.scene.leave();
+    await ctx.reply('Отменено', successButtons);
+  } catch (error) {
+    logger.error('Error in cancel_scene handler:', error);
+    // Local error handling - don't throw to avoid infinite spinner
+    try {
+      await ctx.editMessageText(
+        'Произошла ошибка при отмене\n\nПопробуйте позже',
+        successButtons
+      );
+    } catch (replyError) {
+      logger.error('Failed to send error message:', replyError);
+    }
+  }
 });
 
 export default createShopScene;

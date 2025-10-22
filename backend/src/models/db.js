@@ -16,7 +16,7 @@ export const userQueries = {
   // Find user by ID
   findById: async (id) => {
     const result = await query(
-      'SELECT * FROM users WHERE id = $1',
+      'SELECT id, telegram_id, username, first_name, last_name, selected_role, created_at, updated_at FROM users WHERE id = $1',
       [id]
     );
     return result.rows[0];
@@ -46,6 +46,19 @@ export const userQueries = {
        WHERE id = $1
        RETURNING *`,
       [id, username, firstName, lastName]
+    );
+    return result.rows[0];
+  },
+
+  // Update user role
+  updateRole: async (userId, role) => {
+    const result = await query(
+      `UPDATE users
+       SET selected_role = $2,
+           updated_at = NOW()
+       WHERE id = $1
+       RETURNING id, telegram_id, username, first_name, last_name, selected_role, created_at, updated_at`,
+      [userId, role]
     );
     return result.rows[0];
   }
@@ -88,6 +101,37 @@ export const shopQueries = {
     return result.rows;
   },
 
+  // Search active shops by name with optional subscription context
+  searchByName: async (name, limit = 10, userId = null) => {
+    const params = [`%${name}%`, limit];
+    let paramIndex = params.length + 1;
+
+    let queryText = `
+      SELECT
+        s.*,
+        u.username as seller_username,
+        u.first_name as seller_first_name,
+        u.last_name as seller_last_name,
+        ${userId ? `EXISTS(
+          SELECT 1 FROM subscriptions sub
+          WHERE sub.shop_id = s.id AND sub.user_id = $${paramIndex}
+        )` : 'false'} as is_subscribed
+      FROM shops s
+      JOIN users u ON s.owner_id = u.id
+      WHERE s.is_active = true
+        AND s.name ILIKE $1
+      ORDER BY s.created_at DESC
+      LIMIT $2
+    `;
+
+    if (userId) {
+      params.push(userId);
+    }
+
+    const result = await query(queryText, params);
+    return result.rows;
+  },
+
   // Update shop
   update: async (id, shopData) => {
     const { name, description, logo, isActive } = shopData;
@@ -126,6 +170,23 @@ export const shopQueries = {
       [limit, offset]
     );
     return result.rows;
+  },
+
+  // Update shop wallets
+  updateWallets: async (id, walletData) => {
+    const { wallet_btc, wallet_eth, wallet_usdt, wallet_ton } = walletData;
+    const result = await query(
+      `UPDATE shops
+       SET wallet_btc = COALESCE($2, wallet_btc),
+           wallet_eth = COALESCE($3, wallet_eth),
+           wallet_usdt = COALESCE($4, wallet_usdt),
+           wallet_ton = COALESCE($5, wallet_ton),
+           updated_at = NOW()
+       WHERE id = $1
+       RETURNING *`,
+      [id, wallet_btc, wallet_eth, wallet_usdt, wallet_ton]
+    );
+    return result.rows[0];
   }
 };
 

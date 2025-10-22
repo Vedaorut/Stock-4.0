@@ -28,12 +28,17 @@ const authMiddleware = async (ctx, next) => {
     // Authenticate with backend
     const authData = await authApi.authenticate(ctx.from.id, userData);
 
+    if (!authData?.token || !authData?.user) {
+      throw new Error('Invalid authentication response from backend');
+    }
+
     // Store in session
     ctx.session = ctx.session || {};
-    ctx.session.token = authData.data.token;
-    ctx.session.user = authData.data.user;
+    ctx.session.token = authData.token;
+    ctx.session.user = authData.user;
     ctx.session.role = null;
     ctx.session.shopId = null; // Will be set after shop is created
+    ctx.session.shopName = null;
 
     logger.info(`User authenticated: ${ctx.from.id} (@${ctx.from.username})`);
 
@@ -49,6 +54,8 @@ const authMiddleware = async (ctx, next) => {
       firstName: ctx.from.first_name
     };
     ctx.session.token = null; // No token, will retry on next request
+    ctx.session.shopId = null;
+    ctx.session.shopName = null;
 
     logger.warn(`Auth failed for user ${ctx.from.id}, created basic session`);
 

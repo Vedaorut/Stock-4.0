@@ -334,6 +334,82 @@ curl -X GET "http://localhost:3000/api/payments/status?txHash=0x1234567890abcdef
 
 ---
 
+## Wallets
+
+### Get Shop Wallet Addresses
+```bash
+curl -X GET http://localhost:3000/api/wallets/1 \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "shopId": 1,
+    "shopName": "My Awesome Shop",
+    "wallets": {
+      "btc": "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa",
+      "eth": "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
+      "usdt": "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
+      "ton": "EQD7ckT9p8Hv5Kz8s2lPz5rQx8q9vW1xY2nZ3fJ4kL5mN6oP"
+    }
+  }
+}
+```
+
+### Update Shop Wallet Addresses
+```bash
+# Update all wallets
+curl -X PUT http://localhost:3000/api/wallets/1 \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "walletBtc": "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa",
+    "walletEth": "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
+    "walletUsdt": "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
+    "walletTon": "EQD7ckT9p8Hv5Kz8s2lPz5rQx8q9vW1xY2nZ3fJ4kL5mN6oP"
+  }'
+
+# Update only specific wallets (PATCH)
+curl -X PATCH http://localhost:3000/api/wallets/1 \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "walletBtc": "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa"
+  }'
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "shopId": 1,
+    "shopName": "My Awesome Shop",
+    "wallets": {
+      "btc": "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa",
+      "eth": "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
+      "usdt": "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
+      "ton": "EQD7ckT9p8Hv5Kz8s2lPz5rQx8q9vW1xY2nZ3fJ4kL5mN6oP"
+    },
+    "updatedAt": "2024-01-01T00:10:00.000Z"
+  },
+  "message": "Wallet addresses updated successfully"
+}
+```
+
+**Wallet Validation Rules:**
+- **BTC**: 26-62 alphanumeric characters
+- **ETH**: 42 characters (0x + 40 hex characters)
+- **USDT**: 42 characters (0x + 40 hex characters, ERC-20)
+- **TON**: 48 characters (base64url format)
+
+**Note:** All wallet fields are optional. You can set them to empty string or null to clear them.
+
+---
+
 ## Subscriptions
 
 ### Subscribe to a Shop

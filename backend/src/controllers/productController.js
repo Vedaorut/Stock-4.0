@@ -1,4 +1,5 @@
 import { productQueries, shopQueries } from '../models/db.js';
+import { dbErrorHandler } from '../middleware/errorHandler.js';
 import logger from '../utils/logger.js';
 
 /**
@@ -10,7 +11,15 @@ export const productController = {
    */
   create: async (req, res) => {
     try {
-      const { shopId, name, description, price, currency, stockQuantity } = req.body;
+      const {
+        shopId,
+        name,
+        description,
+        price
+      } = req.body;
+      const stockQuantity = req.body.stockQuantity ?? req.body.stock ?? 0;
+      // Currency is now legacy field - products are priced in USD only
+      const currency = req.body.currency || 'USD';
 
       // Verify shop belongs to user
       const shop = await shopQueries.findById(shopId);
@@ -44,6 +53,15 @@ export const productController = {
       });
 
     } catch (error) {
+      if (error.code) {
+        const handledError = dbErrorHandler(error);
+        return res.status(handledError.statusCode).json({
+          success: false,
+          error: handledError.message,
+          ...(handledError.details ? { details: handledError.details } : {})
+        });
+      }
+
       logger.error('Create product error', { error: error.message, stack: error.stack });
       return res.status(500).json({
         success: false,
@@ -74,6 +92,15 @@ export const productController = {
       });
 
     } catch (error) {
+      if (error.code) {
+        const handledError = dbErrorHandler(error);
+        return res.status(handledError.statusCode).json({
+          success: false,
+          error: handledError.message,
+          ...(handledError.details ? { details: handledError.details } : {})
+        });
+      }
+
       logger.error('Get product error', { error: error.message, stack: error.stack });
       return res.status(500).json({
         success: false,
@@ -111,6 +138,15 @@ export const productController = {
       });
 
     } catch (error) {
+      if (error.code) {
+        const handledError = dbErrorHandler(error);
+        return res.status(handledError.statusCode).json({
+          success: false,
+          error: handledError.message,
+          ...(handledError.details ? { details: handledError.details } : {})
+        });
+      }
+
       logger.error('List products error', { error: error.message, stack: error.stack });
       return res.status(500).json({
         success: false,
@@ -125,7 +161,13 @@ export const productController = {
   update: async (req, res) => {
     try {
       const { id } = req.params;
-      const { name, description, price, stockQuantity, isActive } = req.body;
+      const {
+        name,
+        description,
+        price,
+        isActive
+      } = req.body;
+      const stockQuantity = req.body.stockQuantity ?? req.body.stock;
 
       // Check if product exists and belongs to user's shop
       const existingProduct = await productQueries.findById(id);
@@ -158,6 +200,15 @@ export const productController = {
       });
 
     } catch (error) {
+      if (error.code) {
+        const handledError = dbErrorHandler(error);
+        return res.status(handledError.statusCode).json({
+          success: false,
+          error: handledError.message,
+          ...(handledError.details ? { details: handledError.details } : {})
+        });
+      }
+
       logger.error('Update product error', { error: error.message, stack: error.stack });
       return res.status(500).json({
         success: false,
@@ -198,6 +249,15 @@ export const productController = {
       });
 
     } catch (error) {
+      if (error.code) {
+        const handledError = dbErrorHandler(error);
+        return res.status(handledError.statusCode).json({
+          success: false,
+          error: handledError.message,
+          ...(handledError.details ? { details: handledError.details } : {})
+        });
+      }
+
       logger.error('Delete product error', { error: error.message, stack: error.stack });
       return res.status(500).json({
         success: false,

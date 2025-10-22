@@ -3,11 +3,18 @@ import config from '../config/index.js';
 
 // Seller menu (with active shop)
 export const sellerMenu = (shopName) => Markup.inlineKeyboard([
-  [Markup.button.callback('➕ Добавить товар', 'seller:add_product')],
-  [Markup.button.webApp('📦 Мои товары', `${config.webAppUrl}/products`)],
-  [Markup.button.webApp('💰 Продажи', `${config.webAppUrl}/sales`)],
-  [Markup.button.webApp('📱 Приложение', config.webAppUrl)],
+  [Markup.button.webApp('📱 Открыть приложение', config.webAppUrl)],
+  [Markup.button.callback('📦 Мои товары', 'seller:products')],
+  [Markup.button.callback('💰 Продажи', 'seller:sales')],
+  [Markup.button.callback('💼 Кошельки', 'seller:wallets')],
+  [Markup.button.callback('🔄 Переключить на Покупателя', 'role:toggle')],
   [Markup.button.callback('« Назад', 'main_menu')]
+]);
+
+// Products menu (inside "Мои товары" screen)
+export const productsMenu = (shopName) => Markup.inlineKeyboard([
+  [Markup.button.callback('➕ Добавить товар', 'seller:add_product')],
+  [Markup.button.callback('« Назад в главное меню', 'seller:main')]
 ]);
 
 // Seller menu (no shop - need registration)
@@ -24,7 +31,7 @@ export const currencyKeyboard = Markup.inlineKeyboard([
   ],
   [
     Markup.button.callback('₮ USDT', 'currency:USDT'),
-    Markup.button.callback('Ł LTC', 'currency:LTC')
+    Markup.button.callback('🔷 TON', 'currency:TON')
   ],
   [Markup.button.callback('« Отменить', 'cancel_scene')]
 ]);
@@ -37,7 +44,7 @@ export const productCurrencyKeyboard = Markup.inlineKeyboard([
   ],
   [
     Markup.button.callback('₮ USDT', 'product_currency:USDT'),
-    Markup.button.callback('Ł LTC', 'product_currency:LTC')
+    Markup.button.callback('🔷 TON', 'product_currency:TON')
   ],
   [Markup.button.callback('« Отменить', 'cancel_scene')]
 ]);

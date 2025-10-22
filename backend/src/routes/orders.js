@@ -18,6 +18,26 @@ router.post(
 );
 
 /**
+ * @route   GET /api/orders
+ * @desc    Get current user's orders (as buyer)
+ * @access  Private
+ */
+router.get('/', verifyToken, (req, res, next) => {
+  req.query.type = 'buyer';
+  return orderController.getMyOrders(req, res, next);
+});
+
+/**
+ * @route   GET /api/orders/sales
+ * @desc    Get current user's sales (as seller)
+ * @access  Private
+ */
+router.get('/sales', verifyToken, (req, res, next) => {
+  req.query.type = 'seller';
+  return orderController.getMyOrders(req, res, next);
+});
+
+/**
  * @route   GET /api/orders/my
  * @desc    Get current user's orders
  * @access  Private

@@ -1,4 +1,5 @@
 import { shopQueries } from '../models/db.js';
+import { dbErrorHandler } from '../middleware/errorHandler.js';
 import logger from '../utils/logger.js';
 
 /**
@@ -26,6 +27,15 @@ export const shopController = {
       });
 
     } catch (error) {
+      if (error.code) {
+        const handledError = dbErrorHandler(error);
+        return res.status(handledError.statusCode).json({
+          success: false,
+          error: handledError.message,
+          ...(handledError.details ? { details: handledError.details } : {})
+        });
+      }
+
       logger.error('Create shop error', { error: error.message, stack: error.stack });
       return res.status(500).json({
         success: false,
@@ -56,6 +66,15 @@ export const shopController = {
       });
 
     } catch (error) {
+      if (error.code) {
+        const handledError = dbErrorHandler(error);
+        return res.status(handledError.statusCode).json({
+          success: false,
+          error: handledError.message,
+          ...(handledError.details ? { details: handledError.details } : {})
+        });
+      }
+
       logger.error('Get shop error', { error: error.message, stack: error.stack });
       return res.status(500).json({
         success: false,
@@ -78,6 +97,15 @@ export const shopController = {
       });
 
     } catch (error) {
+      if (error.code) {
+        const handledError = dbErrorHandler(error);
+        return res.status(handledError.statusCode).json({
+          success: false,
+          error: handledError.message,
+          ...(handledError.details ? { details: handledError.details } : {})
+        });
+      }
+
       logger.error('Get my shops error', { error: error.message, stack: error.stack });
       return res.status(500).json({
         success: false,
@@ -124,6 +152,15 @@ export const shopController = {
       });
 
     } catch (error) {
+      if (error.code) {
+        const handledError = dbErrorHandler(error);
+        return res.status(handledError.statusCode).json({
+          success: false,
+          error: handledError.message,
+          ...(handledError.details ? { details: handledError.details } : {})
+        });
+      }
+
       logger.error('Update shop error', { error: error.message, stack: error.stack });
       return res.status(500).json({
         success: false,
@@ -164,6 +201,15 @@ export const shopController = {
       });
 
     } catch (error) {
+      if (error.code) {
+        const handledError = dbErrorHandler(error);
+        return res.status(handledError.statusCode).json({
+          success: false,
+          error: handledError.message,
+          ...(handledError.details ? { details: handledError.details } : {})
+        });
+      }
+
       logger.error('Delete shop error', { error: error.message, stack: error.stack });
       return res.status(500).json({
         success: false,
@@ -194,10 +240,160 @@ export const shopController = {
       });
 
     } catch (error) {
+      if (error.code) {
+        const handledError = dbErrorHandler(error);
+        return res.status(handledError.statusCode).json({
+          success: false,
+          error: handledError.message,
+          ...(handledError.details ? { details: handledError.details } : {})
+        });
+      }
+
       logger.error('List shops error', { error: error.message, stack: error.stack });
       return res.status(500).json({
         success: false,
         error: 'Failed to list shops'
+      });
+    }
+  },
+
+  /**
+   * Search active shops by name
+   */
+  search: async (req, res) => {
+    try {
+      const term = (req.query.q || req.query.query || '').trim();
+
+      if (term.length < 2) {
+        return res.status(400).json({
+          success: false,
+          error: 'Search query must be at least 2 characters long'
+        });
+      }
+
+      const limit = parseInt(req.query.limit, 10) || 10;
+      const shops = await shopQueries.searchByName(
+        term,
+        limit,
+        req.user?.id ?? null
+      );
+
+      return res.status(200).json({
+        success: true,
+        data: shops
+      });
+    } catch (error) {
+      if (error.code) {
+        const handledError = dbErrorHandler(error);
+        return res.status(handledError.statusCode).json({
+          success: false,
+          error: handledError.message,
+          ...(handledError.details ? { details: handledError.details } : {})
+        });
+      }
+
+      logger.error('Search shops error', { error: error.message, stack: error.stack });
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to search shops'
+      });
+    }
+  },
+
+  /**
+   * Get shop wallets
+   */
+  getWallets: async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      // Check if shop exists and belongs to user
+      const shop = await shopQueries.findById(id);
+
+      if (!shop) {
+        return res.status(404).json({
+          success: false,
+          error: 'Shop not found'
+        });
+      }
+
+      if (shop.owner_id !== req.user.id) {
+        return res.status(403).json({
+          success: false,
+          error: 'You can only view your own shop wallets'
+        });
+      }
+
+      // Return wallet data
+      return res.status(200).json({
+        success: true,
+        data: {
+          wallet_btc: shop.wallet_btc || null,
+          wallet_eth: shop.wallet_eth || null,
+          wallet_usdt: shop.wallet_usdt || null,
+          wallet_ton: shop.wallet_ton || null
+        }
+      });
+
+    } catch (error) {
+      logger.error('Get wallets error', { error: error.message, stack: error.stack });
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to get wallets'
+      });
+    }
+  },
+
+  /**
+   * Update shop wallets
+   */
+  updateWallets: async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { wallet_btc, wallet_eth, wallet_usdt, wallet_ton } = req.body;
+
+      // Check if shop exists and belongs to user
+      const existingShop = await shopQueries.findById(id);
+
+      if (!existingShop) {
+        return res.status(404).json({
+          success: false,
+          error: 'Shop not found'
+        });
+      }
+
+      if (existingShop.owner_id !== req.user.id) {
+        return res.status(403).json({
+          success: false,
+          error: 'You can only update your own shop wallets'
+        });
+      }
+
+      // Build update object (only include provided fields)
+      const walletUpdates = {};
+      if (wallet_btc !== undefined) walletUpdates.wallet_btc = wallet_btc;
+      if (wallet_eth !== undefined) walletUpdates.wallet_eth = wallet_eth;
+      if (wallet_usdt !== undefined) walletUpdates.wallet_usdt = wallet_usdt;
+      if (wallet_ton !== undefined) walletUpdates.wallet_ton = wallet_ton;
+
+      // Update wallets
+      const shop = await shopQueries.updateWallets(id, walletUpdates);
+
+      return res.status(200).json({
+        success: true,
+        data: {
+          wallet_btc: shop.wallet_btc || null,
+          wallet_eth: shop.wallet_eth || null,
+          wallet_usdt: shop.wallet_usdt || null,
+          wallet_ton: shop.wallet_ton || null
+        }
+      });
+
+    } catch (error) {
+      logger.error('Update wallets error', { error: error.message, stack: error.stack });
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to update wallets'
       });
     }
   }

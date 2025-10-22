@@ -158,6 +158,7 @@ export const authController = {
           username: user.username,
           firstName: user.first_name,
           lastName: user.last_name,
+          selectedRole: user.selected_role,
           createdAt: user.created_at,
           updatedAt: user.updated_at
         }
@@ -209,6 +210,40 @@ export const authController = {
       return res.status(500).json({
         success: false,
         error: 'Failed to update profile'
+      });
+    }
+  },
+
+  /**
+   * Update user's selected role
+   */
+  updateRole: async (req, res) => {
+    try {
+      const { role } = req.body;
+
+      logger.info(`User ${req.user.id} updating role to: ${role}`);
+
+      const user = await userQueries.updateRole(req.user.id, role);
+
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          error: 'User not found'
+        });
+      }
+
+      return res.status(200).json({
+        success: true,
+        data: {
+          selected_role: user.selected_role
+        }
+      });
+
+    } catch (error) {
+      logger.error('Update role error', { error: error.message, stack: error.stack });
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to update role'
       });
     }
   }

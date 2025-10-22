@@ -1,24 +1,24 @@
 import { Scenes } from 'telegraf';
-import { productCurrencyKeyboard } from '../keyboards/seller.js';
 import { cancelButton, successButtons } from '../keyboards/common.js';
 import { productApi } from '../utils/api.js';
-import config from '../config/index.js';
+import { formatPrice } from '../utils/format.js';
 import logger from '../utils/logger.js';
 
 /**
  * Add Product Scene - Multi-step wizard
  * Steps:
  * 1. Enter product name
- * 2. Enter price
- * 3. Select currency
- * 4. Complete
+ * 2. Enter price (USD only)
+ * 3. Complete
  */
 
 // Step 1: Enter product name
 const enterName = async (ctx) => {
   try {
-    await ctx.editMessageText(
-      'Добавить товар\n\nОтправьте название товара:',
+    logger.info('product_add_step:name', { userId: ctx.from.id });
+    
+    await ctx.reply(
+      'Название товара:',
       cancelButton
     );
 
@@ -32,11 +32,6 @@ const enterName = async (ctx) => {
 // Step 2: Enter price
 const enterPrice = async (ctx) => {
   try {
-    // Skip callback queries
-    if (ctx.callbackQuery) {
-      return;
-    }
-
     // Get product name from message
     if (!ctx.message || !ctx.message.text) {
       await ctx.reply('Отправьте название товара', cancelButton);
@@ -46,15 +41,18 @@ const enterPrice = async (ctx) => {
     const productName = ctx.message.text.trim();
 
     if (productName.length < 3) {
-      await ctx.reply('Название должно быть минимум 3 символа', cancelButton);
+      await ctx.reply('Минимум 3 символа', cancelButton);
       return;
     }
 
     ctx.wizard.state.name = productName;
 
-    logger.info(`User ${ctx.from.id} entered product name: ${productName}`);
+    logger.info('product_add_step:price', {
+      userId: ctx.from.id,
+      productName: productName
+    });
 
-    await ctx.reply('Отправьте цену товара:', cancelButton);
+    await ctx.reply('Цена ($):', cancelButton);
 
     return ctx.wizard.next();
   } catch (error) {
@@ -63,70 +61,31 @@ const enterPrice = async (ctx) => {
   }
 };
 
-// Step 3: Select currency
-const selectCurrency = async (ctx) => {
+// Step 3: Complete
+const complete = async (ctx) => {
   try {
-    // Skip callback queries
-    if (ctx.callbackQuery) {
-      return;
-    }
-
     // Get price from message
     if (!ctx.message || !ctx.message.text) {
       await ctx.reply('Отправьте цену товара', cancelButton);
       return;
     }
 
-    const priceText = ctx.message.text.trim();
+    const priceText = ctx.message.text.trim().replace(',', '.');
     const price = parseFloat(priceText);
 
     if (isNaN(price) || price <= 0) {
-      await ctx.reply('Введите корректную цену', cancelButton);
+      await ctx.reply('❌ Цена — число > 0\n\nПример: 99.99 или 99,99', cancelButton);
       return;
     }
 
     ctx.wizard.state.price = price;
 
-    logger.info(`User ${ctx.from.id} entered price: ${price}`);
+    logger.info('product_add_step:confirm', {
+      userId: ctx.from.id,
+      price: price
+    });
 
-    await ctx.reply('Выберите валюту:', productCurrencyKeyboard);
-
-    return ctx.wizard.next();
-  } catch (error) {
-    logger.error('Error in selectCurrency step:', error);
-    throw error;
-  }
-};
-
-// Step 4: Complete
-const complete = async (ctx) => {
-  try {
-    // БАГ #8 & #13: Better validation
-    if (!ctx.callbackQuery || !ctx.callbackQuery.data) {
-      await ctx.reply('Пожалуйста, выберите валюту из меню', cancelButton);
-      return;
-    }
-
-    if (!ctx.callbackQuery.data.startsWith('product_currency:')) {
-      await ctx.reply('Неверный выбор. Выберите валюту', productCurrencyKeyboard);
-      return;
-    }
-
-    await ctx.answerCbQuery();
-
-    const currencyParts = ctx.callbackQuery.data.split(':');
-    if (currencyParts.length !== 2) {
-      logger.error('Invalid currency callback data:', ctx.callbackQuery.data);
-      await ctx.editMessageText('Ошибка выбора валюты. Попробуйте снова', productCurrencyKeyboard);
-      return;
-    }
-
-    const currency = currencyParts[1];
-    ctx.wizard.state.currency = currency;
-
-    logger.info(`User ${ctx.from.id} selected currency: ${currency}`);
-
-    const { name, price } = ctx.wizard.state;
+    const { name } = ctx.wizard.state;
 
     // Validate shopId exists
     if (!ctx.session.shopId) {
@@ -134,21 +93,34 @@ const complete = async (ctx) => {
         userId: ctx.from.id,
         session: ctx.session
       });
-      await ctx.editMessageText(
+      await ctx.reply(
         'Ошибка: магазин не найден\n\nСначала создайте магазин',
         successButtons
       );
       return await ctx.scene.leave();
     }
 
+    if (!ctx.session.token) {
+      logger.error('Missing auth token when creating product', {
+        userId: ctx.from.id,
+        session: ctx.session
+      });
+      await ctx.reply(
+        'Ошибка авторизации. Попробуйте снова через главное меню',
+        successButtons
+      );
+      return await ctx.scene.leave();
+    }
+
     // Create product via backend
-    await ctx.editMessageText('Создаём товар...');
+    await ctx.reply('Сохраняем...');
 
     const product = await productApi.createProduct({
       name,
       price,
-      currency,
-      shopId: ctx.session.shopId
+      currency: 'USD',
+      shopId: ctx.session.shopId,
+      stockQuantity: 0
     }, ctx.session.token);
 
     // Validate product object
@@ -157,19 +129,15 @@ const complete = async (ctx) => {
       throw new Error('Invalid product object from API');
     }
 
-    logger.info('Product created successfully:', {
+    logger.info('product_saved', {
       productId: product.id,
       productName: product.name,
       shopId: ctx.session.shopId,
       userId: ctx.from.id
     });
 
-    // Find currency emoji
-    const currencyData = config.currencies.find(c => c.code === currency);
-    const currencyEmoji = currencyData ? currencyData.emoji : '';
-
-    await ctx.editMessageText(
-      `✓ Товар добавлен\n\n${name}\n${price} ${currencyEmoji}${currency}`,
+    await ctx.reply(
+      `✓ ${name}\n${formatPrice(price)}`,
       successButtons
     );
 
@@ -177,8 +145,8 @@ const complete = async (ctx) => {
     return await ctx.scene.leave();
   } catch (error) {
     logger.error('Error creating product:', error);
-    await ctx.editMessageText(
-      'Не удалось добавить товар\n\nПопробуйте позже',
+    await ctx.reply(
+      'Ошибка. Попробуйте позже',
       successButtons
     );
     return await ctx.scene.leave();
@@ -190,7 +158,6 @@ const addProductScene = new Scenes.WizardScene(
   'addProduct',
   enterName,
   enterPrice,
-  selectCurrency,
   complete
 );
 
@@ -198,6 +165,27 @@ const addProductScene = new Scenes.WizardScene(
 addProductScene.leave(async (ctx) => {
   ctx.wizard.state = {};
   logger.info(`User ${ctx.from?.id} left addProduct scene`);
+});
+
+// Handle cancel action within scene
+addProductScene.action('cancel_scene', async (ctx) => {
+  try {
+    await ctx.answerCbQuery();
+    logger.info('product_add_cancelled', { userId: ctx.from.id });
+    await ctx.scene.leave();
+    await ctx.reply('Отменено', successButtons);
+  } catch (error) {
+    logger.error('Error in cancel_scene handler:', error);
+    // Local error handling - don't throw to avoid infinite spinner
+    try {
+      await ctx.editMessageText(
+        'Произошла ошибка при отмене\n\nПопробуйте позже',
+        successButtons
+      );
+    } catch (replyError) {
+      logger.error('Failed to send error message:', replyError);
+    }
+  }
 });
 
 export default addProductScene;

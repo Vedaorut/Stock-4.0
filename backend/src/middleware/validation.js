@@ -47,6 +47,13 @@ export const authValidation = {
       .isLength({ max: 64 })
       .withMessage('First name is required (max 64 characters)'),
     validate
+  ],
+
+  updateRole: [
+    body('role')
+      .isIn(['buyer', 'seller'])
+      .withMessage('Role must be either "buyer" or "seller"'),
+    validate
   ]
 };
 
@@ -116,6 +123,7 @@ export const productValidation = {
       .isLength({ min: 3, max: 200 })
       .withMessage('Product name must be 3-200 characters'),
     body('description')
+      .optional()
       .trim()
       .isLength({ max: 1000 })
       .withMessage('Description must not exceed 1000 characters'),
@@ -123,11 +131,17 @@ export const productValidation = {
       .isFloat({ min: 0.01 })
       .withMessage('Price must be greater than 0'),
     body('currency')
-      .isIn(['BTC', 'ETH', 'USDT', 'TON'])
-      .withMessage('Currency must be BTC, ETH, USDT, or TON'),
-    body('stock')
+      .optional()
+      .isIn(['BTC', 'ETH', 'USDT', 'TON', 'USD'])
+      .withMessage('Currency must be BTC, ETH, USDT, TON, or USD'),
+    body('stockQuantity')
+      .optional()
       .isInt({ min: 0 })
-      .withMessage('Stock must be a non-negative integer'),
+      .withMessage('stockQuantity must be a non-negative integer'),
+    body('stock')
+      .optional()
+      .isInt({ min: 0 })
+      .withMessage('stock must be a non-negative integer'),
     body('images')
       .optional()
       .isArray()
@@ -162,10 +176,14 @@ export const productValidation = {
       .optional()
       .isFloat({ min: 0.01 })
       .withMessage('Price must be greater than 0'),
+    body('stockQuantity')
+      .optional()
+      .isInt({ min: 0 })
+      .withMessage('stockQuantity must be a non-negative integer'),
     body('stock')
       .optional()
       .isInt({ min: 0 })
-      .withMessage('Stock must be a non-negative integer'),
+      .withMessage('stock must be a non-negative integer'),
     body('isActive')
       .optional()
       .isBoolean()
@@ -265,11 +283,55 @@ export const paymentValidation = {
   ]
 };
 
+/**
+ * Wallet validation schemas
+ */
+export const walletValidation = {
+  getWallets: [
+    param('shopId')
+      .isInt({ min: 1 })
+      .withMessage('Valid shop ID is required'),
+    validate
+  ],
+
+  updateWallets: [
+    param('shopId')
+      .isInt({ min: 1 })
+      .withMessage('Valid shop ID is required'),
+    body('walletBtc')
+      .optional()
+      .trim()
+      .isLength({ min: 26, max: 62 })
+      .matches(/^[a-zA-Z0-9]+$/)
+      .withMessage('BTC wallet must be 26-62 alphanumeric characters'),
+    body('walletEth')
+      .optional()
+      .trim()
+      .isLength({ min: 42, max: 42 })
+      .matches(/^0x[a-fA-F0-9]{40}$/)
+      .withMessage('ETH wallet must be a valid Ethereum address (0x followed by 40 hex characters)'),
+    body('walletUsdt')
+      .optional()
+      .trim()
+      .isLength({ min: 42, max: 42 })
+      .matches(/^0x[a-fA-F0-9]{40}$/)
+      .withMessage('USDT wallet must be a valid Ethereum address (0x followed by 40 hex characters)'),
+    body('walletTon')
+      .optional()
+      .trim()
+      .isLength({ min: 48, max: 48 })
+      .matches(/^[a-zA-Z0-9_-]+$/)
+      .withMessage('TON wallet must be a valid TON address (48 characters)'),
+    validate
+  ]
+};
+
 export default {
   validate,
   authValidation,
   shopValidation,
   productValidation,
   orderValidation,
-  paymentValidation
+  paymentValidation,
+  walletValidation
 };

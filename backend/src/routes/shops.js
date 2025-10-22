@@ -1,7 +1,7 @@
 import express from 'express';
 import { shopController } from '../controllers/shopController.js';
 import { shopValidation } from '../middleware/validation.js';
-import { verifyToken, requireShopOwner } from '../middleware/auth.js';
+import { verifyToken, optionalAuth, requireShopOwner } from '../middleware/auth.js';
 
 const router = express.Router();
 
@@ -36,6 +36,17 @@ router.get(
 router.get('/active', shopController.listActive);
 
 /**
+ * @route   GET /api/shops/search
+ * @desc    Search active shops by name
+ * @access  Public (auth optional to include subscription flag)
+ */
+router.get(
+  '/search',
+  optionalAuth,
+  shopController.search
+);
+
+/**
  * @route   GET /api/shops/:id
  * @desc    Get shop by ID
  * @access  Public
@@ -66,6 +77,31 @@ router.delete(
   requireShopOwner,
   shopValidation.getById,
   shopController.delete
+);
+
+/**
+ * @route   GET /api/shops/:id/wallets
+ * @desc    Get shop wallets
+ * @access  Private (Shop owner only)
+ */
+router.get(
+  '/:id/wallets',
+  verifyToken,
+  requireShopOwner,
+  shopValidation.getById,
+  shopController.getWallets
+);
+
+/**
+ * @route   PUT /api/shops/:id/wallets
+ * @desc    Update shop wallets
+ * @access  Private (Shop owner only)
+ */
+router.put(
+  '/:id/wallets',
+  verifyToken,
+  requireShopOwner,
+  shopController.updateWallets
 );
 
 export default router;

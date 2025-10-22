@@ -33,4 +33,11 @@ router.get('/profile', verifyToken, authController.getProfile);
  */
 router.put('/profile', verifyToken, authController.updateProfile);
 
+/**
+ * @route   PATCH /api/auth/role
+ * @desc    Update user's selected role
+ * @access  Private
+ */
+router.patch('/role', verifyToken, authValidation.updateRole, authController.updateRole);
+
 export default router;
