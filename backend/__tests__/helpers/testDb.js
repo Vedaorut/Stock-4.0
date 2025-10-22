@@ -7,6 +7,7 @@ import pkg from 'pg';
 const { Pool } = pkg;
 
 let testPool = null;
+let testUserCounter = 0; // Counter to ensure unique test user IDs
 
 /**
  * Get test database pool
@@ -34,25 +35,29 @@ export const closeTestDb = async () => {
 
 /**
  * Clean up test data
- * Deletes all data from tables in reverse dependency order
+ * Uses TRUNCATE CASCADE for faster cleanup and avoiding FK issues
+ * IMPORTANT: Only truncates test data (users with telegram_id >= 9000000000)
  */
 export const cleanupTestData = async () => {
   const pool = getTestPool();
   const client = await pool.connect();
-  
+
   try {
+    // Use a more aggressive cleanup approach:
+    // 1. Delete test users (CASCADE handles dependencies)
+    // 2. Clean up orphaned records
     await client.query('BEGIN');
-    
-    // Delete in reverse dependency order
-    await client.query('DELETE FROM order_items');
-    await client.query('DELETE FROM orders');
-    await client.query('DELETE FROM payments');
-    await client.query('DELETE FROM shop_payments');
-    await client.query('DELETE FROM products');
-    await client.query('DELETE FROM subscriptions');
-    await client.query('DELETE FROM shops');
-    await client.query('DELETE FROM users WHERE telegram_id >= 9000000000'); // Only test users (ID >= 9000000000)
-    
+
+    // Delete test users first - this will CASCADE to shops, which CASCADE to products
+    await client.query('DELETE FROM users WHERE telegram_id >= 9000000000');
+
+    // Clean up any orphaned records (in case of ON DELETE SET NULL)
+    await client.query('DELETE FROM orders WHERE buyer_id IS NULL OR product_id IS NULL');
+    await client.query('DELETE FROM order_items WHERE order_id IS NULL OR product_id IS NULL');
+    await client.query('DELETE FROM payments WHERE order_id IS NULL');
+    await client.query('DELETE FROM subscriptions WHERE user_id IS NULL OR shop_id IS NULL');
+    await client.query('DELETE FROM shop_payments WHERE user_id IS NULL OR shop_id IS NULL');
+
     await client.query('COMMIT');
   } catch (error) {
     await client.query('ROLLBACK');
@@ -64,29 +69,38 @@ export const cleanupTestData = async () => {
 
 /**
  * Create test user
+ * Accepts both camelCase (API format) and snake_case (DB format)
  */
 export const createTestUser = async (userData = {}) => {
   const pool = getTestPool();
-  
-  // Generate numeric test ID (9000000000 + timestamp to avoid conflicts)
-  const testIdBase = 9000000000;
-  const timestamp = Date.now() % 1000000000; // Last 9 digits
-  
+
+  // Generate unique test ID
+  // If explicit telegram_id provided, use it
+  // Otherwise generate: 9000000000 + counter + timestamp
+  let generatedId;
+  if (!userData.telegramId && !userData.telegram_id) {
+    const testIdBase = 9000000000;
+    const timestamp = Date.now() % 100000; // Last 5 digits
+    testUserCounter++;
+    generatedId = `${testIdBase + testUserCounter * 100000 + timestamp}`;
+  }
+
+  // Support both camelCase (API) and snake_case (DB) formats
   const user = {
-    telegram_id: userData.telegram_id || `${testIdBase + timestamp}`,
-    username: userData.username || 'testuser',
-    first_name: userData.first_name || 'Test',
-    last_name: userData.last_name || 'User',
-    selected_role: userData.selected_role || 'buyer',
+    telegram_id: userData.telegramId || userData.telegram_id || generatedId,
+    username: userData.username || `testuser${testUserCounter}`,
+    first_name: userData.firstName || userData.first_name || 'Test',
+    last_name: userData.lastName || userData.last_name || 'User',
+    selected_role: userData.selectedRole || userData.selected_role || 'buyer',
   };
-  
+
   const result = await pool.query(
     `INSERT INTO users (telegram_id, username, first_name, last_name, selected_role)
      VALUES ($1, $2, $3, $4, $5)
      RETURNING *`,
     [user.telegram_id, user.username, user.first_name, user.last_name, user.selected_role]
   );
-  
+
   return result.rows[0];
 };
 

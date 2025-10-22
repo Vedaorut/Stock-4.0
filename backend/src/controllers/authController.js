@@ -87,6 +87,7 @@ export const authController = {
 
       // Check if user already exists
       let user = await userQueries.findByTelegramId(telegramId);
+      let isNewUser = false;
 
       if (!user) {
         // Create new user only if doesn't exist
@@ -96,6 +97,7 @@ export const authController = {
           firstName,
           lastName
         });
+        isNewUser = true;
         logger.info(`New user registered: ${telegramId} (@${username})`);
       } else {
         logger.info(`Existing user logged in: ${telegramId} (@${username})`);
@@ -105,25 +107,22 @@ export const authController = {
       const token = jwt.sign(
         {
           id: user.id,
-          telegramId: user.telegram_id,
+          telegram_id: Number(user.telegram_id),
           username: user.username
         },
         config.jwt.secret,
         { expiresIn: config.jwt.expiresIn }
       );
 
-      return res.status(200).json({
-        success: true,
-        data: {
-          token,
-          user: {
-            id: user.id,
-            telegramId: user.telegram_id,
-            username: user.username,
-            firstName: user.first_name,
-            lastName: user.last_name,
-            createdAt: user.created_at
-          }
+      return res.status(isNewUser ? 201 : 200).json({
+        token,
+        user: {
+          id: user.id,
+          telegram_id: Number(user.telegram_id),
+          username: user.username,
+          first_name: user.first_name,
+          last_name: user.last_name,
+          created_at: user.created_at
         }
       });
 
@@ -151,16 +150,15 @@ export const authController = {
       }
 
       return res.status(200).json({
-        success: true,
-        data: {
+        user: {
           id: user.id,
-          telegramId: user.telegram_id,
+          telegram_id: user.telegram_id,
           username: user.username,
-          firstName: user.first_name,
-          lastName: user.last_name,
-          selectedRole: user.selected_role,
-          createdAt: user.created_at,
-          updatedAt: user.updated_at
+          first_name: user.first_name,
+          last_name: user.last_name,
+          selected_role: user.selected_role,
+          created_at: user.created_at,
+          updated_at: user.updated_at
         }
       });
 
@@ -233,8 +231,7 @@ export const authController = {
       }
 
       return res.status(200).json({
-        success: true,
-        data: {
+        user: {
           selected_role: user.selected_role
         }
       });

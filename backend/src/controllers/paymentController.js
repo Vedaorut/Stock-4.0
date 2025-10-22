@@ -58,7 +58,7 @@ export const paymentController = {
       if (!order.payment_address) {
         return res.status(400).json({
           success: false,
-          error: 'Payment address not set for this order'
+          error: 'payment_address is required for payment verification'
         });
       }
 

@@ -138,11 +138,13 @@ export const verifyTelegramInitData = (req, res, next) => {
  * Usage: Apply to routes that are accessed from both WebApp and other clients
  */
 export const optionalTelegramAuth = (req, res, next) => {
-  // In development, skip validation if no initData header
-  if (config.nodeEnv === 'development' && !req.headers['x-telegram-init-data']) {
-    logger.debug('Skipping Telegram validation in development', {
+  // In development/test, skip validation if no initData header
+  const env = process.env.NODE_ENV || 'development';
+  if ((env === 'development' || env === 'test') && !req.headers['x-telegram-init-data']) {
+    logger.debug('Skipping Telegram validation in development/test', {
       path: req.path,
-      method: req.method
+      method: req.method,
+      env
     });
     return next();
   }

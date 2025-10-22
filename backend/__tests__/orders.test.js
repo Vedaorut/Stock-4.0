@@ -35,7 +35,7 @@ describe('POST /api/orders', () => {
   it('should create order successfully with sufficient stock', async () => {
     // Setup: Create seller, shop, product
     const seller = await createTestUser({
-      telegram_id: 'test_seller_order1',
+      telegram_id: 9000200001,
       selected_role: 'seller',
     });
 
@@ -51,7 +51,7 @@ describe('POST /api/orders', () => {
 
     // Setup: Create buyer
     const buyer = await createTestUser({
-      telegram_id: 'test_buyer_order1',
+      telegram_id: 9000300001,
       selected_role: 'buyer',
     });
 
@@ -66,7 +66,7 @@ describe('POST /api/orders', () => {
       .post('/api/orders')
       .set('Authorization', `Bearer ${token}`)
       .send({
-        product_id: product.id,
+        productId: product.id,
         quantity: 3,
       })
       .expect(201);
@@ -84,7 +84,7 @@ describe('POST /api/orders', () => {
   it('should reject order with insufficient stock', async () => {
     // Setup: Create seller, shop, product with low stock
     const seller = await createTestUser({
-      telegram_id: 'test_seller_order2',
+      telegram_id: 9000200002,
       selected_role: 'seller',
     });
 
@@ -98,7 +98,7 @@ describe('POST /api/orders', () => {
 
     // Setup: Create buyer
     const buyer = await createTestUser({
-      telegram_id: 'test_buyer_order2',
+      telegram_id: 9000300002,
       selected_role: 'buyer',
     });
 
@@ -113,7 +113,7 @@ describe('POST /api/orders', () => {
       .post('/api/orders')
       .set('Authorization', `Bearer ${token}`)
       .send({
-        product_id: product.id,
+        productId: product.id,
         quantity: 5, // Want 5, but only 2 available
       })
       .expect(400);
@@ -130,7 +130,7 @@ describe('POST /api/orders', () => {
 
     // Setup: Create seller, shop, product with limited stock
     const seller = await createTestUser({
-      telegram_id: 'test_seller_race',
+      telegram_id: 9000200005,
       selected_role: 'seller',
     });
 
@@ -144,12 +144,12 @@ describe('POST /api/orders', () => {
 
     // Setup: Create two buyers
     const buyer1 = await createTestUser({
-      telegram_id: 'test_buyer_race1',
+      telegram_id: 9000300006,
       username: 'buyer1',
     });
 
     const buyer2 = await createTestUser({
-      telegram_id: 'test_buyer_race2',
+      telegram_id: 9000300007,
       username: 'buyer2',
     });
 
@@ -170,7 +170,7 @@ describe('POST /api/orders', () => {
       .post('/api/orders')
       .set('Authorization', `Bearer ${token1}`)
       .send({
-        product_id: product.id,
+        productId: product.id,
         quantity: 3,
       });
 
@@ -178,7 +178,7 @@ describe('POST /api/orders', () => {
       .post('/api/orders')
       .set('Authorization', `Bearer ${token2}`)
       .send({
-        product_id: product.id,
+        productId: product.id,
         quantity: 3,
       });
 
@@ -208,7 +208,7 @@ describe('POST /api/orders', () => {
     const product = await createTestProduct(shop.id);
 
     const buyer = await createTestUser({
-      telegram_id: 'test_buyer_zero',
+      telegram_id: 9000300008,
     });
 
     const token = jwt.sign(
@@ -221,7 +221,7 @@ describe('POST /api/orders', () => {
       .post('/api/orders')
       .set('Authorization', `Bearer ${token}`)
       .send({
-        product_id: product.id,
+        productId: product.id,
         quantity: 0,
       })
       .expect(400);
@@ -235,7 +235,7 @@ describe('POST /api/orders', () => {
     const product = await createTestProduct(shop.id);
 
     const buyer = await createTestUser({
-      telegram_id: 'test_buyer_negative',
+      telegram_id: 9000300009,
     });
 
     const token = jwt.sign(
@@ -248,7 +248,7 @@ describe('POST /api/orders', () => {
       .post('/api/orders')
       .set('Authorization', `Bearer ${token}`)
       .send({
-        product_id: product.id,
+        productId: product.id,
         quantity: -5,
       })
       .expect(400);
@@ -258,7 +258,7 @@ describe('POST /api/orders', () => {
 
   it('should reject order for non-existent product', async () => {
     const buyer = await createTestUser({
-      telegram_id: 'test_buyer_noProduct',
+      telegram_id: 9000300010,
     });
 
     const token = jwt.sign(
@@ -271,7 +271,7 @@ describe('POST /api/orders', () => {
       .post('/api/orders')
       .set('Authorization', `Bearer ${token}`)
       .send({
-        product_id: 999999, // Non-existent
+        productId: 999999, // Non-existent
         quantity: 1,
       })
       .expect(404);
@@ -283,7 +283,7 @@ describe('POST /api/orders', () => {
     const response = await request(app)
       .post('/api/orders')
       .send({
-        product_id: 1,
+        productId: 1,
         quantity: 1,
       })
       .expect(401);
@@ -296,7 +296,7 @@ describe('GET /api/orders', () => {
   it('should return user orders', async () => {
     // Setup: Create seller, shop, product
     const seller = await createTestUser({
-      telegram_id: 'test_seller_list',
+      telegram_id: 9000200011,
       selected_role: 'seller',
     });
 
@@ -305,7 +305,7 @@ describe('GET /api/orders', () => {
 
     // Setup: Create buyer and order
     const buyer = await createTestUser({
-      telegram_id: 'test_buyer_list',
+      telegram_id: 9000300012,
     });
 
     const token = jwt.sign(
@@ -319,7 +319,7 @@ describe('GET /api/orders', () => {
       .post('/api/orders')
       .set('Authorization', `Bearer ${token}`)
       .send({
-        product_id: product.id,
+        productId: product.id,
         quantity: 2,
       })
       .expect(201);
@@ -338,7 +338,7 @@ describe('GET /api/orders', () => {
 
   it('should return empty array for user with no orders', async () => {
     const buyer = await createTestUser({
-      telegram_id: 'test_buyer_empty',
+      telegram_id: 9000300013,
     });
 
     const token = jwt.sign(
@@ -360,7 +360,7 @@ describe('PUT /api/orders/:id/status', () => {
   it('should update order status', async () => {
     // Setup: Create seller, shop, product
     const seller = await createTestUser({
-      telegram_id: 'test_seller_status',
+      telegram_id: 9000200014,
       selected_role: 'seller',
     });
 
@@ -369,7 +369,7 @@ describe('PUT /api/orders/:id/status', () => {
 
     // Setup: Create buyer and order
     const buyer = await createTestUser({
-      telegram_id: 'test_buyer_status',
+      telegram_id: 9000300015,
     });
 
     const buyerToken = jwt.sign(
@@ -383,7 +383,7 @@ describe('PUT /api/orders/:id/status', () => {
       .post('/api/orders')
       .set('Authorization', `Bearer ${buyerToken}`)
       .send({
-        product_id: product.id,
+        productId: product.id,
         quantity: 1,
       })
       .expect(201);
@@ -401,16 +401,16 @@ describe('PUT /api/orders/:id/status', () => {
       .put(`/api/orders/${orderId}/status`)
       .set('Authorization', `Bearer ${sellerToken}`)
       .send({
-        status: 'completed',
+        status: 'delivered',
       })
       .expect(200);
 
-    expect(updateResponse.body.order.status).toBe('completed');
+    expect(updateResponse.body.data.status).toBe('delivered');
   });
 
   it('should reject invalid status', async () => {
     const seller = await createTestUser({
-      telegram_id: 'test_seller_invalid',
+      telegram_id: 9000200016,
       selected_role: 'seller',
     });
 

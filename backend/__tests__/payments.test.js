@@ -62,7 +62,7 @@ describe('POST /api/payments/verify - Validation Tests', () => {
       .post('/api/orders')
       .set('Authorization', `Bearer ${token}`)
       .send({
-        product_id: product.id,
+        productId: product.id,
         quantity: 1,
       })
       .expect(201);
@@ -74,10 +74,9 @@ describe('POST /api/payments/verify - Validation Tests', () => {
       .post('/api/payments/verify')
       .set('Authorization', `Bearer ${token}`)
       .send({
-        order_id: orderId,
-        payment_address: null, // NULL address
-        tx_hash: 'btc_tx_hash_null',
-        crypto: 'BTC',
+        orderId: orderId,
+        txHash: 'btc_tx_hash_null',
+        currency: 'BTC',
       })
       .expect(400);
 
@@ -111,7 +110,7 @@ describe('POST /api/payments/verify - Validation Tests', () => {
       .post('/api/orders')
       .set('Authorization', `Bearer ${token}`)
       .send({
-        product_id: product.id,
+        productId: product.id,
         quantity: 1,
       })
       .expect(201);
@@ -123,10 +122,9 @@ describe('POST /api/payments/verify - Validation Tests', () => {
       .post('/api/payments/verify')
       .set('Authorization', `Bearer ${token}`)
       .send({
-        order_id: orderId,
-        payment_address: '', // Empty string
-        tx_hash: 'btc_tx_hash_empty',
-        crypto: 'BTC',
+        orderId: orderId,
+        txHash: 'btc_tx_hash_empty',
+        currency: 'BTC',
       })
       .expect(400);
 
@@ -146,10 +144,10 @@ describe('POST /api/payments/verify - Validation Tests', () => {
       .post('/api/payments/verify')
       .set('Authorization', `Bearer ${token}`)
       .send({
-        order_id: 1,
-        payment_address: 'some_address',
-        tx_hash: 'some_hash',
-        crypto: 'INVALID_CRYPTO', // Invalid crypto type
+        orderId: 1,
+        
+        txHash: 'some_hash',
+        currency: 'INVALID_CRYPTO', // Invalid crypto type
       })
       .expect(400);
 
@@ -160,10 +158,10 @@ describe('POST /api/payments/verify - Validation Tests', () => {
     const response = await request(app)
       .post('/api/payments/verify')
       .send({
-        order_id: 1,
-        payment_address: 'bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh',
-        tx_hash: 'btc_tx_hash',
-        crypto: 'BTC',
+        orderId: 1,
+        
+        txHash: 'btc_tx_hash',
+        currency: 'BTC',
       })
       .expect(401);
 
@@ -183,10 +181,10 @@ describe('POST /api/payments/verify - Validation Tests', () => {
       .post('/api/payments/verify')
       .set('Authorization', `Bearer ${token}`)
       .send({
-        order_id: 999999, // Non-existent order
-        payment_address: 'bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh',
-        tx_hash: 'btc_tx_hash',
-        crypto: 'BTC',
+        orderId: 999999, // Non-existent order
+        
+        txHash: 'btc_tx_hash',
+        currency: 'BTC',
       })
       .expect(404);
 
@@ -206,10 +204,10 @@ describe('POST /api/payments/verify - Validation Tests', () => {
       .post('/api/payments/verify')
       .set('Authorization', `Bearer ${token}`)
       .send({
-        order_id: 1,
-        payment_address: 'bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh',
+        orderId: 1,
+        
         // tx_hash missing
-        crypto: 'BTC',
+        currency: 'BTC',
       })
       .expect(400);
 

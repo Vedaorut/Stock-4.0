@@ -32,10 +32,10 @@ beforeEach(async () => {
 describe('POST /api/auth/register', () => {
   it('should register a new user and return JWT token', async () => {
     const userData = {
-      telegram_id: '9000123456',
+      telegramId: 9000123456,
       username: 'newuser',
-      first_name: 'New',
-      last_name: 'User',
+      firstName: 'New',
+      lastName: 'User',
     };
 
     const response = await request(app)
@@ -46,16 +46,16 @@ describe('POST /api/auth/register', () => {
     // Check response structure
     expect(response.body).toHaveProperty('token');
     expect(response.body).toHaveProperty('user');
-    expect(response.body.user.telegram_id).toBe(userData.telegram_id);
+    expect(response.body.user.telegram_id).toBe(userData.telegramId);
     expect(response.body.user.username).toBe(userData.username);
 
     // Verify JWT token
     const decoded = jwt.verify(response.body.token, process.env.JWT_SECRET);
     expect(decoded).toHaveProperty('id');
-    expect(decoded.telegram_id).toBe(userData.telegram_id);
+    expect(decoded.telegram_id).toBe(userData.telegramId);
 
     // Verify user in database
-    const dbUser = await getUserByTelegramId(userData.telegram_id);
+    const dbUser = await getUserByTelegramId(userData.telegramId);
     expect(dbUser).toBeTruthy();
     expect(dbUser.username).toBe(userData.username);
   });
@@ -63,7 +63,7 @@ describe('POST /api/auth/register', () => {
   it('should return existing user if already registered', async () => {
     // Create user first
     const existingUser = await createTestUser({
-      telegram_id: '9000111222',
+      telegram_id: 9000111222,
       username: 'existing',
     });
 
@@ -71,9 +71,9 @@ describe('POST /api/auth/register', () => {
     const response = await request(app)
       .post('/api/auth/register')
       .send({
-        telegram_id: '9000111222',
+        telegramId: 9000111222,
         username: 'different_username', // Different username
-        first_name: 'Test',
+        firstName: 'Test',
       })
       .expect(200); // 200, not 201 for existing user
 
@@ -87,7 +87,7 @@ describe('POST /api/auth/register', () => {
       .post('/api/auth/register')
       .send({
         username: 'testuser',
-        first_name: 'Test',
+        firstName: 'Test',
       })
       .expect(400);
 
@@ -99,7 +99,7 @@ describe('GET /api/auth/profile', () => {
   it('should return user profile with valid token', async () => {
     // Create test user
     const user = await createTestUser({
-      telegram_id: 'test_profile_123',
+      telegram_id: 9000100123,
       username: 'profileuser',
     });
 
@@ -142,7 +142,7 @@ describe('PATCH /api/auth/role', () => {
   it('should switch user role from buyer to seller', async () => {
     // Create buyer user
     const user = await createTestUser({
-      telegram_id: 'test_role_456',
+      telegram_id: 9000100456,
       selected_role: 'buyer',
     });
 
@@ -168,7 +168,7 @@ describe('PATCH /api/auth/role', () => {
   it('should switch user role from seller to buyer', async () => {
     // Create seller user
     const user = await createTestUser({
-      telegram_id: 'test_role_789',
+      telegram_id: 9000100789,
       selected_role: 'seller',
     });
 
