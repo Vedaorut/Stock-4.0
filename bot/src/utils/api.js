@@ -150,6 +150,48 @@ export const productApi = {
     });
     // Unwrap response: return data.data (array of products) instead of wrapper
     return data.data || data;
+  },
+
+  // Update product
+  async updateProduct(productId, productData, token) {
+    const { data } = await api.put(`/products/${productId}`, productData, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    // Unwrap response: return data.data (product object) instead of wrapper
+    return data.data || data;
+  },
+
+  // Delete product
+  async deleteProduct(productId, token) {
+    const { data } = await api.delete(`/products/${productId}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    // Unwrap response: return data.data instead of wrapper
+    return data.data || data;
+  },
+
+  // Bulk delete all products from a shop
+  async bulkDeleteAll(shopId, token) {
+    const { data } = await api.post('/products/bulk-delete-all',
+      { shopId },
+      {
+        headers: { Authorization: `Bearer ${token}` }
+      }
+    );
+    // Unwrap response: return data.data (result with deletedCount and deletedProducts) instead of wrapper
+    return data.data || data;
+  },
+
+  // Bulk delete specific products by IDs
+  async bulkDeleteByIds(shopId, productIds, token) {
+    const { data } = await api.post('/products/bulk-delete',
+      { shopId, productIds },
+      {
+        headers: { Authorization: `Bearer ${token}` }
+      }
+    );
+    // Unwrap response: return data.data (result with deletedCount and deletedProducts) instead of wrapper
+    return data.data || data;
   }
 };
 

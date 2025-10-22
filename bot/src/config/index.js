@@ -16,6 +16,9 @@ const config = {
   // Logging
   logLevel: process.env.LOG_LEVEL || 'info',
 
+  // AI configuration
+  deepseekApiKey: process.env.DEEPSEEK_API_KEY,
+
   // Supported cryptocurrencies
   currencies: [
     { code: 'BTC', name: 'Bitcoin', symbol: '₿', emoji: '₿' },

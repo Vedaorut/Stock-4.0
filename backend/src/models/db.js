@@ -290,6 +290,26 @@ export const productQueries = {
       [id, quantity]
     );
     return result.rows[0];
+  },
+
+  // Bulk delete products by shop ID
+  bulkDeleteByShopId: async (shopId) => {
+    const result = await query(
+      'DELETE FROM products WHERE shop_id = $1 RETURNING *',
+      [shopId]
+    );
+    return result.rows;
+  },
+
+  // Bulk delete products by IDs (with ownership check via shopId)
+  bulkDeleteByIds: async (productIds, shopId) => {
+    const result = await query(
+      `DELETE FROM products
+       WHERE id = ANY($1) AND shop_id = $2
+       RETURNING *`,
+      [productIds, shopId]
+    );
+    return result.rows;
   }
 };
 

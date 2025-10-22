@@ -218,6 +218,26 @@ export const productValidation = {
       .isLength({ max: 100 })
       .withMessage('Category must not exceed 100 characters'),
     validate
+  ],
+
+  bulkDeleteAll: [
+    body('shopId')
+      .isInt({ min: 1 })
+      .withMessage('Valid shop ID is required'),
+    validate
+  ],
+
+  bulkDeleteByIds: [
+    body('shopId')
+      .isInt({ min: 1 })
+      .withMessage('Valid shop ID is required'),
+    body('productIds')
+      .isArray({ min: 1 })
+      .withMessage('productIds must be a non-empty array'),
+    body('productIds.*')
+      .isInt({ min: 1 })
+      .withMessage('Each product ID must be a positive integer'),
+    validate
   ]
 };
 

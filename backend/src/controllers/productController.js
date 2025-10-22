@@ -264,6 +264,119 @@ export const productController = {
         error: 'Failed to delete product'
       });
     }
+  },
+
+  /**
+   * Bulk delete all products from a shop
+   */
+  bulkDeleteAll: async (req, res) => {
+    try {
+      const { shopId } = req.body;
+
+      // Verify shop belongs to user
+      const shop = await shopQueries.findById(shopId);
+
+      if (!shop) {
+        return res.status(404).json({
+          success: false,
+          error: 'Shop not found'
+        });
+      }
+
+      if (shop.owner_id !== req.user.id) {
+        return res.status(403).json({
+          success: false,
+          error: 'You can only delete products from your own shops'
+        });
+      }
+
+      const deletedProducts = await productQueries.bulkDeleteByShopId(shopId);
+
+      return res.status(200).json({
+        success: true,
+        message: `${deletedProducts.length} product(s) deleted successfully`,
+        data: {
+          deletedCount: deletedProducts.length,
+          deletedProducts
+        }
+      });
+
+    } catch (error) {
+      if (error.code) {
+        const handledError = dbErrorHandler(error);
+        return res.status(handledError.statusCode).json({
+          success: false,
+          error: handledError.message,
+          ...(handledError.details ? { details: handledError.details } : {})
+        });
+      }
+
+      logger.error('Bulk delete all products error', { error: error.message, stack: error.stack });
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to delete products'
+      });
+    }
+  },
+
+  /**
+   * Bulk delete specific products by IDs
+   */
+  bulkDeleteByIds: async (req, res) => {
+    try {
+      const { shopId, productIds } = req.body;
+
+      if (!Array.isArray(productIds) || productIds.length === 0) {
+        return res.status(400).json({
+          success: false,
+          error: 'productIds must be a non-empty array'
+        });
+      }
+
+      // Verify shop belongs to user
+      const shop = await shopQueries.findById(shopId);
+
+      if (!shop) {
+        return res.status(404).json({
+          success: false,
+          error: 'Shop not found'
+        });
+      }
+
+      if (shop.owner_id !== req.user.id) {
+        return res.status(403).json({
+          success: false,
+          error: 'You can only delete products from your own shops'
+        });
+      }
+
+      const deletedProducts = await productQueries.bulkDeleteByIds(productIds, shopId);
+
+      return res.status(200).json({
+        success: true,
+        message: `${deletedProducts.length} product(s) deleted successfully`,
+        data: {
+          deletedCount: deletedProducts.length,
+          deletedProducts
+        }
+      });
+
+    } catch (error) {
+      if (error.code) {
+        const handledError = dbErrorHandler(error);
+        return res.status(handledError.statusCode).json({
+          success: false,
+          error: handledError.message,
+          ...(handledError.details ? { details: handledError.details } : {})
+        });
+      }
+
+      logger.error('Bulk delete products error', { error: error.message, stack: error.stack });
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to delete products'
+      });
+    }
   }
 };
 

@@ -18,6 +18,7 @@ import { handleStart } from './handlers/start.js';
 import { setupSellerHandlers } from './handlers/seller/index.js';
 import { setupBuyerHandlers } from './handlers/buyer/index.js';
 import { setupCommonHandlers } from './handlers/common.js';
+import { setupAIProductHandlers } from './handlers/seller/aiProducts.js';
 
 dotenv.config();
 
@@ -65,6 +66,9 @@ bot.start(handleStart);
 setupSellerHandlers(bot);
 setupBuyerHandlers(bot);
 setupCommonHandlers(bot);
+
+// AI Product Management (must be registered last to handle text messages)
+setupAIProductHandlers(bot);
 
 // Graceful shutdown
 const shutdown = async () => {

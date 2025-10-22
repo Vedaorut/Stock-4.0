@@ -58,4 +58,30 @@ router.delete(
   productController.delete
 );
 
+/**
+ * @route   POST /api/products/bulk-delete-all
+ * @desc    Delete all products from a shop
+ * @access  Private (Shop owner only)
+ */
+router.post(
+  '/bulk-delete-all',
+  verifyToken,
+  requireShopOwner,
+  productValidation.bulkDeleteAll,
+  productController.bulkDeleteAll
+);
+
+/**
+ * @route   POST /api/products/bulk-delete
+ * @desc    Delete multiple products by IDs
+ * @access  Private (Shop owner only)
+ */
+router.post(
+  '/bulk-delete',
+  verifyToken,
+  requireShopOwner,
+  productValidation.bulkDeleteByIds,
+  productController.bulkDeleteByIds
+);
+
 export default router;
