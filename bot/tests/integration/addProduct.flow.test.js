@@ -39,9 +39,9 @@ describe('Add Product Flow - Price Validation (P0)', () => {
     // Проверяем что answerCbQuery был вызван
     expect(testBot.captor.wasAnswerCbQueryCalled()).toBe(true);
 
-    // Проверяем что показали приглашение ввести название
+    // Проверяем что показали приглашение ввести название (minimalist)
     const text1 = testBot.getLastReplyText();
-    expect(text1).toContain('Название товара');
+    expect(text1).toContain('Название');
 
     testBot.captor.reset();
 
@@ -51,7 +51,7 @@ describe('Add Product Flow - Price Validation (P0)', () => {
 
     // Проверяем что показали приглашение ввести цену
     const text2 = testBot.getLastReplyText();
-    expect(text2).toContain('Цена ($)');
+    expect(text2).toContain('Цена ('); // minimalist: 'Цена ($, > 0):'
 
     testBot.captor.reset();
 
@@ -76,9 +76,9 @@ describe('Add Product Flow - Price Validation (P0)', () => {
     const replies = testBot.captor.getReplies();
     expect(replies.some(r => r.text === 'Сохраняем...')).toBe(true);
 
-    // Проверяем что показали успех
+    // Проверяем что показали успех (minimalist: "✅" emoji)
     const text3 = testBot.getLastReplyText();
-    expect(text3).toContain('✓');
+    expect(text3).toContain('✅');
     expect(text3).toContain(productName);
 
     // Проверяем что API был вызван один раз с правильной ценой

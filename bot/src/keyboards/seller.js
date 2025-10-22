@@ -1,25 +1,24 @@
 import { Markup } from 'telegraf';
 import config from '../config/index.js';
 
-// Seller menu (with active shop)
+// Seller menu (with active shop) - minimalist labels
 export const sellerMenu = (shopName) => Markup.inlineKeyboard([
-  [Markup.button.webApp('📱 Открыть приложение', config.webAppUrl)],
-  [Markup.button.callback('📦 Мои товары', 'seller:products')],
+  [Markup.button.webApp('📱 Открыть', config.webAppUrl)],
+  [Markup.button.callback('📦 Товары', 'seller:products')],
   [Markup.button.callback('💰 Продажи', 'seller:sales')],
   [Markup.button.callback('💼 Кошельки', 'seller:wallets')],
-  [Markup.button.callback('🔄 Переключить на Покупателя', 'role:toggle')],
-  [Markup.button.callback('« Назад', 'main_menu')]
+  [Markup.button.callback('🔄 Покупатель', 'role:toggle')]
 ]);
 
-// Products menu (inside "Мои товары" screen)
+// Products menu (inside "Товары" screen) - minimalist
 export const productsMenu = (shopName) => Markup.inlineKeyboard([
-  [Markup.button.callback('➕ Добавить товар', 'seller:add_product')],
-  [Markup.button.callback('« Назад в главное меню', 'seller:main')]
+  [Markup.button.callback('➕ Добавить', 'seller:add_product')],
+  [Markup.button.callback('« Назад', 'seller:main')]
 ]);
 
-// Seller menu (no shop - need registration)
+// Seller menu (no shop - need registration) - minimalist
 export const sellerMenuNoShop = Markup.inlineKeyboard([
-  [Markup.button.callback('➕ Создать магазин', 'seller:create_shop')],
+  [Markup.button.callback('➕ Магазин ($25)', 'seller:create_shop')],
   [Markup.button.callback('« Назад', 'main_menu')]
 ]);
 

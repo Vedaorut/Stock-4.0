@@ -57,12 +57,12 @@ describe('Main Menu - WebApp Button Position (P0)', () => {
     const webAppButtons = buttons.filter(b => b.web_app !== undefined);
     expect(webAppButtons.length).toBe(1);
 
-    // Проверяем что WebApp кнопка на первой позиции
+    // Проверяем что WebApp кнопка на первой позиции (minimalist: "Открыть")
     const firstRow = markup.inline_keyboard[0];
     expect(firstRow.length).toBeGreaterThan(0);
     const firstButton = firstRow[0];
     expect(firstButton.web_app).toBeDefined();
-    expect(firstButton.text).toContain('Открыть приложение');
+    expect(firstButton.text).toContain('Открыть');
 
     // Проверяем что нет других URL-кнопок (url, login_url)
     const urlButtons = buttons.filter(b => b.url !== undefined || b.login_url !== undefined);
@@ -90,12 +90,12 @@ describe('Main Menu - WebApp Button Position (P0)', () => {
     const webAppButtons = buttons.filter(b => b.web_app !== undefined);
     expect(webAppButtons.length).toBe(1);
 
-    // Проверяем что WebApp кнопка на первой позиции
+    // Проверяем что WebApp кнопка на первой позиции (minimalist)
     const firstRow = markup.inline_keyboard[0];
     expect(firstRow.length).toBeGreaterThan(0);
     const firstButton = firstRow[0];
     expect(firstButton.web_app).toBeDefined();
-    expect(firstButton.text).toContain('Открыть приложение');
+    expect(firstButton.text).toContain('Открыть');
 
     // Проверяем что нет других URL-кнопок
     const urlButtons = buttons.filter(b => b.url !== undefined || b.login_url !== undefined);

@@ -6,14 +6,17 @@ import CartButton from '../components/Cart/CartButton';
 import { useStore } from '../store/useStore';
 import { useTelegram } from '../hooks/useTelegram';
 import { useTranslation } from '../i18n/useTranslation';
+import { useApi } from '../hooks/useApi';
 
 export default function Catalog() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
-  const { currentShop, setCurrentShop, products: allProducts, setCartOpen } = useStore();
+  const { currentShop, setCurrentShop, setCartOpen } = useStore();
   const { triggerHaptic } = useTelegram();
   const { t } = useTranslation();
+  const { get } = useApi();
 
   useEffect(() => {
     if (currentShop) {
@@ -21,12 +24,28 @@ export default function Catalog() {
     }
   }, [currentShop]);
 
-  const loadProducts = (shopId) => {
-    setLoading(true);
-    // Используем mock данные вместо API
-    const shopProducts = allProducts.filter(p => p.shopId === shopId);
-    setProducts(shopProducts);
-    setLoading(false);
+  const loadProducts = async (shopId) => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // GET /api/products?shopId=<shopId>
+      const { data, error: apiError } = await get('/products', {
+        params: { shopId }
+      });
+
+      if (apiError) {
+        setError('Failed to load products');
+        console.error('Products error:', apiError);
+      } else {
+        setProducts(data?.products || []);
+      }
+    } catch (err) {
+      setError('Failed to load products');
+      console.error('Products error:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleBack = () => {
@@ -99,11 +118,30 @@ export default function Catalog() {
         </div>
       </div>
 
+      {/* Error State */}
+      {error && (
+        <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
+          <svg className="w-16 h-16 text-red-500 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <h3 className="text-lg font-semibold text-gray-400 mb-2">{error}</h3>
+          <motion.button
+            onClick={() => loadProducts(currentShop.id)}
+            className="bg-orange-primary hover:bg-orange-light text-white font-semibold px-6 py-3 rounded-xl transition-colors mt-4"
+            whileTap={{ scale: 0.95 }}
+          >
+            Retry
+          </motion.button>
+        </div>
+      )}
+
       {/* Products Grid */}
-      <ProductGrid
-        products={products}
-        loading={loading}
-      />
+      {!error && (
+        <ProductGrid
+          products={products}
+          loading={loading}
+        />
+      )}
 
       {/* Floating Cart Button */}
       <CartButton onClick={() => setCartOpen(true)} />

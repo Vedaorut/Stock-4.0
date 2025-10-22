@@ -167,8 +167,8 @@ class CryptoService {
 
       } else if (currency === 'USDT') {
         // Verify USDT (ERC-20) transaction
-        // USDT contract address on Ethereum
-        const usdtContract = '0xdac17f958d2ee523a2206206994597c13d831ec7';
+        // USDT contract address from config
+        const usdtContract = config.crypto.usdtAddress;
 
         if (tx.to.toLowerCase() !== usdtContract.toLowerCase()) {
           return {

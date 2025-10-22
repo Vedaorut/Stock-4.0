@@ -1,4 +1,5 @@
 import { body, param, query, validationResult } from 'express-validator';
+import { validateCryptoAddress, getCryptoValidationError } from '../utils/validation.js';
 
 /**
  * Validate request and return errors if any
@@ -301,27 +302,39 @@ export const walletValidation = {
     body('walletBtc')
       .optional()
       .trim()
-      .isLength({ min: 26, max: 62 })
-      .matches(/^[a-zA-Z0-9]+$/)
-      .withMessage('BTC wallet must be 26-62 alphanumeric characters'),
+      .custom((value) => {
+        if (value && !validateCryptoAddress(value, 'BTC')) {
+          throw new Error(getCryptoValidationError('BTC'));
+        }
+        return true;
+      }),
     body('walletEth')
       .optional()
       .trim()
-      .isLength({ min: 42, max: 42 })
-      .matches(/^0x[a-fA-F0-9]{40}$/)
-      .withMessage('ETH wallet must be a valid Ethereum address (0x followed by 40 hex characters)'),
+      .custom((value) => {
+        if (value && !validateCryptoAddress(value, 'ETH')) {
+          throw new Error(getCryptoValidationError('ETH'));
+        }
+        return true;
+      }),
     body('walletUsdt')
       .optional()
       .trim()
-      .isLength({ min: 42, max: 42 })
-      .matches(/^0x[a-fA-F0-9]{40}$/)
-      .withMessage('USDT wallet must be a valid Ethereum address (0x followed by 40 hex characters)'),
+      .custom((value) => {
+        if (value && !validateCryptoAddress(value, 'USDT')) {
+          throw new Error(getCryptoValidationError('USDT'));
+        }
+        return true;
+      }),
     body('walletTon')
       .optional()
       .trim()
-      .isLength({ min: 48, max: 48 })
-      .matches(/^[a-zA-Z0-9_-]+$/)
-      .withMessage('TON wallet must be a valid TON address (48 characters)'),
+      .custom((value) => {
+        if (value && !validateCryptoAddress(value, 'TON')) {
+          throw new Error(getCryptoValidationError('TON'));
+        }
+        return true;
+      }),
     validate
   ]
 };

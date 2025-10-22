@@ -15,14 +15,14 @@ import { validateCryptoAddress, getCryptoValidationError } from '../utils/valida
 // Crypto selection keyboard
 const cryptoKeyboard = Markup.inlineKeyboard([
   [
-    Markup.button.callback('₿ BTC', 'wallet:btc'),
-    Markup.button.callback('Ξ ETH', 'wallet:eth')
+    Markup.button.callback('BTC', 'wallet:btc'),
+    Markup.button.callback('ETH', 'wallet:eth')
   ],
   [
-    Markup.button.callback('₮ USDT', 'wallet:usdt'),
-    Markup.button.callback('🔷 TON', 'wallet:ton')
+    Markup.button.callback('USDT', 'wallet:usdt'),
+    Markup.button.callback('TON', 'wallet:ton')
   ],
-  [Markup.button.callback('« Отменить', 'cancel_scene')]
+  [Markup.button.callback('« Назад', 'cancel_scene')]
 ]);
 
 // Step 1: Show wallets and select crypto
@@ -56,13 +56,21 @@ const showWallets = async (ctx) => {
     const usdt = shop.wallet_usdt || 'не указан';
     const ton = shop.wallet_ton || 'не указан';
 
+    // Format inline (67% reduction: 9 lines → 3 lines)
+    const btcStatus = btc === 'не указан' ? '○' : '✓';
+    const ethStatus = eth === 'не указан' ? '○' : '✓';
+    const usdtStatus = usdt === 'не указан' ? '○' : '✓';
+    const tonStatus = ton === 'не указан' ? '○' : '✓';
+
+    // Check if all wallets are empty
+    const allEmpty = btc === 'не указан' && eth === 'не указан' &&
+                     usdt === 'не указан' && ton === 'не указан';
+    const hint = allEmpty ? '\n💡 Привяжите кошелек чтобы клиенты могли оплачивать\n' : '';
+
     await ctx.editMessageText(
-      `💼 Кошельки\n\n` +
-      `₿ BTC: ${btc}\n` +
-      `Ξ ETH: ${eth}\n` +
-      `₮ USDT: ${usdt}\n` +
-      `🔷 TON: ${ton}\n\n` +
-      `Выберите криптовалюту:`,
+      `💼 Кошельки\n` +
+      `BTC ${btcStatus} | ETH ${ethStatus} | USDT ${usdtStatus} | TON ${tonStatus}${hint}\n` +
+      `Выберите:`,
       cryptoKeyboard
     );
 
@@ -112,15 +120,8 @@ const enterAddress = async (ctx) => {
         crypto: crypto
       });
 
-      const symbols = {
-        'BTC': '₿',
-        'ETH': 'Ξ',
-        'USDT': '₮',
-        'TON': '🔷'
-      };
-
       await ctx.reply(
-        `${symbols[crypto]} ${crypto} адрес:`,
+        `${crypto} адрес:`,
         cancelButton
       );
 
@@ -199,15 +200,8 @@ const saveWallet = async (ctx) => {
       userId: ctx.from.id
     });
 
-    const symbols = {
-      'BTC': '₿',
-      'ETH': 'Ξ',
-      'USDT': '₮',
-      'TON': '🔷'
-    };
-
     await ctx.reply(
-      `✓ ${symbols[crypto]} ${crypto}\n${address}`,
+      `✅ ${crypto} ${address}`,
       successButtons
     );
 
@@ -243,7 +237,7 @@ manageWalletsScene.action('cancel_scene', async (ctx) => {
     await ctx.answerCbQuery();
     logger.info('wallet_manage_cancelled', { userId: ctx.from.id });
     await ctx.scene.leave();
-    await ctx.reply('Отменено', successButtons);
+    // No message - just go back
   } catch (error) {
     logger.error('Error in cancel_scene handler:', error);
     // Local error handling - don't throw to avoid infinite spinner

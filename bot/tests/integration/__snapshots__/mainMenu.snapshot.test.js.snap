@@ -6,7 +6,7 @@ exports[`Main Menu - WebApp Button Position (P0) buyer menu: exactly 1 WebApp bu
     [
       {
         "hide": false,
-        "text": "📱 Открыть приложение",
+        "text": "📱 Открыть",
         "web_app": {
           "url": "https://your-domain.com",
         },
@@ -16,14 +16,14 @@ exports[`Main Menu - WebApp Button Position (P0) buyer menu: exactly 1 WebApp bu
       {
         "callback_data": "seller:create_shop",
         "hide": false,
-        "text": "➕ Создать магазин ($25)",
+        "text": "➕ Магазин ($25)",
       },
     ],
     [
       {
         "callback_data": "buyer:search",
         "hide": false,
-        "text": "🔍 Найти магазин",
+        "text": "🔍 Найти",
       },
     ],
     [
@@ -44,14 +44,7 @@ exports[`Main Menu - WebApp Button Position (P0) buyer menu: exactly 1 WebApp bu
       {
         "callback_data": "role:toggle",
         "hide": false,
-        "text": "🔄 Переключить на Продавца",
-      },
-    ],
-    [
-      {
-        "callback_data": "main_menu",
-        "hide": false,
-        "text": "« Назад",
+        "text": "🔄 Продавец",
       },
     ],
   ],
@@ -85,7 +78,7 @@ exports[`Main Menu - WebApp Button Position (P0) seller menu without shop: exact
     [
       {
         "hide": false,
-        "text": "📱 Открыть приложение",
+        "text": "📱 Открыть",
         "web_app": {
           "url": "https://your-domain.com",
         },
@@ -95,14 +88,14 @@ exports[`Main Menu - WebApp Button Position (P0) seller menu without shop: exact
       {
         "callback_data": "seller:create_shop",
         "hide": false,
-        "text": "➕ Создать магазин ($25)",
+        "text": "➕ Магазин ($25)",
       },
     ],
     [
       {
         "callback_data": "buyer:search",
         "hide": false,
-        "text": "🔍 Найти магазин",
+        "text": "🔍 Найти",
       },
     ],
     [
@@ -123,14 +116,7 @@ exports[`Main Menu - WebApp Button Position (P0) seller menu without shop: exact
       {
         "callback_data": "role:toggle",
         "hide": false,
-        "text": "🔄 Переключить на Продавца",
-      },
-    ],
-    [
-      {
-        "callback_data": "main_menu",
-        "hide": false,
-        "text": "« Назад",
+        "text": "🔄 Продавец",
       },
     ],
   ],
@@ -143,7 +129,7 @@ exports[`Main Menu - WebApp Button Position (P0) seller menu: exactly 1 WebApp b
     [
       {
         "hide": false,
-        "text": "📱 Открыть приложение",
+        "text": "📱 Открыть",
         "web_app": {
           "url": "https://your-domain.com",
         },
@@ -153,7 +139,7 @@ exports[`Main Menu - WebApp Button Position (P0) seller menu: exactly 1 WebApp b
       {
         "callback_data": "seller:products",
         "hide": false,
-        "text": "📦 Мои товары",
+        "text": "📦 Товары",
       },
     ],
     [
@@ -174,14 +160,7 @@ exports[`Main Menu - WebApp Button Position (P0) seller menu: exactly 1 WebApp b
       {
         "callback_data": "role:toggle",
         "hide": false,
-        "text": "🔄 Переключить на Покупателя",
-      },
-    ],
-    [
-      {
-        "callback_data": "main_menu",
-        "hide": false,
-        "text": "« Назад",
+        "text": "🔄 Покупатель",
       },
     ],
   ],

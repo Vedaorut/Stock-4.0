@@ -53,9 +53,9 @@ export const handleStart = async (ctx) => {
     logger.info('No saved role, showing role selection');
     ctx.session.role = null;
 
-    // Send welcome message
+    // Send welcome message (minimalist)
     await ctx.reply(
-      'Telegram Shop\n\nВыберите роль:',
+      'Status Stock\n\nРоль:',
       mainMenu
     );
   } catch (error) {

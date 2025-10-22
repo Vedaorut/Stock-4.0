@@ -237,6 +237,92 @@ async function migrateProductsToUSD() {
 }
 
 /**
+ * Run incremental migration: Remove currency constraint for USD support
+ * This fixes the bug where products cannot be created with USD currency
+ */
+async function removeCurrencyConstraint() {
+  log.header('Running Incremental Migration: Remove Currency Constraint for USD Support');
+  const client = await pool.connect();
+  try {
+    // Check if constraint exists
+    log.info('Checking if products_currency_check constraint exists...');
+    const checkResult = await client.query(`
+      SELECT constraint_name
+      FROM information_schema.table_constraints
+      WHERE table_name = 'products'
+      AND constraint_name = 'products_currency_check'
+    `);
+
+    if (checkResult.rows.length > 0) {
+      log.info('Removing products_currency_check constraint...');
+      await client.query('ALTER TABLE products DROP CONSTRAINT products_currency_check;');
+      log.success('Currency constraint removed');
+
+      // Set default value to USD
+      log.info('Setting default currency to USD...');
+      await client.query("ALTER TABLE products ALTER COLUMN currency SET DEFAULT 'USD';");
+      log.success('Default currency set to USD');
+
+      // Update any existing NULL currencies to USD
+      log.info('Updating existing NULL currencies to USD...');
+      const updateResult = await client.query("UPDATE products SET currency = 'USD' WHERE currency IS NULL;");
+      log.success(`Updated ${updateResult.rowCount} products with NULL currency`);
+    } else {
+      log.warning('Currency constraint already removed, skipping');
+    }
+
+    log.success('Migration completed: Products can now use USD currency');
+  } catch (error) {
+    log.error(`Migration failed: ${error.message}`);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Run incremental migration: Add NOT NULL constraint to payments.payment_address
+ * This prevents payment verification failures due to NULL addresses
+ */
+async function addPaymentAddressConstraint() {
+  log.header('Running Incremental Migration: Add NOT NULL constraint to payments.payment_address');
+  const client = await pool.connect();
+  try {
+    // Check if column allows NULL
+    log.info('Checking if payment_address allows NULL...');
+    const checkResult = await client.query(`
+      SELECT is_nullable
+      FROM information_schema.columns
+      WHERE table_name = 'payments'
+      AND column_name = 'payment_address'
+    `);
+
+    if (checkResult.rows.length === 0) {
+      log.warning('Column payment_address does not exist, skipping');
+      return;
+    }
+
+    if (checkResult.rows[0].is_nullable === 'YES') {
+      log.info('Adding NOT NULL constraint to payment_address...');
+      await client.query(`
+        ALTER TABLE payments
+        ALTER COLUMN payment_address SET NOT NULL
+      `);
+      log.success('NOT NULL constraint added to payment_address');
+    } else {
+      log.warning('Column payment_address already NOT NULL, skipping');
+    }
+
+    log.success('Migration completed: payment_address now requires a value');
+  } catch (error) {
+    log.error(`Migration failed: ${error.message}`);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+/**
  * Enable required PostgreSQL extensions
  */
 async function enableExtensions() {
@@ -420,6 +506,14 @@ async function migrate(options = {}) {
       await migrateProductsToUSD();
     }
 
+    if (options.removeCurrencyConstraint) {
+      await removeCurrencyConstraint();
+    }
+
+    if (options.fixPaymentAddress) {
+      await addPaymentAddressConstraint();
+    }
+
     // Verify tables
     if (verify) {
       await verifyTables();
@@ -455,6 +549,8 @@ function parseArgs() {
     stats: args.includes('--stats'),
     addSelectedRole: args.includes('--add-selected-role'),
     migrateToUSD: args.includes('--migrate-to-usd'),
+    removeCurrencyConstraint: args.includes('--fix-currency'),
+    fixPaymentAddress: args.includes('--fix-payment-address'),
   };
 
   // Show help
@@ -470,6 +566,8 @@ Options:
   --stats                Show database statistics after migration
   --add-selected-role    Run incremental migration: Add selected_role column to users table
   --migrate-to-usd       Run incremental migration: Migrate products to USD-only pricing
+  --fix-currency         Run incremental migration: Remove currency constraint to allow USD
+  --fix-payment-address  Run incremental migration: Add NOT NULL constraint to payments.payment_address
   --no-schema            Skip schema migration
   --no-indexes           Skip index creation
   --no-extensions        Skip extension setup
@@ -482,6 +580,8 @@ Examples:
   node migrations.js --seed --stats           # Add test data and show stats
   node migrations.js --add-selected-role      # Add selected_role column (incremental)
   node migrations.js --migrate-to-usd         # Migrate products to USD-only pricing
+  node migrations.js --fix-currency           # Fix currency constraint to allow USD
+  node migrations.js --fix-payment-address    # Add NOT NULL constraint to payments.payment_address
   node migrations.js --no-indexes             # Run without indexes
     `);
     process.exit(0);
@@ -508,4 +608,6 @@ module.exports = {
   dropAllTables,
   addSelectedRoleColumn,
   migrateProductsToUSD,
+  removeCurrencyConstraint,
+  addPaymentAddressConstraint,
 };

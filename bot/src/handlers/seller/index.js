@@ -1,6 +1,7 @@
 import { sellerMenu, sellerMenuNoShop, productsMenu } from '../../keyboards/seller.js';
 import { shopApi, authApi, productApi, orderApi } from '../../utils/api.js';
 import { formatPrice, formatOrderStatus } from '../../utils/format.js';
+import { formatProductsList, formatSalesList } from '../../utils/minimalist.js';
 import logger from '../../utils/logger.js';
 
 /**
@@ -71,7 +72,7 @@ export const handleSellerRole = async (ctx) => {
         ctx.session.shopId = null;
         ctx.session.shopName = null;
         await ctx.editMessageText(
-          'Создайте магазин для продажи товаров\n\nСтоимость регистрации: $25',
+          'Создать магазин — $25',
           sellerMenuNoShop
         );
       }
@@ -194,36 +195,10 @@ const handleProducts = async (ctx) => {
 
     // Get shop products
     const products = await productApi.getShopProducts(ctx.session.shopId);
-
-    if (!products || products.length === 0) {
-      const shopName = ctx.session.shopName || 'Магазин';
-      await ctx.editMessageText(
-        `📦 Товары\n\nПусто`,
-        productsMenu(shopName)
-      );
-      return;
-    }
-
-    // Format products list (first 5, can add pagination later)
     const shopName = ctx.session.shopName || 'Магазин';
-    let message = `📦 Мои товары (${products.length}):\n\n`;
-    message += `Магазин: ${shopName}\n\n`;
 
-    const productsToShow = products.slice(0, 5);
-
-    productsToShow.forEach((product, index) => {
-      const stock = product.stock_quantity !== undefined ? product.stock_quantity :
-                   (product.stockQuantity !== undefined ? product.stockQuantity : 0);
-      const stockEmoji = stock > 0 ? '✅' : '⚠️';
-
-      message += `${index + 1}. ${product.name}\n`;
-      message += `   ${formatPrice(product.price)}\n`;
-      message += `   ${stockEmoji} Запас: ${stock}\n\n`;
-    });
-
-    if (products.length > 5) {
-      message += `\n...и ещё ${products.length - 5} товаров`;
-    }
+    // Use minimalist formatter (8 lines → 3 lines)
+    const message = formatProductsList(products, shopName);
 
     await ctx.editMessageText(message, productsMenu(shopName));
     logger.info(`User ${ctx.from.id} viewed products (${products.length} total)`);
@@ -265,36 +240,10 @@ const handleSales = async (ctx) => {
 
     // Get shop orders (sales)
     const orders = await orderApi.getShopOrders(ctx.session.shopId, ctx.session.token);
-
     const shopName = ctx.session.shopName || 'Магазин';
 
-    if (!orders || orders.length === 0) {
-      await ctx.editMessageText(
-        `💰 Продажи\n\nПусто`,
-        sellerMenu(shopName)
-      );
-      return;
-    }
-
-    // Format sales list (first 5)
-    let message = `💰 Продажи (${orders.length}):\n\n`;
-    message += `Магазин: ${shopName}\n\n`;
-
-    const ordersToShow = orders.slice(0, 5);
-
-    ordersToShow.forEach((order, index) => {
-      const status = formatOrderStatus(order.status);
-      const buyerName = order.buyer_username
-        ? `@${order.buyer_username}`
-        : (order.buyer_first_name || 'Покупатель');
-      const totalPrice = order.total_price || order.totalPrice || 0;
-
-      message += `${index + 1}. ${status} ${buyerName} - ${formatPrice(totalPrice)}\n`;
-    });
-
-    if (orders.length > 5) {
-      message += `\n...и ещё ${orders.length - 5} заказов`;
-    }
+    // Use minimalist formatter (9 lines → 4 lines)
+    const message = formatSalesList(orders, shopName);
 
     await ctx.editMessageText(message, sellerMenu(shopName));
     logger.info(`User ${ctx.from.id} viewed sales (${orders.length} total)`);

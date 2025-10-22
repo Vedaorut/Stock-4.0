@@ -2,8 +2,12 @@ import express from 'express';
 import { authController } from '../controllers/authController.js';
 import { authValidation } from '../middleware/validation.js';
 import { verifyToken } from '../middleware/auth.js';
+import { authLimiter } from '../middleware/rateLimiter.js';
 
 const router = express.Router();
+
+// Apply auth rate limiter to all routes in this router
+router.use(authLimiter);
 
 /**
  * @route   POST /api/auth/login

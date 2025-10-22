@@ -54,6 +54,14 @@ export const paymentController = {
         });
       }
 
+      // Check if payment address is set (CRITICAL: prevents NULL address verification failures)
+      if (!order.payment_address) {
+        return res.status(400).json({
+          success: false,
+          error: 'Payment address not set for this order'
+        });
+      }
+
       // Verify payment with blockchain
       const verification = await cryptoService.verifyTransaction(
         txHash,

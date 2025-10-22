@@ -7,27 +7,36 @@ import { useTelegram } from '../hooks/useTelegram';
 import { useTranslation } from '../i18n/useTranslation';
 
 export default function Subscriptions() {
+  const [shops, setShops] = useState([]);
   const [loading, setLoading] = useState(true);
-  const { subscriptions, setSubscriptions } = useStore();
+  const [error, setError] = useState(null);
   const { getSubscriptions } = useShopApi();
   const { triggerHaptic } = useTelegram();
   const { t } = useTranslation();
 
   useEffect(() => {
-    // Используем mock данные вместо API
-    setLoading(false);
-    // loadSubscriptions(); // Закомментировано для демо
+    loadSubscriptions();
   }, []);
 
   const loadSubscriptions = async () => {
-    setLoading(true);
-    const { data, error } = await getSubscriptions();
+    try {
+      setLoading(true);
+      setError(null);
+      const { data, error: apiError } = await getSubscriptions();
 
-    if (data) {
-      setSubscriptions(data);
+      if (apiError) {
+        setError('Failed to load subscriptions');
+        console.error('Subscriptions error:', apiError);
+      } else {
+        // Backend returns { subscriptions: [...] }
+        setShops(data?.subscriptions || []);
+      }
+    } catch (err) {
+      setError('Failed to load subscriptions');
+      console.error('Subscriptions error:', err);
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   const handleShopClick = (shop) => {
@@ -55,7 +64,21 @@ export default function Subscriptions() {
           <div className="flex items-center justify-center py-12">
             <div className="w-8 h-8 border-4 border-orange-primary border-t-transparent rounded-full animate-spin" />
           </div>
-        ) : subscriptions.length === 0 ? (
+        ) : error ? (
+          <div className="flex flex-col items-center justify-center py-12 text-center">
+            <svg className="w-16 h-16 text-red-500 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <h3 className="text-lg font-semibold text-gray-400 mb-2">{error}</h3>
+            <motion.button
+              onClick={loadSubscriptions}
+              className="touch-target bg-orange-primary hover:bg-orange-light text-white font-semibold px-6 rounded-xl transition-colors duration-300 mt-4"
+              whileTap={{ scale: 0.95 }}
+            >
+              Retry
+            </motion.button>
+          </div>
+        ) : shops.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-center">
             <svg className="w-16 h-16 text-gray-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
@@ -72,7 +95,7 @@ export default function Subscriptions() {
           </div>
         ) : (
           <div className="space-y-4">
-            {subscriptions.map((subscription) => (
+            {shops.map((subscription) => (
               <motion.div
                 key={subscription.id}
                 onClick={() => handleShopClick(subscription.shop)}

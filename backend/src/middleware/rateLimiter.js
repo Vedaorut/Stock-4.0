@@ -51,6 +51,15 @@ export const apiLimiter = createRateLimiter(
 );
 
 /**
+ * Rate limiter for payment endpoints (stricter to prevent spam)
+ */
+export const paymentLimiter = createRateLimiter(
+  RATE_LIMITS.PAYMENT.WINDOW_MS,
+  RATE_LIMITS.PAYMENT.MAX_REQUESTS,
+  'Too many payment requests, please slow down'
+);
+
+/**
  * Rate limiter for webhook endpoints
  */
 export const webhookLimiter = createRateLimiter(
@@ -75,6 +84,7 @@ export const customLimiter = (options = {}) => {
 export default {
   authLimiter,
   apiLimiter,
+  paymentLimiter,
   webhookLimiter,
   customLimiter
 };

@@ -15,28 +15,35 @@ async function loadTranslations(lang) {
   return translations[lang]
 }
 
+// Получить язык из Telegram SDK (NO localStorage)
+function getTelegramLanguage() {
+  const tg = window.Telegram?.WebApp;
+  const userLang = tg?.initDataUnsafe?.user?.language_code || 'ru';
+  return userLang.startsWith('ru') ? 'ru' : 'en';
+}
+
 // Установить язык (вызывается из LanguageModal)
 export async function setLanguage(lang) {
-  currentLang = lang
-  localStorage.setItem('app_language', lang)
+  currentLang = lang || getTelegramLanguage();
+  // NO localStorage.setItem
 
   // Загрузить переводы для нового языка
-  await loadTranslations(lang)
+  await loadTranslations(currentLang)
 
   // Обновить Zustand store (импортируется динамически чтобы избежать циклических зависимостей)
   const { useStore } = await import('../store/useStore')
-  useStore.getState().setLanguage(lang)
+  useStore.getState().setLanguage(currentLang)
 }
 
 // Получить текущий язык
 export function getLanguage() {
-  const stored = localStorage.getItem('app_language')
-  return stored || 'ru'
+  // Always get from Telegram (NO localStorage)
+  return getTelegramLanguage();
 }
 
 // Инициализация i18n (вызывается в App.jsx)
 export async function initI18n() {
-  currentLang = getLanguage()
+  currentLang = getTelegramLanguage();  // Use Telegram language
   await loadTranslations(currentLang)
 }
 

@@ -278,9 +278,10 @@ export const productQueries = {
     return result.rows[0];
   },
 
-  // Update stock
-  updateStock: async (id, quantity) => {
-    const result = await query(
+  // Update stock (with optional transaction client)
+  updateStock: async (id, quantity, client = null) => {
+    const queryFn = client ? client.query.bind(client) : query;
+    const result = await queryFn(
       `UPDATE products
        SET stock_quantity = stock_quantity + $2,
            updated_at = NOW()
@@ -296,10 +297,11 @@ export const productQueries = {
  * Order database queries
  */
 export const orderQueries = {
-  // Create new order
-  create: async (orderData) => {
+  // Create new order (with optional transaction client)
+  create: async (orderData, client = null) => {
     const { buyerId, productId, quantity, totalPrice, currency, deliveryAddress } = orderData;
-    const result = await query(
+    const queryFn = client ? client.query.bind(client) : query;
+    const result = await queryFn(
       `INSERT INTO orders (buyer_id, product_id, quantity, total_price, currency, delivery_address, status)
        VALUES ($1, $2, $3, $4, $5, $6, 'pending')
        RETURNING *`,

@@ -1,6 +1,7 @@
 import { buyerMenu, buyerMenuNoShop, shopActionsKeyboard } from '../../keyboards/buyer.js';
 import { subscriptionApi, shopApi, authApi, orderApi, productApi } from '../../utils/api.js';
 import { formatPrice, formatOrderStatus } from '../../utils/format.js';
+import { formatBuyerOrders, formatSubscriptions, formatShopInfo } from '../../utils/minimalist.js';
 import logger from '../../utils/logger.js';
 
 /**
@@ -67,7 +68,7 @@ export const handleBuyerRole = async (ctx) => {
         if (!shops || shops.length === 0) {
           // No shop - show CTA to create shop
           await ctx.editMessageText(
-            'Мои покупки\n\nСтаньте продавцом за $25',
+            'Мои покупки\n\nПродавец — $25',
             buyerMenuNoShop
           );
           logger.info(`Buyer ${ctx.from.id} has no shop, showing CTA`);
@@ -80,7 +81,7 @@ export const handleBuyerRole = async (ctx) => {
     }
 
     await ctx.editMessageText(
-      'Мои покупки\n\n',
+      'Мои покупки',
       buyerMenu
     );
   } catch (error) {
@@ -138,20 +139,8 @@ const handleSubscriptions = async (ctx) => {
 
     const subscriptions = await subscriptionApi.getMySubscriptions(ctx.session.token);
 
-    if (!subscriptions || subscriptions.length === 0) {
-      await ctx.editMessageText(
-        'Нет подписок\n\nНайдите магазины',
-        buyerMenu
-      );
-      return;
-    }
-
-    // Format subscriptions list
-    let message = 'Мои подписки:\n\n';
-    subscriptions.forEach((sub, index) => {
-      const shopName = sub.shop_name || sub.shopName || 'Магазин';
-      message += `${index + 1}. ${shopName}\n`;
-    });
+    // Use minimalist formatter
+    const message = formatSubscriptions(subscriptions);
 
     await ctx.editMessageText(message, buyerMenu);
   } catch (error) {
@@ -280,29 +269,8 @@ const handleOrders = async (ctx) => {
     // Get buyer orders
     const orders = await orderApi.getMyOrders(ctx.session.token);
 
-    if (!orders || orders.length === 0) {
-      await ctx.editMessageText(
-        '🛒 Заказы\n\nПусто',
-        buyerMenu
-      );
-      return;
-    }
-
-    // Format orders list (first 5 for now, can add pagination later)
-    let message = '🛒 Мои заказы:\n\n';
-    const ordersToShow = orders.slice(0, 5);
-
-    ordersToShow.forEach((order, index) => {
-      const status = formatOrderStatus(order.status);
-      const shopName = order.shop_name || 'Магазин';
-      const totalPrice = order.total_price || order.totalPrice || 0;
-
-      message += `${index + 1}. ${status} ${shopName} - ${formatPrice(totalPrice)}\n`;
-    });
-
-    if (orders.length > 5) {
-      message += `\n...и ещё ${orders.length - 5} заказов`;
-    }
+    // Use minimalist formatter (9 lines → 4 lines)
+    const message = formatBuyerOrders(orders);
 
     await ctx.editMessageText(message, buyerMenu);
     logger.info(`User ${ctx.from.id} viewed orders (${orders.length} total)`);
@@ -340,32 +308,8 @@ const handleShopView = async (ctx) => {
     // Get shop products
     const products = await productApi.getShopProducts(shopId);
 
-    // Format shop info
-    const sellerUsername = shop.seller_username
-      ? `@${shop.seller_username}`
-      : (shop.seller_first_name || 'Продавец');
-
-    let message = `ℹ️ ${shop.name}\n\n`;
-    message += `Продавец: ${sellerUsername}\n`;
-
-    if (shop.description && shop.description !== `Магазин ${shop.name}`) {
-      message += `${shop.description}\n`;
-    }
-
-    message += `\n📦 Товары: ${products.length || 0}\n`;
-
-    // Show first 3 products
-    if (products && products.length > 0) {
-      message += '\nВ магазине:\n';
-      const productsToShow = products.slice(0, 3);
-      productsToShow.forEach((product, index) => {
-        message += `${index + 1}. ${product.name} - ${formatPrice(product.price)}\n`;
-      });
-
-      if (products.length > 3) {
-        message += `...и ещё ${products.length - 3} товаров\n`;
-      }
-    }
+    // Use minimalist formatter (13 lines → 7 lines)
+    const message = formatShopInfo(shop, products);
 
     // Check subscription status (MEDIUM severity fix - add token check)
     let isSubscribed = false;

@@ -45,7 +45,7 @@ const handleMainMenu = async (ctx) => {
     ctx.session.role = null;
 
     await ctx.editMessageText(
-      'Telegram Shop\n\nВыберите роль:',
+      'Status Stock\n\nРоль:',
       mainMenu
     );
   } catch (error) {
@@ -72,9 +72,9 @@ const handleCancelScene = async (ctx) => {
     // Leave current scene
     await ctx.scene.leave();
 
-    // Return to main menu
+    // Return to main menu (minimalist)
     await ctx.editMessageText(
-      'Telegram Shop\n\nВыберите роль:',
+      'Status Stock\n\nРоль:',
       mainMenu
     );
   } catch (error) {
@@ -111,7 +111,7 @@ const handleBack = async (ctx) => {
       );
     } else {
       await ctx.editMessageText(
-        'Telegram Shop\n\nВыберите роль:',
+        'Status Stock\n\nРоль:',
         mainMenu
       );
     }

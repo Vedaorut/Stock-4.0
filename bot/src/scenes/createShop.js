@@ -16,7 +16,7 @@ const enterShopName = async (ctx) => {
     logger.info('shop_create_step:name', { userId: ctx.from.id });
     
     await ctx.reply(
-      'Название магазина:',
+      'Название (3-100 символов):',
       cancelButton
     );
 
@@ -97,7 +97,7 @@ const handleShopName = async (ctx) => {
     });
 
     await ctx.reply(
-      `✓ Магазин создан!\n\n${shopName}`,
+      `✅ ${shopName}`,
       successButtons
     );
 

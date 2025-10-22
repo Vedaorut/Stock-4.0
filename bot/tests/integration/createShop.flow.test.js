@@ -37,9 +37,9 @@ describe('Create Shop Flow - Wizard Validation (P0)', () => {
     // Проверяем что answerCbQuery был вызван
     expect(testBot.captor.wasAnswerCbQueryCalled()).toBe(true);
 
-    // Проверяем что показали приглашение ввести имя
+    // Проверяем что показали приглашение ввести имя (minimalist)
     const text1 = testBot.getLastReplyText();
-    expect(text1).toContain('Название магазина');
+    expect(text1).toContain('Название');
 
     testBot.captor.reset();
 
@@ -72,9 +72,9 @@ describe('Create Shop Flow - Wizard Validation (P0)', () => {
     const replies = testBot.captor.getReplies();
     expect(replies.some(r => r.text === 'Сохраняем...')).toBe(true);
 
-    // Проверяем что показали успех
+    // Проверяем что показали успех (minimalist: "✅ {shopName}")
     const text3 = testBot.getLastReplyText();
-    expect(text3).toContain('✓ Магазин создан!');
+    expect(text3).toContain('✅');
     expect(text3).toContain(shopName);
 
     // Проверяем что session.shopId установлен

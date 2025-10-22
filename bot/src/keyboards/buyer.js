@@ -1,25 +1,23 @@
 import { Markup } from 'telegraf';
 import config from '../config/index.js';
 
-// Buyer menu
+// Buyer menu (minimalist labels)
 export const buyerMenu = Markup.inlineKeyboard([
-  [Markup.button.webApp('📱 Открыть приложение', config.webAppUrl)],
-  [Markup.button.callback('🔍 Найти магазин', 'buyer:search')],
+  [Markup.button.webApp('📱 Открыть', config.webAppUrl)],
+  [Markup.button.callback('🔍 Найти', 'buyer:search')],
   [Markup.button.callback('📚 Подписки', 'buyer:subscriptions')],
   [Markup.button.callback('🛒 Заказы', 'buyer:orders')],
-  [Markup.button.callback('🔄 Переключить на Продавца', 'role:toggle')],
-  [Markup.button.callback('« Назад', 'main_menu')]
+  [Markup.button.callback('🔄 Продавец', 'role:toggle')]
 ]);
 
 // Buyer menu without shop (shows CTA to create shop)
 export const buyerMenuNoShop = Markup.inlineKeyboard([
-  [Markup.button.webApp('📱 Открыть приложение', config.webAppUrl)],
-  [Markup.button.callback('➕ Создать магазин ($25)', 'seller:create_shop')],
-  [Markup.button.callback('🔍 Найти магазин', 'buyer:search')],
+  [Markup.button.webApp('📱 Открыть', config.webAppUrl)],
+  [Markup.button.callback('➕ Магазин ($25)', 'seller:create_shop')],
+  [Markup.button.callback('🔍 Найти', 'buyer:search')],
   [Markup.button.callback('📚 Подписки', 'buyer:subscriptions')],
   [Markup.button.callback('🛒 Заказы', 'buyer:orders')],
-  [Markup.button.callback('🔄 Переключить на Продавца', 'role:toggle')],
-  [Markup.button.callback('« Назад', 'main_menu')]
+  [Markup.button.callback('🔄 Продавец', 'role:toggle')]
 ]);
 
 // Shop actions (subscribe/unsubscribe/open)

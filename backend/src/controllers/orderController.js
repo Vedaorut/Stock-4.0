@@ -1,4 +1,5 @@
 import { orderQueries, productQueries, shopQueries } from '../models/db.js';
+import { getClient } from '../config/database.js';
 import { dbErrorHandler } from '../middleware/errorHandler.js';
 import telegramService from '../services/telegram.js';
 import logger from '../utils/logger.js';
@@ -11,13 +12,24 @@ export const orderController = {
    * Create new order
    */
   create: async (req, res) => {
+    const client = await getClient();
+
     try {
       const { productId, quantity, deliveryAddress } = req.body;
 
-      // Get product details
-      const product = await productQueries.findById(productId);
+      // Start transaction
+      await client.query('BEGIN');
+
+      // Lock product row for update (prevents race condition)
+      const productResult = await client.query(
+        'SELECT * FROM products WHERE id = $1 FOR UPDATE',
+        [productId]
+      );
+
+      const product = productResult.rows[0];
 
       if (!product) {
+        await client.query('ROLLBACK');
         return res.status(404).json({
           success: false,
           error: 'Product not found'
@@ -25,14 +37,16 @@ export const orderController = {
       }
 
       if (!product.is_active) {
+        await client.query('ROLLBACK');
         return res.status(400).json({
           success: false,
           error: 'Product is not available'
         });
       }
 
-      // Check stock
+      // Check stock (ATOMIC: prevents overselling)
       if (product.stock_quantity < quantity) {
+        await client.query('ROLLBACK');
         return res.status(400).json({
           success: false,
           error: `Insufficient stock. Available: ${product.stock_quantity}`
@@ -42,7 +56,7 @@ export const orderController = {
       // Calculate total price
       const totalPrice = product.price * quantity;
 
-      // Create order
+      // Create order (pass client for transaction)
       const order = await orderQueries.create({
         buyerId: req.user.id,
         productId,
@@ -50,12 +64,15 @@ export const orderController = {
         totalPrice,
         currency: product.currency,
         deliveryAddress
-      });
+      }, client);
 
-      // Decrease product stock
-      await productQueries.updateStock(productId, -quantity);
+      // Decrease product stock (pass client for transaction)
+      await productQueries.updateStock(productId, -quantity, client);
 
-      // Notify seller about new order
+      // Commit transaction
+      await client.query('COMMIT');
+
+      // Notify seller about new order (outside transaction)
       try {
         await telegramService.notifyNewOrder(product.owner_id, {
           id: order.id,
@@ -75,6 +92,8 @@ export const orderController = {
       });
 
     } catch (error) {
+      // Rollback transaction on any error
+      await client.query('ROLLBACK');
       if (error.code) {
         const handledError = dbErrorHandler(error);
         return res.status(handledError.statusCode).json({
@@ -89,6 +108,9 @@ export const orderController = {
         success: false,
         error: 'Failed to create order'
       });
+    } finally {
+      // Always release client back to pool
+      client.release();
     }
   },
 

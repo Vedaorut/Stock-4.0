@@ -18,7 +18,7 @@ const enterName = async (ctx) => {
     logger.info('product_add_step:name', { userId: ctx.from.id });
     
     await ctx.reply(
-      'Название товара:',
+      'Название (мин 3 символа):',
       cancelButton
     );
 
@@ -52,7 +52,7 @@ const enterPrice = async (ctx) => {
       productName: productName
     });
 
-    await ctx.reply('Цена ($):', cancelButton);
+    await ctx.reply('Цена ($, > 0):', cancelButton);
 
     return ctx.wizard.next();
   } catch (error) {
@@ -137,7 +137,7 @@ const complete = async (ctx) => {
     });
 
     await ctx.reply(
-      `✓ ${name}\n${formatPrice(price)}`,
+      `✅ ${name} — ${formatPrice(price)}`,
       successButtons
     );
 

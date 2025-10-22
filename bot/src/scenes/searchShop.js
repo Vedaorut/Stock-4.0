@@ -17,7 +17,7 @@ const enterShopName = async (ctx) => {
     logger.info('shop_search_step:name', { userId: ctx.from.id });
     
     await ctx.reply(
-      'Введите название магазина',
+      'Название (мин 2 символа):',
       cancelButton
     );
 
@@ -69,7 +69,7 @@ const showResults = async (ctx) => {
         : (shop.seller_first_name || 'Продавец');
 
       await ctx.reply(
-        `${shop.name}\nПродавец: ${sellerUsername}\n\n`,
+        `${shop.name} • ${sellerUsername}`,
         shopActionsKeyboard(shop.id, Boolean(shop.is_subscribed))
       );
 

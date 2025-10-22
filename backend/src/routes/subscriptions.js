@@ -1,6 +1,7 @@
 import express from 'express';
 import { subscriptionController } from '../controllers/subscriptionController.js';
 import { verifyToken } from '../middleware/auth.js';
+import { optionalTelegramAuth } from '../middleware/telegramAuth.js';
 import { body, param, query } from 'express-validator';
 import { validate } from '../middleware/validation.js';
 
@@ -9,11 +10,12 @@ const router = express.Router();
 /**
  * @route   POST /api/subscriptions
  * @desc    Subscribe to a shop
- * @access  Private
+ * @access  Private (WebApp)
  */
 router.post(
   '/',
   verifyToken,
+  optionalTelegramAuth,
   [
     body('shopId')
       .isInt({ min: 1 })
@@ -26,11 +28,12 @@ router.post(
 /**
  * @route   GET /api/subscriptions
  * @desc    Get current user's subscriptions
- * @access  Private
+ * @access  Private (WebApp)
  */
 router.get(
   '/',
   verifyToken,
+  optionalTelegramAuth,
   [
     query('page').optional().isInt({ min: 1 }).withMessage('Page must be a positive integer'),
     query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100'),
@@ -57,11 +60,12 @@ router.get(
 /**
  * @route   GET /api/subscriptions/check/:shopId
  * @desc    Check if user is subscribed to shop
- * @access  Private
+ * @access  Private (WebApp)
  */
 router.get(
   '/check/:shopId',
   verifyToken,
+  optionalTelegramAuth,
   [
     param('shopId').isInt({ min: 1 }).withMessage('Valid shop ID is required'),
     validate
@@ -72,11 +76,12 @@ router.get(
 /**
  * @route   DELETE /api/subscriptions/:shopId
  * @desc    Unsubscribe from a shop
- * @access  Private
+ * @access  Private (WebApp)
  */
 router.delete(
   '/:shopId',
   verifyToken,
+  optionalTelegramAuth,
   [
     param('shopId').isInt({ min: 1 }).withMessage('Valid shop ID is required'),
     validate

@@ -1,11 +1,8 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
 import { mockShops, mockProducts, mockSubscriptions, mockUser } from '../utils/mockData';
 import { generateWalletAddress, generateOrderId } from '../utils/paymentUtils';
 
-export const useStore = create(
-  persist(
-    (set, get) => ({
+export const useStore = create((set, get) => ({
       // User data
       user: mockUser,
       setUser: (user) => set({ user }),
@@ -170,12 +167,4 @@ export const useStore = create(
       // Language
       language: 'ru',
       setLanguage: (lang) => set({ language: lang })
-    }),
-    {
-      name: 'status-stock-storage',
-      partialize: (state) => ({
-        pendingOrders: state.pendingOrders
-      })
-    }
-  )
-);
+}));

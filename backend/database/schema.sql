@@ -65,7 +65,7 @@ CREATE TABLE products (
   name VARCHAR(255) NOT NULL,
   description TEXT,
   price DECIMAL(18, 8) NOT NULL CHECK (price > 0),
-  currency VARCHAR(10) CHECK (currency IN ('BTC', 'ETH', 'USDT', 'TON')),
+  currency VARCHAR(10) DEFAULT 'USD',
   stock_quantity INT DEFAULT 0 CHECK (stock_quantity >= 0),
   is_active BOOLEAN DEFAULT true,
   created_at TIMESTAMP DEFAULT NOW(),

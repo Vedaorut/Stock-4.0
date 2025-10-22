@@ -47,6 +47,27 @@ app.use(helmet({
 }));
 
 /**
+ * HTTPS enforcement in production
+ */
+if (config.nodeEnv === 'production' && process.env.HTTPS_ENABLED === 'true') {
+  app.use((req, res, next) => {
+    if (req.secure || req.headers['x-forwarded-proto'] === 'https') {
+      return next();
+    }
+    logger.info('HTTP → HTTPS redirect', { url: req.url, ip: req.ip });
+    return res.redirect(301, `https://${req.headers.host}${req.url}`);
+  });
+
+  // Add HSTS header for HTTPS security
+  app.use((req, res, next) => {
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    next();
+  });
+
+  logger.info('HTTPS enforcement enabled');
+}
+
+/**
  * CORS configuration
  */
 app.use(cors({

@@ -42,9 +42,9 @@ describe('/start Flow - Role Memory (P0)', () => {
     // Отправляем /start
     await testBot.handleUpdate(commandUpdate('start'));
 
-    // Проверяем что показали выбор роли
+    // Проверяем что показали выбор роли (minimalist: "Роль:")
     const lastText = testBot.getLastReplyText();
-    expect(lastText).toContain('Выберите роль');
+    expect(lastText).toContain('Роль:');
   });
 
   it.skip('повторный /start с ролью buyer → сразу buyer ЛК (БЕЗ вопроса о роли)', async () => {
