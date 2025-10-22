@@ -11,6 +11,76 @@ import logger from '../utils/logger.js';
  * Orchestrates AI calls and executes product operations
  */
 
+// Conversation history constants
+const MAX_HISTORY_MESSAGES = 20; // Keep last 20 messages (10 exchanges)
+const CONVERSATION_TIMEOUT = 30 * 60 * 1000; // 30 minutes
+
+/**
+ * Get conversation history from session
+ * @param {Object} ctx - Telegraf context
+ * @returns {Array} Conversation history messages
+ */
+function getConversationHistory(ctx) {
+  if (!ctx || !ctx.session || !ctx.session.aiConversation) {
+    return [];
+  }
+
+  const conversation = ctx.session.aiConversation;
+
+  // Check if conversation expired (30 min timeout)
+  if (conversation.lastActivity && Date.now() - conversation.lastActivity > CONVERSATION_TIMEOUT) {
+    logger.info('conversation_expired', { userId: ctx.from?.id });
+    delete ctx.session.aiConversation;
+    return [];
+  }
+
+  return conversation.messages || [];
+}
+
+/**
+ * Save messages to conversation history with sliding window
+ * @param {Object} ctx - Telegraf context
+ * @param {string} userMessage - User's message
+ * @param {string} assistantMessage - AI's response
+ */
+function saveToConversationHistory(ctx, userMessage, assistantMessage) {
+  if (!ctx || !ctx.session) {
+    return;
+  }
+
+  // Initialize conversation if not exists
+  if (!ctx.session.aiConversation) {
+    ctx.session.aiConversation = {
+      messages: [],
+      lastActivity: Date.now(),
+      messageCount: 0
+    };
+  }
+
+  const conversation = ctx.session.aiConversation;
+
+  // Add new messages
+  conversation.messages.push(
+    { role: 'user', content: userMessage },
+    { role: 'assistant', content: assistantMessage }
+  );
+
+  // Implement sliding window - keep only last N messages
+  if (conversation.messages.length > MAX_HISTORY_MESSAGES) {
+    conversation.messages = conversation.messages.slice(-MAX_HISTORY_MESSAGES);
+  }
+
+  // Update metadata
+  conversation.lastActivity = Date.now();
+  conversation.messageCount = (conversation.messageCount || 0) + 1;
+
+  logger.debug('conversation_history_saved', {
+    userId: ctx.from?.id,
+    messageCount: conversation.messageCount,
+    historyLength: conversation.messages.length
+  });
+}
+
 /**
  * Process AI command for product management
  * 
@@ -51,11 +121,21 @@ export async function processProductCommand(userCommand, context) {
     // Generate system prompt
     const systemPrompt = generateProductAIPrompt(shopName, products);
 
-    // Call DeepSeek API
+    // Get conversation history for context
+    const conversationHistory = getConversationHistory(ctx);
+
+    logger.debug('ai_processing_with_history', {
+      shopId,
+      historyLength: conversationHistory.length,
+      command: sanitizedCommand.slice(0, 50)
+    });
+
+    // Call DeepSeek API with conversation history
     const response = await deepseek.chat(
       systemPrompt,
       sanitizedCommand,
-      productTools
+      productTools,
+      conversationHistory
     );
 
     // Calculate cost
@@ -88,11 +168,24 @@ export async function processProductCommand(userCommand, context) {
       });
 
       // Execute the appropriate function
-      return await executeToolCall(functionName, args, { shopId, token, products, ctx });
+      const result = await executeToolCall(functionName, args, { shopId, token, products, ctx });
+
+      // Save conversation history (user command + function result)
+      if (ctx && result.message) {
+        saveToConversationHistory(ctx, sanitizedCommand, result.message);
+      }
+
+      return result;
     }
 
     // No tool call - AI responded with text
     const aiMessage = choice.message.content;
+
+    // Save conversation history (user command + AI text response)
+    if (ctx && aiMessage) {
+      saveToConversationHistory(ctx, sanitizedCommand, aiMessage);
+    }
+
     return {
       success: true,
       message: aiMessage || '✅ Команда обработана',

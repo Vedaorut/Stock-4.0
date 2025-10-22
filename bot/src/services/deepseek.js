@@ -32,20 +32,22 @@ class DeepSeekClient {
 
   /**
    * Call DeepSeek API with function calling (tool use)
-   * 
+   *
    * @param {string} systemPrompt - System prompt with context
    * @param {string} userMessage - User command
    * @param {Array} tools - Available tools/functions
+   * @param {Array} conversationHistory - Previous messages for context
    * @param {number} maxRetries - Max retry attempts
    * @returns {Object} API response with tool calls
    */
-  async chat(systemPrompt, userMessage, tools = [], maxRetries = 3) {
+  async chat(systemPrompt, userMessage, tools = [], conversationHistory = [], maxRetries = 3) {
     if (!this.isAvailable()) {
       throw new Error('DeepSeek API not configured');
     }
 
     const messages = [
       { role: 'system', content: systemPrompt },
+      ...conversationHistory,
       { role: 'user', content: userMessage }
     ];
 

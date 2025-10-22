@@ -10,6 +10,10 @@ export const handleStart = async (ctx) => {
   try {
     logger.info(`/start command from user ${ctx.from.id}`);
 
+    // Clear conversation history on /start
+    delete ctx.session.aiConversation;
+    delete ctx.session.pendingAI;
+
     // Check if user has saved role
     const savedRole = ctx.session.user?.selectedRole;
 
