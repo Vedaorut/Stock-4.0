@@ -117,9 +117,123 @@ class DeepSeekClient {
   }
 
   /**
+   * Call DeepSeek API with streaming for real-time responses
+   *
+   * @param {string} systemPrompt - System prompt with context
+   * @param {string} userMessage - User command
+   * @param {Array} tools - Available tools/functions
+   * @param {Array} conversationHistory - Previous messages for context
+   * @param {Function} onChunk - Callback called with each text chunk: (chunk: string, fullText: string) => void
+   * @returns {Object} Complete response with finish_reason, content, and tool_calls
+   */
+  async chatStreaming(systemPrompt, userMessage, tools = [], conversationHistory = [], onChunk = null) {
+    if (!this.isAvailable()) {
+      throw new Error('DeepSeek API not configured');
+    }
+
+    const messages = [
+      { role: 'system', content: systemPrompt },
+      ...conversationHistory,
+      { role: 'user', content: userMessage }
+    ];
+
+    const startTime = Date.now();
+    let fullText = '';
+    let toolCalls = [];
+    let finishReason = null;
+
+    try {
+      const stream = await this.client.chat.completions.create({
+        model: 'deepseek-chat',
+        messages,
+        tools: tools.length > 0 ? tools : undefined,
+        tool_choice: tools.length > 0 ? 'auto' : undefined,
+        temperature: 0.7,
+        max_tokens: 500,
+        stream: true  // Enable streaming
+      });
+
+      // Process stream chunks
+      for await (const chunk of stream) {
+        const delta = chunk.choices[0]?.delta;
+
+        if (!delta) continue;
+
+        // Handle text content
+        if (delta.content) {
+          fullText += delta.content;
+
+          // Call onChunk callback if provided
+          if (onChunk && typeof onChunk === 'function') {
+            await onChunk(delta.content, fullText);
+          }
+        }
+
+        // Handle tool calls (function calls)
+        if (delta.tool_calls) {
+          for (const toolCall of delta.tool_calls) {
+            const index = toolCall.index;
+
+            if (!toolCalls[index]) {
+              toolCalls[index] = {
+                id: toolCall.id || '',
+                type: 'function',
+                function: {
+                  name: toolCall.function?.name || '',
+                  arguments: toolCall.function?.arguments || ''
+                }
+              };
+            } else {
+              // Accumulate function arguments
+              if (toolCall.function?.arguments) {
+                toolCalls[index].function.arguments += toolCall.function.arguments;
+              }
+            }
+          }
+        }
+
+        // Capture finish reason
+        if (chunk.choices[0]?.finish_reason) {
+          finishReason = chunk.choices[0].finish_reason;
+        }
+      }
+
+      const latency = Date.now() - startTime;
+
+      logger.info('deepseek_streaming_api_call', {
+        latencyMs: latency,
+        textLength: fullText.length,
+        toolCallsCount: toolCalls.length,
+        finishReason
+      });
+
+      // Return response in same format as non-streaming chat()
+      return {
+        choices: [{
+          message: {
+            role: 'assistant',
+            content: fullText || null,
+            tool_calls: toolCalls.length > 0 ? toolCalls : undefined
+          },
+          finish_reason: finishReason
+        }],
+        model: 'deepseek-chat'
+      };
+
+    } catch (error) {
+      logger.error('DeepSeek streaming API error:', {
+        error: error.message,
+        status: error.status,
+        code: error.code
+      });
+      throw error;
+    }
+  }
+
+  /**
    * Calculate estimated cost for a request
    * Based on DeepSeek API pricing (as of 2025)
-   * 
+   *
    * @param {number} promptTokens - Input tokens
    * @param {number} completionTokens - Output tokens
    * @param {boolean} cacheHit - Whether prompt was cached

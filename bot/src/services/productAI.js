@@ -11,6 +11,24 @@ import logger from '../utils/logger.js';
  * Orchestrates AI calls and executes product operations
  */
 
+/**
+ * Format price - remove trailing zeros from PostgreSQL NUMERIC
+ * @param {string|number} price - Price value
+ * @returns {string} Formatted price (e.g., "1200" or "1200.50")
+ */
+function formatPrice(price) {
+  const num = parseFloat(price);
+  if (isNaN(num)) return '0';
+
+  // If integer, return without decimals
+  if (num % 1 === 0) {
+    return num.toString();
+  }
+
+  // Otherwise, format to 2 decimals and remove trailing zeros
+  return num.toFixed(2).replace(/\.?0+$/, '');
+}
+
 // Conversation history constants
 const MAX_HISTORY_MESSAGES = 20; // Keep last 20 messages (10 exchanges)
 const CONVERSATION_TIMEOUT = 30 * 60 * 1000; // 30 minutes
@@ -130,27 +148,64 @@ export async function processProductCommand(userCommand, context) {
       command: sanitizedCommand.slice(0, 50)
     });
 
-    // Call DeepSeek API with conversation history
-    const response = await deepseek.chat(
+    // Streaming state for Telegram message updates
+    let streamingMessage = null;
+    let lastUpdateTime = 0;
+    let wordCount = 0;
+    const UPDATE_THROTTLE_MS = 500; // Update max once per 500ms
+    const WORDS_PER_UPDATE = 15; // Or every 15 words
+
+    // NO initial message - first chunk will create it
+
+    // onChunk callback for streaming updates
+    const onChunk = async (chunk, fullText) => {
+      if (!ctx) return;
+
+      // Count words
+      wordCount++;
+
+      const now = Date.now();
+      const timeSinceLastUpdate = now - lastUpdateTime;
+
+      // Throttle updates: update every 15 words OR every 500ms
+      if (wordCount >= WORDS_PER_UPDATE || timeSinceLastUpdate >= UPDATE_THROTTLE_MS) {
+        try {
+          if (!streamingMessage) {
+            // First chunk - create new message
+            streamingMessage = await ctx.reply(fullText);
+          } else {
+            // Subsequent chunks - update existing message
+            await ctx.telegram.editMessageText(
+              streamingMessage.chat.id,
+              streamingMessage.message_id,
+              undefined,
+              fullText
+            );
+          }
+          lastUpdateTime = now;
+          wordCount = 0;
+        } catch (err) {
+          // Ignore edit errors (message not modified, too many requests, etc.)
+          if (err.response?.error_code !== 400) {
+            logger.warn('Streaming edit error:', err.message);
+          }
+        }
+      }
+    };
+
+    // Call DeepSeek API with streaming
+    const response = await deepseek.chatStreaming(
       systemPrompt,
       sanitizedCommand,
       productTools,
-      conversationHistory
-    );
-
-    // Calculate cost
-    const cost = deepseek.calculateCost(
-      response.usage?.prompt_tokens || 0,
-      response.usage?.completion_tokens || 0,
-      (response.usage?.prompt_cache_hit_tokens || 0) > 0
+      conversationHistory,
+      onChunk
     );
 
     logger.info('ai_product_command_processed', {
       shopId,
       command: sanitizedCommand,
-      tokensUsed: response.usage?.total_tokens,
-      cost: cost.toFixed(6),
-      cacheHit: (response.usage?.prompt_cache_hit_tokens || 0) > 0
+      streaming: true
     });
 
     const choice = response.choices[0];
@@ -167,6 +222,15 @@ export async function processProductCommand(userCommand, context) {
         arguments: args
       });
 
+      // Delete streaming message since function result will be in a new message
+      if (streamingMessage && ctx) {
+        try {
+          await ctx.telegram.deleteMessage(streamingMessage.chat.id, streamingMessage.message_id);
+        } catch (err) {
+          logger.warn('Failed to delete streaming message:', err.message);
+        }
+      }
+
       // Execute the appropriate function
       const result = await executeToolCall(functionName, args, { shopId, token, products, ctx });
 
@@ -180,6 +244,17 @@ export async function processProductCommand(userCommand, context) {
 
     // No tool call - AI responded with text
     const aiMessage = choice.message.content;
+
+    // If streaming was too fast and no message was created, send regular message
+    if (!streamingMessage && ctx && aiMessage) {
+      try {
+        await ctx.reply(aiMessage);
+      } catch (err) {
+        logger.warn('Failed to send AI message:', err.message);
+      }
+    }
+    // Note: If streamingMessage exists, it was already updated via onChunk callback
+    // No need for final update - would cause duplication
 
     // Save conversation history (user command + AI text response)
     if (ctx && aiMessage) {
@@ -240,6 +315,9 @@ async function executeToolCall(functionName, args, context) {
       case 'addProduct':
         return await handleAddProduct(args, shopId, token);
 
+      case 'bulkAddProducts':
+        return await handleBulkAddProducts(args, shopId, token);
+
       case 'deleteProduct':
         return await handleDeleteProduct(args, shopId, token, products);
 
@@ -286,7 +364,7 @@ async function executeToolCall(functionName, args, context) {
  * Add product handler
  */
 async function handleAddProduct(args, shopId, token) {
-  const { name, price, stock = 0 } = args;
+  const { name, price, stock } = args;
 
   // Validate
   if (!name || name.length < 3) {
@@ -300,6 +378,13 @@ async function handleAddProduct(args, shopId, token) {
     return {
       success: false,
       message: '❌ Цена должна быть больше 0'
+    };
+  }
+
+  if (stock === undefined || stock === null) {
+    return {
+      success: false,
+      message: '❌ Укажите количество товара. Например: "добавь iPhone за 500 10 штук"'
     };
   }
 
@@ -344,6 +429,143 @@ async function handleAddProduct(args, shopId, token) {
       message: '❌ Не удалось добавить товар'
     };
   }
+}
+
+/**
+ * Bulk add products handler
+ */
+async function handleBulkAddProducts(args, shopId, token) {
+  const { products } = args;
+
+  // Validate
+  if (!products || !Array.isArray(products)) {
+    return {
+      success: false,
+      message: '❌ Некорректный формат: ожидается массив товаров'
+    };
+  }
+
+  if (products.length < 2) {
+    return {
+      success: false,
+      message: '❌ Для bulk операции нужно минимум 2 товара'
+    };
+  }
+
+  const results = {
+    successful: [],
+    failed: []
+  };
+
+  // Process each product
+  for (const product of products) {
+    const { name, price, stock } = product;
+
+    // Validate individual product
+    if (!name || name.length < 3) {
+      results.failed.push({
+        name: name || 'unnamed',
+        reason: 'Название должно быть минимум 3 символа'
+      });
+      continue;
+    }
+
+    if (!price || price <= 0) {
+      results.failed.push({
+        name,
+        reason: 'Цена должна быть больше 0'
+      });
+      continue;
+    }
+
+    if (stock === undefined || stock === null) {
+      results.failed.push({
+        name,
+        reason: 'Не указано количество товара'
+      });
+      continue;
+    }
+
+    // Auto-transliterate
+    const transliteratedName = autoTransliterateProductName(name);
+    const translitInfo = getTransliterationInfo(name, transliteratedName);
+
+    // Log transliteration if occurred
+    if (translitInfo.changed) {
+      logger.info('product_name_transliterated', {
+        original: name,
+        transliterated: transliteratedName,
+        shopId
+      });
+    }
+
+    try {
+      const createdProduct = await productApi.createProduct({
+        name: transliteratedName,
+        price,
+        currency: 'USD',
+        shopId,
+        stockQuantity: stock
+      }, token);
+
+      const displayName = translitInfo.changed
+        ? `${transliteratedName} (${name})`
+        : transliteratedName;
+
+      results.successful.push({
+        name: displayName,
+        price,
+        stock,
+        data: createdProduct
+      });
+    } catch (error) {
+      logger.error('Bulk add product failed:', { name, error: error.message });
+      results.failed.push({
+        name,
+        reason: 'Ошибка API'
+      });
+    }
+  }
+
+  // Build result message
+  const successCount = results.successful.length;
+  const failCount = results.failed.length;
+
+  if (successCount === 0) {
+    return {
+      success: false,
+      message: `❌ Не удалось добавить товары (${failCount} ошибок):\n${results.failed.map(f => `• ${f.name}: ${f.reason}`).join('\n')}`,
+      data: results
+    };
+  }
+
+  let message = `✅ Добавлено товаров: ${successCount}/${products.length}\n\n`;
+
+  // Show successful products
+  results.successful.forEach(p => {
+    message += `• ${p.name} — $${formatPrice(p.price)}`;
+    if (p.stock > 0) {
+      message += ` (сток: ${p.stock})`;
+    }
+    message += '\n';
+  });
+
+  // Show failed products if any
+  if (failCount > 0) {
+    message += `\n❌ Ошибки (${failCount}):\n`;
+    results.failed.forEach(f => {
+      message += `• ${f.name}: ${f.reason}\n`;
+    });
+  }
+
+  return {
+    success: true,
+    message: message.trim(),
+    data: results,
+    operation: 'bulkAdd',
+    successCount,
+    failCount
+  };
 }
 
 /**
@@ -393,7 +615,7 @@ async function handleDeleteProduct(args, shopId, token, products) {
 
     return {
       success: true,
-      message: `✅ Удалён: ${product.name} ($${product.price})`,
+      message: `✅ Удалён: ${product.name} ($${formatPrice(product.price)})`,
       data: product,
       operation: 'delete'
     };
@@ -420,7 +642,7 @@ async function handleListProducts(products) {
   }
 
   const list = products
-    .map((p, i) => `${i + 1}. ${p.name} — $${p.price} (сток: ${p.stock_quantity || 0})`)
+    .map((p, i) => `${i + 1}. ${p.name} — $${formatPrice(p.price)} (сток: ${p.stock_quantity || 0})`)
     .join('\n');
 
   return {
@@ -536,7 +758,7 @@ async function handleUpdateProduct(args, shopId, token, products) {
     // Build change description
     const changes = [];
     if (newName) changes.push(`название: "${newName}"`);
-    if (newPrice !== undefined) changes.push(`цена: ${newPrice}`);
+    if (newPrice !== undefined) changes.push(`цена: ${formatPrice(newPrice)}`);
     if (newStock !== undefined) changes.push(`сток: ${newStock}`);
 
     return {
@@ -756,7 +978,7 @@ async function handleGetProductInfo(args, products) {
 
   return {
     success: true,
-    message: `📊 ${product.name}\nЦена: ${product.price}\nНа складе: ${product.stock_quantity || 0} шт.`,
+    message: `📊 ${product.name}\nЦена: $${formatPrice(product.price)}\nНа складе: ${product.stock_quantity || 0} шт.`,
     data: product,
     operation: 'info'
   };
