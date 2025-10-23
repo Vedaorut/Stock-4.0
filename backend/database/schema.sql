@@ -6,12 +6,13 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- Drop tables if exist (for clean migrations)
+DROP TABLE IF EXISTS synced_products CASCADE;
+DROP TABLE IF EXISTS shop_follows CASCADE;
 DROP TABLE IF EXISTS payments CASCADE;
 DROP TABLE IF EXISTS subscriptions CASCADE;
 DROP TABLE IF EXISTS order_items CASCADE;
 DROP TABLE IF EXISTS orders CASCADE;
 DROP TABLE IF EXISTS products CASCADE;
-DROP TABLE IF EXISTS shop_payments CASCADE;
 DROP TABLE IF EXISTS shops CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
 
@@ -78,6 +79,56 @@ COMMENT ON COLUMN products.currency IS 'Legacy field - products are priced in US
 COMMENT ON COLUMN products.stock_quantity IS 'Available stock quantity';
 
 -- ============================================
+-- Shop follows table
+-- ============================================
+CREATE TABLE shop_follows (
+  id SERIAL PRIMARY KEY,
+  follower_shop_id INT NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
+  source_shop_id INT NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
+  mode VARCHAR(20) NOT NULL CHECK (mode IN ('monitor', 'resell')),
+  markup_percentage DECIMAL(5, 2) DEFAULT 0 CHECK (markup_percentage >= 0 AND markup_percentage <= 500),
+  status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'paused', 'cancelled')),
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE(follower_shop_id, source_shop_id),
+  CHECK (follower_shop_id != source_shop_id)
+);
+
+COMMENT ON TABLE shop_follows IS 'Tracks follower→source shop relationships for dropshipping/reseller functionality';
+COMMENT ON COLUMN shop_follows.mode IS 'monitor: just watch, resell: auto-copy with markup';
+COMMENT ON COLUMN shop_follows.markup_percentage IS 'Markup percentage for resell mode (1-500%)';
+
+-- ============================================
+-- Synced products table
+-- ============================================
+CREATE TABLE synced_products (
+  id SERIAL PRIMARY KEY,
+  follow_id INT NOT NULL REFERENCES shop_follows(id) ON DELETE CASCADE,
+  synced_product_id INT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  source_product_id INT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  last_synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  conflict_status VARCHAR(20) DEFAULT 'synced' CHECK (conflict_status IN ('synced', 'conflict', 'manual_override')),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(synced_product_id),
+  UNIQUE(follow_id, source_product_id),
+  CHECK (synced_product_id != source_product_id)
+);
+
+COMMENT ON TABLE synced_products IS 'Tracks synced products between follower and source shops';
+COMMENT ON COLUMN synced_products.conflict_status IS 'synced: in sync, conflict: manual edits detected, manual_override: user kept manual edits';
+
+-- Indexes for follow tables
+CREATE INDEX idx_shop_follows_follower ON shop_follows(follower_shop_id);
+CREATE INDEX idx_shop_follows_source ON shop_follows(source_shop_id);
+CREATE INDEX idx_shop_follows_status ON shop_follows(status);
+CREATE INDEX idx_shop_follows_mode ON shop_follows(mode);
+
+CREATE INDEX idx_synced_products_follow ON synced_products(follow_id);
+CREATE INDEX idx_synced_products_source ON synced_products(source_product_id);
+CREATE INDEX idx_synced_products_synced ON synced_products(synced_product_id);
+CREATE INDEX idx_synced_products_conflict ON synced_products(conflict_status);
+
+-- ============================================
 -- Orders table
 -- ============================================
 CREATE TABLE orders (
@@ -130,25 +181,6 @@ CREATE TABLE subscriptions (
 );
 
 COMMENT ON TABLE subscriptions IS 'Stores user subscriptions to shops for notifications';
-
--- ============================================
--- Shop payments table (for $25 seller activation)
--- ============================================
-CREATE TABLE shop_payments (
-  id SERIAL PRIMARY KEY,
-  user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  shop_id INT REFERENCES shops(id) ON DELETE SET NULL,
-  amount DECIMAL(18, 8) NOT NULL CHECK (amount > 0),
-  currency VARCHAR(10) NOT NULL,
-  payment_hash VARCHAR(255) UNIQUE,
-  payment_address VARCHAR(255),
-  status VARCHAR(20) CHECK (status IN ('pending', 'confirmed', 'failed')) DEFAULT 'pending',
-  created_at TIMESTAMP DEFAULT NOW(),
-  verified_at TIMESTAMP
-);
-
-COMMENT ON TABLE shop_payments IS 'Stores $25 payments for shop activation';
-COMMENT ON COLUMN shop_payments.status IS 'Payment status: pending, confirmed, failed';
 
 -- ============================================
 -- Payments table (for crypto payment verification)

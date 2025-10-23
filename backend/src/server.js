@@ -25,6 +25,10 @@ import orderRoutes from './routes/orders.js';
 import paymentRoutes from './routes/payments.js';
 import subscriptionRoutes from './routes/subscriptions.js';
 import walletRoutes from './routes/wallets.js';
+import followRoutes from './routes/follows.js';
+
+// Import cron jobs
+import { startSyncCron, stopSyncCron } from './jobs/productSyncCron.js';
 
 /**
  * Initialize Express app
@@ -119,6 +123,7 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/wallets', walletRoutes);
+app.use('/api/follows', followRoutes);
 
 /**
  * 404 handler
@@ -160,6 +165,9 @@ const startServer = async () => {
 ║                                                        ║
 ╚════════════════════════════════════════════════════════╝
       `);
+
+      // Start product sync cron job
+      startSyncCron();
     });
 
     // Setup WebSocket server for real-time updates
@@ -216,6 +224,9 @@ const startServer = async () => {
     // Graceful shutdown
     const shutdown = async (signal) => {
       logger.info(`${signal} received, shutting down gracefully...`);
+
+      // Stop product sync cron job
+      stopSyncCron();
 
       server.close(async () => {
         logger.info('HTTP server closed');

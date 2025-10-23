@@ -4,6 +4,9 @@ import { formatPrice, formatOrderStatus } from '../../utils/format.js';
 import { formatProductsList, formatSalesList } from '../../utils/minimalist.js';
 import logger from '../../utils/logger.js';
 
+// Export follows handlers
+export * from './follows.js';
+
 /**
  * Handle seller role selection
  */

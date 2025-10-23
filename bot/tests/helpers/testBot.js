@@ -17,10 +17,12 @@ import createShopScene from '../../src/scenes/createShop.js';
 import addProductScene from '../../src/scenes/addProduct.js';
 import searchShopScene from '../../src/scenes/searchShop.js';
 import manageWalletsScene from '../../src/scenes/manageWallets.js';
+import createFollowScene from '../../src/scenes/createFollow.js';
 
 // Handlers
 import { handleStart } from '../../src/handlers/start.js';
 import { setupSellerHandlers } from '../../src/handlers/seller/index.js';
+import { setupFollowHandlers } from '../../src/handlers/seller/follows.js';
 import { setupBuyerHandlers } from '../../src/handlers/buyer/index.js';
 import { setupCommonHandlers } from '../../src/handlers/common.js';
 
@@ -80,23 +82,40 @@ export function createTestBot(options = {}) {
     createShopScene,
     addProductScene,
     searchShopScene,
-    manageWalletsScene
+    manageWalletsScene,
+    createFollowScene
   ]);
 
-  bot.use(session());
+  // ✅ FIX: Controlled session storage (same as session() middleware but with direct access)
+  // This allows tests to set session state via setSessionState() method
+  const sessionStorage = new Map();
+  const DEFAULT_CHAT_ID = 123456; // Default test chat ID (matches updateFactories.js)
 
-  // Mock session if provided
-  if (options.mockSession) {
-    bot.use(async (ctx, next) => {
-      ctx.session = ctx.session || {};
-      Object.assign(ctx.session, options.mockSession);
-      return next();
-    });
+  // Initialize default session ONCE (persists between handleUpdate calls)
+  if (!sessionStorage.has(DEFAULT_CHAT_ID)) {
+    sessionStorage.set(DEFAULT_CHAT_ID, options.mockSession ? { ...options.mockSession } : {});
   }
+
+  // Custom session middleware with controlled storage
+  bot.use(async (ctx, next) => {
+    const chatId = ctx.chat?.id || ctx.from?.id || DEFAULT_CHAT_ID;
+
+    // Get or create session for this chat (REUSES same object across calls)
+    if (!sessionStorage.has(chatId)) {
+      sessionStorage.set(chatId, options.mockSession ? { ...options.mockSession } : {});
+    }
+
+    // Attach session to context (reference to same object!)
+    ctx.session = sessionStorage.get(chatId);
+
+    return next();
+  });
 
   // ✅ FIX #3-5: lastContext middleware ДОЛЖЕН быть ПЕРЕД captor!
   // Иначе он добавляется ПОСЛЕ handlers и никогда не выполняется
-  let lastContext = null;
+  // Initialize lastContext with mockSession if provided (for getSession() to work before handleUpdate())
+  let lastContext = options.mockSession ? { session: { ...options.mockSession } } : null;
+
   bot.use(async (ctx, next) => {
     lastContext = ctx;
     return next();
@@ -119,6 +138,7 @@ export function createTestBot(options = {}) {
   // Register handlers
   bot.start(handleStart);
   setupSellerHandlers(bot);
+  setupFollowHandlers(bot);
   setupBuyerHandlers(bot);
   setupCommonHandlers(bot);
 
@@ -145,6 +165,17 @@ export function createTestBot(options = {}) {
   const getLastReplyText = () => {
     const lastReply = captor.getLastReply();
     return lastReply?.text || null;
+  };
+
+  /**
+   * Helper: получить последнюю клавиатуру (inline keyboard)
+   */
+  const getLastReplyKeyboard = () => {
+    const lastReply = captor.getLastReply();
+    if (!lastReply?.markup) return null;
+    
+    // Extract inline_keyboard from markup
+    return lastReply.markup.inline_keyboard || lastReply.markup;
   };
 
   /**
@@ -176,6 +207,33 @@ export function createTestBot(options = {}) {
     return lastContext?.session || null;
   };
 
+  /**
+   * Helper: установить session state напрямую в sessionStorage
+   * Используется для setup session state БЕЗ handleUpdate()
+   *
+   * @param {object} state - Session state для merge (например, { editingFollowId: 40 })
+   * @param {number} chatId - Chat ID (опционально, по умолчанию DEFAULT_CHAT_ID)
+   *
+   * @example
+   * testBot.setSessionState({ editingFollowId: 40 });
+   * await testBot.handleUpdate(textUpdate('15')); // session.editingFollowId доступен!
+   */
+  const setSessionState = (state, chatId = DEFAULT_CHAT_ID) => {
+    // Get existing session or create new one
+    const existingSession = sessionStorage.get(chatId) || (options.mockSession ? { ...options.mockSession } : {});
+
+    // Merge new state into existing session
+    const mergedSession = { ...existingSession, ...state };
+
+    // Update session in storage
+    sessionStorage.set(chatId, mergedSession);
+
+    // Also update lastContext if it exists (for getSession() to work immediately)
+    if (lastContext) {
+      lastContext.session = mergedSession;
+    }
+  };
+
   return {
     bot,
     captor,
@@ -183,10 +241,12 @@ export function createTestBot(options = {}) {
     reset,
     // Helper methods
     getLastReplyText,
+    getLastReplyKeyboard,
     getLastMarkup,
     wasCallbackAnswered,
     getReplies,
     getSession,
+    setSessionState,  // ← NEW METHOD
     // Raw access
     telegram: bot.telegram,
     calls: captor.calls

@@ -5,6 +5,7 @@ import config from '../config/index.js';
 export const sellerMenu = (shopName) => Markup.inlineKeyboard([
   [Markup.button.webApp('📱 Открыть', config.webAppUrl)],
   [Markup.button.callback('📦 Товары', 'seller:products')],
+  [Markup.button.callback('📡 Подписки', 'seller:follows')],
   [Markup.button.callback('💰 Продажи', 'seller:sales')],
   [Markup.button.callback('💼 Кошельки', 'seller:wallets')],
   [Markup.button.callback('🔄 Покупатель', 'role:toggle')]
@@ -14,6 +15,20 @@ export const sellerMenu = (shopName) => Markup.inlineKeyboard([
 export const productsMenu = (shopName) => Markup.inlineKeyboard([
   [Markup.button.callback('➕ Добавить', 'seller:add_product')],
   [Markup.button.callback('« Назад', 'seller:main')]
+]);
+
+// Follows menu - minimalist
+export const followsMenu = (shopName) => Markup.inlineKeyboard([
+  [Markup.button.callback('➕ Подписаться', 'follows:create')],
+  [Markup.button.callback('« Назад', 'seller:main')]
+]);
+
+// Follow detail menu
+export const followDetailMenu = (followId) => Markup.inlineKeyboard([
+  [Markup.button.callback('✏️ Наценка', `follow_edit:${followId}`)],
+  [Markup.button.callback('🔄 Режим', `follow_mode:${followId}`)],
+  [Markup.button.callback('🗑 Удалить', `follow_delete:${followId}`)],
+  [Markup.button.callback('« Назад', 'follows:list')]
 ]);
 
 // Seller menu (no shop - need registration) - minimalist

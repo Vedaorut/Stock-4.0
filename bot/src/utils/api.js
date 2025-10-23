@@ -278,6 +278,84 @@ export const subscriptionApi = {
     });
     // Unwrap response: return data.data instead of wrapper
     return data.data || data;
+  },
+
+  // Get shop subscribers (shop owner only)
+  async getShopSubscribers(shopId, token) {
+    const { data } = await api.get(`/subscriptions/shop/${shopId}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    // Unwrap response: return data.data (object with subscribers array and count) instead of wrapper
+    return data.data || data;
+  }
+};
+
+export const followApi = {
+  // Get my follows
+  async getMyFollows(shopId, token) {
+    const { data } = await api.get('/follows/my', {
+      params: { shopId },
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    return data.data || data;
+  },
+
+  // Check follow limit (FREE tier = 2)
+  async checkFollowLimit(shopId, token) {
+    const { data } = await api.get('/follows/check-limit', {
+      params: { shopId },
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    return data.data || data;
+  },
+
+  // Create follow
+  async createFollow(followData, token) {
+    const { data } = await api.post(
+      '/follows',
+      followData,
+      {
+        headers: { Authorization: `Bearer ${token}` }
+      }
+    );
+    return data.data || data;
+  },
+
+  // Update markup
+  async updateMarkup(followId, markupPercentage, token) {
+    const { data } = await api.put(
+      `/follows/${followId}/markup`,
+      { markupPercentage: Number(markupPercentage) },
+      {
+        headers: { Authorization: `Bearer ${token}` }
+      }
+    );
+    return data.data || data;
+  },
+
+  // Switch mode (monitor ↔ resell)
+  async switchMode(followId, mode, token, markupPercentage = null) {
+    const requestBody = { mode };
+    if (markupPercentage !== null) {
+      requestBody.markupPercentage = Number(markupPercentage);
+    }
+    
+    const { data } = await api.put(
+      `/follows/${followId}/mode`,
+      requestBody,
+      {
+        headers: { Authorization: `Bearer ${token}` }
+      }
+    );
+    return data.data || data;
+  },
+
+  // Delete follow
+  async deleteFollow(followId, token) {
+    const { data } = await api.delete(`/follows/${followId}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    return data.data || data;
   }
 };
 

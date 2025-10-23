@@ -12,10 +12,11 @@ import createShopScene from './scenes/createShop.js';
 import addProductScene from './scenes/addProduct.js';
 import searchShopScene from './scenes/searchShop.js';
 import manageWalletsScene from './scenes/manageWallets.js';
+import createFollowScene from './scenes/createFollow.js';
 
 // Handlers
 import { handleStart } from './handlers/start.js';
-import { setupSellerHandlers } from './handlers/seller/index.js';
+import { setupSellerHandlers, setupFollowHandlers } from './handlers/seller/index.js';
 import { setupBuyerHandlers } from './handlers/buyer/index.js';
 import { setupCommonHandlers } from './handlers/common.js';
 import { setupAIProductHandlers } from './handlers/seller/aiProducts.js';
@@ -36,7 +37,8 @@ const stage = new Scenes.Stage([
   createShopScene,
   addProductScene,
   searchShopScene,
-  manageWalletsScene
+  manageWalletsScene,
+  createFollowScene
 ]);
 
 bot.use(session());
@@ -64,6 +66,7 @@ bot.use(errorMiddleware);
 // Register handlers
 bot.start(handleStart);
 setupSellerHandlers(bot);
+setupFollowHandlers(bot);
 setupBuyerHandlers(bot);
 setupCommonHandlers(bot);
 

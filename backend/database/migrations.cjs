@@ -323,6 +323,146 @@ async function addPaymentAddressConstraint() {
 }
 
 /**
+ * Run incremental migration: Add Follow Shop feature tables
+ * - Creates shop_follows table (follower → source shop relationships)
+ * - Creates synced_products table (tracks synced products)
+ * - Adds indexes for performance
+ */
+async function addFollowShopFeature() {
+  log.header('Running Incremental Migration: Add Follow Shop Feature');
+  const client = await pool.connect();
+  try {
+    // Step 1: Check if shop_follows table already exists
+    log.info('Checking if shop_follows table exists...');
+    const checkShopFollows = await client.query(`
+      SELECT table_name
+      FROM information_schema.tables
+      WHERE table_name = 'shop_follows'
+    `);
+
+    if (checkShopFollows.rows.length > 0) {
+      log.warning('Table shop_follows already exists, verifying constraints');
+
+      // Ensure markup defaults to 0 for monitor mode
+      await client.query(`
+        ALTER TABLE shop_follows
+        ALTER COLUMN markup_percentage SET DEFAULT 0
+      `);
+
+      // Replace legacy constraint that required markup >= 1
+      await client.query(`
+        ALTER TABLE shop_follows
+        DROP CONSTRAINT IF EXISTS shop_follows_markup_percentage_check
+      `);
+      await client.query(`
+        ALTER TABLE shop_follows
+        ADD CONSTRAINT shop_follows_markup_percentage_check
+        CHECK (markup_percentage >= 0 AND markup_percentage <= 500)
+      `);
+
+      log.success('Existing shop_follows table constraints updated');
+      return;
+    }
+
+    // Step 2: Create shop_follows table
+    log.info('Creating shop_follows table...');
+    await client.query(`
+      CREATE TABLE shop_follows (
+        id SERIAL PRIMARY KEY,
+        follower_shop_id INT NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
+        source_shop_id INT NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
+        mode VARCHAR(20) NOT NULL CHECK (mode IN ('monitor', 'resell')),
+        markup_percentage DECIMAL(5, 2) DEFAULT 0 CHECK (markup_percentage >= 0 AND markup_percentage <= 500),
+        status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'paused', 'cancelled')),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(follower_shop_id, source_shop_id),
+        CHECK (follower_shop_id != source_shop_id)
+      )
+    `);
+    log.success('Table shop_follows created successfully');
+
+    // Step 3: Create synced_products table
+    log.info('Creating synced_products table...');
+    await client.query(`
+      CREATE TABLE synced_products (
+        id SERIAL PRIMARY KEY,
+        follow_id INT NOT NULL REFERENCES shop_follows(id) ON DELETE CASCADE,
+        synced_product_id INT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+        source_product_id INT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+        last_synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        conflict_status VARCHAR(20) DEFAULT 'synced' CHECK (conflict_status IN ('synced', 'conflict', 'manual_override')),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(synced_product_id),
+        UNIQUE(follow_id, source_product_id),
+        CHECK (synced_product_id != source_product_id)
+      )
+    `);
+    log.success('Table synced_products created successfully');
+
+    // Step 4: Add indexes on shop_follows
+    log.info('Creating indexes on shop_follows...');
+    await client.query('CREATE INDEX idx_shop_follows_follower ON shop_follows(follower_shop_id)');
+    await client.query('CREATE INDEX idx_shop_follows_source ON shop_follows(source_shop_id)');
+    await client.query('CREATE INDEX idx_shop_follows_mode ON shop_follows(mode)');
+    await client.query('CREATE INDEX idx_shop_follows_status ON shop_follows(status)');
+    log.success('Indexes on shop_follows created successfully');
+
+    // Step 5: Add indexes on synced_products
+    log.info('Creating indexes on synced_products...');
+    await client.query('CREATE INDEX idx_synced_products_follow ON synced_products(follow_id)');
+    await client.query('CREATE INDEX idx_synced_products_synced ON synced_products(synced_product_id)');
+    await client.query('CREATE INDEX idx_synced_products_source ON synced_products(source_product_id)');
+    await client.query('CREATE INDEX idx_synced_products_conflict ON synced_products(conflict_status)');
+    log.success('Indexes on synced_products created successfully');
+
+    // Step 6: Add comments for documentation
+    log.info('Adding table comments...');
+    await client.query(`
+      COMMENT ON TABLE shop_follows IS 'Tracks follower→source shop relationships for dropshipping/reseller functionality';
+      COMMENT ON TABLE synced_products IS 'Tracks synced products between follower and source shops';
+      COMMENT ON COLUMN shop_follows.mode IS 'monitor: just watch, resell: auto-copy with markup';
+      COMMENT ON COLUMN shop_follows.markup_percentage IS 'Markup percentage for resell mode (1-500%)';
+      COMMENT ON COLUMN synced_products.conflict_status IS 'synced: in sync, conflict: manual edit detected, manual_override: user chose to keep manual edits';
+    `);
+    log.success('Table comments added successfully');
+
+    log.success('Migration completed: Follow Shop feature tables created');
+  } catch (error) {
+    log.error(`Migration failed: ${error.message}`);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Rollback incremental migration: Remove Follow Shop feature tables
+ * Use with caution - this will delete all follow relationships and synced products!
+ */
+async function rollbackFollowShopFeature() {
+  log.header('Rolling back Follow Shop Feature');
+  log.warning('This will delete all follow relationships and synced products!');
+  const client = await pool.connect();
+  try {
+    log.info('Dropping synced_products table...');
+    await client.query('DROP TABLE IF EXISTS synced_products CASCADE');
+    log.success('Table synced_products dropped');
+
+    log.info('Dropping shop_follows table...');
+    await client.query('DROP TABLE IF EXISTS shop_follows CASCADE');
+    log.success('Table shop_follows dropped');
+
+    log.success('Rollback completed: Follow Shop feature removed');
+  } catch (error) {
+    log.error(`Rollback failed: ${error.message}`);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+/**
  * Enable required PostgreSQL extensions
  */
 async function enableExtensions() {
@@ -367,7 +507,7 @@ async function verifyTables() {
 
     const expectedTables = [
       'users', 'shops', 'products', 'orders',
-      'order_items', 'subscriptions', 'shop_payments'
+      'order_items', 'subscriptions', 'payments'
     ];
 
     const foundTables = result.rows.map(r => r.table_name);
@@ -432,11 +572,13 @@ async function dropAllTables() {
   const client = await pool.connect();
   try {
     await client.query(`
+      DROP TABLE IF EXISTS synced_products CASCADE;
+      DROP TABLE IF EXISTS shop_follows CASCADE;
+      DROP TABLE IF EXISTS payments CASCADE;
       DROP TABLE IF EXISTS subscriptions CASCADE;
       DROP TABLE IF EXISTS order_items CASCADE;
       DROP TABLE IF EXISTS orders CASCADE;
       DROP TABLE IF EXISTS products CASCADE;
-      DROP TABLE IF EXISTS shop_payments CASCADE;
       DROP TABLE IF EXISTS shops CASCADE;
       DROP TABLE IF EXISTS users CASCADE;
     `);
@@ -514,6 +656,14 @@ async function migrate(options = {}) {
       await addPaymentAddressConstraint();
     }
 
+    if (options.addFollowShop) {
+      await addFollowShopFeature();
+    }
+
+    if (options.rollbackFollowShop) {
+      await rollbackFollowShopFeature();
+    }
+
     // Verify tables
     if (verify) {
       await verifyTables();
@@ -551,6 +701,8 @@ function parseArgs() {
     migrateToUSD: args.includes('--migrate-to-usd'),
     removeCurrencyConstraint: args.includes('--fix-currency'),
     fixPaymentAddress: args.includes('--fix-payment-address'),
+    addFollowShop: args.includes('--add-follow-shop'),
+    rollbackFollowShop: args.includes('--rollback-follow-shop'),
   };
 
   // Show help
@@ -568,6 +720,8 @@ Options:
   --migrate-to-usd       Run incremental migration: Migrate products to USD-only pricing
   --fix-currency         Run incremental migration: Remove currency constraint to allow USD
   --fix-payment-address  Run incremental migration: Add NOT NULL constraint to payments.payment_address
+  --add-follow-shop      Run incremental migration: Add Follow Shop feature (shop_follows + synced_products tables)
+  --rollback-follow-shop Rollback Follow Shop feature (WARNING: deletes all follow data!)
   --no-schema            Skip schema migration
   --no-indexes           Skip index creation
   --no-extensions        Skip extension setup
@@ -582,6 +736,8 @@ Examples:
   node migrations.js --migrate-to-usd         # Migrate products to USD-only pricing
   node migrations.js --fix-currency           # Fix currency constraint to allow USD
   node migrations.js --fix-payment-address    # Add NOT NULL constraint to payments.payment_address
+  node migrations.js --add-follow-shop        # Add Follow Shop feature tables
+  node migrations.js --rollback-follow-shop   # Remove Follow Shop feature (DESTRUCTIVE)
   node migrations.js --no-indexes             # Run without indexes
     `);
     process.exit(0);
@@ -610,4 +766,6 @@ module.exports = {
   migrateProductsToUSD,
   removeCurrencyConstraint,
   addPaymentAddressConstraint,
+  addFollowShopFeature,
+  rollbackFollowShopFeature,
 };

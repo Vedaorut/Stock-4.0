@@ -219,7 +219,7 @@ export const errorMessage = (action, reason = 'Попробуйте позже')
 /**
  * Format wallet display (inline)
  * Compresses 9 lines → 3 lines (67% reduction)
- * 
+ *
  * @param {Object} shop - Shop object with wallet fields
  * @returns {string} Formatted message
  */
@@ -235,3 +235,41 @@ export const formatWallets = (shop) => {
 
   return msg;
 };
+
+/**
+ * Format follows list (minimalist - 3 lines max)
+ *
+ * @param {Array} follows - Array of follow objects
+ * @param {string} shopName - Shop name for header
+ * @returns {string} Formatted message
+ */
+export function formatFollowsList(follows, shopName) {
+  if (!follows || follows.length === 0) {
+    return `📡 Подписки (0)\n\nПодписок пока нет`;
+  }
+
+  const followsText = follows
+    .map((f) => {
+      const modeIcon = f.mode === 'resell' ? '💰' : '👀';
+      const markup = f.mode === 'resell' ? ` +${f.markup_percentage}%` : '';
+      return `${modeIcon} ${f.source_shop_name}${markup}`;
+    })
+    .join('\n');
+
+  return `📡 Подписки (${follows.length})\n\n${followsText}`;
+}
+
+/**
+ * Format follow detail (minimalist)
+ *
+ * @param {Object} follow - Follow object
+ * @returns {string} Formatted message
+ */
+export function formatFollowDetail(follow) {
+  const modeIcon = follow.mode === 'resell' ? '💰 Resell' : '👀 Monitor';
+  const markupLine = follow.mode === 'resell'
+    ? `\nНаценка: +${follow.markup_percentage}%`
+    : '';
+
+  return `${modeIcon}\n\n${follow.source_shop_name}${markupLine}`;
+}
