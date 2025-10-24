@@ -10,6 +10,32 @@ import logger from '../../utils/logger.js';
  */
 
 /**
+ * Delete AI message pair (user question + bot answer)
+ * @param {Object} ctx - Telegraf context
+ * @param {Object} pair - { userMsgId, botMsgId }
+ */
+async function deleteAIPair(ctx, pair) {
+  if (!pair) return;
+
+  try {
+    if (pair.userMsgId) {
+      await ctx.deleteMessage(pair.userMsgId);
+    }
+  } catch (err) {
+    // Ignore errors - message might be already deleted or too old (>48h)
+    logger.debug('Could not delete user AI message:', err.message);
+  }
+
+  try {
+    if (pair.botMsgId) {
+      await ctx.deleteMessage(pair.botMsgId);
+    }
+  } catch (err) {
+    logger.debug('Could not delete bot AI message:', err.message);
+  }
+}
+
+/**
  * Handle AI product command
  * Called when seller (with shop) sends a text message
  */
@@ -63,6 +89,19 @@ export async function handleAIProductCommand(ctx) {
 
     // Mark as processing
     ctx.session.aiProcessing = true;
+
+    // === MESSAGE CLEANUP: Delete previous AI pair + cancel timer ===
+    // Clear existing cleanup timer if exists
+    if (ctx.session.aiCleanupTimer) {
+      clearTimeout(ctx.session.aiCleanupTimer);
+      ctx.session.aiCleanupTimer = null;
+    }
+
+    // Delete previous AI message pair (question + answer)
+    if (ctx.session.lastAIPair) {
+      await deleteAIPair(ctx, ctx.session.lastAIPair);
+      ctx.session.lastAIPair = null;
+    }
 
     // Rate limiting - max 10 AI commands per minute
     if (!ctx.session.aiCommands) {
@@ -128,11 +167,54 @@ export async function handleAIProductCommand(ctx) {
 
     // ONLY send message for tool call results (they weren't sent via streaming)
     // Text responses were already sent via streaming in processProductCommand
-    if (result.operation) {
-      // Tool call result - send it
-      await ctx.reply(result.message);
+    // ALSO send error messages that weren't sent (missing operation field)
+    if (result.operation || (!result.success && result.message)) {
+      // Tool call result OR error - send it
+      const botMsg = await ctx.reply(result.message);
+
+      // === MESSAGE CLEANUP: Track this pair + set auto-delete timer ===
+      const userMsgId = ctx.message.message_id;
+      const botMsgId = botMsg.message_id;
+
+      // Save pair for next cleanup
+      ctx.session.lastAIPair = {
+        userMsgId,
+        botMsgId
+      };
+
+      // Set 60-second auto-delete timer
+      ctx.session.aiCleanupTimer = setTimeout(async () => {
+        try {
+          await deleteAIPair(ctx, ctx.session.lastAIPair);
+          ctx.session.lastAIPair = null;
+          ctx.session.aiCleanupTimer = null;
+        } catch (err) {
+          logger.debug('AI cleanup timer error:', err.message);
+        }
+      }, 60000);
+    } else if (result.streamingMessageId) {
+      // === MESSAGE CLEANUP: Streaming text response (already sent) ===
+      const userMsgId = ctx.message.message_id;
+      const botMsgId = result.streamingMessageId;
+
+      // Save pair for next cleanup
+      ctx.session.lastAIPair = {
+        userMsgId,
+        botMsgId
+      };
+
+      // Set 60-second auto-delete timer
+      ctx.session.aiCleanupTimer = setTimeout(async () => {
+        try {
+          await deleteAIPair(ctx, ctx.session.lastAIPair);
+          ctx.session.lastAIPair = null;
+          ctx.session.aiCleanupTimer = null;
+        } catch (err) {
+          logger.debug('AI cleanup timer error:', err.message);
+        }
+      }, 60000);
     }
-    // If no operation field, it's a text response already sent via streaming
+    // If no operation field and success=true, it's a text response already sent via streaming
 
     // Log analytics
     logger.info('ai_command_result', {

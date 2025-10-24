@@ -15,7 +15,8 @@
     "db:setup": "createdb telegram_shop && npm run db:migrate",
     "backend": "cd backend && npm start",
     "webapp": "cd webapp && npm run dev",
-    "bot": "cd bot && npm start"
+    "bot": "cd bot && npm start",
+    "prepare": "husky"
   },
   "keywords": [
     "telegram",

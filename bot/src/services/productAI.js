@@ -300,7 +300,8 @@ export async function processProductCommand(userCommand, context) {
     return {
       success: true,
       message: aiMessage || '✅ Команда обработана',
-      data: null
+      data: null,
+      streamingMessageId: streamingMessage?.message_id // For message cleanup tracking
     };
 
   } catch (error) {

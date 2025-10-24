@@ -1,0 +1,22 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+echo "${YELLOW}🔍 Running pre-commit checks...${NC}"
+
+# Navigate to bot directory
+cd bot || exit 1
+
+# Run CI checks (lint + clean-chat + tests)
+echo "${YELLOW}📦 Running bot CI checks...${NC}"
+if npm run test:ci; then
+  echo "${GREEN}✅ All pre-commit checks passed!${NC}"
+else
+  echo "${RED}❌ Pre-commit checks failed. Please fix the issues before committing.${NC}"
+  exit 1
+fi

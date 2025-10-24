@@ -8,6 +8,7 @@ import authMiddleware from './middleware/auth.js';
 import errorMiddleware from './middleware/error.js';
 import debounceMiddleware from './middleware/debounce.js';
 import sessionRecoveryMiddleware from './middleware/sessionRecovery.js';
+import { cleanChatMonitor } from './middleware/cleanChatMonitor.js';
 
 // Scenes
 import createShopScene from './scenes/createShop.js';
@@ -71,6 +72,7 @@ bot.use((ctx, next) => {
 });
 
 // Apply clean chat middleware
+bot.use(cleanChatMonitor());        // Monitor message count (development only)
 bot.use(debounceMiddleware);        // Prevent rapid clicks
 bot.use(sessionRecoveryMiddleware); // Recover session after restart
 
@@ -141,7 +143,10 @@ export async function startBot() {
 }
 
 // Auto-start when run directly (not imported)
-if (import.meta.url === `file://${process.argv[1]}`) {
+// Check if this file is being run directly (not imported as a module)
+const isMainModule = process.argv[1] && import.meta.url.endsWith(process.argv[1].replace(/\\/g, '/'));
+
+if (isMainModule || process.argv[1]?.includes('bot.js')) {
   startBot().catch((error) => {
     logger.error('Bot startup failed:', error);
     process.exit(1);

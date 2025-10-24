@@ -1,0 +1,114 @@
+name: Bot CI - Clean Chat Compliance
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'bot/**'
+      - '.github/workflows/bot-ci.yml'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'bot/**'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+        cache-dependency-path: bot/package-lock.json
+    
+    - name: Install dependencies
+      working-directory: ./bot
+      run: npm ci
+    
+    - name: Run callback acknowledgment linter
+      working-directory: ./bot
+      run: npm run test:lint:bot
+    
+    - name: Run Clean Chat linter
+      working-directory: ./bot
+      run: npm run lint:clean-chat
+    
+    - name: Run unit tests
+      working-directory: ./bot
+      run: npm run test:unit
+    
+    - name: Run integration tests
+      working-directory: ./bot
+      run: npm run test:integration
+    
+    - name: Generate coverage report
+      working-directory: ./bot
+      run: npm run test:coverage
+    
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v4
+      with:
+        files: ./bot/coverage/lcov.info
+        flags: bot
+        name: bot-coverage
+        fail_ci_if_error: false
+  
+  lint:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+        cache-dependency-path: bot/package-lock.json
+    
+    - name: Install dependencies
+      working-directory: ./bot
+      run: npm ci
+    
+    - name: Run ESLint
+      working-directory: ./bot
+      run: npm run lint:check
+  
+  clean-chat-report:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+        cache-dependency-path: bot/package-lock.json
+    
+    - name: Install dependencies
+      working-directory: ./bot
+      run: npm ci
+    
+    - name: Generate Clean Chat Report
+      working-directory: ./bot
+      run: npm run lint:clean-chat > clean-chat-report.txt 2>&1 || true
+    
+    - name: Upload Clean Chat Report
+      uses: actions/upload-artifact@v4
+      with:
+        name: clean-chat-report
+        path: bot/clean-chat-report.txt
+        retention-days: 30

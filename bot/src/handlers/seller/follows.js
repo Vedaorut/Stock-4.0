@@ -209,7 +209,10 @@ export const handleEditMarkup = async (ctx) => {
     // Set session flag to capture next text message
     ctx.session.editingFollowId = followId;
 
-    await ctx.editMessageText('Новая наценка (%):\n\n1-500');
+    const promptMsg = await ctx.editMessageText('Новая наценка (%):\n\n1-500');
+    // Save message ID for later editMessageText
+    ctx.session.editingMessageId = promptMsg.message_id;
+
     logger.info(`User ${ctx.from.id} initiated markup edit for follow ${followId}`);
   } catch (error) {
     logger.error('Error initiating markup edit:', error);
@@ -228,18 +231,27 @@ export const handleMarkupUpdate = async (ctx) => {
 
   try {
     const followId = ctx.session.editingFollowId;
-    
-    // FIX VIOLATION #1: Track user message ID for cleanup
+    const editingMessageId = ctx.session.editingMessageId;
+
+    // Track user message ID for cleanup
     const userMsgId = ctx.message.message_id;
     const markupText = ctx.message.text.trim().replace(',', '.');
     const markup = parseFloat(markupText);
 
     if (isNaN(markup) || markup < 1 || markup > 500) {
-      await ctx.reply('Наценка должна быть 1-500%');
+      // FIX: Use editMessageText instead of reply
+      await ctx.telegram.editMessageText(
+        ctx.chat.id,
+        editingMessageId,
+        undefined,
+        'Наценка должна быть 1-500%'
+      );
+      // Don't delete session - allow retry
+      await ctx.deleteMessage(userMsgId).catch(() => {});
       return;
     }
 
-    // Delete user message BEFORE reply (clean chat pattern)
+    // Delete user message (clean chat pattern)
     await ctx.deleteMessage(userMsgId).catch((err) => {
       logger.debug(`Could not delete user message ${userMsgId}:`, err.message);
     });
@@ -249,32 +261,58 @@ export const handleMarkupUpdate = async (ctx) => {
       // Mode switch: use switchMode API (endpoint: /follows/:id/mode)
       await followApi.switchMode(followId, ctx.session.pendingModeSwitch, ctx.session.token, markup);
       delete ctx.session.pendingModeSwitch;
-      await ctx.reply('✅ Режим изменён');
+      // FIX: Use editMessageText instead of reply
+      await ctx.telegram.editMessageText(
+        ctx.chat.id,
+        editingMessageId,
+        undefined,
+        '✅ Режим изменён'
+      );
     } else {
       // Simple markup update: use updateMarkup API (endpoint: /follows/:id/markup)
       await followApi.updateMarkup(followId, markup, ctx.session.token);
-      await ctx.reply(`✅ Наценка обновлена: ${markup}%`);
+      // FIX: Use editMessageText instead of reply
+      await ctx.telegram.editMessageText(
+        ctx.chat.id,
+        editingMessageId,
+        undefined,
+        `✅ Наценка обновлена: ${markup}%`
+      );
     }
 
     delete ctx.session.editingFollowId;
+    delete ctx.session.editingMessageId;
     
     logger.info(`User ${ctx.from.id} updated markup for follow ${followId} to ${markup}%`);
   } catch (error) {
     logger.error('Error updating markup:', error);
-    
+
     const errorMsg = error.response?.data?.error;
-    
+    const editingMessageId = ctx.session.editingMessageId;
+
+    let message = '❌ Ошибка изменения наценки';
     if (error.response?.status === 402) {
-      await ctx.reply('❌ Лимит достигнут\n\nНужен PRO ($35/мес)');
+      message = '❌ Лимит достигнут\n\nНужен PRO ($35/мес)';
     } else if (error.response?.status === 404) {
-      await ctx.reply('❌ Подписка не найдена');
+      message = '❌ Подписка не найдена';
     } else if (errorMsg?.toLowerCase().includes('markup')) {
-      await ctx.reply('❌ Некорректная наценка (1-500%)');
-    } else {
-      await ctx.reply('❌ Ошибка изменения наценки');
+      message = '❌ Некорректная наценка (1-500%)';
     }
-    
+
+    // FIX: Use editMessageText instead of reply
+    if (editingMessageId) {
+      await ctx.telegram.editMessageText(
+        ctx.chat.id,
+        editingMessageId,
+        undefined,
+        message
+      ).catch((err) => {
+        logger.debug('Could not edit error message:', err.message);
+      });
+    }
+
     delete ctx.session.editingFollowId;
+    delete ctx.session.editingMessageId;
   }
 };
 

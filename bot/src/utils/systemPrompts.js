@@ -103,6 +103,15 @@ Input: "замени iPhone на Samsung за 300"
 Input: "добавь iPhone $500 и удали Samsung"
 ✅ [addProduct(name="iPhone", price=500, stock=10), deleteProduct(productName="Samsung")]
 
+Input: "выстави наличие 10 штук"
+✅ "Для какого товара выставить наличие 10 штук? Укажите название."
+
+Input: "поставь iPhone 15 штук"
+✅ updateProduct(productName="iPhone", updates={stock_quantity=15})
+
+Input: "измени цену на 500"
+✅ "Для какого товара изменить цену на $500?"
+
 === ANTI-PATTERNS (НЕ ДЕЛАЙ ТАК!) ===
 
 ❌ ПЛОХО - Добавлять только один товар из нескольких:

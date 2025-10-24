@@ -128,7 +128,7 @@ export const productTools = [
     strict: true,
     function: {
       name: 'updateProduct',
-      description: 'Обновить товар (цену, название или количество). ALWAYS call this function when user wants to change/update/modify product price, name, or stock. DO NOT respond with text, CALL the function.',
+      description: 'Обновить товар (цену, название или количество). ALWAYS call this function when user wants to: "изменить цену", "переименовать", "выставить наличие", "поставить сток", "добавить количество", "обновить остаток". IMPORTANT: If user does not specify product name, ask which product to update. DO NOT respond with text, CALL the function.',
       parameters: {
         type: 'object',
         properties: {
