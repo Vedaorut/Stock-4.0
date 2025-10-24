@@ -513,31 +513,33 @@ export const setupSellerHandlers = (bot) => {
         { headers: { Authorization: `Bearer ${ctx.session.token}` } }
       );
 
-      const { subscription, shop } = response.data;
+      // FIX BUG #1: Backend returns FLAT object without 'shop' field
+      const subscriptionData = response.data;
+      const shopName = ctx.session.shopName || 'Магазин';
 
       // Build message with subscription status
       let message = `📊 <b>Подписка магазина</b>\n\n`;
-      message += `🏪 <b>${shop.name}</b>\n\n`;
+      message += `🏪 <b>${shopName}</b>\n\n`;
 
       const buttons = [];
 
-      if (subscription) {
-        const tier = subscription.tier === 'pro' ? 'PRO 💎' : 'FREE';
-        const statusEmoji = subscription.status === 'active' ? '✅' :
-                            subscription.status === 'grace_period' ? '⚠️' : '❌';
+      if (subscriptionData.currentSubscription) {
+        const tier = subscriptionData.tier === 'pro' ? 'PRO 💎' : 'FREE';
+        const statusEmoji = subscriptionData.status === 'active' ? '✅' :
+                            subscriptionData.status === 'grace_period' ? '⚠️' : '❌';
 
         message += `📌 <b>Тариф:</b> ${tier}\n`;
-        message += `${statusEmoji} <b>Статус:</b> ${subscription.status}\n`;
-        message += `📅 <b>Действует до:</b> ${new Date(subscription.periodEnd).toLocaleDateString('ru-RU')}\n\n`;
+        message += `${statusEmoji} <b>Статус:</b> ${subscriptionData.status}\n`;
+        message += `📅 <b>Действует до:</b> ${new Date(subscriptionData.nextPaymentDue || subscriptionData.periodEnd).toLocaleDateString('ru-RU')}\n\n`;
 
         // Show appropriate action buttons based on status
-        if (subscription.status === 'inactive' || subscription.status === 'grace_period') {
+        if (subscriptionData.status === 'inactive' || subscriptionData.status === 'grace_period') {
           message += `⚠️ <b>Требуется оплата</b>\n`;
           message += `Оплатите подписку для продления активации магазина.\n\n`;
           buttons.push([Markup.button.callback('💳 Оплатить подписку', 'subscription:pay')]);
         }
 
-        if (subscription.tier === 'free' && subscription.status === 'active') {
+        if (subscriptionData.tier === 'free' && subscriptionData.status === 'active') {
           message += `💎 <b>Доступен апгрейд на PRO:</b>\n`;
           message += `• Безлимитные подписчики\n`;
           message += `• Рассылка при смене канала (2/мес)\n`;
@@ -545,7 +547,7 @@ export const setupSellerHandlers = (bot) => {
           buttons.push([Markup.button.callback('💎 Апгрейд на PRO ($35)', 'subscription:upgrade')]);
         }
 
-        if (subscription.tier === 'pro') {
+        if (subscriptionData.tier === 'pro') {
           message += `✨ <b>PRO функции активны:</b>\n`;
           message += `• ♾ Безлимитные подписчики\n`;
           message += `• 📢 Рассылка при смене канала\n`;

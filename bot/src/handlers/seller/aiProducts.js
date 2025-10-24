@@ -15,14 +15,24 @@ import logger from '../../utils/logger.js';
  */
 export async function handleAIProductCommand(ctx) {
   try {
-    // Only process if user is seller with a shop
-    if (ctx.session.role !== 'seller' || !ctx.session.shopId) {
-      return; // Ignore, not for AI
+    // FIX BUG #3: Check role FIRST - buyer has NO AI access
+    // Delete buyer's text messages silently (NO response, NO menu)
+    if (ctx.session.role === 'buyer') {
+      // Silent deletion - buyer should NOT see any AI messages
+      await ctx.deleteMessage(ctx.message.message_id).catch((err) => {
+        logger.debug('Could not delete buyer message:', err.message);
+      });
+      return; // Exit handler completely, no processing
     }
 
     // Check if in a scene
     if (ctx.scene.current) {
       return; // In a scene, let scene handle it
+    }
+
+    // Only process if user is seller with a shop
+    if (ctx.session.role !== 'seller' || !ctx.session.shopId) {
+      return; // Ignore, not for AI
     }
 
     // Get user message

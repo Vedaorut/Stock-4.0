@@ -41,7 +41,14 @@ const showResults = async (ctx) => {
       return;
     }
 
+    // FIX BUG #2: Track user message ID for cleanup
+    const userMsgId = ctx.message.message_id;
     const query = ctx.message.text.trim();
+
+    // Delete user message immediately (clean chat pattern)
+    await ctx.deleteMessage(userMsgId).catch((err) => {
+      logger.debug(`Could not delete user message ${userMsgId}:`, err.message);
+    });
 
     if (query.length < 2) {
       await smartMessage.send(ctx, {

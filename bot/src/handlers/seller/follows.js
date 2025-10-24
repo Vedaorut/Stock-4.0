@@ -228,6 +228,9 @@ export const handleMarkupUpdate = async (ctx) => {
 
   try {
     const followId = ctx.session.editingFollowId;
+    
+    // FIX VIOLATION #1: Track user message ID for cleanup
+    const userMsgId = ctx.message.message_id;
     const markupText = ctx.message.text.trim().replace(',', '.');
     const markup = parseFloat(markupText);
 
@@ -235,6 +238,11 @@ export const handleMarkupUpdate = async (ctx) => {
       await ctx.reply('Наценка должна быть 1-500%');
       return;
     }
+
+    // Delete user message BEFORE reply (clean chat pattern)
+    await ctx.deleteMessage(userMsgId).catch((err) => {
+      logger.debug(`Could not delete user message ${userMsgId}:`, err.message);
+    });
 
     // Check if this is a mode switch or simple markup update
     if (ctx.session.pendingModeSwitch) {
