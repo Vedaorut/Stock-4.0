@@ -1,5 +1,6 @@
-import { sellerMenu, sellerMenuNoShop, productsMenu } from '../../keyboards/seller.js';
-import { shopApi, authApi, productApi, orderApi } from '../../utils/api.js';
+import { sellerMenu, sellerMenuNoShop, sellerToolsMenu, productsMenu, subscriptionStatusMenu } from '../../keyboards/seller.js';
+import { manageWorkersMenu } from '../../keyboards/workspace.js';
+import { shopApi, authApi, productApi, orderApi, workerApi } from '../../utils/api.js';
 import { formatPrice, formatOrderStatus } from '../../utils/format.js';
 import { formatProductsList, formatSalesList } from '../../utils/minimalist.js';
 import logger from '../../utils/logger.js';
@@ -315,6 +316,396 @@ export const setupSellerHandlers = (bot) => {
   // Manage wallets
   bot.action('seller:wallets', handleWallets);
 
+  // Workers management
+  bot.action('seller:workers', handleWorkers);
+  bot.action('workers:add', handleWorkersAdd);
+  bot.action('workers:list', handleWorkersList);
+  bot.action(/^workers:remove:(\d+)$/, handleWorkerRemove);
+  bot.action(/^workers:remove:confirm:(\d+)$/, handleWorkerRemoveConfirm);
+
+  // Channel migration (PRO feature)
+  bot.action('seller:migrate_channel', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      await ctx.scene.enter('migrate_channel');
+    } catch (error) {
+      logger.error('Error entering migrate_channel scene:', error);
+      await ctx.answerCbQuery('❌ Ошибка', { show_alert: true });
+    }
+  });
+
+  // Subscription management
+  bot.action('subscription:pay', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      await ctx.scene.enter('pay_subscription');
+    } catch (error) {
+      logger.error('Error entering pay_subscription scene:', error);
+      await ctx.answerCbQuery('❌ Ошибка', { show_alert: true });
+    }
+  });
+
+  bot.action('subscription:upgrade', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      await ctx.scene.enter('upgrade_shop');
+    } catch (error) {
+      logger.error('Error entering upgrade_shop scene:', error);
+      await ctx.answerCbQuery('❌ Ошибка', { show_alert: true });
+    }
+  });
+
+  bot.action('subscription:status', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+
+      if (!ctx.session.shopId) {
+        await ctx.editMessageText(
+          'Сначала создайте магазин',
+          sellerMenuNoShop
+        );
+        return;
+      }
+
+      if (!ctx.session.token) {
+        await ctx.editMessageText(
+          'Необходима авторизация. Перезапустите бота командой /start',
+          sellerMenu(ctx.session.shopName || 'Магазин')
+        );
+        return;
+      }
+
+      // Get subscription status from backend
+      const api = await import('../../utils/api.js');
+      const response = await api.default.get(
+        `/subscriptions/status/${ctx.session.shopId}`,
+        { headers: { Authorization: `Bearer ${ctx.session.token}` } }
+      );
+
+      const { subscription, shop } = response.data;
+
+      let message = `📊 <b>Статус подписки</b>\n\n`;
+      message += `🏪 Магазин: ${shop.name}\n\n`;
+
+      if (subscription) {
+        const tier = subscription.tier === 'pro' ? 'PRO 💎' : 'FREE';
+        const statusEmoji = subscription.status === 'active' ? '✅' :
+                            subscription.status === 'grace_period' ? '⚠️' : '❌';
+
+        message += `📌 <b>Тариф:</b> ${tier}\n`;
+        message += `${statusEmoji} <b>Статус:</b> ${subscription.status}\n`;
+        message += `📅 <b>Действует до:</b> ${new Date(subscription.periodEnd).toLocaleDateString('ru-RU')}\n\n`;
+
+        if (subscription.status === 'grace_period') {
+          message += `⚠️ <b>Льготный период</b>\n`;
+          message += `Магазин будет деактивирован после окончания периода.\n\n`;
+        }
+
+        if (subscription.tier === 'free') {
+          message += `💎 <b>Апгрейд на PRO:</b>\n`;
+          message += `• Безлимитные подписчики\n`;
+          message += `• Рассылка при смене канала (2/мес)\n`;
+          message += `• Приоритетная поддержка\n`;
+        } else {
+          message += `✨ <b>PRO функции активны:</b>\n`;
+          message += `• ♾ Безлимитные подписчики\n`;
+          message += `• 📢 Рассылка при смене канала\n`;
+          message += `• ⭐️ Приоритетная поддержка\n`;
+        }
+      } else {
+        message += `❌ <b>Нет активной подписки</b>\n\n`;
+        message += `Оплатите подписку для активации магазина.\n\n`;
+        message += `<b>Тарифы (ежемесячно):</b>\n`;
+        message += `• FREE - $25/мес\n`;
+        message += `• PRO 💎 - $35/мес\n`;
+      }
+
+      const canUpgrade = subscription?.tier === 'free' && subscription?.status === 'active';
+      await ctx.editMessageText(
+        message,
+        {
+          parse_mode: 'HTML',
+          ...subscriptionStatusMenu(subscription?.tier || 'free', canUpgrade)
+        }
+      );
+
+      logger.info(`User ${ctx.from.id} viewed subscription status`);
+    } catch (error) {
+      logger.error('Error fetching subscription status:', error);
+      await ctx.editMessageText(
+        '❌ Ошибка загрузки статуса подписки',
+        sellerMenu(ctx.session.shopName || 'Магазин')
+      );
+    }
+  });
+
+  // Tools Submenu - advanced features (Wallets, Follows, Workers)
+  bot.action('seller:tools', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+
+      if (!ctx.session.shopId || !ctx.session.token) {
+        await ctx.editMessageText(
+          'Необходима авторизация. Перезапустите бота командой /start',
+          sellerMenu(ctx.session.shopName || 'Магазин')
+        );
+        return;
+      }
+
+      // Check if user is shop owner
+      const shopResponse = await shopApi.getShop(ctx.session.shopId, ctx.session.token);
+      const isOwner = shopResponse.owner_id === ctx.from.id;
+
+      await ctx.editMessageText(
+        '🔧 <b>Инструменты магазина</b>\n\nДополнительные функции для управления вашим магазином:',
+        { parse_mode: 'HTML', ...sellerToolsMenu(isOwner) }
+      );
+
+      logger.info(`User ${ctx.from.id} opened tools submenu`);
+    } catch (error) {
+      logger.error('Error in tools submenu handler:', error);
+      await ctx.editMessageText(
+        '❌ Ошибка загрузки инструментов',
+        sellerMenu(ctx.session.shopName || 'Магазин')
+      );
+    }
+  });
+
+  // Subscription Hub - unified entry point for all subscription actions
+  bot.action('subscription:hub', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+
+      if (!ctx.session.shopId) {
+        await ctx.editMessageText(
+          'Сначала создайте магазин',
+          sellerMenuNoShop
+        );
+        return;
+      }
+
+      if (!ctx.session.token) {
+        await ctx.editMessageText(
+          'Необходима авторизация. Перезапустите бота командой /start',
+          sellerMenu(ctx.session.shopName || 'Магазин')
+        );
+        return;
+      }
+
+      // Get subscription status from backend
+      const api = await import('../../utils/api.js');
+      const response = await api.default.get(
+        `/subscriptions/status/${ctx.session.shopId}`,
+        { headers: { Authorization: `Bearer ${ctx.session.token}` } }
+      );
+
+      const { subscription, shop } = response.data;
+
+      // Build message with subscription status
+      let message = `📊 <b>Подписка магазина</b>\n\n`;
+      message += `🏪 <b>${shop.name}</b>\n\n`;
+
+      const buttons = [];
+
+      if (subscription) {
+        const tier = subscription.tier === 'pro' ? 'PRO 💎' : 'FREE';
+        const statusEmoji = subscription.status === 'active' ? '✅' :
+                            subscription.status === 'grace_period' ? '⚠️' : '❌';
+
+        message += `📌 <b>Тариф:</b> ${tier}\n`;
+        message += `${statusEmoji} <b>Статус:</b> ${subscription.status}\n`;
+        message += `📅 <b>Действует до:</b> ${new Date(subscription.periodEnd).toLocaleDateString('ru-RU')}\n\n`;
+
+        // Show appropriate action buttons based on status
+        if (subscription.status === 'inactive' || subscription.status === 'grace_period') {
+          message += `⚠️ <b>Требуется оплата</b>\n`;
+          message += `Оплатите подписку для продления активации магазина.\n\n`;
+          buttons.push([Markup.button.callback('💳 Оплатить подписку', 'subscription:pay')]);
+        }
+
+        if (subscription.tier === 'free' && subscription.status === 'active') {
+          message += `💎 <b>Доступен апгрейд на PRO:</b>\n`;
+          message += `• Безлимитные подписчики\n`;
+          message += `• Рассылка при смене канала (2/мес)\n`;
+          message += `• Приоритетная поддержка\n\n`;
+          buttons.push([Markup.button.callback('💎 Апгрейд на PRO ($35)', 'subscription:upgrade')]);
+        }
+
+        if (subscription.tier === 'pro') {
+          message += `✨ <b>PRO функции активны:</b>\n`;
+          message += `• ♾ Безлимитные подписчики\n`;
+          message += `• 📢 Рассылка при смене канала\n`;
+          message += `• ⭐️ Приоритетная поддержка\n\n`;
+          buttons.push([Markup.button.callback('🔄 Миграция канала', 'seller:migrate_channel')]);
+        }
+      } else {
+        message += `❌ <b>Нет активной подписки</b>\n\n`;
+        message += `Оплатите подписку для активации магазина.\n\n`;
+        message += `<b>Тарифы (ежемесячно):</b>\n`;
+        message += `• FREE - $25/мес\n`;
+        message += `• PRO 💎 - $35/мес\n`;
+        buttons.push([Markup.button.callback('💳 Оплатить подписку', 'subscription:pay')]);
+      }
+
+      // Add back button
+      buttons.push([Markup.button.callback('◀️ Назад', 'seller:main')]);
+
+      await ctx.editMessageText(
+        message,
+        { parse_mode: 'HTML', ...Markup.inlineKeyboard(buttons) }
+      );
+
+      logger.info(`User ${ctx.from.id} opened subscription hub`);
+    } catch (error) {
+      logger.error('Error in subscription hub handler:', error);
+      await ctx.editMessageText(
+        '❌ Ошибка загрузки подписки',
+        sellerMenu(ctx.session.shopName || 'Магазин')
+      );
+    }
+  });
+
   // Back to seller menu
   bot.action('seller:main', handleSellerRole);
+};
+
+/**
+ * Handle workers management menu
+ */
+const handleWorkers = async (ctx) => {
+  try {
+    await ctx.answerCbQuery();
+
+    if (!ctx.session.shopId) {
+      await ctx.editMessageText(
+        'Сначала создайте магазин',
+        sellerMenuNoShop
+      );
+      return;
+    }
+
+    const shopName = ctx.session.shopName || 'Магазин';
+    await ctx.editMessageText(
+      `Работники магазина: ${shopName}`,
+      manageWorkersMenu(shopName)
+    );
+
+    logger.info(`User ${ctx.from.id} opened workers management`);
+  } catch (error) {
+    logger.error('Error in workers menu handler:', error);
+    const shopName = ctx.session.shopName || 'Магазин';
+    await ctx.editMessageText(
+      'Ошибка загрузки',
+      sellerMenu(shopName)
+    );
+  }
+};
+
+/**
+ * Handle add worker action
+ */
+const handleWorkersAdd = async (ctx) => {
+  try {
+    await ctx.answerCbQuery();
+
+    if (!ctx.session.shopId) {
+      await ctx.editMessageText(
+        'Сначала создайте магазин',
+        sellerMenuNoShop
+      );
+      return;
+    }
+
+    // Enter manageWorkers scene
+    await ctx.scene.enter('manageWorkers');
+  } catch (error) {
+    logger.error('Error entering manageWorkers scene:', error);
+    const shopName = ctx.session.shopName || 'Магазин';
+    await ctx.editMessageText(
+      'Произошла ошибка\n\nПопробуйте позже',
+      manageWorkersMenu(shopName)
+    );
+  }
+};
+
+/**
+ * Handle list workers action
+ */
+const handleWorkersList = async (ctx) => {
+  try {
+    await ctx.answerCbQuery();
+
+    if (!ctx.session.shopId) {
+      await ctx.editMessageText(
+        'Сначала создайте магазин',
+        sellerMenuNoShop
+      );
+      return;
+    }
+
+    if (!ctx.session.token) {
+      const shopName = ctx.session.shopName || 'Магазин';
+      await ctx.editMessageText(
+        'Необходима авторизация. Перезапустите бота командой /start',
+        manageWorkersMenu(shopName)
+      );
+      return;
+    }
+
+    // Get workers list
+    const workers = await workerApi.listWorkers(ctx.session.shopId, ctx.session.token);
+    const shopName = ctx.session.shopName || 'Магазин';
+
+    if (workers.length === 0) {
+      await ctx.editMessageText(
+        `Работники магазина: ${shopName}\n\nПока нет работников`,
+        manageWorkersMenu(shopName)
+      );
+      return;
+    }
+
+    // Format workers list
+    const workersList = workers.map((w, index) => {
+      const name = w.username ? `@${w.username}` : w.first_name || `ID:${w.telegram_id}`;
+      return `${index + 1}. ${name} (ID: ${w.telegram_id})`;
+    }).join('\n');
+
+    await ctx.editMessageText(
+      `Работники магазина: ${shopName}\n\n${workersList}`,
+      manageWorkersMenu(shopName)
+    );
+
+    logger.info(`User ${ctx.from.id} viewed workers list (${workers.length} total)`);
+  } catch (error) {
+    logger.error('Error fetching workers:', error);
+    const shopName = ctx.session.shopName || 'Магазин';
+    await ctx.editMessageText(
+      'Ошибка загрузки',
+      manageWorkersMenu(shopName)
+    );
+  }
+};
+
+/**
+ * Handle remove worker action
+ */
+const handleWorkerRemove = async (ctx) => {
+  try {
+    await ctx.answerCbQuery('Функция в разработке');
+    // TODO: Implement worker removal with confirmation
+  } catch (error) {
+    logger.error('Error in worker remove handler:', error);
+  }
+};
+
+/**
+ * Handle confirm worker removal
+ */
+const handleWorkerRemoveConfirm = async (ctx) => {
+  try {
+    await ctx.answerCbQuery('Функция в разработке');
+    // TODO: Implement worker removal confirmation
+  } catch (error) {
+    logger.error('Error in worker remove confirm handler:', error);
+  }
 };
