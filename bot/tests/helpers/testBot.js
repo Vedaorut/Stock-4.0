@@ -18,6 +18,7 @@ import addProductScene from '../../src/scenes/addProduct.js';
 import searchShopScene from '../../src/scenes/searchShop.js';
 import manageWalletsScene from '../../src/scenes/manageWallets.js';
 import createFollowScene from '../../src/scenes/createFollow.js';
+import migrateChannelScene from '../../src/scenes/migrateChannel.js';
 
 // Handlers
 import { handleStart } from '../../src/handlers/start.js';
@@ -25,6 +26,7 @@ import { setupSellerHandlers } from '../../src/handlers/seller/index.js';
 import { setupFollowHandlers } from '../../src/handlers/seller/follows.js';
 import { setupBuyerHandlers } from '../../src/handlers/buyer/index.js';
 import { setupCommonHandlers } from '../../src/handlers/common.js';
+import { setupAIProductHandlers } from '../../src/handlers/seller/aiProducts.js';
 
 import { createCallsCaptor } from './callsCaptor.js';
 
@@ -73,6 +75,7 @@ export function createTestBot(options = {}) {
   bot.telegram.editMessageText = jest.fn().mockResolvedValue(fallbackMockMessage);
   bot.telegram.answerCbQuery = jest.fn().mockResolvedValue({ ok: true });
   bot.telegram.deleteMessage = jest.fn().mockResolvedValue(true);
+  bot.telegram.sendChatAction = jest.fn().mockResolvedValue(true);  // AI handler uses this
 
   // Создаём captor для перехвата вызовов
   const captor = createCallsCaptor();
@@ -83,7 +86,8 @@ export function createTestBot(options = {}) {
     addProductScene,
     searchShopScene,
     manageWalletsScene,
-    createFollowScene
+    createFollowScene,
+    migrateChannelScene
   ]);
 
   // ✅ FIX: Controlled session storage (same as session() middleware but with direct access)
@@ -141,6 +145,9 @@ export function createTestBot(options = {}) {
   setupFollowHandlers(bot);
   setupBuyerHandlers(bot);
   setupCommonHandlers(bot);
+  
+  // AI Product Management (must be registered last to handle text messages)
+  setupAIProductHandlers(bot);
 
   /**
    * Helper: обработать update и подождать завершения

@@ -5,6 +5,7 @@ import { authApi } from '../utils/api.js';
 import { handleSellerRole } from './seller/index.js';
 import { handleBuyerRole } from './buyer/index.js';
 import logger from '../utils/logger.js';
+import * as smartMessage from '../utils/smartMessage.js';
 
 /**
  * Setup common handlers (main menu, cancel, etc.)
@@ -44,18 +45,18 @@ const handleMainMenu = async (ctx) => {
     // No saved role - show role selection
     ctx.session.role = null;
 
-    await ctx.editMessageText(
-      'Status Stock\n\nРоль:',
-      mainMenu
-    );
+    await smartMessage.send(ctx, {
+      text: 'Status Stock\n\nРоль:',
+      keyboard: mainMenu
+    });
   } catch (error) {
     logger.error('Error in main menu handler:', error);
     // Local error handling - don't throw to avoid infinite spinner
     try {
-      await ctx.editMessageText(
-        'Произошла ошибка\n\nПопробуйте позже',
-        mainMenu
-      );
+      await smartMessage.send(ctx, {
+        text: 'Произошла ошибка\n\nПопробуйте позже',
+        keyboard: mainMenu
+      });
     } catch (replyError) {
       logger.error('Failed to send error message:', replyError);
     }
@@ -73,18 +74,18 @@ const handleCancelScene = async (ctx) => {
     await ctx.scene.leave();
 
     // Return to main menu (minimalist)
-    await ctx.editMessageText(
-      'Status Stock\n\nРоль:',
-      mainMenu
-    );
+    await smartMessage.send(ctx, {
+      text: 'Status Stock\n\nРоль:',
+      keyboard: mainMenu
+    });
   } catch (error) {
     logger.error('Error canceling scene:', error);
     // Local error handling - don't throw to avoid infinite spinner
     try {
-      await ctx.editMessageText(
-        'Произошла ошибка\n\nПопробуйте позже',
-        mainMenu
-      );
+      await smartMessage.send(ctx, {
+        text: 'Произошла ошибка\n\nПопробуйте позже',
+        keyboard: mainMenu
+      });
     } catch (replyError) {
       logger.error('Failed to send error message:', replyError);
     }
@@ -100,29 +101,29 @@ const handleBack = async (ctx) => {
 
     // Route based on current role
     if (ctx.session.role === 'seller') {
-      await ctx.editMessageText(
-        'Мой магазин\n\n',
-        sellerMenu()
-      );
+      await smartMessage.send(ctx, {
+        text: 'Мой магазин\n\n',
+        keyboard: sellerMenu()
+      });
     } else if (ctx.session.role === 'buyer') {
-      await ctx.editMessageText(
-        'Мои покупки\n\n',
-        buyerMenu
-      );
+      await smartMessage.send(ctx, {
+        text: 'Мои покупки\n\n',
+        keyboard: buyerMenu
+      });
     } else {
-      await ctx.editMessageText(
-        'Status Stock\n\nРоль:',
-        mainMenu
-      );
+      await smartMessage.send(ctx, {
+        text: 'Status Stock\n\nРоль:',
+        keyboard: mainMenu
+      });
     }
   } catch (error) {
     logger.error('Error in back handler:', error);
     // Local error handling - don't throw to avoid infinite spinner
     try {
-      await ctx.editMessageText(
-        'Произошла ошибка\n\nПопробуйте позже',
-        mainMenu
-      );
+      await smartMessage.send(ctx, {
+        text: 'Произошла ошибка\n\nПопробуйте позже',
+        keyboard: mainMenu
+      });
     } catch (replyError) {
       logger.error('Failed to send error message:', replyError);
     }
@@ -141,10 +142,10 @@ const handleRoleToggle = async (ctx) => {
 
     if (!currentRole) {
       logger.warn(`User ${ctx.from.id} tried to toggle role without current role`);
-      await ctx.editMessageText(
-        'Telegram Shop\n\nВыберите роль:',
-        mainMenu
-      );
+      await smartMessage.send(ctx, {
+        text: 'Telegram Shop\n\nВыберите роль:',
+        keyboard: mainMenu
+      });
       return;
     }
 
@@ -181,10 +182,10 @@ const handleRoleToggle = async (ctx) => {
     logger.error('Error in role toggle handler:', error);
     // Local error handling - don't throw to avoid infinite spinner
     try {
-      await ctx.editMessageText(
-        'Произошла ошибка\n\nПопробуйте позже',
-        mainMenu
-      );
+      await smartMessage.send(ctx, {
+        text: 'Произошла ошибка\n\nПопробуйте позже',
+        keyboard: mainMenu
+      });
     } catch (replyError) {
       logger.error('Failed to send error message:', replyError);
     }

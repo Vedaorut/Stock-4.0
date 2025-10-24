@@ -4,6 +4,7 @@ import { shopApi, authApi, productApi, orderApi, workerApi } from '../../utils/a
 import { formatPrice, formatOrderStatus } from '../../utils/format.js';
 import { formatProductsList, formatSalesList } from '../../utils/minimalist.js';
 import logger from '../../utils/logger.js';
+import * as smartMessage from '../../utils/smartMessage.js';
 
 // Export follows handlers
 export * from './follows.js';
@@ -38,10 +39,10 @@ export const handleSellerRole = async (ctx) => {
       logger.warn(`User ${ctx.from.id} has no token, cannot check shop`);
       ctx.session.shopId = null;
       ctx.session.shopName = null;
-      await ctx.editMessageText(
-        'Создать магазин - $25',
-        sellerMenuNoShop
-      );
+      await smartMessage.send(ctx, {
+        text: 'Создать магазин - $25',
+        keyboard: sellerMenuNoShop
+      });
       return;
       }
 
@@ -67,18 +68,18 @@ export const handleSellerRole = async (ctx) => {
           savedToSession: ctx.session.shopId === shop.id
         });
 
-        await ctx.editMessageText(
-          `Мой магазин: ${shop.name}\n\n`,
-          sellerMenu(shop.name)
-        );
+        await smartMessage.send(ctx, {
+          text: `Мой магазин: ${shop.name}\n\n`,
+          keyboard: sellerMenu(shop.name)
+        });
       } else {
         logger.info(`User ${ctx.from.id} has no shops, showing create shop menu`);
         ctx.session.shopId = null;
         ctx.session.shopName = null;
-        await ctx.editMessageText(
-          'Создать магазин — $25',
-          sellerMenuNoShop
-        );
+        await smartMessage.send(ctx, {
+          text: 'Создать магазин — $25',
+          keyboard: sellerMenuNoShop
+        });
       }
     } catch (error) {
       logger.error('Error checking shop:', error);
@@ -87,28 +88,28 @@ export const handleSellerRole = async (ctx) => {
         // No shop found or auth failed
         ctx.session.shopId = null;
         ctx.session.shopName = null;
-        await ctx.editMessageText(
-          'Создать магазин - $25',
-          sellerMenuNoShop
-        );
+        await smartMessage.send(ctx, {
+          text: 'Создать магазин - $25',
+          keyboard: sellerMenuNoShop
+        });
       } else {
         // Real error (network, server)
         ctx.session.shopId = null;
         ctx.session.shopName = null;
-        await ctx.editMessageText(
-          'Ошибка загрузки',
-          sellerMenuNoShop
-        );
+        await smartMessage.send(ctx, {
+          text: 'Ошибка загрузки',
+          keyboard: sellerMenuNoShop
+        });
       }
     }
   } catch (error) {
     logger.error('Error in seller role handler:', error);
     // Local error handling - don't throw to avoid infinite spinner
     try {
-      await ctx.editMessageText(
-        'Произошла ошибка\n\nПопробуйте позже',
-        sellerMenuNoShop
-      );
+      await smartMessage.send(ctx, {
+        text: 'Произошла ошибка\n\nПопробуйте позже',
+        keyboard: sellerMenuNoShop
+      });
     } catch (replyError) {
       logger.error('Failed to send error message:', replyError);
     }
@@ -128,10 +129,10 @@ const handleCreateShop = async (ctx) => {
     logger.error('Error entering createShop scene:', error);
     // Local error handling - don't throw to avoid infinite spinner
     try {
-      await ctx.editMessageText(
-        'Произошла ошибка\n\nПопробуйте позже',
-        sellerMenuNoShop
-      );
+      await smartMessage.send(ctx, {
+        text: 'Произошла ошибка\n\nПопробуйте позже',
+        keyboard: sellerMenuNoShop
+      });
     } catch (replyError) {
       logger.error('Failed to send error message:', replyError);
     }
@@ -147,10 +148,10 @@ const handleAddProduct = async (ctx) => {
 
     // Check if user has shop
     if (!ctx.session.shopId) {
-      await ctx.editMessageText(
-        'Сначала создайте магазин',
-        sellerMenuNoShop
-      );
+      await smartMessage.send(ctx, {
+        text: 'Сначала создайте магазин',
+        keyboard: sellerMenuNoShop
+      });
       return;
     }
 
@@ -161,10 +162,10 @@ const handleAddProduct = async (ctx) => {
     // Local error handling - don't throw to avoid infinite spinner
     try {
       const shopName = ctx.session.shopName || 'Магазин';
-      await ctx.editMessageText(
-        'Произошла ошибка\n\nПопробуйте позже',
-        sellerMenu(shopName)
-      );
+      await smartMessage.send(ctx, {
+        text: 'Произошла ошибка\n\nПопробуйте позже',
+        keyboard: sellerMenu(shopName)
+      });
     } catch (replyError) {
       logger.error('Failed to send error message:', replyError);
     }
@@ -180,20 +181,20 @@ const handleProducts = async (ctx) => {
 
     // Check if user has shop
     if (!ctx.session.shopId) {
-      await ctx.editMessageText(
-        'Сначала создайте магазин',
-        sellerMenuNoShop
-      );
+      await smartMessage.send(ctx, {
+        text: 'Сначала создайте магазин',
+        keyboard: sellerMenuNoShop
+      });
       return;
     }
 
     // Check authentication (MEDIUM severity fix - add token check)
     if (!ctx.session.token) {
       const shopName = ctx.session.shopName || 'Магазин';
-      await ctx.editMessageText(
-        'Необходима авторизация. Перезапустите бота командой /start',
-        productsMenu(shopName)
-      );
+      await smartMessage.send(ctx, {
+        text: 'Необходима авторизация. Перезапустите бота командой /start',
+        keyboard: productsMenu(shopName)
+      });
       return;
     }
 
@@ -204,15 +205,18 @@ const handleProducts = async (ctx) => {
     // Use minimalist formatter (8 lines → 3 lines)
     const message = formatProductsList(products, shopName);
 
-    await ctx.editMessageText(message, productsMenu(shopName));
+    await smartMessage.send(ctx, {
+      text: message,
+      keyboard: productsMenu(shopName)
+    });
     logger.info(`User ${ctx.from.id} viewed products (${products.length} total)`);
   } catch (error) {
     logger.error('Error fetching products:', error);
     const shopName = ctx.session.shopName || 'Магазин';
-    await ctx.editMessageText(
-      'Ошибка загрузки',
-      productsMenu(shopName)
-    );
+    await smartMessage.send(ctx, {
+      text: 'Ошибка загрузки',
+      keyboard: productsMenu(shopName)
+    });
   }
 };
 
@@ -225,20 +229,20 @@ const handleSales = async (ctx) => {
 
     // Check if user has shop
     if (!ctx.session.shopId) {
-      await ctx.editMessageText(
-        'Сначала создайте магазин',
-        sellerMenuNoShop
-      );
+      await smartMessage.send(ctx, {
+        text: 'Сначала создайте магазин',
+        keyboard: sellerMenuNoShop
+      });
       return;
     }
 
     // Check authentication
     if (!ctx.session.token) {
       const shopName = ctx.session.shopName || 'Магазин';
-      await ctx.editMessageText(
-        'Необходима авторизация. Перезапустите бота командой /start',
-        sellerMenu(shopName)
-      );
+      await smartMessage.send(ctx, {
+        text: 'Необходима авторизация. Перезапустите бота командой /start',
+        keyboard: sellerMenu(shopName)
+      });
       return;
     }
 
@@ -249,15 +253,18 @@ const handleSales = async (ctx) => {
     // Use minimalist formatter (9 lines → 4 lines)
     const message = formatSalesList(orders, shopName);
 
-    await ctx.editMessageText(message, sellerMenu(shopName));
+    await smartMessage.send(ctx, {
+      text: message,
+      keyboard: sellerMenu(shopName)
+    });
     logger.info(`User ${ctx.from.id} viewed sales (${orders.length} total)`);
   } catch (error) {
     logger.error('Error fetching sales:', error);
     const shopName = ctx.session.shopName || 'Магазин';
-    await ctx.editMessageText(
-      'Ошибка загрузки',
-      sellerMenu(shopName)
-    );
+    await smartMessage.send(ctx, {
+      text: 'Ошибка загрузки',
+      keyboard: sellerMenu(shopName)
+    });
   }
 };
 
@@ -270,10 +277,10 @@ const handleWallets = async (ctx) => {
 
     // Check if user has shop
     if (!ctx.session.shopId) {
-      await ctx.editMessageText(
-        'Сначала создайте магазин',
-        sellerMenuNoShop
-      );
+      await smartMessage.send(ctx, {
+        text: 'Сначала создайте магазин',
+        keyboard: sellerMenuNoShop
+      });
       return;
     }
 
@@ -284,10 +291,10 @@ const handleWallets = async (ctx) => {
     // Local error handling - don't throw to avoid infinite spinner
     try {
       const shopName = ctx.session.shopName || 'Магазин';
-      await ctx.editMessageText(
-        'Произошла ошибка\n\nПопробуйте позже',
-        sellerMenu(shopName)
-      );
+      await smartMessage.send(ctx, {
+        text: 'Произошла ошибка\n\nПопробуйте позже',
+        keyboard: sellerMenu(shopName)
+      });
     } catch (replyError) {
       logger.error('Failed to send error message:', replyError);
     }
@@ -360,18 +367,18 @@ export const setupSellerHandlers = (bot) => {
       await ctx.answerCbQuery();
 
       if (!ctx.session.shopId) {
-        await ctx.editMessageText(
-          'Сначала создайте магазин',
-          sellerMenuNoShop
-        );
+        await smartMessage.send(ctx, {
+          text: 'Сначала создайте магазин',
+          keyboard: sellerMenuNoShop
+        });
         return;
       }
 
       if (!ctx.session.token) {
-        await ctx.editMessageText(
-          'Необходима авторизация. Перезапустите бота командой /start',
-          sellerMenu(ctx.session.shopName || 'Магазин')
-        );
+        await smartMessage.send(ctx, {
+          text: 'Необходима авторизация. Перезапустите бота командой /start',
+          keyboard: sellerMenu(ctx.session.shopName || 'Магазин')
+        });
         return;
       }
 
@@ -382,26 +389,33 @@ export const setupSellerHandlers = (bot) => {
         { headers: { Authorization: `Bearer ${ctx.session.token}` } }
       );
 
-      const { subscription, shop } = response.data;
+      // FIX BUG #2: Backend returns flat object, NOT { subscription, shop }
+      const status = response.data;
 
       let message = `📊 <b>Статус подписки</b>\n\n`;
-      message += `🏪 Магазин: ${shop.name}\n\n`;
+      // Use shop name from session (already available)
+      const shopName = ctx.session.shopName || 'Магазин';
+      message += `🏪 Магазин: ${shopName}\n\n`;
 
-      if (subscription) {
-        const tier = subscription.tier === 'pro' ? 'PRO 💎' : 'FREE';
-        const statusEmoji = subscription.status === 'active' ? '✅' :
-                            subscription.status === 'grace_period' ? '⚠️' : '❌';
+      // FIX BUG #2: Use status object from backend response
+      if (status.currentSubscription) {
+        const tier = status.tier === 'pro' ? 'PRO 💎' : 'FREE';
+        const statusEmoji = status.status === 'active' ? '✅' :
+                            status.status === 'grace_period' ? '⚠️' : '❌';
 
         message += `📌 <b>Тариф:</b> ${tier}\n`;
-        message += `${statusEmoji} <b>Статус:</b> ${subscription.status}\n`;
-        message += `📅 <b>Действует до:</b> ${new Date(subscription.periodEnd).toLocaleDateString('ru-RU')}\n\n`;
+        message += `${statusEmoji} <b>Статус:</b> ${status.status}\n`;
 
-        if (subscription.status === 'grace_period') {
+        if (status.nextPaymentDue) {
+          message += `📅 <b>Действует до:</b> ${new Date(status.nextPaymentDue).toLocaleDateString('ru-RU')}\n\n`;
+        }
+
+        if (status.status === 'grace_period') {
           message += `⚠️ <b>Льготный период</b>\n`;
           message += `Магазин будет деактивирован после окончания периода.\n\n`;
         }
 
-        if (subscription.tier === 'free') {
+        if (status.tier === 'free') {
           message += `💎 <b>Апгрейд на PRO:</b>\n`;
           message += `• Безлимитные подписчики\n`;
           message += `• Рассылка при смене канала (2/мес)\n`;
@@ -420,22 +434,22 @@ export const setupSellerHandlers = (bot) => {
         message += `• PRO 💎 - $35/мес\n`;
       }
 
-      const canUpgrade = subscription?.tier === 'free' && subscription?.status === 'active';
-      await ctx.editMessageText(
-        message,
-        {
+      const canUpgrade = status.tier === 'free' && status.status === 'active';
+      await smartMessage.send(ctx, {
+        text: message,
+        keyboard: {
           parse_mode: 'HTML',
-          ...subscriptionStatusMenu(subscription?.tier || 'free', canUpgrade)
+          ...subscriptionStatusMenu(status.tier || 'free', canUpgrade)
         }
-      );
+      });
 
       logger.info(`User ${ctx.from.id} viewed subscription status`);
     } catch (error) {
       logger.error('Error fetching subscription status:', error);
-      await ctx.editMessageText(
-        '❌ Ошибка загрузки статуса подписки',
-        sellerMenu(ctx.session.shopName || 'Магазин')
-      );
+      await smartMessage.send(ctx, {
+        text: '❌ Ошибка загрузки статуса подписки',
+        keyboard: sellerMenu(ctx.session.shopName || 'Магазин')
+      });
     }
   });
 
@@ -445,10 +459,10 @@ export const setupSellerHandlers = (bot) => {
       await ctx.answerCbQuery();
 
       if (!ctx.session.shopId || !ctx.session.token) {
-        await ctx.editMessageText(
-          'Необходима авторизация. Перезапустите бота командой /start',
-          sellerMenu(ctx.session.shopName || 'Магазин')
-        );
+        await smartMessage.send(ctx, {
+          text: 'Необходима авторизация. Перезапустите бота командой /start',
+          keyboard: sellerMenu(ctx.session.shopName || 'Магазин')
+        });
         return;
       }
 
@@ -456,18 +470,18 @@ export const setupSellerHandlers = (bot) => {
       const shopResponse = await shopApi.getShop(ctx.session.shopId, ctx.session.token);
       const isOwner = shopResponse.owner_id === ctx.from.id;
 
-      await ctx.editMessageText(
-        '🔧 <b>Инструменты магазина</b>\n\nДополнительные функции для управления вашим магазином:',
-        { parse_mode: 'HTML', ...sellerToolsMenu(isOwner) }
-      );
+      await smartMessage.send(ctx, {
+        text: '🔧 <b>Инструменты магазина</b>\n\nДополнительные функции для управления вашим магазином:',
+        keyboard: { parse_mode: 'HTML', ...sellerToolsMenu(isOwner) }
+      });
 
       logger.info(`User ${ctx.from.id} opened tools submenu`);
     } catch (error) {
       logger.error('Error in tools submenu handler:', error);
-      await ctx.editMessageText(
-        '❌ Ошибка загрузки инструментов',
-        sellerMenu(ctx.session.shopName || 'Магазин')
-      );
+      await smartMessage.send(ctx, {
+        text: '❌ Ошибка загрузки инструментов',
+        keyboard: sellerMenu(ctx.session.shopName || 'Магазин')
+      });
     }
   });
 
@@ -477,18 +491,18 @@ export const setupSellerHandlers = (bot) => {
       await ctx.answerCbQuery();
 
       if (!ctx.session.shopId) {
-        await ctx.editMessageText(
-          'Сначала создайте магазин',
-          sellerMenuNoShop
-        );
+        await smartMessage.send(ctx, {
+          text: 'Сначала создайте магазин',
+          keyboard: sellerMenuNoShop
+        });
         return;
       }
 
       if (!ctx.session.token) {
-        await ctx.editMessageText(
-          'Необходима авторизация. Перезапустите бота командой /start',
-          sellerMenu(ctx.session.shopName || 'Магазин')
-        );
+        await smartMessage.send(ctx, {
+          text: 'Необходима авторизация. Перезапустите бота командой /start',
+          keyboard: sellerMenu(ctx.session.shopName || 'Магазин')
+        });
         return;
       }
 
@@ -550,18 +564,18 @@ export const setupSellerHandlers = (bot) => {
       // Add back button
       buttons.push([Markup.button.callback('◀️ Назад', 'seller:main')]);
 
-      await ctx.editMessageText(
-        message,
-        { parse_mode: 'HTML', ...Markup.inlineKeyboard(buttons) }
-      );
+      await smartMessage.send(ctx, {
+        text: message,
+        keyboard: { parse_mode: 'HTML', ...Markup.inlineKeyboard(buttons) }
+      });
 
       logger.info(`User ${ctx.from.id} opened subscription hub`);
     } catch (error) {
       logger.error('Error in subscription hub handler:', error);
-      await ctx.editMessageText(
-        '❌ Ошибка загрузки подписки',
-        sellerMenu(ctx.session.shopName || 'Магазин')
-      );
+      await smartMessage.send(ctx, {
+        text: '❌ Ошибка загрузки подписки',
+        keyboard: sellerMenu(ctx.session.shopName || 'Магазин')
+      });
     }
   });
 
@@ -577,27 +591,27 @@ const handleWorkers = async (ctx) => {
     await ctx.answerCbQuery();
 
     if (!ctx.session.shopId) {
-      await ctx.editMessageText(
-        'Сначала создайте магазин',
-        sellerMenuNoShop
-      );
+      await smartMessage.send(ctx, {
+        text: 'Сначала создайте магазин',
+        keyboard: sellerMenuNoShop
+      });
       return;
     }
 
     const shopName = ctx.session.shopName || 'Магазин';
-    await ctx.editMessageText(
-      `Работники магазина: ${shopName}`,
-      manageWorkersMenu(shopName)
-    );
+    await smartMessage.send(ctx, {
+      text: `Работники магазина: ${shopName}`,
+      keyboard: manageWorkersMenu(shopName)
+    });
 
     logger.info(`User ${ctx.from.id} opened workers management`);
   } catch (error) {
     logger.error('Error in workers menu handler:', error);
     const shopName = ctx.session.shopName || 'Магазин';
-    await ctx.editMessageText(
-      'Ошибка загрузки',
-      sellerMenu(shopName)
-    );
+    await smartMessage.send(ctx, {
+      text: 'Ошибка загрузки',
+      keyboard: sellerMenu(shopName)
+    });
   }
 };
 
@@ -609,10 +623,10 @@ const handleWorkersAdd = async (ctx) => {
     await ctx.answerCbQuery();
 
     if (!ctx.session.shopId) {
-      await ctx.editMessageText(
-        'Сначала создайте магазин',
-        sellerMenuNoShop
-      );
+      await smartMessage.send(ctx, {
+        text: 'Сначала создайте магазин',
+        keyboard: sellerMenuNoShop
+      });
       return;
     }
 
@@ -621,10 +635,10 @@ const handleWorkersAdd = async (ctx) => {
   } catch (error) {
     logger.error('Error entering manageWorkers scene:', error);
     const shopName = ctx.session.shopName || 'Магазин';
-    await ctx.editMessageText(
-      'Произошла ошибка\n\nПопробуйте позже',
-      manageWorkersMenu(shopName)
-    );
+    await smartMessage.send(ctx, {
+      text: 'Произошла ошибка\n\nПопробуйте позже',
+      keyboard: manageWorkersMenu(shopName)
+    });
   }
 };
 
@@ -636,19 +650,19 @@ const handleWorkersList = async (ctx) => {
     await ctx.answerCbQuery();
 
     if (!ctx.session.shopId) {
-      await ctx.editMessageText(
-        'Сначала создайте магазин',
-        sellerMenuNoShop
-      );
+      await smartMessage.send(ctx, {
+        text: 'Сначала создайте магазин',
+        keyboard: sellerMenuNoShop
+      });
       return;
     }
 
     if (!ctx.session.token) {
       const shopName = ctx.session.shopName || 'Магазин';
-      await ctx.editMessageText(
-        'Необходима авторизация. Перезапустите бота командой /start',
-        manageWorkersMenu(shopName)
-      );
+      await smartMessage.send(ctx, {
+        text: 'Необходима авторизация. Перезапустите бота командой /start',
+        keyboard: manageWorkersMenu(shopName)
+      });
       return;
     }
 
@@ -657,10 +671,10 @@ const handleWorkersList = async (ctx) => {
     const shopName = ctx.session.shopName || 'Магазин';
 
     if (workers.length === 0) {
-      await ctx.editMessageText(
-        `Работники магазина: ${shopName}\n\nПока нет работников`,
-        manageWorkersMenu(shopName)
-      );
+      await smartMessage.send(ctx, {
+        text: `Работники магазина: ${shopName}\n\nПока нет работников`,
+        keyboard: manageWorkersMenu(shopName)
+      });
       return;
     }
 
@@ -670,19 +684,19 @@ const handleWorkersList = async (ctx) => {
       return `${index + 1}. ${name} (ID: ${w.telegram_id})`;
     }).join('\n');
 
-    await ctx.editMessageText(
-      `Работники магазина: ${shopName}\n\n${workersList}`,
-      manageWorkersMenu(shopName)
-    );
+    await smartMessage.send(ctx, {
+      text: `Работники магазина: ${shopName}\n\n${workersList}`,
+      keyboard: manageWorkersMenu(shopName)
+    });
 
     logger.info(`User ${ctx.from.id} viewed workers list (${workers.length} total)`);
   } catch (error) {
     logger.error('Error fetching workers:', error);
     const shopName = ctx.session.shopName || 'Магазин';
-    await ctx.editMessageText(
-      'Ошибка загрузки',
-      manageWorkersMenu(shopName)
-    );
+    await smartMessage.send(ctx, {
+      text: 'Ошибка загрузки',
+      keyboard: manageWorkersMenu(shopName)
+    });
   }
 };
 

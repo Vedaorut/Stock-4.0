@@ -1,92 +1,77 @@
+/**
+ * Subscription Routes
+ * 
+ * Defines API endpoints for shop subscription management
+ */
+
 import express from 'express';
-import { subscriptionController } from '../controllers/subscriptionController.js';
+import * as subscriptionController from '../controllers/subscriptionController.js';
 import { verifyToken } from '../middleware/auth.js';
-import { optionalTelegramAuth } from '../middleware/telegramAuth.js';
-import { body, param, query } from 'express-validator';
-import { validate } from '../middleware/validation.js';
 
 const router = express.Router();
 
 /**
- * @route   POST /api/subscriptions
- * @desc    Subscribe to a shop
- * @access  Private (WebApp)
+ * All subscription routes require authentication
  */
-router.post(
-  '/',
-  verifyToken,
-  optionalTelegramAuth,
-  [
-    body('shopId')
-      .isInt({ min: 1 })
-      .withMessage('Valid shop ID is required'),
-    validate
-  ],
-  subscriptionController.subscribe
-);
+router.use(verifyToken);
 
 /**
- * @route   GET /api/subscriptions
- * @desc    Get current user's subscriptions
- * @access  Private (WebApp)
+ * GET /api/subscriptions
+ * Get user subscriptions (buyer view)
+ *
+ * Returns all shops the user is subscribed to
  */
-router.get(
-  '/',
-  verifyToken,
-  optionalTelegramAuth,
-  [
-    query('page').optional().isInt({ min: 1 }).withMessage('Page must be a positive integer'),
-    query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100'),
-    validate
-  ],
-  subscriptionController.getMySubscriptions
-);
+router.get('/', subscriptionController.getUserSubscriptions);
 
 /**
- * @route   GET /api/subscriptions/shop/:shopId
- * @desc    Get shop subscribers (shop owner only)
- * @access  Private
+ * POST /api/subscriptions/pay
+ * Pay for monthly subscription (renewal or new)
+ *
+ * Body: {
+ *   shopId: number,
+ *   tier: 'free' | 'pro',
+ *   txHash: string,
+ *   currency: 'BTC' | 'ETH' | 'USDT' | 'TON',
+ *   paymentAddress: string
+ * }
  */
-router.get(
-  '/shop/:shopId',
-  verifyToken,
-  [
-    param('shopId').isInt({ min: 1 }).withMessage('Valid shop ID is required'),
-    validate
-  ],
-  subscriptionController.getShopSubscribers
-);
+router.post('/pay', subscriptionController.paySubscription);
 
 /**
- * @route   GET /api/subscriptions/check/:shopId
- * @desc    Check if user is subscribed to shop
- * @access  Private (WebApp)
+ * POST /api/subscriptions/upgrade
+ * Upgrade shop from free to PRO tier
+ * 
+ * Body: {
+ *   shopId: number,
+ *   txHash: string,
+ *   currency: 'BTC' | 'ETH' | 'USDT' | 'TON',
+ *   paymentAddress: string
+ * }
  */
-router.get(
-  '/check/:shopId',
-  verifyToken,
-  optionalTelegramAuth,
-  [
-    param('shopId').isInt({ min: 1 }).withMessage('Valid shop ID is required'),
-    validate
-  ],
-  subscriptionController.checkSubscription
-);
+router.post('/upgrade', subscriptionController.upgradeShop);
 
 /**
- * @route   DELETE /api/subscriptions/:shopId
- * @desc    Unsubscribe from a shop
- * @access  Private (WebApp)
+ * GET /api/subscriptions/upgrade-cost/:shopId
+ * Calculate prorated upgrade cost for shop
  */
-router.delete(
-  '/:shopId',
-  verifyToken,
-  optionalTelegramAuth,
-  [
-    param('shopId').isInt({ min: 1 }).withMessage('Valid shop ID is required'),
-    validate
-  ],
-  subscriptionController.unsubscribe
-);
+router.get('/upgrade-cost/:shopId', subscriptionController.getUpgradeCost);
+
+/**
+ * GET /api/subscriptions/status/:shopId
+ * Get subscription status for shop
+ */
+router.get('/status/:shopId', subscriptionController.getStatus);
+
+/**
+ * GET /api/subscriptions/history/:shopId?limit=10
+ * Get subscription payment history for shop
+ */
+router.get('/history/:shopId', subscriptionController.getHistory);
+
+/**
+ * GET /api/subscriptions/pricing
+ * Get subscription pricing information (free vs pro)
+ */
+router.get('/pricing', subscriptionController.getPricing);
 
 export default router;

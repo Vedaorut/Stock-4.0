@@ -9,7 +9,10 @@
     "dev": "nodemon src/server.js",
     "test": "NODE_OPTIONS=--experimental-vm-modules jest",
     "test:watch": "NODE_OPTIONS=--experimental-vm-modules jest --watch",
-    "test:coverage": "NODE_OPTIONS=--experimental-vm-modules jest --coverage"
+    "test:coverage": "NODE_OPTIONS=--experimental-vm-modules jest --coverage",
+    "lint": "eslint src/ __tests__/ --fix",
+    "lint:check": "eslint src/ __tests__/",
+    "test:all": "npm run lint:check && npm test"
   },
   "keywords": [
     "telegram",
@@ -30,6 +33,8 @@
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
     "pg": "^8.11.0",
+    "qrcode": "^1.5.4",
+    "wallet-validator": "^0.3.18",
     "winston": "^3.11.0",
     "winston-daily-rotate-file": "^4.7.1",
     "ws": "^8.14.2"

@@ -8,6 +8,11 @@ export default {
   // Module file extensions
   moduleFileExtensions: ['js', 'json'],
   
+  // Map external ESM packages that need manual mocks
+  moduleNameMapper: {
+    '^openai$': '<rootDir>/tests/mocks/openai.js'
+  },
+  
   // Test match patterns
   testMatch: [
     '**/tests/**/*.test.js',

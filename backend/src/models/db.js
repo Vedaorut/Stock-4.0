@@ -1,4 +1,5 @@
 import { query, getClient } from '../config/database.js';
+import { workerQueries } from './workerQueries.js';
 
 /**
  * User database queries
@@ -463,14 +464,14 @@ export const paymentQueries = {
  */
 export const subscriptionQueries = {
   // Create subscription
-  create: async (userId, shopId) => {
+  create: async (userId, shopId, telegramId = null) => {
     try {
       const result = await query(
-        `INSERT INTO subscriptions (user_id, shop_id)
-         VALUES ($1, $2)
-         ON CONFLICT (user_id, shop_id) DO NOTHING
+        `INSERT INTO subscriptions (user_id, shop_id, telegram_id)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (user_id, shop_id) DO UPDATE SET telegram_id = EXCLUDED.telegram_id
          RETURNING *`,
-        [userId, shopId]
+        [userId, shopId, telegramId]
       );
       return result.rows[0];
     } catch (error) {
@@ -539,11 +540,14 @@ export const subscriptionQueries = {
   }
 };
 
+export { workerQueries };
+
 export default {
   userQueries,
   shopQueries,
   productQueries,
   orderQueries,
   paymentQueries,
-  subscriptionQueries
+  subscriptionQueries,
+  workerQueries
 };

@@ -1,210 +1,341 @@
-import { subscriptionQueries, shopQueries } from '../models/db.js';
+/**
+ * Subscription Controller
+ * 
+ * Handles HTTP requests for shop subscription management:
+ * - Payment processing for monthly subscriptions
+ * - Tier upgrades (free → pro)
+ * - Subscription status and history
+ */
+
+import * as subscriptionService from '../services/subscriptionService.js';
 import logger from '../utils/logger.js';
 
 /**
- * Subscription Controller
+ * Pay for subscription (monthly renewal or new subscription)
+ * POST /api/subscriptions/pay
+ * 
+ * Body: {
+ *   shopId: number,
+ *   tier: 'free' | 'pro',
+ *   txHash: string,
+ *   currency: 'BTC' | 'ETH' | 'USDT' | 'TON',
+ *   paymentAddress: string
+ * }
  */
-export const subscriptionController = {
-  /**
-   * Subscribe to a shop
-   */
-  subscribe: async (req, res) => {
-    try {
-      const { shopId } = req.body;
-
-      // Check if shop exists
-      const shop = await shopQueries.findById(shopId);
-
-      if (!shop) {
-        return res.status(404).json({
-          success: false,
-          error: 'Shop not found'
-        });
-      }
-
-      if (!shop.is_active) {
-        return res.status(400).json({
-          success: false,
-          error: 'Shop is not active'
-        });
-      }
-
-      // Check if user is subscribing to their own shop
-      if (shop.owner_id === req.user.id) {
-        return res.status(400).json({
-          success: false,
-          error: 'Cannot subscribe to your own shop'
-        });
-      }
-
-      // Create subscription
-      const subscription = await subscriptionQueries.create(req.user.id, shopId);
-
-      if (!subscription) {
-        return res.status(400).json({
-          success: false,
-          error: 'Already subscribed to this shop'
-        });
-      }
-
-      return res.status(201).json({
-        success: true,
-        message: 'Successfully subscribed to shop',
-        data: subscription
-      });
-
-    } catch (error) {
-      logger.error('Subscribe error:', { error: error.message, stack: error.stack });
-      return res.status(500).json({
-        success: false,
-        error: error.message || 'Failed to subscribe'
+async function paySubscription(req, res) {
+  try {
+    const { shopId, tier, txHash, currency, paymentAddress } = req.body;
+    const userId = req.user.id;
+    
+    // Validate required fields
+    if (!shopId || !tier || !txHash || !currency || !paymentAddress) {
+      return res.status(400).json({ 
+        error: 'Missing required fields',
+        required: ['shopId', 'tier', 'txHash', 'currency', 'paymentAddress']
       });
     }
-  },
-
-  /**
-   * Get current user's subscriptions
-   */
-  getMySubscriptions: async (req, res) => {
-    try {
-      const page = parseInt(req.query.page) || 1;
-      const limit = parseInt(req.query.limit) || 50;
-      const offset = (page - 1) * limit;
-
-      const subscriptions = await subscriptionQueries.findByUserId(
-        req.user.id,
-        limit,
-        offset
-      );
-
-      return res.status(200).json({
-        success: true,
-        data: subscriptions,
-        pagination: {
-          page,
-          limit,
-          total: subscriptions.length
-        }
-      });
-
-    } catch (error) {
-      logger.error('Get subscriptions error:', { error: error.message, stack: error.stack });
-      return res.status(500).json({
-        success: false,
-        error: 'Failed to get subscriptions'
-      });
+    
+    // Verify shop ownership
+    const ownershipCheck = await verifyShopOwnership(shopId, userId);
+    if (!ownershipCheck.success) {
+      return res.status(ownershipCheck.status).json({ error: ownershipCheck.error });
     }
-  },
-
-  /**
-   * Get shop subscribers (shop owner only)
-   */
-  getShopSubscribers: async (req, res) => {
-    try {
-      const { shopId } = req.params;
-
-      // Check if shop exists and belongs to user
-      const shop = await shopQueries.findById(shopId);
-
-      if (!shop) {
-        return res.status(404).json({
-          success: false,
-          error: 'Shop not found'
-        });
-      }
-
-      if (shop.owner_id !== req.user.id) {
-        return res.status(403).json({
-          success: false,
-          error: 'Access denied. You can only view your own shop subscribers'
-        });
-      }
-
-      const page = parseInt(req.query.page) || 1;
-      const limit = parseInt(req.query.limit) || 50;
-      const offset = (page - 1) * limit;
-
-      const subscribers = await subscriptionQueries.findByShopId(
-        shopId,
-        limit,
-        offset
-      );
-
-      const count = await subscriptionQueries.countByShopId(shopId);
-
-      return res.status(200).json({
-        success: true,
-        data: subscribers,
-        pagination: {
-          page,
-          limit,
-          total: count
-        }
-      });
-
-    } catch (error) {
-      logger.error('Get shop subscribers error:', { error: error.message, stack: error.stack });
-      return res.status(500).json({
-        success: false,
-        error: 'Failed to get shop subscribers'
-      });
+    
+    // Process subscription payment
+    const subscription = await subscriptionService.processSubscriptionPayment(
+      shopId,
+      tier,
+      txHash,
+      currency,
+      paymentAddress
+    );
+    
+    logger.info(`[SubscriptionController] Subscription payment processed for shop ${shopId}, tier: ${tier}`);
+    
+    res.status(201).json({
+      success: true,
+      subscription,
+      message: `Subscription activated: ${tier} tier for 30 days`
+    });
+  } catch (error) {
+    logger.error('[SubscriptionController] Error processing subscription payment:', error);
+    
+    // Handle specific errors
+    if (error.message.includes('Transaction verification failed')) {
+      return res.status(400).json({ error: 'Transaction verification failed', details: error.message });
     }
-  },
-
-  /**
-   * Unsubscribe from a shop
-   */
-  unsubscribe: async (req, res) => {
-    try {
-      const { shopId } = req.params;
-
-      const subscription = await subscriptionQueries.delete(req.user.id, parseInt(shopId));
-
-      if (!subscription) {
-        return res.status(404).json({
-          success: false,
-          error: 'Subscription not found'
-        });
-      }
-
-      return res.status(200).json({
-        success: true,
-        message: 'Successfully unsubscribed from shop'
-      });
-
-    } catch (error) {
-      logger.error('Unsubscribe error:', { error: error.message, stack: error.stack });
-      return res.status(500).json({
-        success: false,
-        error: 'Failed to unsubscribe'
-      });
+    if (error.message.includes('already processed')) {
+      return res.status(409).json({ error: 'Transaction already processed' });
     }
-  },
-
-  /**
-   * Check subscription status
-   */
-  checkSubscription: async (req, res) => {
-    try {
-      const { shopId } = req.params;
-
-      const exists = await subscriptionQueries.exists(req.user.id, parseInt(shopId));
-
-      return res.status(200).json({
-        success: true,
-        data: {
-          subscribed: exists
-        }
-      });
-
-    } catch (error) {
-      logger.error('Check subscription error:', { error: error.message, stack: error.stack });
-      return res.status(500).json({
-        success: false,
-        error: 'Failed to check subscription'
-      });
+    if (error.message.includes('Invalid subscription tier')) {
+      return res.status(400).json({ error: 'Invalid subscription tier. Use "free" or "pro"' });
     }
+    
+    res.status(500).json({ error: 'Failed to process subscription payment' });
   }
-};
+}
 
-export default subscriptionController;
+/**
+ * Upgrade shop from free to PRO tier
+ * POST /api/subscriptions/upgrade
+ * 
+ * Body: {
+ *   shopId: number,
+ *   txHash: string,
+ *   currency: 'BTC' | 'ETH' | 'USDT' | 'TON',
+ *   paymentAddress: string
+ * }
+ */
+async function upgradeShop(req, res) {
+  try {
+    const { shopId, txHash, currency, paymentAddress } = req.body;
+    const userId = req.user.id;
+    
+    // Validate required fields
+    if (!shopId || !txHash || !currency || !paymentAddress) {
+      return res.status(400).json({ 
+        error: 'Missing required fields',
+        required: ['shopId', 'txHash', 'currency', 'paymentAddress']
+      });
+    }
+    
+    // Verify shop ownership
+    const ownershipCheck = await verifyShopOwnership(shopId, userId);
+    if (!ownershipCheck.success) {
+      return res.status(ownershipCheck.status).json({ error: ownershipCheck.error });
+    }
+    
+    // Upgrade shop to PRO
+    const subscription = await subscriptionService.upgradeShopToPro(
+      shopId,
+      txHash,
+      currency,
+      paymentAddress
+    );
+    
+    logger.info(`[SubscriptionController] Shop ${shopId} upgraded to PRO tier`);
+    
+    res.status(200).json({
+      success: true,
+      subscription,
+      message: 'Shop upgraded to PRO tier successfully',
+      newTier: 'pro'
+    });
+  } catch (error) {
+    logger.error('[SubscriptionController] Error upgrading shop:', error);
+    
+    // Handle specific errors
+    if (error.message.includes('already PRO')) {
+      return res.status(400).json({ error: 'Shop is already PRO tier' });
+    }
+    if (error.message.includes('No active subscription')) {
+      return res.status(400).json({ error: 'No active subscription found. Please renew subscription first.' });
+    }
+    if (error.message.includes('Transaction verification failed')) {
+      return res.status(400).json({ error: 'Transaction verification failed', details: error.message });
+    }
+    if (error.message.includes('already processed')) {
+      return res.status(409).json({ error: 'Transaction already processed' });
+    }
+    
+    res.status(500).json({ error: 'Failed to upgrade shop' });
+  }
+}
+
+/**
+ * Get upgrade cost for shop
+ * GET /api/subscriptions/upgrade-cost/:shopId
+ */
+async function getUpgradeCost(req, res) {
+  try {
+    const shopId = parseInt(req.params.shopId, 10);
+    const userId = req.user.id;
+    
+    // Verify shop ownership
+    const ownershipCheck = await verifyShopOwnership(shopId, userId);
+    if (!ownershipCheck.success) {
+      return res.status(ownershipCheck.status).json({ error: ownershipCheck.error });
+    }
+    
+    const upgradeInfo = await subscriptionService.calculateUpgradeCost(shopId);
+    
+    res.json(upgradeInfo);
+  } catch (error) {
+    logger.error('[SubscriptionController] Error calculating upgrade cost:', error);
+    
+    if (error.message.includes('Shop not found')) {
+      return res.status(404).json({ error: 'Shop not found' });
+    }
+    if (error.message.includes('No active subscription')) {
+      return res.status(400).json({ error: 'No active subscription found' });
+    }
+    
+    res.status(500).json({ error: 'Failed to calculate upgrade cost' });
+  }
+}
+
+/**
+ * Get subscription status for shop
+ * GET /api/subscriptions/status/:shopId
+ */
+async function getStatus(req, res) {
+  try {
+    const shopId = parseInt(req.params.shopId, 10);
+    const userId = req.user.id;
+    
+    // Verify shop ownership
+    const ownershipCheck = await verifyShopOwnership(shopId, userId);
+    if (!ownershipCheck.success) {
+      return res.status(ownershipCheck.status).json({ error: ownershipCheck.error });
+    }
+    
+    const status = await subscriptionService.getSubscriptionStatus(shopId);
+    
+    res.json(status);
+  } catch (error) {
+    logger.error('[SubscriptionController] Error getting subscription status:', error);
+    
+    if (error.message.includes('Shop not found')) {
+      return res.status(404).json({ error: 'Shop not found' });
+    }
+    
+    res.status(500).json({ error: 'Failed to get subscription status' });
+  }
+}
+
+/**
+ * Get subscription payment history for shop
+ * GET /api/subscriptions/history/:shopId?limit=10
+ */
+async function getHistory(req, res) {
+  try {
+    const shopId = parseInt(req.params.shopId, 10);
+    const userId = req.user.id;
+    const limit = parseInt(req.query.limit, 10) || 10;
+    
+    // Verify shop ownership
+    const ownershipCheck = await verifyShopOwnership(shopId, userId);
+    if (!ownershipCheck.success) {
+      return res.status(ownershipCheck.status).json({ error: ownershipCheck.error });
+    }
+    
+    const history = await subscriptionService.getSubscriptionHistory(shopId, limit);
+    
+    res.json({
+      shopId,
+      history
+    });
+  } catch (error) {
+    logger.error('[SubscriptionController] Error getting subscription history:', error);
+    res.status(500).json({ error: 'Failed to get subscription history' });
+  }
+}
+
+/**
+ * Get subscription pricing info
+ * GET /api/subscriptions/pricing
+ */
+async function getPricing(req, res) {
+  try {
+    res.json({
+      free: {
+        price: subscriptionService.SUBSCRIPTION_PRICES.free,
+        currency: 'USD',
+        period: '30 days',
+        features: [
+          'Create and manage shop',
+          'Unlimited products',
+          'Basic analytics',
+          'Crypto payments (BTC, ETH, USDT, TON)'
+        ]
+      },
+      pro: {
+        price: subscriptionService.SUBSCRIPTION_PRICES.pro,
+        currency: 'USD',
+        period: '30 days',
+        features: [
+          'All Free features',
+          'Unlimited Follow Shop (dropshipping)',
+          'Channel Migration (2 times/month)',
+          'Priority support',
+          'Advanced analytics'
+        ]
+      },
+      gracePeriod: {
+        days: subscriptionService.GRACE_PERIOD_DAYS,
+        description: 'Grace period after subscription expires before shop deactivation'
+      }
+    });
+  } catch (error) {
+    logger.error('[SubscriptionController] Error getting pricing:', error);
+    res.status(500).json({ error: 'Failed to get pricing information' });
+  }
+}
+
+/**
+ * Helper: Verify shop ownership
+ * 
+ * @param {number} shopId - Shop ID
+ * @param {number} userId - User ID
+ * @returns {Promise<{success: boolean, status?: number, error?: string}>}
+ */
+async function verifyShopOwnership(shopId, userId) {
+  try {
+    const pool = (await import('../config/database.js')).default;
+    
+    const result = await pool.query(
+      'SELECT owner_id FROM shops WHERE id = $1',
+      [shopId]
+    );
+    
+    if (result.rows.length === 0) {
+      return { success: false, status: 404, error: 'Shop not found' };
+    }
+    
+    if (result.rows[0].owner_id !== userId) {
+      return { success: false, status: 403, error: 'Not authorized to manage this shop' };
+    }
+    
+    return { success: true };
+  } catch (error) {
+    logger.error('[SubscriptionController] Error verifying shop ownership:', error);
+    return { success: false, status: 500, error: 'Internal server error' };
+  }
+}
+
+/**
+ * Get user subscriptions (buyer view)
+ * GET /api/subscriptions
+ */
+async function getUserSubscriptions(req, res) {
+  try {
+    const userId = req.user.id;
+
+    const subscriptions = await subscriptionService.getUserSubscriptions(userId);
+
+    res.json({
+      data: subscriptions,
+      count: subscriptions.length
+    });
+  } catch (error) {
+    logger.error('[SubscriptionController] Error getting user subscriptions:', {
+      error: error.message,
+      stack: error.stack,
+      userId: req.user?.id
+    });
+
+    res.status(500).json({
+      error: 'Failed to fetch subscriptions'
+    });
+  }
+}
+
+export {
+  paySubscription,
+  upgradeShop,
+  getUpgradeCost,
+  getStatus,
+  getHistory,
+  getPricing,
+  getUserSubscriptions
+};

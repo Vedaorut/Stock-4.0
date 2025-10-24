@@ -41,6 +41,19 @@ export async function handleAIProductCommand(ctx) {
       return;
     }
 
+    // Race condition guard - prevent concurrent AI calls
+    if (ctx.session.aiProcessing) {
+      logger.debug('ai_concurrent_blocked', {
+        userId: ctx.from.id,
+        message: userMessage.slice(0, 50)
+      });
+      await ctx.reply('⏳ Обрабатываю предыдущую команду. Подождите...');
+      return;
+    }
+
+    // Mark as processing
+    ctx.session.aiProcessing = true;
+
     // Rate limiting - max 10 AI commands per minute
     if (!ctx.session.aiCommands) {
       ctx.session.aiCommands = [];
@@ -103,8 +116,13 @@ export async function handleAIProductCommand(ctx) {
       return;
     }
 
-    // Success or simple error - show message
-    await ctx.reply(result.message);
+    // ONLY send message for tool call results (they weren't sent via streaming)
+    // Text responses were already sent via streaming in processProductCommand
+    if (result.operation) {
+      // Tool call result - send it
+      await ctx.reply(result.message);
+    }
+    // If no operation field, it's a text response already sent via streaming
 
     // Log analytics
     logger.info('ai_command_result', {
@@ -127,6 +145,11 @@ export async function handleAIProductCommand(ctx) {
       await ctx.reply('❌ Произошла ошибка. Используйте меню.');
     } catch (replyError) {
       logger.error('Failed to send error message:', replyError);
+    }
+  } finally {
+    // Always clear processing flag
+    if (ctx.session) {
+      ctx.session.aiProcessing = false;
     }
   }
 }
@@ -152,7 +175,7 @@ async function handleClarification(ctx, result) {
         callback_data: `ai_select:${opt.id}`
       }]),
       [{
-        text: '❌ Отмена',
+        text: '◀️ Назад',
         callback_data: 'ai_cancel'
       }]
     ]
@@ -225,7 +248,7 @@ export async function handleAISelection(ctx) {
 export async function handleAICancel(ctx) {
   try {
     await ctx.answerCbQuery();
-    await ctx.editMessageText('❌ Отменено');
+    await ctx.editMessageText('◀️ Назад');
     delete ctx.session.pendingAI;
   } catch (error) {
     logger.error('AI cancel handler error:', error);

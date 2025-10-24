@@ -1,7 +1,10 @@
 import { Scenes } from 'telegraf';
-import { cancelButton, successButtons } from '../keyboards/common.js';
+import { successButtons, cancelButton } from '../keyboards/common.js';
 import { shopApi } from '../utils/api.js';
 import logger from '../utils/logger.js';
+import * as smartMessage from '../utils/smartMessage.js';
+import * as messageCleanup from '../utils/messageCleanup.js';
+import * as messageTracker from '../utils/messageTracker.js';
 
 /**
  * Create Shop Scene - Simplified (NO PAYMENT)
@@ -32,19 +35,25 @@ const handleShopName = async (ctx) => {
   try {
     // Get shop name from message
     if (!ctx.message || !ctx.message.text) {
-      await ctx.reply('Введите название магазина', cancelButton);
+      await ctx.reply('Введите название магазина');
       return;
     }
+
+    // Track user message for cleanup
+    if (!ctx.wizard.state.userMessageIds) {
+      ctx.wizard.state.userMessageIds = [];
+    }
+    ctx.wizard.state.userMessageIds.push(ctx.message.message_id);
 
     const shopName = ctx.message.text.trim();
 
     if (shopName.length < 3) {
-      await ctx.reply('Минимум 3 символа', cancelButton);
+      await ctx.reply('Минимум 3 символа');
       return;
     }
 
     if (shopName.length > 100) {
-      await ctx.reply('Макс 100 символов', cancelButton);
+      await ctx.reply('Макс 100 символов');
       return;
     }
 
@@ -53,7 +62,8 @@ const handleShopName = async (ctx) => {
       shopName: shopName
     });
 
-    await ctx.reply('Сохраняем...');
+    // Show loading message (will be deleted after)
+    const loadingMsg = await ctx.reply('Сохраняем...');
 
     if (!ctx.session.token) {
       logger.error('Missing auth token when creating shop', {
@@ -96,19 +106,30 @@ const handleShopName = async (ctx) => {
       savedToSession: ctx.session.shopId === shop.id
     });
 
-    await ctx.reply(
-      `✅ ${shopName}`,
-      successButtons
-    );
+    // Delete loading message
+    await messageTracker.deleteMessage(ctx, loadingMsg.message_id);
 
-    // Leave scene
+    // Send success message using smartMessage (will be editable)
+    await smartMessage.send(ctx, {
+      text: `✅ ${shopName}`,
+      keyboard: successButtons
+    });
+
+    // Leave scene (cleanup will happen in scene.leave())
     return await ctx.scene.leave();
   } catch (error) {
     logger.error('Error creating shop:', error);
-    await ctx.reply(
-      'Ошибка. Попробуйте позже',
-      successButtons
-    );
+
+    // Delete loading message if exists
+    if (loadingMsg) {
+      await messageTracker.deleteMessage(ctx, loadingMsg.message_id);
+    }
+
+    await smartMessage.send(ctx, {
+      text: 'Ошибка. Попробуйте позже',
+      keyboard: successButtons
+    });
+
     return await ctx.scene.leave();
   }
 };
@@ -122,6 +143,23 @@ const createShopScene = new Scenes.WizardScene(
 
 // Handle scene leave
 createShopScene.leave(async (ctx) => {
+  // Delete user messages (shop name input)
+  const userMsgIds = ctx.wizard.state.userMessageIds || [];
+  for (const msgId of userMsgIds) {
+    try {
+      await ctx.deleteMessage(msgId);
+    } catch (error) {
+      // Message may already be deleted or too old
+      logger.debug(`Could not delete user message ${msgId}:`, error.message);
+    }
+  }
+
+  // Cleanup wizard messages (keep final message)
+  await messageCleanup.cleanupWizard(ctx, {
+    keepFinalMessage: true,
+    keepWelcome: true
+  });
+
   ctx.wizard.state = {};
   logger.info(`User ${ctx.from?.id} left createShop scene`);
 });
@@ -131,16 +169,21 @@ createShopScene.action('cancel_scene', async (ctx) => {
   try {
     await ctx.answerCbQuery();
     logger.info('shop_create_cancelled', { userId: ctx.from.id });
+
     await ctx.scene.leave();
-    await ctx.reply('Отменено', successButtons);
+
+    await smartMessage.send(ctx, {
+      text: 'Отменено',
+      keyboard: successButtons
+    });
   } catch (error) {
     logger.error('Error in cancel_scene handler:', error);
     // Local error handling - don't throw to avoid infinite spinner
     try {
-      await ctx.editMessageText(
-        'Произошла ошибка при отмене\n\nПопробуйте позже',
-        successButtons
-      );
+      await smartMessage.send(ctx, {
+        text: 'Произошла ошибка при отмене\n\nПопробуйте позже',
+        keyboard: successButtons
+      });
     } catch (replyError) {
       logger.error('Failed to send error message:', replyError);
     }

@@ -139,7 +139,7 @@ class DeepSeekClient {
 
     const startTime = Date.now();
     let fullText = '';
-    let toolCalls = [];
+    const toolCalls = [];
     let finishReason = null;
 
     try {

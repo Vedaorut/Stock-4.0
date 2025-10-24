@@ -193,6 +193,31 @@ export const handleSwitchMode = async (ctx) => {
 };
 
 /**
+ * Handle edit markup button click
+ */
+export const handleEditMarkup = async (ctx) => {
+  try {
+    await ctx.answerCbQuery();
+
+    const followId = parseInt(ctx.match[1]);
+
+    if (!ctx.session.token) {
+      await ctx.editMessageText('Необходима авторизация');
+      return;
+    }
+
+    // Set session flag to capture next text message
+    ctx.session.editingFollowId = followId;
+
+    await ctx.editMessageText('Новая наценка (%):\n\n1-500');
+    logger.info(`User ${ctx.from.id} initiated markup edit for follow ${followId}`);
+  } catch (error) {
+    logger.error('Error initiating markup edit:', error);
+    await ctx.editMessageText('❌ Ошибка');
+  }
+};
+
+/**
  * Handle markup update when editingFollowId is set
  */
 export const handleMarkupUpdate = async (ctx) => {
@@ -264,6 +289,9 @@ export const setupFollowHandlers = (bot) => {
 
   // Switch mode (pattern: follow_mode:123)
   bot.action(/^follow_mode:(\d+)$/, handleSwitchMode);
+
+  // Edit markup (pattern: follow_edit:123)
+  bot.action(/^follow_edit:(\d+)$/, handleEditMarkup);
 
   // Handle text for markup updates (EARLY handler - before AI)
   bot.on('text', async (ctx, next) => {

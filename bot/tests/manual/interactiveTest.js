@@ -24,7 +24,7 @@ const deepseek = new OpenAI({
 });
 
 // Mock products
-let products = [
+const products = [
   { id: 1, name: 'iPhone 15 Pro', price: 999, currency: 'USD', stock_quantity: 10 },
   { id: 2, name: 'MacBook Pro', price: 2499, currency: 'USD', stock_quantity: 5 },
   { id: 3, name: 'AirPods Pro', price: 249, currency: 'USD', stock_quantity: 20 }

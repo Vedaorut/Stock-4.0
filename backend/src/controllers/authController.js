@@ -122,6 +122,7 @@ export const authController = {
           username: user.username,
           first_name: user.first_name,
           last_name: user.last_name,
+          selected_role: user.selected_role,  // ✅ Добавлено для восстановления роли
           created_at: user.created_at
         }
       });

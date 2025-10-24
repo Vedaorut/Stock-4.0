@@ -463,6 +463,278 @@ async function rollbackFollowShopFeature() {
 }
 
 /**
+ * Run incremental migration: Add Recurring Subscriptions feature
+ * - Add subscription_status, next_payment_due, grace_period_until to shops table
+ * - Create shop_subscriptions table for tracking monthly payments
+ */
+async function addRecurringSubscriptions() {
+  log.header('Running Incremental Migration: Add Recurring Subscriptions Feature');
+  const client = await pool.connect();
+  try {
+    // Step 1: Add subscription_status to shops table
+    log.info('Checking if subscription_status column exists in shops...');
+    const checkSubStatus = await client.query(`
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_name = 'shops'
+      AND column_name = 'subscription_status'
+    `);
+
+    if (checkSubStatus.rows.length === 0) {
+      log.info('Adding subscription_status column to shops table...');
+      await client.query(`
+        ALTER TABLE shops
+        ADD COLUMN subscription_status VARCHAR(20) DEFAULT 'active' CHECK (subscription_status IN ('active', 'grace_period', 'inactive'))
+      `);
+      log.success('Column subscription_status added to shops');
+
+      // Add index
+      log.info('Creating index on subscription_status...');
+      await client.query(`
+        CREATE INDEX idx_shops_subscription_status ON shops(subscription_status)
+      `);
+      log.success('Index idx_shops_subscription_status created');
+    } else {
+      log.warning('Column subscription_status already exists in shops, skipping');
+    }
+
+    // Step 2: Add next_payment_due to shops table
+    log.info('Checking if next_payment_due column exists in shops...');
+    const checkPaymentDue = await client.query(`
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_name = 'shops'
+      AND column_name = 'next_payment_due'
+    `);
+
+    if (checkPaymentDue.rows.length === 0) {
+      log.info('Adding next_payment_due column to shops table...');
+      await client.query(`
+        ALTER TABLE shops
+        ADD COLUMN next_payment_due TIMESTAMP
+      `);
+      log.success('Column next_payment_due added to shops');
+
+      // Add index
+      log.info('Creating index on next_payment_due...');
+      await client.query(`
+        CREATE INDEX idx_shops_next_payment_due ON shops(next_payment_due)
+      `);
+      log.success('Index idx_shops_next_payment_due created');
+    } else {
+      log.warning('Column next_payment_due already exists in shops, skipping');
+    }
+
+    // Step 3: Add grace_period_until to shops table
+    log.info('Checking if grace_period_until column exists in shops...');
+    const checkGracePeriod = await client.query(`
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_name = 'shops'
+      AND column_name = 'grace_period_until'
+    `);
+
+    if (checkGracePeriod.rows.length === 0) {
+      log.info('Adding grace_period_until column to shops table...');
+      await client.query(`
+        ALTER TABLE shops
+        ADD COLUMN grace_period_until TIMESTAMP
+      `);
+      log.success('Column grace_period_until added to shops');
+    } else {
+      log.warning('Column grace_period_until already exists in shops, skipping');
+    }
+
+    // Step 4: Create shop_subscriptions table
+    log.info('Checking if shop_subscriptions table exists...');
+    const checkSubscriptions = await client.query(`
+      SELECT table_name
+      FROM information_schema.tables
+      WHERE table_name = 'shop_subscriptions'
+    `);
+
+    if (checkSubscriptions.rows.length === 0) {
+      log.info('Creating shop_subscriptions table...');
+      await client.query(`
+        CREATE TABLE shop_subscriptions (
+          id SERIAL PRIMARY KEY,
+          shop_id INT NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
+          tier VARCHAR(20) NOT NULL CHECK (tier IN ('free', 'pro')),
+          amount DECIMAL(10, 2) NOT NULL,
+          tx_hash VARCHAR(255) UNIQUE NOT NULL,
+          currency VARCHAR(10) NOT NULL CHECK (currency IN ('BTC', 'ETH', 'USDT', 'TON')),
+          period_start TIMESTAMP NOT NULL,
+          period_end TIMESTAMP NOT NULL,
+          status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'expired', 'cancelled')),
+          created_at TIMESTAMP DEFAULT NOW(),
+          verified_at TIMESTAMP
+        )
+      `);
+      log.success('Table shop_subscriptions created');
+
+      // Add indexes
+      log.info('Creating indexes on shop_subscriptions...');
+      await client.query('CREATE INDEX idx_shop_subscriptions_shop ON shop_subscriptions(shop_id)');
+      await client.query('CREATE INDEX idx_shop_subscriptions_status ON shop_subscriptions(status)');
+      await client.query('CREATE INDEX idx_shop_subscriptions_period_end ON shop_subscriptions(period_end)');
+      log.success('Indexes on shop_subscriptions created');
+
+      // Add comments
+      log.info('Adding comments to shop_subscriptions...');
+      await client.query(`
+        COMMENT ON TABLE shop_subscriptions IS 'Stores monthly subscription payments for shops (free $25/mo, pro $35/mo)';
+        COMMENT ON COLUMN shop_subscriptions.tier IS 'Subscription tier: free ($25) or pro ($35)';
+        COMMENT ON COLUMN shop_subscriptions.amount IS 'Payment amount in USD';
+        COMMENT ON COLUMN shop_subscriptions.tx_hash IS 'Blockchain transaction hash for verification';
+        COMMENT ON COLUMN shop_subscriptions.period_start IS 'Start date of subscription period';
+        COMMENT ON COLUMN shop_subscriptions.period_end IS 'End date of subscription period (30 days from start)';
+        COMMENT ON COLUMN shop_subscriptions.status IS 'active: valid, expired: period ended, cancelled: refunded';
+      `);
+      log.success('Comments added');
+    } else {
+      log.warning('Table shop_subscriptions already exists, skipping');
+    }
+
+    // Step 5: Update existing shops comments
+    log.info('Updating shop table comments...');
+    await client.query(`
+      COMMENT ON COLUMN shops.registration_paid IS 'Whether initial subscription payment was confirmed';
+      COMMENT ON COLUMN shops.is_active IS 'Shop activation status (deactivated after grace period expires)';
+      COMMENT ON COLUMN shops.tier IS 'Subscription tier: free ($25/month) or pro ($35/month)';
+      COMMENT ON COLUMN shops.subscription_status IS 'active: paid, grace_period: 2 days after expiry, inactive: deactivated';
+      COMMENT ON COLUMN shops.next_payment_due IS 'Next monthly subscription payment due date';
+      COMMENT ON COLUMN shops.grace_period_until IS 'Grace period end date (2 days after payment due)';
+    `);
+    log.success('Shop table comments updated');
+
+    log.success('Migration completed: Recurring Subscriptions feature added');
+  } catch (error) {
+    log.error(`Migration failed: ${error.message}`);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Run incremental migration: Add Channel Migration feature for PRO subscribers
+ * - Add telegram_id to subscriptions table for broadcast capability
+ * - Add tier (free/pro) to shops table
+ * - Create channel_migrations table for logging migrations
+ */
+async function addChannelMigrationFeature() {
+  log.header('Running Incremental Migration: Add Channel Migration Feature');
+  const client = await pool.connect();
+  try {
+    // Step 1: Add telegram_id to subscriptions table
+    log.info('Checking if telegram_id column exists in subscriptions...');
+    const checkTelegramId = await client.query(`
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_name = 'subscriptions'
+      AND column_name = 'telegram_id'
+    `);
+
+    if (checkTelegramId.rows.length === 0) {
+      log.info('Adding telegram_id column to subscriptions table...');
+      await client.query(`
+        ALTER TABLE subscriptions
+        ADD COLUMN telegram_id BIGINT
+      `);
+      log.success('Column telegram_id added to subscriptions');
+
+      // Add index for telegram_id
+      log.info('Creating index on telegram_id...');
+      await client.query(`
+        CREATE INDEX idx_subscriptions_telegram_id ON subscriptions(telegram_id)
+      `);
+      log.success('Index idx_subscriptions_telegram_id created');
+    } else {
+      log.warning('Column telegram_id already exists in subscriptions, skipping');
+    }
+
+    // Step 2: Add tier column to shops table
+    log.info('Checking if tier column exists in shops...');
+    const checkTier = await client.query(`
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_name = 'shops'
+      AND column_name = 'tier'
+    `);
+
+    if (checkTier.rows.length === 0) {
+      log.info('Adding tier column to shops table...');
+      await client.query(`
+        ALTER TABLE shops
+        ADD COLUMN tier VARCHAR(20) DEFAULT 'free' CHECK (tier IN ('free', 'pro'))
+      `);
+      log.success('Column tier added to shops');
+
+      // Add index on tier
+      log.info('Creating index on tier...');
+      await client.query(`
+        CREATE INDEX idx_shops_tier ON shops(tier)
+      `);
+      log.success('Index idx_shops_tier created');
+    } else {
+      log.warning('Column tier already exists in shops, skipping');
+    }
+
+    // Step 3: Create channel_migrations table
+    log.info('Checking if channel_migrations table exists...');
+    const checkMigrations = await client.query(`
+      SELECT table_name
+      FROM information_schema.tables
+      WHERE table_name = 'channel_migrations'
+    `);
+
+    if (checkMigrations.rows.length === 0) {
+      log.info('Creating channel_migrations table...');
+      await client.query(`
+        CREATE TABLE channel_migrations (
+          id SERIAL PRIMARY KEY,
+          shop_id INT NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
+          old_channel_url TEXT,
+          new_channel_url TEXT NOT NULL,
+          sent_count INT DEFAULT 0,
+          failed_count INT DEFAULT 0,
+          status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'completed', 'failed')),
+          created_at TIMESTAMP DEFAULT NOW(),
+          started_at TIMESTAMP,
+          completed_at TIMESTAMP
+        )
+      `);
+      log.success('Table channel_migrations created');
+
+      // Add indexes
+      log.info('Creating indexes on channel_migrations...');
+      await client.query('CREATE INDEX idx_channel_migrations_shop ON channel_migrations(shop_id)');
+      await client.query('CREATE INDEX idx_channel_migrations_status ON channel_migrations(status)');
+      await client.query('CREATE INDEX idx_channel_migrations_created ON channel_migrations(created_at)');
+      log.success('Indexes on channel_migrations created');
+
+      // Add comments
+      log.info('Adding comments to channel_migrations...');
+      await client.query(`
+        COMMENT ON TABLE channel_migrations IS 'Logs channel migration broadcasts for PRO shop owners';
+        COMMENT ON COLUMN channel_migrations.sent_count IS 'Number of successfully sent messages';
+        COMMENT ON COLUMN channel_migrations.failed_count IS 'Number of failed message deliveries';
+      `);
+      log.success('Comments added');
+    } else {
+      log.warning('Table channel_migrations already exists, skipping');
+    }
+
+    log.success('Migration completed: Channel Migration feature added');
+  } catch (error) {
+    log.error(`Migration failed: ${error.message}`);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+/**
  * Enable required PostgreSQL extensions
  */
 async function enableExtensions() {
@@ -589,6 +861,102 @@ async function dropAllTables() {
 }
 
 /**
+ * Run incremental migration: Add Shop Workers feature for workspace functionality
+ * - Creates shop_workers table (worker assignments to shops)
+ * - Adds indexes for performance
+ * - Supports both telegram_id and @username for adding workers
+ */
+async function addShopWorkersFeature() {
+  log.header('Running Incremental Migration: Add Shop Workers Feature');
+  const client = await pool.connect();
+  try {
+    // Step 1: Check if table exists
+    log.info('Checking if shop_workers table exists...');
+    const checkTable = await client.query(`
+      SELECT table_name FROM information_schema.tables
+      WHERE table_name = 'shop_workers'
+    `);
+    
+    if (checkTable.rows.length > 0) {
+      log.warning('Table shop_workers already exists, skipping');
+      return;
+    }
+    
+    // Step 2: Create shop_workers table
+    log.info('Creating shop_workers table...');
+    await client.query(`
+      CREATE TABLE shop_workers (
+        id SERIAL PRIMARY KEY,
+        shop_id INT NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
+        worker_user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        telegram_id BIGINT NOT NULL,
+        added_by INT REFERENCES users(id) ON DELETE SET NULL,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE(shop_id, worker_user_id)
+      )
+    `);
+    log.success('Table shop_workers created');
+    
+    // Step 3: Create indexes
+    log.info('Creating indexes on shop_workers...');
+    await client.query('CREATE INDEX idx_shop_workers_shop ON shop_workers(shop_id)');
+    await client.query('CREATE INDEX idx_shop_workers_worker ON shop_workers(worker_user_id)');
+    await client.query('CREATE INDEX idx_shop_workers_telegram ON shop_workers(telegram_id)');
+    await client.query('CREATE INDEX idx_shop_workers_composite ON shop_workers(shop_id, worker_user_id)');
+    log.success('Indexes on shop_workers created');
+    
+    // Step 4: Create trigger for updated_at
+    log.info('Creating trigger for shop_workers...');
+    await client.query(`
+      CREATE TRIGGER update_shop_workers_updated_at 
+      BEFORE UPDATE ON shop_workers
+      FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()
+    `);
+    log.success('Trigger created');
+    
+    // Step 5: Add comments
+    log.info('Adding comments to shop_workers...');
+    await client.query(`
+      COMMENT ON TABLE shop_workers IS 'Shop workspace members - employees who can manage products';
+      COMMENT ON COLUMN shop_workers.worker_user_id IS 'User ID of the worker';
+      COMMENT ON COLUMN shop_workers.telegram_id IS 'Telegram ID for search/display';
+      COMMENT ON COLUMN shop_workers.added_by IS 'Shop owner who added this worker';
+    `);
+    log.success('Comments added');
+    
+    log.success('Migration completed: Shop Workers feature added');
+  } catch (error) {
+    log.error(`Migration failed: ${error.message}`);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Rollback incremental migration: Remove Shop Workers feature
+ * Use with caution - this will delete all worker assignments!
+ */
+async function rollbackShopWorkersFeature() {
+  log.header('Rolling back Shop Workers Feature');
+  log.warning('This will delete all worker assignments!');
+  const client = await pool.connect();
+  try {
+    log.info('Dropping shop_workers table...');
+    await client.query('DROP TABLE IF EXISTS shop_workers CASCADE');
+    log.success('Table shop_workers dropped');
+    
+    log.success('Rollback completed: Shop Workers feature removed');
+  } catch (error) {
+    log.error(`Rollback failed: ${error.message}`);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+/**
  * Main migration runner
  */
 async function migrate(options = {}) {
@@ -664,6 +1032,22 @@ async function migrate(options = {}) {
       await rollbackFollowShopFeature();
     }
 
+    if (options.addChannelMigration) {
+      await addChannelMigrationFeature();
+    }
+
+    if (options.addRecurringSubscriptions) {
+      await addRecurringSubscriptions();
+    }
+
+    if (options.addShopWorkers) {
+      await addShopWorkersFeature();
+    }
+
+    if (options.rollbackShopWorkers) {
+      await rollbackShopWorkersFeature();
+    }
+
     // Verify tables
     if (verify) {
       await verifyTables();
@@ -703,6 +1087,10 @@ function parseArgs() {
     fixPaymentAddress: args.includes('--fix-payment-address'),
     addFollowShop: args.includes('--add-follow-shop'),
     rollbackFollowShop: args.includes('--rollback-follow-shop'),
+    addChannelMigration: args.includes('--add-channel-migration'),
+    addRecurringSubscriptions: args.includes('--add-recurring-subscriptions'),
+    addShopWorkers: args.includes('--add-shop-workers'),
+    rollbackShopWorkers: args.includes('--rollback-shop-workers'),
   };
 
   // Show help
@@ -722,6 +1110,10 @@ Options:
   --fix-payment-address  Run incremental migration: Add NOT NULL constraint to payments.payment_address
   --add-follow-shop      Run incremental migration: Add Follow Shop feature (shop_follows + synced_products tables)
   --rollback-follow-shop Rollback Follow Shop feature (WARNING: deletes all follow data!)
+  --add-channel-migration Run incremental migration: Add Channel Migration feature (telegram_id in subscriptions, tier in shops, channel_migrations table)
+  --add-recurring-subscriptions Run incremental migration: Add Recurring Subscriptions feature (shop_subscriptions table, subscription tracking in shops)
+  --add-shop-workers     Run incremental migration: Add Shop Workers feature (workspace functionality)
+  --rollback-shop-workers Rollback Shop Workers feature (WARNING: deletes all worker assignments!)
   --no-schema            Skip schema migration
   --no-indexes           Skip index creation
   --no-extensions        Skip extension setup
@@ -738,6 +1130,7 @@ Examples:
   node migrations.js --fix-payment-address    # Add NOT NULL constraint to payments.payment_address
   node migrations.js --add-follow-shop        # Add Follow Shop feature tables
   node migrations.js --rollback-follow-shop   # Remove Follow Shop feature (DESTRUCTIVE)
+  node migrations.js --add-channel-migration  # Add Channel Migration feature for PRO subscribers
   node migrations.js --no-indexes             # Run without indexes
     `);
     process.exit(0);
@@ -768,4 +1161,8 @@ module.exports = {
   addPaymentAddressConstraint,
   addFollowShopFeature,
   rollbackFollowShopFeature,
+  addChannelMigrationFeature,
+  addRecurringSubscriptions,
+  addShopWorkersFeature,
+  rollbackShopWorkersFeature,
 };

@@ -2,6 +2,7 @@ import express from 'express';
 import { shopController } from '../controllers/shopController.js';
 import { shopValidation } from '../middleware/validation.js';
 import { verifyToken, optionalAuth, requireShopOwner } from '../middleware/auth.js';
+import * as migrationController from '../controllers/migrationController.js';
 
 const router = express.Router();
 
@@ -102,6 +103,50 @@ router.put(
   verifyToken,
   requireShopOwner,
   shopController.updateWallets
+);
+
+/**
+ * @route   GET /api/shops/:shopId/migration/check
+ * @desc    Check migration eligibility (PRO tier + rate limits)
+ * @access  Private (Shop owner only)
+ */
+router.get(
+  '/:shopId/migration/check',
+  verifyToken,
+  migrationController.checkMigrationEligibility
+);
+
+/**
+ * @route   POST /api/shops/:shopId/migration
+ * @desc    Initiate channel migration broadcast
+ * @access  Private (Shop owner only)
+ */
+router.post(
+  '/:shopId/migration',
+  verifyToken,
+  migrationController.initiateMigration
+);
+
+/**
+ * @route   GET /api/shops/:shopId/migration/history
+ * @desc    Get migration history for a shop
+ * @access  Private (Shop owner only)
+ */
+router.get(
+  '/:shopId/migration/history',
+  verifyToken,
+  migrationController.getMigrationHistory
+);
+
+/**
+ * @route   GET /api/shops/:shopId/migration/:migrationId
+ * @desc    Get specific migration status
+ * @access  Private (Shop owner only)
+ */
+router.get(
+  '/:shopId/migration/:migrationId',
+  verifyToken,
+  migrationController.getMigrationStatus
 );
 
 export default router;

@@ -47,15 +47,23 @@ CREATE TABLE shops (
   wallet_eth VARCHAR(255),
   wallet_usdt VARCHAR(255),
   wallet_ton VARCHAR(255),
+  tier VARCHAR(20) DEFAULT 'free' CHECK (tier IN ('free', 'pro')),
   is_active BOOLEAN DEFAULT true,
+  subscription_status VARCHAR(20) DEFAULT 'active' CHECK (subscription_status IN ('active', 'grace_period', 'inactive')),
+  next_payment_due TIMESTAMP,
+  grace_period_until TIMESTAMP,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
 );
 
 COMMENT ON TABLE shops IS 'Stores shops - any user with a shop becomes a seller';
 COMMENT ON COLUMN shops.owner_id IS 'Reference to shop owner (user becomes seller by creating shop)';
-COMMENT ON COLUMN shops.registration_paid IS 'Whether $25 registration payment was confirmed';
-COMMENT ON COLUMN shops.is_active IS 'Shop activation status';
+COMMENT ON COLUMN shops.registration_paid IS 'Whether initial subscription payment was confirmed';
+COMMENT ON COLUMN shops.is_active IS 'Shop activation status (deactivated after grace period expires)';
+COMMENT ON COLUMN shops.tier IS 'Subscription tier: free ($25/month) or pro ($35/month)';
+COMMENT ON COLUMN shops.subscription_status IS 'active: paid, grace_period: 2 days after expiry, inactive: deactivated';
+COMMENT ON COLUMN shops.next_payment_due IS 'Next monthly subscription payment due date';
+COMMENT ON COLUMN shops.grace_period_until IS 'Grace period end date (2 days after payment due)';
 
 -- ============================================
 -- Products table
@@ -176,6 +184,7 @@ CREATE TABLE subscriptions (
   id SERIAL PRIMARY KEY,
   user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   shop_id INT NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
+  telegram_id BIGINT,
   created_at TIMESTAMP DEFAULT NOW(),
   UNIQUE(user_id, shop_id)
 );
@@ -201,6 +210,51 @@ CREATE TABLE payments (
 COMMENT ON TABLE payments IS 'Stores crypto payment verification records';
 COMMENT ON COLUMN payments.tx_hash IS 'Blockchain transaction hash';
 COMMENT ON COLUMN payments.confirmations IS 'Number of blockchain confirmations';
+
+-- ============================================
+-- Channel Migrations table (PRO feature)
+-- ============================================
+CREATE TABLE channel_migrations (
+  id SERIAL PRIMARY KEY,
+  shop_id INT NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
+  old_channel_url TEXT,
+  new_channel_url TEXT NOT NULL,
+  sent_count INT DEFAULT 0,
+  failed_count INT DEFAULT 0,
+  status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'completed', 'failed')),
+  created_at TIMESTAMP DEFAULT NOW(),
+  started_at TIMESTAMP,
+  completed_at TIMESTAMP
+);
+
+COMMENT ON TABLE channel_migrations IS 'Logs channel migration broadcasts for PRO shop owners';
+COMMENT ON COLUMN channel_migrations.sent_count IS 'Number of successfully sent messages';
+COMMENT ON COLUMN channel_migrations.failed_count IS 'Number of failed message deliveries';
+
+-- ============================================
+-- Shop Subscriptions table (Recurring Payments)
+-- ============================================
+CREATE TABLE shop_subscriptions (
+  id SERIAL PRIMARY KEY,
+  shop_id INT NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
+  tier VARCHAR(20) NOT NULL CHECK (tier IN ('free', 'pro')),
+  amount DECIMAL(10, 2) NOT NULL,
+  tx_hash VARCHAR(255) UNIQUE NOT NULL,
+  currency VARCHAR(10) NOT NULL CHECK (currency IN ('BTC', 'ETH', 'USDT', 'TON')),
+  period_start TIMESTAMP NOT NULL,
+  period_end TIMESTAMP NOT NULL,
+  status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'expired', 'cancelled')),
+  created_at TIMESTAMP DEFAULT NOW(),
+  verified_at TIMESTAMP
+);
+
+COMMENT ON TABLE shop_subscriptions IS 'Stores monthly subscription payments for shops (free $25/mo, pro $35/mo)';
+COMMENT ON COLUMN shop_subscriptions.tier IS 'Subscription tier: free ($25) or pro ($35)';
+COMMENT ON COLUMN shop_subscriptions.amount IS 'Payment amount in USD';
+COMMENT ON COLUMN shop_subscriptions.tx_hash IS 'Blockchain transaction hash for verification';
+COMMENT ON COLUMN shop_subscriptions.period_start IS 'Start date of subscription period';
+COMMENT ON COLUMN shop_subscriptions.period_end IS 'End date of subscription period (30 days from start)';
+COMMENT ON COLUMN shop_subscriptions.status IS 'active: valid, expired: period ended, cancelled: refunded';
 
 -- ============================================
 -- Functions for updated_at timestamps
@@ -236,10 +290,20 @@ CREATE TRIGGER update_payments_updated_at BEFORE UPDATE ON payments
 -- ============================================
 CREATE INDEX IF NOT EXISTS idx_users_selected_role ON users(selected_role);
 CREATE INDEX IF NOT EXISTS idx_shops_owner ON shops(owner_id);
+CREATE INDEX IF NOT EXISTS idx_shops_tier ON shops(tier);
 CREATE INDEX IF NOT EXISTS idx_products_shop ON products(shop_id);
 CREATE INDEX IF NOT EXISTS idx_products_shop_active ON products(shop_id, is_active);
 CREATE INDEX IF NOT EXISTS idx_subscriptions_user ON subscriptions(user_id);
 CREATE INDEX IF NOT EXISTS idx_subscriptions_shop ON subscriptions(shop_id);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_telegram_id ON subscriptions(telegram_id);
 CREATE INDEX IF NOT EXISTS idx_orders_buyer ON orders(buyer_id);
 CREATE INDEX IF NOT EXISTS idx_orders_product ON orders(product_id);
 CREATE INDEX IF NOT EXISTS idx_payments_order_status ON payments(order_id, status);
+CREATE INDEX IF NOT EXISTS idx_channel_migrations_shop ON channel_migrations(shop_id);
+CREATE INDEX IF NOT EXISTS idx_channel_migrations_status ON channel_migrations(status);
+CREATE INDEX IF NOT EXISTS idx_channel_migrations_created ON channel_migrations(created_at);
+CREATE INDEX IF NOT EXISTS idx_shop_subscriptions_shop ON shop_subscriptions(shop_id);
+CREATE INDEX IF NOT EXISTS idx_shop_subscriptions_status ON shop_subscriptions(status);
+CREATE INDEX IF NOT EXISTS idx_shop_subscriptions_period_end ON shop_subscriptions(period_end);
+CREATE INDEX IF NOT EXISTS idx_shops_subscription_status ON shops(subscription_status);
+CREATE INDEX IF NOT EXISTS idx_shops_next_payment_due ON shops(next_payment_due);

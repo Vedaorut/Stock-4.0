@@ -26,9 +26,16 @@ import paymentRoutes from './routes/payments.js';
 import subscriptionRoutes from './routes/subscriptions.js';
 import walletRoutes from './routes/wallets.js';
 import followRoutes from './routes/follows.js';
+import workerRoutes from './routes/workers.js';
+
+// Routes registration (will be added after middleware setup)
 
 // Import cron jobs
 import { startSyncCron, stopSyncCron } from './jobs/productSyncCron.js';
+import { startSubscriptionJobs, stopSubscriptionJobs } from './jobs/subscriptionChecker.js';
+
+// Import Telegram bot
+import { bot, startBot } from '../../bot/src/bot.js';
 
 /**
  * Initialize Express app
@@ -118,6 +125,7 @@ app.get('/health', (req, res) => {
  */
 app.use('/api/auth', authRoutes);
 app.use('/api/shops', shopRoutes);
+app.use('/api/shops', workerRoutes); // Worker management (mounted on /api/shops)
 app.use('/api/products', productRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/payments', paymentRoutes);
@@ -168,6 +176,18 @@ const startServer = async () => {
 
       // Start product sync cron job
       startSyncCron();
+
+      // Start Telegram bot and make it available globally
+      startBot().then(() => {
+        global.botInstance = bot;
+        logger.info('Telegram bot integrated with backend');
+        
+        // Start subscription cron jobs (requires bot instance)
+        startSubscriptionJobs();
+      }).catch((error) => {
+        logger.error('Failed to start Telegram bot:', error);
+        // Bot failure is not critical for backend - continue running
+      });
     });
 
     // Setup WebSocket server for real-time updates
@@ -224,6 +244,19 @@ const startServer = async () => {
     // Graceful shutdown
     const shutdown = async (signal) => {
       logger.info(`${signal} received, shutting down gracefully...`);
+
+      // Stop subscription cron jobs
+      stopSubscriptionJobs();
+
+      // Stop Telegram bot
+      if (global.botInstance) {
+        try {
+          await bot.stop();
+          logger.info('Telegram bot stopped');
+        } catch (error) {
+          logger.error('Error stopping bot:', error);
+        }
+      }
 
       // Stop product sync cron job
       stopSyncCron();

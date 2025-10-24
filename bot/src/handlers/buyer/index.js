@@ -3,6 +3,7 @@ import { subscriptionApi, shopApi, authApi, orderApi, productApi } from '../../u
 import { formatPrice, formatOrderStatus } from '../../utils/format.js';
 import { formatBuyerOrders, formatSubscriptions, formatShopInfo } from '../../utils/minimalist.js';
 import logger from '../../utils/logger.js';
+import * as smartMessage from '../../utils/smartMessage.js';
 
 /**
  * Setup buyer-related handlers
@@ -67,10 +68,10 @@ export const handleBuyerRole = async (ctx) => {
 
         if (!shops || shops.length === 0) {
           // No shop - show CTA to create shop
-          await ctx.editMessageText(
-            'Мои покупки\n\nПродавец — $25',
-            buyerMenuNoShop
-          );
+          await smartMessage.send(ctx, {
+            text: 'Мои покупки\n\nПродавец — $25',
+            keyboard: buyerMenuNoShop
+          });
           logger.info(`Buyer ${ctx.from.id} has no shop, showing CTA`);
           return;
         }
@@ -80,18 +81,18 @@ export const handleBuyerRole = async (ctx) => {
       // Continue to show normal buyer menu on error
     }
 
-    await ctx.editMessageText(
-      'Мои покупки',
-      buyerMenu
-    );
+    await smartMessage.send(ctx, {
+      text: 'Мои покупки',
+      keyboard: buyerMenu
+    });
   } catch (error) {
     logger.error('Error in buyer role handler:', error);
     // Local error handling - don't throw to avoid infinite spinner
     try {
-      await ctx.editMessageText(
-        'Произошла ошибка\n\nПопробуйте позже',
-        buyerMenu
-      );
+      await smartMessage.send(ctx, {
+        text: 'Произошла ошибка\n\nПопробуйте позже',
+        keyboard: buyerMenu
+      });
     } catch (replyError) {
       logger.error('Failed to send error message:', replyError);
     }
@@ -111,10 +112,10 @@ const handleSearchShops = async (ctx) => {
     logger.error('Error entering searchShop scene:', error);
     // Local error handling - don't throw to avoid infinite spinner
     try {
-      await ctx.editMessageText(
-        'Произошла ошибка\n\nПопробуйте позже',
-        buyerMenu
-      );
+      await smartMessage.send(ctx, {
+        text: 'Произошла ошибка\n\nПопробуйте позже',
+        keyboard: buyerMenu
+      });
     } catch (replyError) {
       logger.error('Failed to send error message:', replyError);
     }
@@ -130,10 +131,10 @@ const handleSubscriptions = async (ctx) => {
 
     // Get user subscriptions
     if (!ctx.session.token) {
-      await ctx.editMessageText(
-        'Необходима авторизация. Перезапустите бота командой /start',
-        buyerMenu
-      );
+      await smartMessage.send(ctx, {
+        text: 'Необходима авторизация. Перезапустите бота командой /start',
+        keyboard: buyerMenu
+      });
       return;
     }
 
@@ -142,13 +143,16 @@ const handleSubscriptions = async (ctx) => {
     // Use minimalist formatter
     const message = formatSubscriptions(subscriptions);
 
-    await ctx.editMessageText(message, buyerMenu);
+    await smartMessage.send(ctx, {
+      text: message,
+      keyboard: buyerMenu
+    });
   } catch (error) {
     logger.error('Error fetching subscriptions:', error);
-    await ctx.editMessageText(
-      'Не удалось загрузить подписки\n\nПопробуйте позже',
-      buyerMenu
-    );
+    await smartMessage.send(ctx, {
+      text: 'Не удалось загрузить подписки\n\nПопробуйте позже',
+      keyboard: buyerMenu
+    });
   }
 };
 
@@ -176,17 +180,17 @@ const handleSubscribe = async (ctx) => {
       const shop = await shopApi.getShop(shopId);
 
       // Update message with subscribed state
-      await ctx.editMessageText(
-        `✓ Подписка активна: ${shop.name}`,
-        shopActionsKeyboard(shopId, true)
-      );
+      await smartMessage.send(ctx, {
+        text: `✓ Подписка активна: ${shop.name}`,
+        keyboard: shopActionsKeyboard(shopId, true)
+      });
 
       logger.info(`User ${ctx.from.id} already subscribed to shop ${shopId}`);
       return;
     }
 
-    // Not subscribed - proceed with subscription
-    await subscriptionApi.subscribe(shopId, ctx.session.token);
+    // Not subscribed - proceed with subscription (pass telegram_id for broadcast feature)
+    await subscriptionApi.subscribe(shopId, ctx.session.token, ctx.from.id);
 
     // Get shop details
     const shop = await shopApi.getShop(shopId);
@@ -194,10 +198,10 @@ const handleSubscribe = async (ctx) => {
     // Success - answer callback query
     await ctx.answerCbQuery('✅ Подписались!');
 
-    await ctx.editMessageText(
-      `✓ Подписались: ${shop.name}`,
-      shopActionsKeyboard(shopId, true)
-    );
+    await smartMessage.send(ctx, {
+      text: `✓ Подписались: ${shop.name}`,
+      keyboard: shopActionsKeyboard(shopId, true)
+    });
 
     logger.info(`User ${ctx.from.id} subscribed to shop ${shopId}`);
   } catch (error) {
@@ -238,10 +242,10 @@ const handleUnsubscribe = async (ctx) => {
     // Answer callback query AFTER successful API call
     await ctx.answerCbQuery('✓ Отписались');
 
-    await ctx.editMessageText(
-      `✓ Отписались: ${shop.name}`,
-      shopActionsKeyboard(shopId, false)
-    );
+    await smartMessage.send(ctx, {
+      text: `✓ Отписались: ${shop.name}`,
+      keyboard: shopActionsKeyboard(shopId, false)
+    });
 
     logger.info(`User ${ctx.from.id} unsubscribed from shop ${shopId}`);
   } catch (error) {
@@ -259,10 +263,10 @@ const handleOrders = async (ctx) => {
 
     // Check authentication
     if (!ctx.session.token) {
-      await ctx.editMessageText(
-        'Необходима авторизация. Перезапустите бота командой /start',
-        buyerMenu
-      );
+      await smartMessage.send(ctx, {
+        text: 'Необходима авторизация. Перезапустите бота командой /start',
+        keyboard: buyerMenu
+      });
       return;
     }
 
@@ -272,14 +276,17 @@ const handleOrders = async (ctx) => {
     // Use minimalist formatter (9 lines → 4 lines)
     const message = formatBuyerOrders(orders);
 
-    await ctx.editMessageText(message, buyerMenu);
+    await smartMessage.send(ctx, {
+      text: message,
+      keyboard: buyerMenu
+    });
     logger.info(`User ${ctx.from.id} viewed orders (${orders.length} total)`);
   } catch (error) {
     logger.error('Error fetching orders:', error);
-    await ctx.editMessageText(
-      'Ошибка загрузки',
-      buyerMenu
-    );
+    await smartMessage.send(ctx, {
+      text: 'Ошибка загрузки',
+      keyboard: buyerMenu
+    });
   }
 };
 
@@ -323,17 +330,17 @@ const handleShopView = async (ctx) => {
       }
     }
 
-    await ctx.editMessageText(
-      message,
-      shopActionsKeyboard(shopId, isSubscribed)
-    );
+    await smartMessage.send(ctx, {
+      text: message,
+      keyboard: shopActionsKeyboard(shopId, isSubscribed)
+    });
 
     logger.info(`User ${ctx.from.id} viewed shop ${shopId} details`);
   } catch (error) {
     logger.error('Error viewing shop:', error);
-    await ctx.editMessageText(
-      'Не удалось загрузить информацию о магазине\n\nПопробуйте позже',
-      buyerMenu
-    );
+    await smartMessage.send(ctx, {
+      text: 'Не удалось загрузить информацию о магазине\n\nПопробуйте позже',
+      keyboard: buyerMenu
+    });
   }
 };

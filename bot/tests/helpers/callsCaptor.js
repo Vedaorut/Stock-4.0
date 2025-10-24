@@ -19,6 +19,10 @@ export function createCallsCaptor() {
     const originalEditMarkup = ctx.editMessageReplyMarkup?.bind(ctx);
     const originalAnswerCb = ctx.answerCbQuery?.bind(ctx);
 
+    // Оригинальные методы telegram API (для smartMessage)
+    const originalTelegramEditText = ctx.telegram?.editMessageText?.bind(ctx.telegram);
+    const originalTelegramEditMedia = ctx.telegram?.editMessageMedia?.bind(ctx.telegram);
+
     // Обёртки с захватом
     ctx.reply = async (...args) => {
       calls.push({
@@ -57,6 +61,32 @@ export function createCallsCaptor() {
       });
       return originalAnswerCb ? originalAnswerCb(...args) : true;
     };
+
+    // Wrap ctx.telegram methods (for smartMessage compatibility)
+    if (ctx.telegram) {
+      ctx.telegram.editMessageText = async (...args) => {
+        // args: [chatId, messageId, inlineMessageId, text, extra]
+        calls.push({
+          type: 'editMessageText',
+          args,
+          text: args[3], // text is 4th arg in telegram API
+          markup: args[4]?.reply_markup || args[4]
+        });
+        return originalTelegramEditText ? originalTelegramEditText(...args) : true;
+      };
+
+      ctx.telegram.editMessageMedia = async (...args) => {
+        // args: [chatId, messageId, inlineMessageId, media, extra]
+        const media = args[3];
+        calls.push({
+          type: 'editMessageText', // Treat as edit for test purposes
+          args,
+          text: media?.caption || '',
+          markup: args[4]?.reply_markup || args[4]
+        });
+        return originalTelegramEditMedia ? originalTelegramEditMedia(...args) : true;
+      };
+    }
 
     return next();
   };

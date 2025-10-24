@@ -1,8 +1,10 @@
 import { Scenes } from 'telegraf';
-import { cancelButton, successButtons } from '../keyboards/common.js';
+import { successButtons, cancelButton } from '../keyboards/common.js';
 import { productApi } from '../utils/api.js';
 import { formatPrice } from '../utils/format.js';
 import logger from '../utils/logger.js';
+import * as messageCleanup from '../utils/messageCleanup.js';
+import * as smartMessage from '../utils/smartMessage.js';
 
 /**
  * Add Product Scene - Multi-step wizard
@@ -16,11 +18,11 @@ import logger from '../utils/logger.js';
 const enterName = async (ctx) => {
   try {
     logger.info('product_add_step:name', { userId: ctx.from.id });
-    
-    await ctx.reply(
-      'Название (мин 3 символа):',
-      cancelButton
-    );
+
+    await smartMessage.send(ctx, {
+      text: 'Название (мин 3 символа):',
+      keyboard: cancelButton
+    });
 
     return ctx.wizard.next();
   } catch (error) {
@@ -34,16 +36,22 @@ const enterPrice = async (ctx) => {
   try {
     // Get product name from message
     if (!ctx.message || !ctx.message.text) {
-      await ctx.reply('Отправьте название товара', cancelButton);
+      await smartMessage.send(ctx, { text: 'Отправьте название товара' });
       return;
     }
 
     const productName = ctx.message.text.trim();
 
     if (productName.length < 3) {
-      await ctx.reply('Минимум 3 символа', cancelButton);
+      await smartMessage.send(ctx, { text: 'Минимум 3 символа' });
       return;
     }
+
+    // FIX BUG #1: Track user message IDs for cleanup
+    if (!ctx.wizard.state.userMessageIds) {
+      ctx.wizard.state.userMessageIds = [];
+    }
+    ctx.wizard.state.userMessageIds.push(ctx.message.message_id);
 
     ctx.wizard.state.name = productName;
 
@@ -52,7 +60,7 @@ const enterPrice = async (ctx) => {
       productName: productName
     });
 
-    await ctx.reply('Цена ($, > 0):', cancelButton);
+    await smartMessage.send(ctx, { text: 'Цена ($, > 0):' });
 
     return ctx.wizard.next();
   } catch (error) {
@@ -66,7 +74,7 @@ const complete = async (ctx) => {
   try {
     // Get price from message
     if (!ctx.message || !ctx.message.text) {
-      await ctx.reply('Отправьте цену товара', cancelButton);
+      await smartMessage.send(ctx, { text: 'Отправьте цену товара' });
       return;
     }
 
@@ -74,9 +82,15 @@ const complete = async (ctx) => {
     const price = parseFloat(priceText);
 
     if (isNaN(price) || price <= 0) {
-      await ctx.reply('❌ Цена — число > 0\n\nПример: 99.99 или 99,99', cancelButton);
+      await smartMessage.send(ctx, { text: '❌ Цена — число > 0\n\nПример: 99.99 или 99,99' });
       return;
     }
+
+    // FIX BUG #1: Track user message ID for cleanup
+    if (!ctx.wizard.state.userMessageIds) {
+      ctx.wizard.state.userMessageIds = [];
+    }
+    ctx.wizard.state.userMessageIds.push(ctx.message.message_id);
 
     ctx.wizard.state.price = price;
 
@@ -93,10 +107,10 @@ const complete = async (ctx) => {
         userId: ctx.from.id,
         session: ctx.session
       });
-      await ctx.reply(
-        'Ошибка: магазин не найден\n\nСначала создайте магазин',
-        successButtons
-      );
+      await smartMessage.send(ctx, {
+        text: 'Ошибка: магазин не найден\n\nСначала создайте магазин',
+        keyboard: successButtons
+      });
       return await ctx.scene.leave();
     }
 
@@ -105,15 +119,15 @@ const complete = async (ctx) => {
         userId: ctx.from.id,
         session: ctx.session
       });
-      await ctx.reply(
-        'Ошибка авторизации. Попробуйте снова через главное меню',
-        successButtons
-      );
+      await smartMessage.send(ctx, {
+        text: 'Ошибка авторизации. Попробуйте снова через главное меню',
+        keyboard: successButtons
+      });
       return await ctx.scene.leave();
     }
 
     // Create product via backend
-    await ctx.reply('Сохраняем...');
+    await smartMessage.send(ctx, { text: 'Сохраняем...' });
 
     const product = await productApi.createProduct({
       name,
@@ -136,19 +150,19 @@ const complete = async (ctx) => {
       userId: ctx.from.id
     });
 
-    await ctx.reply(
-      `✅ ${name} — ${formatPrice(price)}`,
-      successButtons
-    );
+    await smartMessage.send(ctx, {
+      text: `✅ ${name} — ${formatPrice(price)}`,
+      keyboard: successButtons
+    });
 
     // Leave scene
     return await ctx.scene.leave();
   } catch (error) {
     logger.error('Error creating product:', error);
-    await ctx.reply(
-      'Ошибка. Попробуйте позже',
-      successButtons
-    );
+    await smartMessage.send(ctx, {
+      text: 'Ошибка. Попробуйте позже',
+      keyboard: successButtons
+    });
     return await ctx.scene.leave();
   }
 };
@@ -163,6 +177,23 @@ const addProductScene = new Scenes.WizardScene(
 
 // Handle scene leave
 addProductScene.leave(async (ctx) => {
+  // FIX BUG #1: Delete user messages (name, price inputs)
+  const userMsgIds = ctx.wizard.state.userMessageIds || [];
+  for (const msgId of userMsgIds) {
+    try {
+      await ctx.deleteMessage(msgId);
+    } catch (error) {
+      // Message may already be deleted or too old
+      logger.debug(`Could not delete user message ${msgId}:`, error.message);
+    }
+  }
+
+  // Cleanup wizard messages (keep final message)
+  await messageCleanup.cleanupWizard(ctx, {
+    keepFinalMessage: true,
+    keepWelcome: true
+  });
+
   ctx.wizard.state = {};
   logger.info(`User ${ctx.from?.id} left addProduct scene`);
 });
@@ -173,7 +204,7 @@ addProductScene.action('cancel_scene', async (ctx) => {
     await ctx.answerCbQuery();
     logger.info('product_add_cancelled', { userId: ctx.from.id });
     await ctx.scene.leave();
-    await ctx.reply('Отменено', successButtons);
+    await smartMessage.send(ctx, { text: 'Отменено', keyboard: successButtons });
   } catch (error) {
     logger.error('Error in cancel_scene handler:', error);
     // Local error handling - don't throw to avoid infinite spinner

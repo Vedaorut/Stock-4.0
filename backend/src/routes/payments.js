@@ -41,4 +41,11 @@ router.get(
  */
 router.get('/status', verifyToken, optionalTelegramAuth, paymentController.checkStatus);
 
+/**
+ * @route   POST /api/payments/qr
+ * @desc    Generate QR code for payment
+ * @access  Private (WebApp)
+ */
+router.post('/qr', verifyToken, optionalTelegramAuth, paymentController.generateQR);
+
 export default router;

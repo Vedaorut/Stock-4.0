@@ -2,6 +2,7 @@ import { paymentQueries, orderQueries } from '../models/db.js';
 import cryptoService from '../services/crypto.js';
 import telegramService from '../services/telegram.js';
 import logger from '../utils/logger.js';
+import QRCode from 'qrcode';
 
 /**
  * Payment Controller
@@ -249,6 +250,86 @@ export const paymentController = {
       return res.status(500).json({
         success: false,
         error: 'Failed to check payment status'
+      });
+    }
+  },
+
+  /**
+   * Generate QR code for payment
+   */
+  generateQR: async (req, res) => {
+    try {
+      const { address, amount, currency } = req.body;
+
+      // Validate inputs
+      if (!address || !amount || !currency) {
+        return res.status(400).json({
+          success: false,
+          error: 'Missing required fields: address, amount, currency'
+        });
+      }
+
+      // Validate currency
+      const supportedCurrencies = ['BTC', 'ETH', 'USDT', 'TON'];
+      if (!supportedCurrencies.includes(currency.toUpperCase())) {
+        return res.status(400).json({
+          success: false,
+          error: `Unsupported currency. Supported: ${supportedCurrencies.join(', ')}`
+        });
+      }
+
+      // Generate payment URI based on currency standard
+      let paymentURI;
+      switch (currency.toUpperCase()) {
+        case 'BTC':
+          // BIP-21: bitcoin:address?amount=X
+          paymentURI = `bitcoin:${address}?amount=${amount}`;
+          break;
+        case 'ETH':
+          // EIP-681: ethereum:address?value=X (value in wei)
+          paymentURI = `ethereum:${address}?value=${amount}`;
+          break;
+        case 'USDT':
+          // TRC-20 Tron format
+          // TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t is USDT contract on Tron
+          paymentURI = `tronlink://send?token=TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t&to=${address}&amount=${amount}`;
+          break;
+        case 'TON':
+          // TON transfer format
+          paymentURI = `ton://transfer/${address}?amount=${amount}`;
+          break;
+      }
+
+      logger.info('Generating QR code', {
+        currency,
+        addressPrefix: address.substring(0, 10),
+        amount
+      });
+
+      // Generate QR code as data URL
+      const qrDataURL = await QRCode.toDataURL(paymentURI, {
+        errorCorrectionLevel: 'M',
+        type: 'image/png',
+        width: 512,
+        margin: 2
+      });
+
+      return res.status(200).json({
+        success: true,
+        data: {
+          qrCode: qrDataURL,
+          paymentURI,
+          address,
+          amount,
+          currency
+        }
+      });
+
+    } catch (error) {
+      logger.error('QR generation error', { error: error.message, stack: error.stack });
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to generate QR code'
       });
     }
   }

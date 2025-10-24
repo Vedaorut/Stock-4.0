@@ -148,6 +148,15 @@ export async function processProductCommand(userCommand, context) {
       command: sanitizedCommand.slice(0, 50)
     });
 
+    // Typing indicator - keep showing "typing..." during AI processing
+    let typingInterval = null;
+    if (ctx) {
+      await ctx.sendChatAction('typing').catch(() => {});
+      typingInterval = setInterval(() => {
+        ctx.sendChatAction('typing').catch(() => {});
+      }, 4000); // Every 4 seconds
+    }
+
     // Streaming state for Telegram message updates
     let streamingMessage = null;
     let lastUpdateTime = 0;
@@ -194,13 +203,21 @@ export async function processProductCommand(userCommand, context) {
     };
 
     // Call DeepSeek API with streaming
-    const response = await deepseek.chatStreaming(
-      systemPrompt,
-      sanitizedCommand,
-      productTools,
-      conversationHistory,
-      onChunk
-    );
+    let response;
+    try {
+      response = await deepseek.chatStreaming(
+        systemPrompt,
+        sanitizedCommand,
+        productTools,
+        conversationHistory,
+        onChunk
+      );
+    } finally {
+      // Stop typing indicator
+      if (typingInterval) {
+        clearInterval(typingInterval);
+      }
+    }
 
     logger.info('ai_product_command_processed', {
       shopId,
@@ -223,11 +240,16 @@ export async function processProductCommand(userCommand, context) {
       });
 
       // Delete streaming message since function result will be in a new message
+      // Add small delay to let any pending edits complete
       if (streamingMessage && ctx) {
         try {
+          await new Promise(resolve => setTimeout(resolve, 100)); // Wait for pending edits
           await ctx.telegram.deleteMessage(streamingMessage.chat.id, streamingMessage.message_id);
         } catch (err) {
-          logger.warn('Failed to delete streaming message:', err.message);
+          // Ignore errors - message might already be gone or not found
+          if (err.response?.error_code !== 400) {
+            logger.warn('Failed to delete streaming message:', err.message);
+          }
         }
       }
 
@@ -245,16 +267,30 @@ export async function processProductCommand(userCommand, context) {
     // No tool call - AI responded with text
     const aiMessage = choice.message.content;
 
-    // If streaming was too fast and no message was created, send regular message
-    if (!streamingMessage && ctx && aiMessage) {
+    // ALWAYS do final update to ensure complete message is sent
+    if (streamingMessage && ctx && aiMessage) {
+      try {
+        // Final update with complete text
+        await ctx.telegram.editMessageText(
+          streamingMessage.chat.id,
+          streamingMessage.message_id,
+          undefined,
+          aiMessage
+        );
+      } catch (err) {
+        // Ignore "message not modified" errors
+        if (err.response?.description !== 'Bad Request: message is not modified') {
+          logger.warn('Failed to send final AI message:', err.message);
+        }
+      }
+    } else if (!streamingMessage && ctx && aiMessage) {
+      // If streaming was too fast and no message was created, send regular message
       try {
         await ctx.reply(aiMessage);
       } catch (err) {
         logger.warn('Failed to send AI message:', err.message);
       }
     }
-    // Note: If streamingMessage exists, it was already updated via onChunk callback
-    // No need for final update - would cause duplication
 
     // Save conversation history (user command + AI text response)
     if (ctx && aiMessage) {
@@ -1022,7 +1058,7 @@ async function handleBulkUpdatePrices(args, shopId, token, products, ctx) {
   // Build preview
   const previewUpdates = products.slice(0, 3).map(p => {
     const newPrice = Math.round(p.price * multiplier * 100) / 100;
-    return `• ${p.name}: ${p.price} → ${newPrice}`;
+    return `• ${p.name}: $${formatPrice(p.price)} → $${formatPrice(newPrice)}`;
   });
   const previewText = previewUpdates.join('\n');
 
@@ -1049,7 +1085,7 @@ async function handleBulkUpdatePrices(args, shopId, token, products, ctx) {
     keyboard: {
       inline_keyboard: [[
         { text: '✅ Применить', callback_data: 'bulk_prices_confirm' },
-        { text: '❌ Отмена', callback_data: 'bulk_prices_cancel' }
+        { text: '◀️ Назад', callback_data: 'bulk_prices_cancel' }
       ]]
     },
     operation: 'bulk_update_prices'
@@ -1178,7 +1214,7 @@ export async function executeBulkPriceUpdate(shopId, token, ctx) {
     const exampleUpdates = updates.slice(0, 5);
     exampleUpdates.forEach(u => {
       const displayName = u.name.length > 40 ? u.name.slice(0, 37) + '...' : u.name;
-      message += `• ${displayName}: ${u.oldPrice} → ${u.newPrice}\n`;
+      message += `• ${displayName}: $${formatPrice(u.oldPrice)} → $${formatPrice(u.newPrice)}\n`;
     });
 
     if (updates.length > 5) {

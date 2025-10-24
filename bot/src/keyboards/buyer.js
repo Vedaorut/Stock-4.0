@@ -35,8 +35,31 @@ export const shopActionsKeyboard = (shopId, isSubscribed = false) => {
 
   buttons.push(
     [Markup.button.callback('ℹ️ О магазине', `shop:view:${shopId}`)],
-    [Markup.button.callback('« Назад', 'buyer:main')]
+    [Markup.button.callback('◀️ Назад', 'buyer:main')]
   );
+
+  return Markup.inlineKeyboard(buttons);
+};
+
+// Shop search results keyboard (all shops in one message)
+export const shopResultsKeyboard = (shops) => {
+  const buttons = [];
+
+  // Add button for each shop (max 10 for clean display)
+  const shopsToShow = shops.slice(0, 10);
+
+  for (const shop of shopsToShow) {
+    buttons.push([
+      Markup.button.callback(`${shop.name}${shop.is_subscribed ? ' ✅' : ''}`, `shop:view:${shop.id}`)
+    ]);
+  }
+
+  // Show "and X more" if there are more results
+  if (shops.length > 10) {
+    buttons.push([Markup.button.callback(`... и ещё ${shops.length - 10}`, 'noop:more')]);
+  }
+
+  buttons.push([Markup.button.callback('◀️ Назад', 'buyer:main')]);
 
   return Markup.inlineKeyboard(buttons);
 };

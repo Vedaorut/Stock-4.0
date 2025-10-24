@@ -23,12 +23,12 @@ CREATE INDEX idx_shops_owner_active ON shops(owner_id, is_active);
 -- Products table indexes
 -- ============================================
 CREATE INDEX idx_products_shop_id ON products(shop_id);
-CREATE INDEX idx_products_is_available ON products(is_available);
+CREATE INDEX idx_products_is_active ON products(is_active);
 CREATE INDEX idx_products_currency ON products(currency);
 CREATE INDEX idx_products_created_at ON products(created_at DESC);
 
--- Composite index for available products by shop
-CREATE INDEX idx_products_shop_available ON products(shop_id, is_available);
+-- Composite index for active products by shop
+CREATE INDEX idx_products_shop_active ON products(shop_id, is_active);
 
 -- Index for price range queries
 CREATE INDEX idx_products_price ON products(price);
@@ -40,14 +40,13 @@ CREATE INDEX idx_products_name_trgm ON products USING gin(name gin_trgm_ops);
 -- Orders table indexes
 -- ============================================
 CREATE INDEX idx_orders_buyer_id ON orders(buyer_id);
-CREATE INDEX idx_orders_shop_id ON orders(shop_id);
+CREATE INDEX idx_orders_product_id ON orders(product_id);
 CREATE INDEX idx_orders_status ON orders(status);
 CREATE INDEX idx_orders_payment_hash ON orders(payment_hash);
 CREATE INDEX idx_orders_created_at ON orders(created_at DESC);
 
 -- Composite indexes for common queries
 CREATE INDEX idx_orders_buyer_status ON orders(buyer_id, status);
-CREATE INDEX idx_orders_shop_status ON orders(shop_id, status);
 CREATE INDEX idx_orders_status_created ON orders(status, created_at DESC);
 
 -- Index for payment tracking
@@ -71,21 +70,6 @@ CREATE INDEX idx_subscriptions_created_at ON subscriptions(created_at DESC);
 
 -- Composite index for subscription lookups
 CREATE INDEX idx_subscriptions_user_shop ON subscriptions(user_id, shop_id);
-
--- ============================================
--- Shop payments table indexes
--- ============================================
-CREATE INDEX idx_shop_payments_user_id ON shop_payments(user_id);
-CREATE INDEX idx_shop_payments_shop_id ON shop_payments(shop_id);
-CREATE INDEX idx_shop_payments_payment_hash ON shop_payments(payment_hash);
-CREATE INDEX idx_shop_payments_status ON shop_payments(status);
-CREATE INDEX idx_shop_payments_created_at ON shop_payments(created_at DESC);
-
--- Composite index for pending payments
-CREATE INDEX idx_shop_payments_status_created ON shop_payments(status, created_at DESC);
-
--- Index for payment verification
-CREATE INDEX idx_shop_payments_hash_status ON shop_payments(payment_hash, status) WHERE payment_hash IS NOT NULL;
 
 -- ============================================
 -- Payments table indexes

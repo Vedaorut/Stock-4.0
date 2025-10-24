@@ -141,8 +141,6 @@ exports[`Main Menu - WebApp Button Position (P0) seller menu: exactly 1 WebApp b
         "hide": false,
         "text": "📦 Товары",
       },
-    ],
-    [
       {
         "callback_data": "seller:sales",
         "hide": false,
@@ -151,9 +149,16 @@ exports[`Main Menu - WebApp Button Position (P0) seller menu: exactly 1 WebApp b
     ],
     [
       {
-        "callback_data": "seller:wallets",
+        "callback_data": "subscription:hub",
         "hide": false,
-        "text": "💼 Кошельки",
+        "text": "📊 Подписка",
+      },
+    ],
+    [
+      {
+        "callback_data": "seller:tools",
+        "hide": false,
+        "text": "🔧 Инструменты",
       },
     ],
     [

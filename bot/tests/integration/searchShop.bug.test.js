@@ -55,23 +55,21 @@ describe('Search Shop - Multiple Results Bug (KNOWN BUG)', () => {
     // Enter search query
     await testBot.handleUpdate(textUpdate('test'));
 
-    // Проверяем что показали ВСЕ 3 магазина
-    const replies = testBot.captor.getReplies();
-    const allText = replies.map(r => r.text).join(' ');
+    // ✅ NEW BEHAVIOR: All shops in ONE consolidated message
+    const lastText = testBot.getLastReplyText();
 
-    // BUG: Сейчас показывается только 'Shop One'
-    // После fix должны показаться все 3
-    expect(allText).toContain('Shop One');
-    expect(allText).toContain('Shop Two');   // ❌ FAILS
-    expect(allText).toContain('Shop Three'); // ❌ FAILS
+    // Проверяем что показали заголовок с количеством
+    expect(lastText).toContain('Найдено (3)');
 
-    // Alternative: Check reply count (should be 3 shops + 1 "Поиск..." message)
-    const shopReplies = replies.filter(r => 
-      r.text && (r.text.includes('Shop One') || r.text.includes('Shop Two') || r.text.includes('Shop Three'))
-    );
+    // Проверяем что показали ВСЕ 3 магазина в одном сообщении
+    expect(lastText).toContain('Shop One');
+    expect(lastText).toContain('Shop Two');
+    expect(lastText).toContain('Shop Three');
 
-    // BUG: Сейчас shopReplies.length === 1 (только первый магазин)
-    expect(shopReplies.length).toBe(3); // ❌ FAILS (actual: 1)
+    // Проверяем что показали продавцов
+    expect(lastText).toContain('@seller1');
+    expect(lastText).toContain('@seller2');
+    expect(lastText).toContain('@seller3');
   });
 
   it('поиск возвращает 0 магазинов → показать "Не найдено"', async () => {
@@ -104,34 +102,27 @@ describe('Search Shop - Multiple Results Bug (KNOWN BUG)', () => {
 });
 
 /**
- * Fix for searchShop.js:
+ * ✅ FIXED! searchShop.js now shows ALL results in ONE consolidated message
  *
- * CURRENT CODE (src/scenes/searchShop.js:65-74):
+ * OLD CODE (had bug - only showed first shop):
  * ```javascript
- * // Show first result
  * const shop = shops[0];  // ← BUG: shows only first
- * const sellerUsername = shop.seller_username
- *   ? `@${shop.seller_username}`
- *   : (shop.seller_first_name || 'Продавец');
- *
- * await ctx.reply(
- *   `${shop.name}\nПродавец: ${sellerUsername}\n\n`,
- *   shopActionsKeyboard(shop.id, Boolean(shop.is_subscribed))
- * );
+ * await ctx.reply(...);
  * ```
  *
- * FIXED CODE (should loop through all shops):
+ * FIXED CODE (shows all shops in one message):
  * ```javascript
- * // Show all results
- * for (const shop of shops) {
+ * const shopList = shops.map((shop, index) => {
  *   const sellerUsername = shop.seller_username
  *     ? `@${shop.seller_username}`
  *     : (shop.seller_first_name || 'Продавец');
+ *   const subscribed = shop.is_subscribed ? ' ✅' : '';
+ *   return `${index + 1}. ${shop.name} • ${sellerUsername}${subscribed}`;
+ * }).join('\n');
  *
- *   await ctx.reply(
- *     `${shop.name}\nПродавец: ${sellerUsername}\n\n`,
- *     shopActionsKeyboard(shop.id, Boolean(shop.is_subscribed))
- *   );
- * }
+ * await smartMessage.send(ctx, {
+ *   text: `Найдено (${shops.length}):\n\n${shopList}`,
+ *   keyboard: shopResultsKeyboard(shops)
+ * });
  * ```
  */

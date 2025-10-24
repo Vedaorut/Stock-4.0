@@ -6,6 +6,8 @@ import logger from './utils/logger.js';
 // Middleware
 import authMiddleware from './middleware/auth.js';
 import errorMiddleware from './middleware/error.js';
+import debounceMiddleware from './middleware/debounce.js';
+import sessionRecoveryMiddleware from './middleware/sessionRecovery.js';
 
 // Scenes
 import createShopScene from './scenes/createShop.js';
@@ -13,6 +15,10 @@ import addProductScene from './scenes/addProduct.js';
 import searchShopScene from './scenes/searchShop.js';
 import manageWalletsScene from './scenes/manageWallets.js';
 import createFollowScene from './scenes/createFollow.js';
+import migrateChannelScene from './scenes/migrateChannel.js';
+import paySubscriptionScene from './scenes/paySubscription.js';
+import upgradeShopScene from './scenes/upgradeShop.js';
+import manageWorkersScene from './scenes/manageWorkers.js';
 
 // Handlers
 import { handleStart } from './handlers/start.js';
@@ -20,6 +26,7 @@ import { setupSellerHandlers, setupFollowHandlers } from './handlers/seller/inde
 import { setupBuyerHandlers } from './handlers/buyer/index.js';
 import { setupCommonHandlers } from './handlers/common.js';
 import { setupAIProductHandlers } from './handlers/seller/aiProducts.js';
+import { setupWorkspaceHandlers } from './handlers/workspace/index.js';
 
 dotenv.config();
 
@@ -38,7 +45,11 @@ const stage = new Scenes.Stage([
   addProductScene,
   searchShopScene,
   manageWalletsScene,
-  createFollowScene
+  createFollowScene,
+  migrateChannelScene,
+  paySubscriptionScene,
+  upgradeShopScene,
+  manageWorkersScene
 ]);
 
 bot.use(session());
@@ -59,7 +70,11 @@ bot.use((ctx, next) => {
   return next();
 });
 
-// Apply middleware
+// Apply clean chat middleware
+bot.use(debounceMiddleware);        // Prevent rapid clicks
+bot.use(sessionRecoveryMiddleware); // Recover session after restart
+
+// Apply auth and error middleware
 bot.use(authMiddleware);
 bot.use(errorMiddleware);
 
@@ -68,6 +83,7 @@ bot.start(handleStart);
 setupSellerHandlers(bot);
 setupFollowHandlers(bot);
 setupBuyerHandlers(bot);
+setupWorkspaceHandlers(bot);
 setupCommonHandlers(bot);
 
 // AI Product Management (must be registered last to handle text messages)
@@ -92,17 +108,42 @@ process.once('SIGTERM', shutdown);
 // Error handling
 bot.catch((err, ctx) => {
   logger.error(`Bot error for ${ctx.updateType}:`, err);
-  ctx.reply('Произошла ошибка\n\nПопробуйте позже').catch(() => {});
+
+  // CRITICAL FIX (BUG #5): Clear corrupted scene to allow /start to work
+  if (ctx.scene) {
+    ctx.scene.leave().catch(() => {});
+  }
+
+  // Clear session state if corrupted
+  if (ctx.session && typeof ctx.session === 'object') {
+    // Keep essential auth data, clear wizard state
+    const { token, user, shopId, shopName, role } = ctx.session;
+    ctx.session = { token, user, shopId, shopName, role };
+  }
+
+  ctx.reply('Произошла ошибка. Нажмите /start для перезапуска').catch(() => {});
 });
 
-// Launch bot
-bot.launch()
-  .catch((error) => {
+// Export bot instance for backend integration
+export { bot };
+
+// Launch function (can be called from backend or standalone)
+export async function startBot() {
+  try {
+    await bot.launch();
+    logger.info(`Bot started successfully in ${config.nodeEnv} mode`);
+    logger.info(`Backend URL: ${config.backendUrl}`);
+    logger.info(`WebApp URL: ${config.webAppUrl}`);
+  } catch (error) {
     logger.error('Failed to launch bot:', error);
+    throw error;
+  }
+}
+
+// Auto-start when run directly (not imported)
+if (import.meta.url === `file://${process.argv[1]}`) {
+  startBot().catch((error) => {
+    logger.error('Bot startup failed:', error);
     process.exit(1);
   });
-
-// Log success immediately (launch() doesn't resolve in polling mode)
-logger.info(`Bot started successfully in ${config.nodeEnv} mode`);
-logger.info(`Backend URL: ${config.backendUrl}`);
-logger.info(`WebApp URL: ${config.webAppUrl}`);
+}

@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken';
 import { config } from '../config/env.js';
-import { shopQueries } from '../models/db.js';
+import { shopQueries, workerQueries } from '../models/db.js';
 import logger from '../utils/logger.js';
 
 /**
@@ -120,8 +120,74 @@ export const requireShopOwner = async (req, res, next) => {
   }
 };
 
+/**
+ * Check if user has access to shop (owner OR worker)
+ * Sets req.shopAccess for downstream handlers
+ */
+export const requireShopAccess = async (req, res, next) => {
+  try {
+    // Get shopId from params or body
+    const shopId = req.params.shopId || req.params.id || req.body.shopId;
+    
+    if (!shopId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Shop ID is required'
+      });
+    }
+
+    // Check if user is owner
+    const shop = await shopQueries.findById(shopId);
+    if (!shop) {
+      return res.status(404).json({
+        success: false,
+        error: 'Shop not found'
+      });
+    }
+
+    const isOwner = shop.owner_id === req.user.id;
+
+    if (isOwner) {
+      req.shopAccess = {
+        shopId,
+        accessType: 'owner',
+        isOwner: true,
+        isWorker: false
+      };
+      return next();
+    }
+
+    // Check if user is worker
+    const isWorker = await workerQueries.isWorker(shopId, req.user.id);
+
+    if (isWorker) {
+      req.shopAccess = {
+        shopId,
+        accessType: 'worker',
+        isOwner: false,
+        isWorker: true
+      };
+      return next();
+    }
+
+    // No access
+    return res.status(403).json({
+      success: false,
+      error: 'You do not have access to this shop'
+    });
+
+  } catch (error) {
+    logger.error('Shop access verification error', { error: error.message });
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to verify shop access'
+    });
+  }
+};
+
 export default {
   verifyToken,
   optionalAuth,
-  requireShopOwner
+  requireShopOwner,
+  requireShopAccess
 };

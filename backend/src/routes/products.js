@@ -1,19 +1,19 @@
 import express from 'express';
 import { productController } from '../controllers/productController.js';
 import { productValidation } from '../middleware/validation.js';
-import { verifyToken, requireShopOwner } from '../middleware/auth.js';
+import { verifyToken, requireShopOwner, requireShopAccess } from '../middleware/auth.js';
 
 const router = express.Router();
 
 /**
  * @route   POST /api/products
  * @desc    Create new product
- * @access  Private (Shop owner only)
+ * @access  Private (Shop owner or worker)
  */
 router.post(
   '/',
   verifyToken,
-  requireShopOwner,
+  requireShopAccess,
   productValidation.create,
   productController.create
 );
@@ -35,12 +35,12 @@ router.get('/:id', productValidation.getById, productController.getById);
 /**
  * @route   PUT /api/products/:id
  * @desc    Update product
- * @access  Private (Shop owner only)
+ * @access  Private (Shop owner or worker)
  */
 router.put(
   '/:id',
   verifyToken,
-  requireShopOwner,
+  requireShopAccess,
   productValidation.update,
   productController.update
 );
@@ -48,12 +48,12 @@ router.put(
 /**
  * @route   DELETE /api/products/:id
  * @desc    Delete product
- * @access  Private (Shop owner only)
+ * @access  Private (Shop owner or worker)
  */
 router.delete(
   '/:id',
   verifyToken,
-  requireShopOwner,
+  requireShopAccess,
   productValidation.getById,
   productController.delete
 );
@@ -61,12 +61,12 @@ router.delete(
 /**
  * @route   POST /api/products/bulk-delete-all
  * @desc    Delete all products from a shop
- * @access  Private (Shop owner only)
+ * @access  Private (Shop owner or worker)
  */
 router.post(
   '/bulk-delete-all',
   verifyToken,
-  requireShopOwner,
+  requireShopAccess,
   productValidation.bulkDeleteAll,
   productController.bulkDeleteAll
 );
@@ -74,12 +74,12 @@ router.post(
 /**
  * @route   POST /api/products/bulk-delete
  * @desc    Delete multiple products by IDs
- * @access  Private (Shop owner only)
+ * @access  Private (Shop owner or worker)
  */
 router.post(
   '/bulk-delete',
   verifyToken,
-  requireShopOwner,
+  requireShopAccess,
   productValidation.bulkDeleteByIds,
   productController.bulkDeleteByIds
 );

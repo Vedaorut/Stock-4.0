@@ -2,6 +2,8 @@
  * Utility validation functions for crypto addresses and other data
  */
 
+import WAValidator from 'wallet-validator';
+
 /**
  * Validate crypto wallet address format
  * @param {string} address - Wallet address
@@ -9,29 +11,75 @@
  * @returns {boolean} - True if valid format
  */
 export const validateCryptoAddress = (address, crypto) => {
-  if (!address || typeof address !== 'string') return false;
+  try {
+    if (!address || typeof address !== 'string') return false;
 
-  switch (crypto.toUpperCase()) {
-    case 'BTC':
-      // BTC: Legacy (1xxx), P2SH (3xxx), or Bech32 (bc1xxx)
-      // Length: 26-62 characters
-      return /^[13][a-km-zA-HJ-NP-Z1-9]{25,61}$/.test(address) ||
-             /^bc1[a-z0-9]{39,59}$/.test(address);
+    const currency = crypto.toLowerCase();
 
-    case 'ETH':
-    case 'USDT':
-      // ETH/ERC-20: 0x followed by 40 hex characters
-      // Total length: 42 characters
-      return /^0x[a-fA-F0-9]{40}$/.test(address);
+    // TON is not supported by wallet-validator, use regex
+    if (currency === 'ton') {
+      // TON: starts with EQ or UQ, followed by 46-48 base64url characters
+      return /^(EQ|UQ)[A-Za-z0-9_-]{46,48}$/.test(address);
+    }
 
-    case 'TON':
-      // TON: Starts with EQ or UQ, followed by 46 base64url characters
-      // Total length: 48 characters
-      return /^[EU]Q[a-zA-Z0-9_-]{46}$/.test(address);
+    // Map crypto names to wallet-validator currency names
+    const currencyMap = {
+      'btc': 'bitcoin',
+      'eth': 'ethereum',
+      'usdt': 'tron'      // USDT uses Tron TRC-20 (TR... addresses)
+    };
 
-    default:
+    const validatorCurrency = currencyMap[currency];
+
+    if (!validatorCurrency) {
+      console.warn('Unknown cryptocurrency type:', crypto);
       return false;
+    }
+
+    return WAValidator.validate(address, validatorCurrency);
+  } catch (error) {
+    console.error('Error validating crypto address:', {
+      error: error.message,
+      address: address.substring(0, 10) + '...',
+      crypto
+    });
+    return false;
   }
+};
+
+/**
+ * Detect cryptocurrency type from address format
+ * @param {string} address - Wallet address
+ * @returns {string|null} - Detected crypto type (BTC, ETH, USDT, TON) or null
+ */
+export const detectCryptoType = (address) => {
+  if (!address || typeof address !== 'string') {
+    return null;
+  }
+
+  const trimmed = address.trim();
+
+  // BTC: starts with 1, 3, or bc1
+  if (/^(1|3|bc1)[a-zA-Z0-9]{25,62}$/.test(trimmed)) {
+    return 'BTC';
+  }
+
+  // ETH: starts with 0x and 40 hex characters
+  if (/^0x[a-fA-F0-9]{40}$/.test(trimmed)) {
+    return 'ETH';
+  }
+
+  // USDT (Tron TRC-20): starts with TR and 32 base58 characters
+  if (/^TR[1-9A-HJ-NP-Za-km-z]{32}$/.test(trimmed)) {
+    return 'USDT';
+  }
+
+  // TON: starts with EQ or UQ
+  if (/^(EQ|UQ)[A-Za-z0-9_-]{46,48}$/.test(trimmed)) {
+    return 'TON';
+  }
+
+  return null;
 };
 
 /**
@@ -43,7 +91,7 @@ export const getCryptoValidationError = (crypto) => {
   const errors = {
     BTC: 'Invalid BTC address format. Must be Legacy (1xxx), P2SH (3xxx), or Bech32 (bc1xxx)',
     ETH: 'Invalid ETH address format. Must be 0x followed by 40 hex characters',
-    USDT: 'Invalid USDT address format. Must be 0x followed by 40 hex characters',
+    USDT: 'Invalid USDT address format. Must be TRC-20 Tron address (TRxxx...)',
     TON: 'Invalid TON address format. Must start with EQ or UQ followed by 46 characters'
   };
   return errors[crypto.toUpperCase()] || 'Invalid crypto address format';
@@ -51,5 +99,6 @@ export const getCryptoValidationError = (crypto) => {
 
 export default {
   validateCryptoAddress,
-  getCryptoValidationError
+  getCryptoValidationError,
+  detectCryptoType
 };

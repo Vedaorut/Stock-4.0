@@ -130,6 +130,52 @@ export const shopApi = {
     const { data } = await api.get(`/shops/${shopId}`);
     // Unwrap response: return data.data (shop object) instead of wrapper
     return data.data || data;
+  },
+
+  // Get accessible shops (owner + worker)
+  async getAccessibleShops(token) {
+    const { data } = await api.get('/shops/accessible', {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    return data.data || data;
+  },
+
+  // Get worker shops only (not owner)
+  async getWorkerShops(token) {
+    const { data } = await api.get('/shops/workspace', {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    return data.data || data;
+  }
+};
+
+export const workerApi = {
+  // Add worker to shop
+  async addWorker(shopId, workerData, token) {
+    const { data } = await api.post(
+      `/shops/${shopId}/workers`,
+      workerData,
+      {
+        headers: { Authorization: `Bearer ${token}` }
+      }
+    );
+    return data.data || data;
+  },
+
+  // List shop workers
+  async listWorkers(shopId, token) {
+    const { data } = await api.get(`/shops/${shopId}/workers`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    return data.data || data;
+  },
+
+  // Remove worker
+  async removeWorker(shopId, workerId, token) {
+    const { data } = await api.delete(`/shops/${shopId}/workers/${workerId}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    return data.data || data;
   }
 };
 
@@ -250,10 +296,13 @@ export const subscriptionApi = {
   },
 
   // Subscribe to shop
-  async subscribe(shopId, token) {
+  async subscribe(shopId, token, telegramId = null) {
     const { data } = await api.post(
       '/subscriptions',
-      { shopId: Number(shopId) },
+      {
+        shopId: Number(shopId),
+        telegramId: telegramId ? String(telegramId) : undefined
+      },
       {
         headers: { Authorization: `Bearer ${token}` }
       }
@@ -378,6 +427,18 @@ export const walletApi = {
       }
     );
     return data.data || data;
+  },
+
+  // Generate QR code for wallet
+  async generateQR(qrData, token) {
+    const { data } = await api.post(
+      '/payments/qr',
+      qrData,
+      {
+        headers: { Authorization: `Bearer ${token}` }
+      }
+    );
+    return data;
   }
 };
 

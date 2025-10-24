@@ -4,7 +4,7 @@
  * Crypto address validation and other input validation
  */
 
-import WAValidator from 'wallet-address-validator';
+import WAValidator from 'wallet-validator';
 import logger from './logger.js';
 
 /**
@@ -17,23 +17,25 @@ export function validateCryptoAddress(address, crypto) {
   try {
     const currency = crypto.toLowerCase();
 
-    // TON addresses: Simple regex validation (EQ or UQ prefix, base64-like chars)
+    // TON is not supported by wallet-validator, use regex
     if (currency === 'ton') {
-      // TON addresses start with EQ or UQ and are ~48 chars base64
-      const tonRegex = /^(EQ|UQ)[A-Za-z0-9_-]{46,48}$/;
-      return tonRegex.test(address);
+      // TON: starts with EQ or UQ, followed by 46-48 base64url characters
+      return /^(EQ|UQ)[A-Za-z0-9_-]{46,48}$/.test(address);
     }
 
-    // USDT uses Ethereum addresses (ERC-20)
-    const currencyForValidation = currency === 'usdt' ? 'ethereum' : currency;
-
-    // Map common names to validator names
+    // Map crypto names to wallet-validator currency names
     const currencyMap = {
       'btc': 'bitcoin',
-      'eth': 'ethereum'
+      'eth': 'ethereum',
+      'usdt': 'tron'      // USDT uses Tron TRC-20 (TR... addresses)
     };
 
-    const validatorCurrency = currencyMap[currencyForValidation] || currencyForValidation;
+    const validatorCurrency = currencyMap[currency];
+
+    if (!validatorCurrency) {
+      logger.warn('Unknown cryptocurrency type:', { crypto });
+      return false;
+    }
 
     return WAValidator.validate(address, validatorCurrency);
   } catch (error) {
@@ -47,6 +49,41 @@ export function validateCryptoAddress(address, crypto) {
 }
 
 /**
+ * Detect cryptocurrency type from address format
+ * @param {string} address - Wallet address
+ * @returns {string|null} - Detected crypto type (BTC, ETH, USDT, TON) or null
+ */
+export function detectCryptoType(address) {
+  if (!address || typeof address !== 'string') {
+    return null;
+  }
+
+  const trimmed = address.trim();
+
+  // BTC: starts with 1, 3, or bc1
+  if (/^(1|3|bc1)[a-zA-Z0-9]{25,62}$/.test(trimmed)) {
+    return 'BTC';
+  }
+
+  // ETH: starts with 0x and 40 hex characters
+  if (/^0x[a-fA-F0-9]{40}$/.test(trimmed)) {
+    return 'ETH';
+  }
+
+  // USDT (Tron TRC-20): starts with TR and 32 base58 characters
+  if (/^TR[1-9A-HJ-NP-Za-km-z]{32}$/.test(trimmed)) {
+    return 'USDT';
+  }
+
+  // TON: starts with EQ or UQ
+  if (/^(EQ|UQ)[A-Za-z0-9_-]{46,48}$/.test(trimmed)) {
+    return 'TON';
+  }
+
+  return null;
+}
+
+/**
  * Get user-friendly validation error message
  * @param {string} crypto - Cryptocurrency type
  * @returns {string} - Error message with examples
@@ -55,7 +92,7 @@ export function getCryptoValidationError(crypto) {
   const examples = {
     BTC: '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa (начинается с 1, 3, или bc1)',
     ETH: '0x742d35Cc6634C0532925a3b844Bc7e7595f42bE1 (начинается с 0x)',
-    USDT: '0x742d35Cc6634C0532925a3b844Bc7e7595f42bE1 (ERC-20, начинается с 0x)',
+    USDT: 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t (TRC-20, начинается с TR)',
     TON: 'EQDhZLC_i-VxZfpnpsDWNR2PxNm-PPIL7uYWjL-I-Nx_T5xJ (начинается с EQ или UQ)'
   };
 
