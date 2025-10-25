@@ -1,5 +1,6 @@
 import logger from '../utils/logger.js';
 import { mainMenuButton } from '../keyboards/common.js';
+import { reply as cleanReply } from '../utils/cleanReply.js';
 
 /**
  * Global error handling middleware
@@ -21,7 +22,7 @@ const errorMiddleware = async (ctx, next) => {
       if (ctx.callbackQuery) {
         await ctx.editMessageText(errorMessage, mainMenuButton);
       } else {
-        await ctx.reply(errorMessage, mainMenuButton);
+        await cleanReply(ctx, errorMessage, mainMenuButton);
       }
     } catch (replyError) {
       logger.error('Failed to send error message:', replyError);

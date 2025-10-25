@@ -45,13 +45,12 @@ export const config = {
   crypto: {
     blockchainApiKey: process.env.BLOCKCHAIN_API_KEY,
     etherscanApiKey: process.env.ETHERSCAN_API_KEY,
-    tonApiKey: process.env.TON_API_KEY,
+    trongridApiKey: process.env.TRONGRID_API_KEY,
     // Platform crypto addresses
     btcAddress: process.env.CRYPTO_BTC_ADDRESS,
     ethAddress: process.env.CRYPTO_ETH_ADDRESS,
     usdtAddress: process.env.CRYPTO_USDT_ADDRESS,
-    tonAddress: process.env.CRYPTO_TON_ADDRESS,
-    usdtNetwork: process.env.USDT_NETWORK || 'ethereum'
+    ltcAddress: process.env.CRYPTO_LTC_ADDRESS
   },
 
   // Shop

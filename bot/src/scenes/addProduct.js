@@ -3,7 +3,6 @@ import { successButtons, cancelButton } from '../keyboards/common.js';
 import { productApi } from '../utils/api.js';
 import { formatPrice } from '../utils/format.js';
 import logger from '../utils/logger.js';
-import * as messageCleanup from '../utils/messageCleanup.js';
 import * as smartMessage from '../utils/smartMessage.js';
 
 /**
@@ -187,12 +186,6 @@ addProductScene.leave(async (ctx) => {
       logger.debug(`Could not delete user message ${msgId}:`, error.message);
     }
   }
-
-  // Cleanup wizard messages (keep final message)
-  await messageCleanup.cleanupWizard(ctx, {
-    keepFinalMessage: true,
-    keepWelcome: true
-  });
 
   ctx.wizard.state = {};
   logger.info(`User ${ctx.from?.id} left addProduct scene`);

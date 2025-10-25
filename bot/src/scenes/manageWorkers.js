@@ -3,7 +3,6 @@ import { manageWorkersMenu, confirmWorkerRemoval } from '../keyboards/workspace.
 import { cancelButton } from '../keyboards/common.js';
 import { workerApi } from '../utils/api.js';
 import logger from '../utils/logger.js';
-import * as messageCleanup from '../utils/messageCleanup.js';
 import * as smartMessage from '../utils/smartMessage.js';
 
 /**
@@ -148,12 +147,6 @@ const manageWorkersScene = new Scenes.WizardScene(
 
 // Handle scene leave
 manageWorkersScene.leave(async (ctx) => {
-  // Cleanup wizard messages (keep final message)
-  await messageCleanup.cleanupWizard(ctx, {
-    keepFinalMessage: true,
-    keepWelcome: true
-  });
-
   ctx.wizard.state = {};
   logger.info(`User ${ctx.from?.id} left manageWorkers scene`);
 });

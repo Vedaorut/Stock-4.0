@@ -2,6 +2,7 @@ import express from 'express';
 import { productController } from '../controllers/productController.js';
 import { productValidation } from '../middleware/validation.js';
 import { verifyToken, requireShopOwner, requireShopAccess } from '../middleware/auth.js';
+import { checkProductLimit, getProductLimitStatus } from '../middleware/productLimits.js';
 
 const router = express.Router();
 
@@ -14,9 +15,34 @@ router.post(
   '/',
   verifyToken,
   requireShopAccess,
+  checkProductLimit,
   productValidation.create,
   productController.create
 );
+
+/**
+ * @route   GET /api/products/limit-status/:shopId
+ * @desc    Get product limit status for a shop
+ * @access  Private (Shop owner)
+ */
+router.get('/limit-status/:shopId', verifyToken, async (req, res) => {
+  try {
+    const shopId = parseInt(req.params.shopId, 10);
+    const userId = req.user.id;
+    
+    const status = await getProductLimitStatus(shopId, userId);
+    
+    res.json(status);
+  } catch (error) {
+    if (error.message === 'Shop not found') {
+      return res.status(404).json({ error: 'Shop not found' });
+    }
+    if (error.message === 'Not authorized to view this shop') {
+      return res.status(403).json({ error: 'Not authorized to view this shop' });
+    }
+    res.status(500).json({ error: 'Failed to get product limit status' });
+  }
+});
 
 /**
  * @route   GET /api/products

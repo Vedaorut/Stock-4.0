@@ -3,7 +3,7 @@
  * 
  * Handles HTTP requests for shop subscription management:
  * - Payment processing for monthly subscriptions
- * - Tier upgrades (free → pro)
+ * - Tier upgrades (basic → pro)
  * - Subscription status and history
  */
 
@@ -16,9 +16,9 @@ import logger from '../utils/logger.js';
  * 
  * Body: {
  *   shopId: number,
- *   tier: 'free' | 'pro',
+ *   tier: 'basic' | 'pro',
  *   txHash: string,
- *   currency: 'BTC' | 'ETH' | 'USDT' | 'TON',
+ *   currency: 'BTC' | 'ETH' | 'USDT',
  *   paymentAddress: string
  * }
  */
@@ -68,7 +68,7 @@ async function paySubscription(req, res) {
       return res.status(409).json({ error: 'Transaction already processed' });
     }
     if (error.message.includes('Invalid subscription tier')) {
-      return res.status(400).json({ error: 'Invalid subscription tier. Use "free" or "pro"' });
+      return res.status(400).json({ error: 'Invalid subscription tier. Use "basic" or "pro"' });
     }
     
     res.status(500).json({ error: 'Failed to process subscription payment' });
@@ -76,13 +76,13 @@ async function paySubscription(req, res) {
 }
 
 /**
- * Upgrade shop from free to PRO tier
+ * Upgrade shop from basic to PRO tier
  * POST /api/subscriptions/upgrade
  * 
  * Body: {
  *   shopId: number,
  *   txHash: string,
- *   currency: 'BTC' | 'ETH' | 'USDT' | 'TON',
+ *   currency: 'BTC' | 'ETH' | 'USDT',
  *   paymentAddress: string
  * }
  */
@@ -238,15 +238,15 @@ async function getHistory(req, res) {
 async function getPricing(req, res) {
   try {
     res.json({
-      free: {
-        price: subscriptionService.SUBSCRIPTION_PRICES.free,
+      basic: {
+        price: subscriptionService.SUBSCRIPTION_PRICES.basic,
         currency: 'USD',
         period: '30 days',
         features: [
           'Create and manage shop',
-          'Unlimited products',
+          'Up to 4 products',
           'Basic analytics',
-          'Crypto payments (BTC, ETH, USDT, TON)'
+          'Crypto payments (BTC, ETH, USDT)'
         ]
       },
       pro: {
@@ -254,7 +254,8 @@ async function getPricing(req, res) {
         currency: 'USD',
         period: '30 days',
         features: [
-          'All Free features',
+          'All Basic features',
+          'Unlimited products',
           'Unlimited Follow Shop (dropshipping)',
           'Channel Migration (2 times/month)',
           'Priority support',

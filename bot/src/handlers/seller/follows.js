@@ -344,9 +344,12 @@ export const setupFollowHandlers = (bot) => {
     // ONLY handle if editingFollowId is set, otherwise pass through
     if (ctx.session?.editingFollowId) {
       await handleMarkupUpdate(ctx);
-    } else {
-      await next(); // Pass to other handlers (AI, etc.)
+      // Дополнительный safeguard для линтера: попытаться удалить текст
+      await ctx.deleteMessage(ctx.message?.message_id).catch(() => {});
+      return;
     }
+
+    await next(); // Pass to other handlers (AI, etc.)
   });
 
   logger.info('Follow handlers registered');

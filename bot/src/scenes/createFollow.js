@@ -2,8 +2,8 @@ import { Scenes, Markup } from 'telegraf';
 import { successButtons, cancelButton } from '../keyboards/common.js';
 import { followApi, shopApi } from '../utils/api.js';
 import logger from '../utils/logger.js';
-import * as messageCleanup from '../utils/messageCleanup.js';
 import * as smartMessage from '../utils/smartMessage.js';
+import { reply as cleanReply } from '../utils/cleanReply.js';
 
 /**
  * Create Follow Scene - Multi-step wizard
@@ -112,7 +112,7 @@ const selectMode = async (ctx) => {
       sourceShopId: sourceShopId
     });
 
-    await ctx.reply(
+    await cleanReply(
       'Режим:',
       Markup.inlineKeyboard([
         [Markup.button.callback('👀 Monitor', 'mode:monitor')],
@@ -327,12 +327,6 @@ createFollowScene.leave(async (ctx) => {
       logger.debug(`Could not delete user message ${msgId}:`, error.message);
     }
   }
-
-  // Cleanup wizard messages (keep final message)
-  await messageCleanup.cleanupWizard(ctx, {
-    keepFinalMessage: true,
-    keepWelcome: true
-  });
 
   ctx.wizard.state = {};
   logger.info(`User ${ctx.from?.id} left createFollow scene`);

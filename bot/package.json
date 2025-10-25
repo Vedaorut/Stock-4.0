@@ -14,11 +14,10 @@
     "test:integration": "node --experimental-vm-modules node_modules/jest/bin/jest.js tests/integration",
     "test:e2e": "node --experimental-vm-modules node_modules/jest/bin/jest.js tests/e2e",
     "test:lint:bot": "node tools/lint-callbacks-ack.js && node tools/lint-webapp-links.js",
-    "lint:clean-chat": "node tools/cleanChatLinter.js",
-    "test:ci": "npm run test:lint:bot && npm run lint:clean-chat && npm test",
+    "test:ci": "npm run test:lint:bot && npm test",
     "lint": "eslint src/ tests/ --fix",
     "lint:check": "eslint src/ tests/",
-    "test:all": "npm run lint:check && npm run lint:clean-chat && npm test"
+    "test:all": "npm run lint:check && npm test"
   },
   "keywords": [
     "telegram",

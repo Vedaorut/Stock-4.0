@@ -30,23 +30,23 @@ export const SUPPORTED_CURRENCIES = {
   ETH: {
     name: 'Ethereum',
     symbol: 'ETH',
-    decimals: 6,
+    decimals: 18,
     confirmations: 12,
     network: 'ethereum'
   },
   USDT: {
-    name: 'Tether (ERC20)',
+    name: 'Tether (TRC20)',
     symbol: 'USDT',
-    decimals: 2,
-    confirmations: 12,
-    network: 'ethereum'
-  },
-  TON: {
-    name: 'Toncoin',
-    symbol: 'TON',
     decimals: 6,
-    confirmations: 1,
-    network: 'ton'
+    confirmations: 19,
+    network: 'tron'
+  },
+  LTC: {
+    name: 'Litecoin',
+    symbol: 'LTC',
+    decimals: 8,
+    confirmations: 6,
+    network: 'litecoin'
   }
 };
 
@@ -126,8 +126,8 @@ export const HTTP_STATUS = {
 export const EXPLORER_URLS = {
   BTC: 'https://blockchair.com/bitcoin/transaction',
   ETH: 'https://etherscan.io/tx',
-  USDT: 'https://etherscan.io/tx',
-  TON: 'https://tonscan.org/tx'
+  USDT: 'https://tronscan.org/#/transaction',
+  LTC: 'https://blockchair.com/litecoin/transaction'
 };
 
 // Error messages

@@ -3,8 +3,7 @@ import { successButtons, cancelButton } from '../keyboards/common.js';
 import { shopApi } from '../utils/api.js';
 import logger from '../utils/logger.js';
 import * as smartMessage from '../utils/smartMessage.js';
-import * as messageCleanup from '../utils/messageCleanup.js';
-import * as messageTracker from '../utils/messageTracker.js';
+import { reply as cleanReply } from '../utils/cleanReply.js';
 
 /**
  * Create Shop Scene - Simplified (NO PAYMENT)
@@ -18,7 +17,7 @@ const enterShopName = async (ctx) => {
   try {
     logger.info('shop_create_step:name', { userId: ctx.from.id });
     
-    await ctx.reply(
+    await cleanReply(
       'Название (3-100 символов):',
       cancelButton
     );
@@ -35,7 +34,7 @@ const handleShopName = async (ctx) => {
   try {
     // Get shop name from message
     if (!ctx.message || !ctx.message.text) {
-      await ctx.reply('Введите название магазина');
+      await cleanReply(ctx, 'Введите название магазина');
       return;
     }
 
@@ -48,12 +47,12 @@ const handleShopName = async (ctx) => {
     const shopName = ctx.message.text.trim();
 
     if (shopName.length < 3) {
-      await ctx.reply('Минимум 3 символа');
+      await cleanReply(ctx, 'Минимум 3 символа');
       return;
     }
 
     if (shopName.length > 100) {
-      await ctx.reply('Макс 100 символов');
+      await cleanReply(ctx, 'Макс 100 символов');
       return;
     }
 
@@ -63,14 +62,14 @@ const handleShopName = async (ctx) => {
     });
 
     // Show loading message (will be deleted after)
-    const loadingMsg = await ctx.reply('Сохраняем...');
+    const loadingMsg = await cleanReply(ctx, 'Сохраняем...');
 
     if (!ctx.session.token) {
       logger.error('Missing auth token when creating shop', {
         userId: ctx.from.id,
         session: ctx.session
       });
-      await ctx.reply(
+      await cleanReply(
         'Ошибка авторизации. Попробуйте снова через главное меню',
         successButtons
       );
@@ -107,7 +106,11 @@ const handleShopName = async (ctx) => {
     });
 
     // Delete loading message
-    await messageTracker.deleteMessage(ctx, loadingMsg.message_id);
+    try {
+      await ctx.deleteMessage(loadingMsg.message_id);
+    } catch (error) {
+      logger.debug(`Could not delete loading message:`, error.message);
+    }
 
     // Send success message using smartMessage (will be editable)
     await smartMessage.send(ctx, {
@@ -122,7 +125,11 @@ const handleShopName = async (ctx) => {
 
     // Delete loading message if exists
     if (loadingMsg) {
-      await messageTracker.deleteMessage(ctx, loadingMsg.message_id);
+      try {
+        await ctx.deleteMessage(loadingMsg.message_id);
+      } catch (deleteError) {
+        logger.debug(`Could not delete loading message:`, deleteError.message);
+      }
     }
 
     await smartMessage.send(ctx, {
@@ -153,12 +160,6 @@ createShopScene.leave(async (ctx) => {
       logger.debug(`Could not delete user message ${msgId}:`, error.message);
     }
   }
-
-  // Cleanup wizard messages (keep final message)
-  await messageCleanup.cleanupWizard(ctx, {
-    keepFinalMessage: true,
-    keepWelcome: true
-  });
 
   ctx.wizard.state = {};
   logger.info(`User ${ctx.from?.id} left createShop scene`);

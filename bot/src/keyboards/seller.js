@@ -5,13 +5,10 @@ import config from '../config/index.js';
 export const sellerMenu = (shopName) => {
   return Markup.inlineKeyboard([
     // PRIMARY: WebApp button
-    [Markup.button.webApp('📱 Открыть', config.webAppUrl)],
+    [Markup.button.webApp('📱 Открыть Menu', config.webAppUrl)],
 
-    // CORE: Main actions (2-column layout)
-    [
-      Markup.button.callback('📦 Товары', 'seller:products'),
-      Markup.button.callback('💰 Продажи', 'seller:sales')
-    ],
+    // CORE: Main actions
+    [Markup.button.callback('💰 Продажи', 'seller:sales')],
 
     // SUBSCRIPTION HUB: Single entry point for all subscription actions
     [Markup.button.callback('📊 Подписка', 'subscription:hub')],
@@ -72,7 +69,7 @@ export const sellerMenuNoShop = Markup.inlineKeyboard([
 export const subscriptionStatusMenu = (tier, canUpgrade = false) => {
   const buttons = [];
 
-  if (canUpgrade && tier === 'free') {
+  if (canUpgrade && tier === 'basic') {
     buttons.push([Markup.button.callback('💎 Апгрейд на PRO', 'subscription:upgrade')]);
   }
 

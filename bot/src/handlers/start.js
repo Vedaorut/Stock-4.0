@@ -4,7 +4,6 @@ import { handleSellerRole } from './seller/index.js';
 import { handleBuyerRole } from './buyer/index.js';
 import logger from '../utils/logger.js';
 import * as smartMessage from '../utils/smartMessage.js';
-import * as messageCleanup from '../utils/messageCleanup.js';
 
 /**
  * /start command handler
@@ -12,9 +11,6 @@ import * as messageCleanup from '../utils/messageCleanup.js';
 export const handleStart = async (ctx) => {
   try {
     logger.info(`/start command from user ${ctx.from.id}`);
-
-    // Cleanup old messages (except welcome if exists)
-    await messageCleanup.cleanupOnStart(ctx);
 
     // Clear conversation history on /start
     delete ctx.session.aiConversation;
@@ -28,19 +24,12 @@ export const handleStart = async (ctx) => {
       ctx.session.role = 'seller';
 
       // Create fake callback query context for handleSellerRole
+      // CRITICAL: Don't use Object.assign with getters - creates new object instead
       const fakeCtx = {
         ...ctx,
-        from: ctx.from,          // Explicitly copy from (getter property)
-        message: ctx.message,    // Explicitly copy message
-        chat: ctx.chat,          // Explicitly copy chat
-        session: ctx.session,    // CRITICAL: pass session reference
         answerCbQuery: async () => {},
-        // Use smartMessage for redirect (handles edit vs reply)
-        editMessageText: async (text, keyboard) => {
-          return await smartMessage.send(ctx, {
-            text,
-            keyboard
-          });
+        editMessageText: async (text, extra) => {
+          return await ctx.reply(text, extra);
         }
       };
 
@@ -51,19 +40,12 @@ export const handleStart = async (ctx) => {
       ctx.session.role = 'buyer';
 
       // Create fake callback query context for handleBuyerRole
+      // CRITICAL: Don't use Object.assign with getters - creates new object instead
       const fakeCtx = {
         ...ctx,
-        from: ctx.from,          // Explicitly copy from (getter property)
-        message: ctx.message,    // Explicitly copy message
-        chat: ctx.chat,          // Explicitly copy chat
-        session: ctx.session,    // CRITICAL: pass session reference
         answerCbQuery: async () => {},
-        // Use smartMessage for redirect (handles edit vs reply)
-        editMessageText: async (text, keyboard) => {
-          return await smartMessage.send(ctx, {
-            text,
-            keyboard
-          });
+        editMessageText: async (text, extra) => {
+          return await ctx.reply(text, extra);
         }
       };
 

@@ -14,7 +14,7 @@ import * as cryptoService from './crypto.js';
 
 // Subscription pricing
 const SUBSCRIPTION_PRICES = {
-  free: 25.00,
+  basic: 25.00,
   pro: 35.00
 };
 
@@ -42,8 +42,8 @@ async function processSubscriptionPayment(shopId, tier, txHash, currency, expect
     await client.query('BEGIN');
     
     // Validate tier
-    if (!['free', 'pro'].includes(tier)) {
-      throw new Error('Invalid subscription tier');
+    if (!['basic', 'pro'].includes(tier)) {
+      throw new Error('Invalid subscription tier. Use "basic" or "pro"');
     }
     
     const amount = SUBSCRIPTION_PRICES[tier];
@@ -146,7 +146,7 @@ async function upgradeShopToPro(shopId, txHash, currency, expectedAddress) {
     const shop = shopResult.rows[0];
     
     if (shop.tier === 'pro') {
-      throw new Error('Shop is already PRO');
+      throw new Error('Shop is already PRO tier');
     }
     
     // Get current active subscription
@@ -170,7 +170,7 @@ async function upgradeShopToPro(shopId, txHash, currency, expectedAddress) {
     const upgradeAmount = calculateUpgradeAmount(
       currentSub.period_start,
       currentSub.period_end,
-      SUBSCRIPTION_PRICES.free,
+      SUBSCRIPTION_PRICES.basic,
       SUBSCRIPTION_PRICES.pro
     );
     
@@ -583,7 +583,7 @@ async function calculateUpgradeCost(shopId) {
     return {
       alreadyPro: false,
       amount,
-      currentTier: 'free',
+      currentTier: 'basic',
       newTier: 'pro',
       periodStart: currentSub.period_start,
       periodEnd: currentSub.period_end,

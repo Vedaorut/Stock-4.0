@@ -3,37 +3,13 @@ import { productApi } from '../../utils/api.js';
 import { sellerMenu } from '../../keyboards/seller.js';
 import { isNoiseCommand } from '../../utils/fuzzyMatch.js';
 import logger from '../../utils/logger.js';
+import { reply as cleanReply } from '../../utils/cleanReply.js';
+import * as smartMessage from '../../utils/smartMessage.js';
 
 /**
  * AI Product Management Handler
  * Handles text messages from sellers for AI-powered product management
  */
-
-/**
- * Delete AI message pair (user question + bot answer)
- * @param {Object} ctx - Telegraf context
- * @param {Object} pair - { userMsgId, botMsgId }
- */
-async function deleteAIPair(ctx, pair) {
-  if (!pair) return;
-
-  try {
-    if (pair.userMsgId) {
-      await ctx.deleteMessage(pair.userMsgId);
-    }
-  } catch (err) {
-    // Ignore errors - message might be already deleted or too old (>48h)
-    logger.debug('Could not delete user AI message:', err.message);
-  }
-
-  try {
-    if (pair.botMsgId) {
-      await ctx.deleteMessage(pair.botMsgId);
-    }
-  } catch (err) {
-    logger.debug('Could not delete bot AI message:', err.message);
-  }
-}
 
 /**
  * Handle AI product command
@@ -83,25 +59,12 @@ export async function handleAIProductCommand(ctx) {
         userId: ctx.from.id,
         message: userMessage.slice(0, 50)
       });
-      await ctx.reply('⏳ Обрабатываю предыдущую команду. Подождите...');
+      await smartMessage.send(ctx, { text: '⏳ Обрабатываю предыдущую команду. Подождите...' });
       return;
     }
 
     // Mark as processing
     ctx.session.aiProcessing = true;
-
-    // === MESSAGE CLEANUP: Delete previous AI pair + cancel timer ===
-    // Clear existing cleanup timer if exists
-    if (ctx.session.aiCleanupTimer) {
-      clearTimeout(ctx.session.aiCleanupTimer);
-      ctx.session.aiCleanupTimer = null;
-    }
-
-    // Delete previous AI message pair (question + answer)
-    if (ctx.session.lastAIPair) {
-      await deleteAIPair(ctx, ctx.session.lastAIPair);
-      ctx.session.lastAIPair = null;
-    }
 
     // Rate limiting - max 10 AI commands per minute
     if (!ctx.session.aiCommands) {
@@ -115,7 +78,7 @@ export async function handleAIProductCommand(ctx) {
 
     // Check rate limit
     if (ctx.session.aiCommands.length >= 10) {
-      await ctx.reply('⏳ Слишком много команд. Подождите минуту.');
+      await smartMessage.send(ctx, { text: '⏳ Слишком много команд. Подождите минуту.' });
       return;
     }
 
@@ -140,8 +103,9 @@ export async function handleAIProductCommand(ctx) {
     // Handle result
     if (result.needsConfirmation) {
       // Bulk operation needs confirmation
-      await ctx.reply(result.message, {
-        reply_markup: result.keyboard
+      await smartMessage.send(ctx, {
+        text: result.message,
+        keyboard: result.keyboard
       });
       return;
     }
@@ -155,13 +119,16 @@ export async function handleAIProductCommand(ctx) {
     if (result.fallbackToMenu) {
       // AI unavailable - show menu
       const shopName = ctx.session.shopName || 'Магазин';
-      await ctx.reply(result.message, sellerMenu(shopName));
+      await smartMessage.send(ctx, {
+        text: result.message,
+        keyboard: sellerMenu(shopName)
+      });
       return;
     }
 
     if (result.retry) {
       // Temporary error - can retry
-      await ctx.reply(result.message);
+      await smartMessage.send(ctx, { text: result.message });
       return;
     }
 
@@ -170,51 +137,14 @@ export async function handleAIProductCommand(ctx) {
     // ALSO send error messages that weren't sent (missing operation field)
     if (result.operation || (!result.success && result.message)) {
       // Tool call result OR error - send it
-      const botMsg = await ctx.reply(result.message);
-
-      // === MESSAGE CLEANUP: Track this pair + set auto-delete timer ===
-      const userMsgId = ctx.message.message_id;
-      const botMsgId = botMsg.message_id;
-
-      // Save pair for next cleanup
-      ctx.session.lastAIPair = {
-        userMsgId,
-        botMsgId
-      };
-
-      // Set 60-second auto-delete timer
-      ctx.session.aiCleanupTimer = setTimeout(async () => {
-        try {
-          await deleteAIPair(ctx, ctx.session.lastAIPair);
-          ctx.session.lastAIPair = null;
-          ctx.session.aiCleanupTimer = null;
-        } catch (err) {
-          logger.debug('AI cleanup timer error:', err.message);
-        }
-      }, 60000);
-    } else if (result.streamingMessageId) {
-      // === MESSAGE CLEANUP: Streaming text response (already sent) ===
-      const userMsgId = ctx.message.message_id;
-      const botMsgId = result.streamingMessageId;
-
-      // Save pair for next cleanup
-      ctx.session.lastAIPair = {
-        userMsgId,
-        botMsgId
-      };
-
-      // Set 60-second auto-delete timer
-      ctx.session.aiCleanupTimer = setTimeout(async () => {
-        try {
-          await deleteAIPair(ctx, ctx.session.lastAIPair);
-          ctx.session.lastAIPair = null;
-          ctx.session.aiCleanupTimer = null;
-        } catch (err) {
-          logger.debug('AI cleanup timer error:', err.message);
-        }
-      }, 60000);
+      await cleanReply(ctx, result.message);
     }
     // If no operation field and success=true, it's a text response already sent via streaming
+
+    // Delete user message immediately after processing
+    await ctx.deleteMessage(ctx.message.message_id).catch((err) => {
+      logger.debug('Could not delete user AI message:', err.message);
+    });
 
     // Log analytics
     logger.info('ai_command_result', {
@@ -234,7 +164,11 @@ export async function handleAIProductCommand(ctx) {
 
     // Graceful error handling
     try {
-      await ctx.reply('❌ Произошла ошибка. Используйте меню.');
+      const shopName = ctx.session.shopName || 'Магазин';
+      await smartMessage.send(ctx, {
+        text: '❌ Произошла ошибка. Используйте меню.',
+        keyboard: sellerMenu(shopName)
+      });
     } catch (replyError) {
       logger.error('Failed to send error message:', replyError);
     }
@@ -273,7 +207,7 @@ async function handleClarification(ctx, result) {
     ]
   };
 
-  await ctx.reply(message, {
+  await cleanReply(ctx, message, {
     reply_markup: keyboard
   });
 }
@@ -363,7 +297,7 @@ export async function handleBulkPricesConfirm(ctx) {
 
     // Result message already sent via editMessageText in executeBulkPriceUpdate
     if (!result.success && result.message) {
-      await ctx.reply(result.message);
+      await cleanReply(ctx, result.message);
     }
 
     logger.info('bulk_prices_confirmed', {
@@ -404,6 +338,7 @@ export async function handleBulkPricesCancel(ctx) {
  */
 export function setupAIProductHandlers(bot) {
   // Text message handler (for AI commands)
+  // User message deleted immediately after processing
   bot.on('text', handleAIProductCommand);
 
   // Clarification selection handlers

@@ -3,7 +3,7 @@ import config from '../config/index.js';
 
 // Buyer menu (minimalist labels)
 export const buyerMenu = Markup.inlineKeyboard([
-  [Markup.button.webApp('📱 Открыть', config.webAppUrl)],
+  [Markup.button.webApp('📱 Открыть Menu', config.webAppUrl)],
   [Markup.button.callback('🔍 Найти', 'buyer:search')],
   [Markup.button.callback('📚 Подписки', 'buyer:subscriptions')],
   [Markup.button.callback('🛒 Заказы', 'buyer:orders')],
@@ -12,7 +12,7 @@ export const buyerMenu = Markup.inlineKeyboard([
 
 // Buyer menu without shop (shows CTA to create shop)
 export const buyerMenuNoShop = Markup.inlineKeyboard([
-  [Markup.button.webApp('📱 Открыть', config.webAppUrl)],
+  [Markup.button.webApp('📱 Открыть Menu', config.webAppUrl)],
   [Markup.button.callback('➕ Магазин ($25)', 'seller:create_shop')],
   [Markup.button.callback('🔍 Найти', 'buyer:search')],
   [Markup.button.callback('📚 Подписки', 'buyer:subscriptions')],

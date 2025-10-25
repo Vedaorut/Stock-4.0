@@ -4,7 +4,6 @@ import { cancelButton } from '../keyboards/common.js';
 import { shopApi } from '../utils/api.js';
 import logger from '../utils/logger.js';
 import * as smartMessage from '../utils/smartMessage.js';
-import * as messageCleanup from '../utils/messageCleanup.js';
 
 /**
  * Search Shop Scene - Clean chat implementation
@@ -119,12 +118,6 @@ const searchShopScene = new Scenes.WizardScene(
 
 // Handle scene leave
 searchShopScene.leave(async (ctx) => {
-  // Cleanup wizard messages (keep final message)
-  await messageCleanup.cleanupWizard(ctx, {
-    keepFinalMessage: true,
-    keepWelcome: true
-  });
-
   ctx.wizard.state = {};
   logger.info(`User ${ctx.from?.id} left searchShop scene`);
 });

@@ -1,7 +1,7 @@
 /**
  * Upgrade Shop Scene
  * 
- * Multi-step wizard for upgrading from FREE to PRO tier
+ * Multi-step wizard for upgrading from BASIC to PRO tier
  * 
  * Steps:
  * 1. Show current subscription and upgrade cost (prorated)
@@ -14,15 +14,15 @@
 import { Scenes, Markup } from 'telegraf';
 import api from '../utils/api.js';
 import logger from '../utils/logger.js';
-import * as messageCleanup from '../utils/messageCleanup.js';
 import * as smartMessage from '../utils/smartMessage.js';
+import { reply as cleanReply, replyHTML as cleanReplyHTML } from '../utils/cleanReply.js';
 
 // Crypto payment addresses (should match backend)
 const PAYMENT_ADDRESSES = {
   BTC: process.env.BTC_PAYMENT_ADDRESS || '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa',
   ETH: process.env.ETH_PAYMENT_ADDRESS || '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb',
-  USDT: process.env.USDT_PAYMENT_ADDRESS || '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb',
-  TON: process.env.TON_PAYMENT_ADDRESS || 'EQD...'
+  USDT: process.env.USDT_PAYMENT_ADDRESS || 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t',
+  LTC: process.env.LTC_PAYMENT_ADDRESS || 'LTC1A2B3C4D5E6F7G8H9J0K1L2M3N4P5Q6R'
 };
 
 const upgradeShopScene = new Scenes.WizardScene(
@@ -49,7 +49,7 @@ const upgradeShopScene = new Scenes.WizardScene(
 
       // Check if already PRO
       if (subscription?.tier === 'pro') {
-        await ctx.reply(
+        await cleanReply(
           '✅ Ваш магазин уже на тарифе PRO 💎',
           Markup.inlineKeyboard([
             [Markup.button.callback('◀️ Назад', 'seller:main')]
@@ -58,10 +58,10 @@ const upgradeShopScene = new Scenes.WizardScene(
         return ctx.scene.leave();
       }
 
-      // Check if has active FREE subscription
-      if (!subscription || subscription.tier !== 'free' || subscription.status !== 'active') {
-        await ctx.reply(
-          '❌ Апгрейд доступен только для активных FREE подписок.\n\n' +
+      // Check if has active BASIC subscription
+      if (!subscription || subscription.tier !== 'basic' || subscription.status !== 'active') {
+        await cleanReply(
+          '❌ Апгрейд доступен только для активных BASIC подписок.\n\n' +
           'Сначала оплатите базовую подписку.',
           Markup.inlineKeyboard([
             [Markup.button.callback('💳 Оплатить подписку', 'subscription:pay')],
@@ -81,7 +81,7 @@ const upgradeShopScene = new Scenes.WizardScene(
       let message = `💎 <b>Апгрейд на PRO</b>\n\n`;
       message += `🏪 Магазин: ${shop.name}\n\n`;
       message += `📊 <b>Текущая подписка:</b>\n`;
-      message += `• Тариф: FREE\n`;
+      message += `• Тариф: BASIC\n`;
       message += `• Действует до: ${new Date(periodEnd).toLocaleDateString('ru-RU')}\n`;
       message += `• Осталось дней: ${remainingDays}\n\n`;
       message += `💰 <b>Стоимость апгрейда:</b>\n`;
@@ -92,7 +92,8 @@ const upgradeShopScene = new Scenes.WizardScene(
       message += `• Приоритетная поддержка\n\n`;
       message += `Продолжить апгрейд?`;
 
-      await ctx.replyWithHTML(
+      await cleanReplyHTML(
+        ctx,
         message,
         Markup.inlineKeyboard([
           [Markup.button.callback('✅ Продолжить', 'upgrade:confirm')],
@@ -111,7 +112,7 @@ const upgradeShopScene = new Scenes.WizardScene(
       logger.error('[UpgradeShop] Step 1 error:', error);
       
       const errorMsg = error.response?.data?.error || error.message;
-      await ctx.reply(`❌ Ошибка: ${errorMsg}`, Markup.inlineKeyboard([
+      await cleanReply(ctx, `❌ Ошибка: ${errorMsg}`, Markup.inlineKeyboard([
         [Markup.button.callback('◀️ Назад', 'seller:main')]
       ]));
       
@@ -153,8 +154,8 @@ const upgradeShopScene = new Scenes.WizardScene(
         ...Markup.inlineKeyboard([
           [Markup.button.callback('₿ Bitcoin (BTC)', 'upgrade:crypto:BTC')],
           [Markup.button.callback('Ξ Ethereum (ETH)', 'upgrade:crypto:ETH')],
-          [Markup.button.callback('💵 USDT (ERC-20)', 'upgrade:crypto:USDT')],
-          [Markup.button.callback('💎 TON', 'upgrade:crypto:TON')],
+          [Markup.button.callback('💵 USDT (TRC-20)', 'upgrade:crypto:USDT')],
+          [Markup.button.callback('Ł Litecoin (LTC)', 'upgrade:crypto:LTC')],
           [Markup.button.callback('◀️ Назад', 'upgrade:back')],
           [Markup.button.callback('❌ Отмена', 'seller:main')]
         ])
@@ -191,7 +192,7 @@ const upgradeShopScene = new Scenes.WizardScene(
     }
 
     const currency = data.replace('upgrade:crypto:', '');
-    if (!['BTC', 'ETH', 'USDT', 'TON'].includes(currency)) {
+    if (!['BTC', 'ETH', 'USDT', 'LTC'].includes(currency)) {
       await ctx.answerCbQuery('❌ Неверная криптовалюта');
       return;
     }
@@ -205,7 +206,7 @@ const upgradeShopScene = new Scenes.WizardScene(
     ctx.wizard.state.paymentAddress = paymentAddress;
 
     let message = `💳 <b>Детали оплаты апгрейда</b>\n\n`;
-    message += `💎 Апгрейд: FREE → PRO\n`;
+    message += `💎 Апгрейд: BASIC → PRO\n`;
     message += `💵 Сумма: $${upgradeCost.toFixed(2)}\n`;
     message += `🪙 Криптовалюта: ${currency}\n\n`;
     message += `📬 <b>Адрес для оплаты:</b>\n`;
@@ -287,7 +288,8 @@ const upgradeShopScene = new Scenes.WizardScene(
       successMessage += `• ⭐️ Приоритетная поддержка\n\n`;
       successMessage += `Спасибо! Ваш магазин теперь PRO 💎`;
 
-      await ctx.replyWithHTML(
+      await cleanReplyHTML(
+        ctx,
         successMessage,
         Markup.inlineKeyboard([
           [Markup.button.callback('◀️ В главное меню', 'seller:main')]
@@ -303,8 +305,8 @@ const upgradeShopScene = new Scenes.WizardScene(
       let errorMessage = '❌ <b>Ошибка апгрейда</b>\n\n';
       
       const errorData = error.response?.data;
-      if (errorData?.error === 'NOT_FREE_TIER') {
-        errorMessage += '⚠️ Апгрейд доступен только для FREE тарифа.\n\n';
+      if (errorData?.error === 'NOT_FREE_TIER' || errorData?.error === 'NOT_BASIC_TIER') {
+        errorMessage += '⚠️ Апгрейд доступен только для BASIC тарифа.\n\n';
         errorMessage += 'Ваша текущая подписка не подходит для апгрейда.';
       } else if (errorData?.error === 'DUPLICATE_TX_HASH') {
         errorMessage += '⚠️ Эта транзакция уже была использована.\n\n';
@@ -320,7 +322,8 @@ const upgradeShopScene = new Scenes.WizardScene(
         errorMessage += errorData?.message || error.message;
       }
 
-      await ctx.replyWithHTML(
+      await cleanReplyHTML(
+        ctx,
         errorMessage,
         Markup.inlineKeyboard([
           [Markup.button.callback('🔄 Попробовать снова', 'upgrade:retry')],
@@ -335,12 +338,6 @@ const upgradeShopScene = new Scenes.WizardScene(
 
 // Leave handler
 upgradeShopScene.leave(async (ctx) => {
-  // Cleanup wizard messages (keep final message)
-  await messageCleanup.cleanupWizard(ctx, {
-    keepFinalMessage: true,
-    keepWelcome: true
-  });
-
   ctx.wizard.state = {};
   logger.info('[UpgradeShop] Scene left');
 });

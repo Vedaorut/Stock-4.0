@@ -10,24 +10,19 @@ import logger from './logger.js';
 /**
  * Validate crypto wallet address
  * @param {string} address - Wallet address to validate
- * @param {string} crypto - Cryptocurrency type (BTC, ETH, USDT, TON)
+ * @param {string} crypto - Cryptocurrency type (BTC, ETH, USDT, LTC)
  * @returns {boolean} - True if valid
  */
 export function validateCryptoAddress(address, crypto) {
   try {
     const currency = crypto.toLowerCase();
 
-    // TON is not supported by wallet-validator, use regex
-    if (currency === 'ton') {
-      // TON: starts with EQ or UQ, followed by 46-48 base64url characters
-      return /^(EQ|UQ)[A-Za-z0-9_-]{46,48}$/.test(address);
-    }
-
     // Map crypto names to wallet-validator currency names
     const currencyMap = {
       'btc': 'bitcoin',
       'eth': 'ethereum',
-      'usdt': 'tron'      // USDT uses Tron TRC-20 (TR... addresses)
+      'usdt': 'tron',      // USDT uses Tron TRC-20 (TR... addresses)
+      'ltc': 'litecoin'
     };
 
     const validatorCurrency = currencyMap[currency];
@@ -51,7 +46,7 @@ export function validateCryptoAddress(address, crypto) {
 /**
  * Detect cryptocurrency type from address format
  * @param {string} address - Wallet address
- * @returns {string|null} - Detected crypto type (BTC, ETH, USDT, TON) or null
+ * @returns {string|null} - Detected crypto type (BTC, ETH, USDT, LTC) or null
  */
 export function detectCryptoType(address) {
   if (!address || typeof address !== 'string') {
@@ -75,9 +70,9 @@ export function detectCryptoType(address) {
     return 'USDT';
   }
 
-  // TON: starts with EQ or UQ
-  if (/^(EQ|UQ)[A-Za-z0-9_-]{46,48}$/.test(trimmed)) {
-    return 'TON';
+  // LTC: starts with L or M (legacy), or ltc1 (bech32)
+  if (/^(L|M)[a-km-zA-HJ-NP-Z1-9]{26,33}$/.test(trimmed) || /^ltc1[a-z0-9]{39,59}$/.test(trimmed)) {
+    return 'LTC';
   }
 
   return null;
@@ -93,7 +88,7 @@ export function getCryptoValidationError(crypto) {
     BTC: '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa (начинается с 1, 3, или bc1)',
     ETH: '0x742d35Cc6634C0532925a3b844Bc7e7595f42bE1 (начинается с 0x)',
     USDT: 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t (TRC-20, начинается с TR)',
-    TON: 'EQDhZLC_i-VxZfpnpsDWNR2PxNm-PPIL7uYWjL-I-Nx_T5xJ (начинается с EQ или UQ)'
+    LTC: 'LTC1A2B3C4D5E6F7G8H9J0K1L2M3N4P5Q6R (начинается с L, M, или ltc1)'
   };
 
   return `❌ Неверный формат ${crypto} адреса\n\nПример:\n${examples[crypto] || 'проверьте формат адреса'}`;

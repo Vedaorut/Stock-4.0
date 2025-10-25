@@ -47,7 +47,7 @@ CREATE TABLE shops (
   wallet_eth VARCHAR(255),
   wallet_usdt VARCHAR(255),
   wallet_ton VARCHAR(255),
-  tier VARCHAR(20) DEFAULT 'free' CHECK (tier IN ('free', 'pro')),
+  tier VARCHAR(20) DEFAULT 'basic' CHECK (tier IN ('basic', 'pro')),
   is_active BOOLEAN DEFAULT true,
   subscription_status VARCHAR(20) DEFAULT 'active' CHECK (subscription_status IN ('active', 'grace_period', 'inactive')),
   next_payment_due TIMESTAMP,
@@ -60,7 +60,7 @@ COMMENT ON TABLE shops IS 'Stores shops - any user with a shop becomes a seller'
 COMMENT ON COLUMN shops.owner_id IS 'Reference to shop owner (user becomes seller by creating shop)';
 COMMENT ON COLUMN shops.registration_paid IS 'Whether initial subscription payment was confirmed';
 COMMENT ON COLUMN shops.is_active IS 'Shop activation status (deactivated after grace period expires)';
-COMMENT ON COLUMN shops.tier IS 'Subscription tier: free ($25/month) or pro ($35/month)';
+COMMENT ON COLUMN shops.tier IS 'Subscription tier: basic ($25/month, 4 products max) or pro ($35/month, unlimited)';
 COMMENT ON COLUMN shops.subscription_status IS 'active: paid, grace_period: 2 days after expiry, inactive: deactivated';
 COMMENT ON COLUMN shops.next_payment_due IS 'Next monthly subscription payment due date';
 COMMENT ON COLUMN shops.grace_period_until IS 'Grace period end date (2 days after payment due)';
@@ -199,7 +199,7 @@ CREATE TABLE payments (
     order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
     tx_hash VARCHAR(255) UNIQUE NOT NULL,
     amount DECIMAL(18, 8) NOT NULL,
-    currency VARCHAR(10) NOT NULL CHECK (currency IN ('BTC', 'ETH', 'USDT', 'TON')),
+    currency VARCHAR(10) NOT NULL CHECK (currency IN ('BTC', 'ETH', 'USDT')),
     status VARCHAR(50) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'confirmed', 'failed')),
     confirmations INTEGER DEFAULT 0,
     verified_at TIMESTAMP,
@@ -237,10 +237,10 @@ COMMENT ON COLUMN channel_migrations.failed_count IS 'Number of failed message d
 CREATE TABLE shop_subscriptions (
   id SERIAL PRIMARY KEY,
   shop_id INT NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
-  tier VARCHAR(20) NOT NULL CHECK (tier IN ('free', 'pro')),
+  tier VARCHAR(20) NOT NULL CHECK (tier IN ('basic', 'pro')),
   amount DECIMAL(10, 2) NOT NULL,
   tx_hash VARCHAR(255) UNIQUE NOT NULL,
-  currency VARCHAR(10) NOT NULL CHECK (currency IN ('BTC', 'ETH', 'USDT', 'TON')),
+  currency VARCHAR(10) NOT NULL CHECK (currency IN ('BTC', 'ETH', 'USDT')),
   period_start TIMESTAMP NOT NULL,
   period_end TIMESTAMP NOT NULL,
   status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'expired', 'cancelled')),
@@ -248,8 +248,8 @@ CREATE TABLE shop_subscriptions (
   verified_at TIMESTAMP
 );
 
-COMMENT ON TABLE shop_subscriptions IS 'Stores monthly subscription payments for shops (free $25/mo, pro $35/mo)';
-COMMENT ON COLUMN shop_subscriptions.tier IS 'Subscription tier: free ($25) or pro ($35)';
+COMMENT ON TABLE shop_subscriptions IS 'Stores monthly subscription payments for shops (basic $25/mo, pro $35/mo)';
+COMMENT ON COLUMN shop_subscriptions.tier IS 'Subscription tier: basic ($25, 4 products max) or pro ($35, unlimited)';
 COMMENT ON COLUMN shop_subscriptions.amount IS 'Payment amount in USD';
 COMMENT ON COLUMN shop_subscriptions.tx_hash IS 'Blockchain transaction hash for verification';
 COMMENT ON COLUMN shop_subscriptions.period_start IS 'Start date of subscription period';

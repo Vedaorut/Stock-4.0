@@ -14,15 +14,15 @@
 import { Scenes, Markup } from 'telegraf';
 import api from '../utils/api.js';
 import logger from '../utils/logger.js';
-import * as messageCleanup from '../utils/messageCleanup.js';
 import * as smartMessage from '../utils/smartMessage.js';
+import { reply as cleanReply, replyHTML as cleanReplyHTML } from '../utils/cleanReply.js';
 
 // Crypto payment addresses (should match backend)
 const PAYMENT_ADDRESSES = {
   BTC: process.env.BTC_PAYMENT_ADDRESS || '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa',
   ETH: process.env.ETH_PAYMENT_ADDRESS || '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb',
-  USDT: process.env.USDT_PAYMENT_ADDRESS || '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb',
-  TON: process.env.TON_PAYMENT_ADDRESS || 'EQD...'
+  USDT: process.env.USDT_PAYMENT_ADDRESS || 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t',
+  LTC: process.env.LTC_PAYMENT_ADDRESS || 'LTC1A2B3C4D5E6F7G8H9J0K1L2M3N4P5Q6R'
 };
 
 const paySubscriptionScene = new Scenes.WizardScene(
@@ -44,15 +44,17 @@ const paySubscriptionScene = new Scenes.WizardScene(
         headers: { Authorization: `Bearer ${token}` }
       });
 
-      const { subscription, shop } = statusResponse.data;
+      const statusData = statusResponse.data || {};
+      const subscription = statusData.subscription || statusData.currentSubscription || null;
+      const shopName = ctx.session.shopName || 'Магазин';
 
       let message = `💳 <b>Оплата подписки магазина</b>\n\n`;
-      message += `🏪 Магазин: ${shop.name}\n\n`;
+      message += `🏪 Магазин: ${shopName}\n\n`;
 
       // Show current status
       if (subscription) {
         message += `📊 <b>Текущая подписка:</b>\n`;
-        message += `• Тариф: ${subscription.tier === 'pro' ? 'PRO 💎' : 'FREE'}\n`;
+        message += `• Тариф: ${subscription.tier === 'pro' ? 'PRO 💎' : 'BASIC'}\n`;
         message += `• Статус: ${subscription.status}\n`;
         message += `• Действует до: ${new Date(subscription.periodEnd).toLocaleDateString('ru-RU')}\n\n`;
       } else {
@@ -61,23 +63,24 @@ const paySubscriptionScene = new Scenes.WizardScene(
 
       // Show pricing
       message += `💰 <b>Тарифы (ежемесячно):</b>\n\n`;
-      message += `<b>FREE</b> - $25/месяц\n`;
-      message += `• Безлимитные товары\n`;
+      message += `<b>BASIC</b> - $25/месяц\n`;
+      message += `• До 4 товаров\n`;
       message += `• Базовая поддержка\n`;
       message += `• Заказы и платежи\n\n`;
       
       message += `<b>PRO 💎</b> - $35/месяц\n`;
-      message += `• Всё из FREE\n`;
+      message += `• Всё из BASIC\n`;
       message += `• Безлимитные подписчики\n`;
       message += `• Рассылка при смене канала (2/мес)\n`;
       message += `• Приоритетная поддержка\n\n`;
       
       message += `Выберите тариф для оплаты:`;
 
-      await ctx.replyWithHTML(
+      await cleanReplyHTML(
+        ctx,
         message,
         Markup.inlineKeyboard([
-          [Markup.button.callback('FREE - $25', 'subscription:tier:free')],
+          [Markup.button.callback('BASIC - $25', 'subscription:tier:basic')],
           [Markup.button.callback('PRO 💎 - $35', 'subscription:tier:pro')],
           [Markup.button.callback('❌ Отмена', 'seller:main')]
         ])
@@ -85,14 +88,17 @@ const paySubscriptionScene = new Scenes.WizardScene(
 
       // Save shop info for next steps
       ctx.wizard.state.shopId = shopId;
-      ctx.wizard.state.shopName = shop.name;
+      ctx.wizard.state.shopName = shopName;
+      if (!ctx.session.shopName) {
+        ctx.session.shopName = shopName;
+      }
 
       return ctx.wizard.next();
     } catch (error) {
       logger.error('[PaySubscription] Step 1 error:', error);
       
       const errorMsg = error.response?.data?.error || error.message;
-      await ctx.reply(`❌ Ошибка: ${errorMsg}`, Markup.inlineKeyboard([
+      await cleanReply(ctx, `❌ Ошибка: ${errorMsg}`, Markup.inlineKeyboard([
         [Markup.button.callback('◀️ Назад', 'seller:main')]
       ]));
       
@@ -121,7 +127,7 @@ const paySubscriptionScene = new Scenes.WizardScene(
     }
 
     const tier = data.replace('subscription:tier:', '');
-    if (tier !== 'free' && tier !== 'pro') {
+    if (tier !== 'basic' && tier !== 'pro') {
       await ctx.answerCbQuery('❌ Неверный тариф');
       return;
     }
@@ -143,8 +149,8 @@ const paySubscriptionScene = new Scenes.WizardScene(
         ...Markup.inlineKeyboard([
           [Markup.button.callback('₿ Bitcoin (BTC)', 'subscription:crypto:BTC')],
           [Markup.button.callback('Ξ Ethereum (ETH)', 'subscription:crypto:ETH')],
-          [Markup.button.callback('💵 USDT (ERC-20)', 'subscription:crypto:USDT')],
-          [Markup.button.callback('💎 TON', 'subscription:crypto:TON')],
+          [Markup.button.callback('💵 USDT (TRC-20)', 'subscription:crypto:USDT')],
+          [Markup.button.callback('Ł Litecoin (LTC)', 'subscription:crypto:LTC')],
           [Markup.button.callback('◀️ Назад', 'subscription:back')]
         ])
       }
@@ -180,7 +186,7 @@ const paySubscriptionScene = new Scenes.WizardScene(
     }
 
     const currency = data.replace('subscription:crypto:', '');
-    if (!['BTC', 'ETH', 'USDT', 'TON'].includes(currency)) {
+    if (!['BTC', 'ETH', 'USDT', 'LTC'].includes(currency)) {
       await ctx.answerCbQuery('❌ Неверная криптовалюта');
       return;
     }
@@ -281,7 +287,8 @@ const paySubscriptionScene = new Scenes.WizardScene(
       
       successMessage += `Спасибо за оплату! Ваш магазин активен.`;
 
-      await ctx.replyWithHTML(
+      await cleanReplyHTML(
+        ctx,
         successMessage,
         Markup.inlineKeyboard([
           [Markup.button.callback('◀️ В главное меню', 'seller:main')]
@@ -311,7 +318,8 @@ const paySubscriptionScene = new Scenes.WizardScene(
         errorMessage += errorData?.message || error.message;
       }
 
-      await ctx.replyWithHTML(
+      await cleanReplyHTML(
+        ctx,
         errorMessage,
         Markup.inlineKeyboard([
           [Markup.button.callback('🔄 Попробовать снова', 'subscription:retry')],
@@ -326,12 +334,6 @@ const paySubscriptionScene = new Scenes.WizardScene(
 
 // Leave handler
 paySubscriptionScene.leave(async (ctx) => {
-  // Cleanup wizard messages (keep final message)
-  await messageCleanup.cleanupWizard(ctx, {
-    keepFinalMessage: true,
-    keepWelcome: true
-  });
-
   ctx.wizard.state = {};
   logger.info('[PaySubscription] Scene left');
 });

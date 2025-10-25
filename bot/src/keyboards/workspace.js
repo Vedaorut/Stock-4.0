@@ -7,8 +7,7 @@ import config from '../config/index.js';
  * Workers cannot: wallets, subscriptions, workers management, shop settings
  */
 export const workspaceMenu = (shopName) => Markup.inlineKeyboard([
-  [Markup.button.webApp('📱 Открыть', config.webAppUrl)],
-  [Markup.button.callback('📦 Товары', 'seller:products')],
+  [Markup.button.webApp('📱 Открыть Menu', config.webAppUrl)],
   [Markup.button.callback('💰 Продажи', 'seller:sales')], // Read-only for workers
   [Markup.button.callback('◀️ Назад', 'workspace:back')],
   [Markup.button.callback('🔄 Покупатель', 'role:toggle')]

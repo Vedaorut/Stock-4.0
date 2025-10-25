@@ -2,13 +2,13 @@ import { Telegraf, Scenes, session } from 'telegraf';
 import dotenv from 'dotenv';
 import config from './config/index.js';
 import logger from './utils/logger.js';
+import { reply as cleanReply } from './utils/cleanReply.js';
 
 // Middleware
 import authMiddleware from './middleware/auth.js';
 import errorMiddleware from './middleware/error.js';
 import debounceMiddleware from './middleware/debounce.js';
 import sessionRecoveryMiddleware from './middleware/sessionRecovery.js';
-import { cleanChatMonitor } from './middleware/cleanChatMonitor.js';
 
 // Scenes
 import createShopScene from './scenes/createShop.js';
@@ -71,8 +71,7 @@ bot.use((ctx, next) => {
   return next();
 });
 
-// Apply clean chat middleware
-bot.use(cleanChatMonitor());        // Monitor message count (development only)
+// Apply middleware
 bot.use(debounceMiddleware);        // Prevent rapid clicks
 bot.use(sessionRecoveryMiddleware); // Recover session after restart
 
@@ -123,7 +122,7 @@ bot.catch((err, ctx) => {
     ctx.session = { token, user, shopId, shopName, role };
   }
 
-  ctx.reply('Произошла ошибка. Нажмите /start для перезапуска').catch(() => {});
+  cleanReply(ctx, 'Произошла ошибка. Нажмите /start для перезапуска').catch(() => {});
 });
 
 // Export bot instance for backend integration

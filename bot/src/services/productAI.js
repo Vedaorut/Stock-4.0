@@ -5,6 +5,7 @@ import { productApi } from '../utils/api.js';
 import { fuzzySearchProducts } from '../utils/fuzzyMatch.js';
 import { autoTransliterateProductName, getTransliterationInfo } from '../utils/transliterate.js';
 import logger from '../utils/logger.js';
+import { reply as cleanReply } from '../utils/cleanReply.js';
 
 /**
  * AI Product Management Service
@@ -32,6 +33,19 @@ function formatPrice(price) {
 // Conversation history constants
 const MAX_HISTORY_MESSAGES = 20; // Keep last 20 messages (10 exchanges)
 const CONVERSATION_TIMEOUT = 30 * 60 * 1000; // 30 minutes
+
+// Natural language shortcuts for stock updates
+const STOCK_KEYWORDS = ['сток', 'наличие', 'остаток', 'stock', 'quantity', 'qty', 'qnty'];
+const STOCK_ACTION_KEYWORDS = ['обнови', 'обновить', 'выстави', 'выставить', 'поставь', 'поставить', 'установи', 'установить', 'измени', 'изменить', 'set', 'update', 'change'];
+const STOCK_INVALID_TARGET_KEYWORDS = ['все', 'каждый', 'каждая', 'каждому', 'каждой', 'каждые', 'каждый товар', 'каждому товару', 'всем', 'all', 'every'];
+const STOCK_UPDATE_PATTERNS = [
+  /(?:обнови(?:ть)?|выстави(?:ть)?|поставь|поставить|установи|установить|измени|изменить|set|update|change)\s+(?:сток|наличие|остаток|stock|quantity|qty|qnty)\s+(?<product>.+?)\s*(?:до|на|=)\s*(?<quantity>\d+)/i,
+  /(?:обнови(?:ть)?|выстави(?:ть)?|поставь|поставить|установи|установить|измени|изменить|set|update|change)\s+(?<product>.+?)\s*(?:сток|наличие|остаток|stock|quantity|qty|qnty)\s*(?:до|на|=)\s*(?<quantity>\d+)/i,
+  /(?:сток|наличие|остаток|stock|quantity|qty|qnty)\s+(?<product>.+?)\s*(?:до|на|=)\s*(?<quantity>\d+)/i,
+  /(?<product>.+?)\s*(?:сток|наличие|остаток|stock|quantity|qty|qnty)\s*(?:до|на|=)\s*(?<quantity>\d+)/i,
+  /(?<quantity>\d+)\s*(?:шт|штук|pcs|pieces|ед|единиц)?\s*(?:для|по|на)\s+(?<product>.+)/i,
+  /(?:наличие|сток|остаток|stock|quantity|qty|qnty)\s+(?<quantity>\d+)\s*(?:шт|штук|pcs|pieces|ед|единиц)?\s*(?:для|у|по)?\s*(?<product>.+)/i
+];
 
 /**
  * Get conversation history from session
@@ -99,6 +113,82 @@ function saveToConversationHistory(ctx, userMessage, assistantMessage) {
   });
 }
 
+function cleanProductCandidate(raw) {
+  if (!raw || typeof raw !== 'string') {
+    return '';
+  }
+
+  return raw
+    .replace(/["'«»]/g, '')
+    .replace(/\b(для|по|на|шт|штук|pcs|pieces|ед|единиц|товара|товар|количество|quantity|qty|qnty|stock|наличие|остаток)\b/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function detectStockUpdateIntent(command) {
+  if (!command) {
+    return null;
+  }
+
+  const normalized = command.toLowerCase();
+  const hasStockKeyword = STOCK_KEYWORDS.some(keyword => normalized.includes(keyword));
+  const hasActionKeyword = STOCK_ACTION_KEYWORDS.some(keyword => normalized.includes(keyword));
+
+  if (!hasStockKeyword && !hasActionKeyword) {
+    return null;
+  }
+
+  for (const pattern of STOCK_UPDATE_PATTERNS) {
+    const match = pattern.exec(command);
+    if (!match) {
+      continue;
+    }
+
+    const rawQuantity = match.groups?.quantity;
+    const rawProduct = match.groups?.product || '';
+
+    const quantity = parseInt(rawQuantity, 10);
+    if (!Number.isFinite(quantity) || quantity < 0 || quantity > 1_000_000) {
+      continue;
+    }
+
+    const productCandidate = cleanProductCandidate(rawProduct);
+    if (!productCandidate) {
+      continue;
+    }
+
+    const candidateLower = productCandidate.toLowerCase();
+
+    if (STOCK_INVALID_TARGET_KEYWORDS.some(keyword => candidateLower.includes(keyword))) {
+      continue;
+    }
+
+    if (candidateLower.includes(' и ') || candidateLower.includes(' and ') || productCandidate.includes(',')) {
+      continue; // Multiple products mentioned - defer to AI
+    }
+
+    if (!/[a-zа-яё]/i.test(productCandidate)) {
+      continue;
+    }
+
+    const candidateTokens = candidateLower.split(/\s+/).filter(Boolean);
+    const hasMeaningfulToken = candidateTokens.some(token =>
+      !STOCK_KEYWORDS.includes(token) && !STOCK_ACTION_KEYWORDS.includes(token)
+    );
+
+    if (!hasMeaningfulToken) {
+      continue;
+    }
+
+    return {
+      productName: productCandidate,
+      quantity
+    };
+  }
+
+  return null;
+}
+
 /**
  * Process AI command for product management
  * 
@@ -136,6 +226,32 @@ export async function processProductCommand(userCommand, context) {
   }
 
   try {
+    // Attempt fast-path stock update detection before calling AI
+    const quickStockUpdate = detectStockUpdateIntent(sanitizedCommand);
+    if (quickStockUpdate) {
+      logger.info('stock_update_intent_detected', {
+        shopId,
+        productName: quickStockUpdate.productName,
+        quantity: quickStockUpdate.quantity
+      });
+
+      const result = await handleUpdateProduct(
+        {
+          productName: quickStockUpdate.productName,
+          updates: { stock_quantity: quickStockUpdate.quantity }
+        },
+        shopId,
+        token,
+        products
+      );
+
+      if (ctx && result.message) {
+        saveToConversationHistory(ctx, sanitizedCommand, result.message);
+      }
+
+      return result;
+    }
+
     // Generate system prompt
     const systemPrompt = generateProductAIPrompt(shopName, products);
 
@@ -181,7 +297,7 @@ export async function processProductCommand(userCommand, context) {
         try {
           if (!streamingMessage) {
             // First chunk - create new message
-            streamingMessage = await ctx.reply(fullText);
+            streamingMessage = await cleanReply(ctx, fullText);
           } else {
             // Subsequent chunks - update existing message
             await ctx.telegram.editMessageText(
@@ -286,7 +402,7 @@ export async function processProductCommand(userCommand, context) {
     } else if (!streamingMessage && ctx && aiMessage) {
       // If streaming was too fast and no message was created, send regular message
       try {
-        await ctx.reply(aiMessage);
+        await cleanReply(ctx, aiMessage);
       } catch (err) {
         logger.warn('Failed to send AI message:', err.message);
       }
@@ -1122,7 +1238,7 @@ export async function executeBulkPriceUpdate(shopId, token, ctx) {
     // Send initial progress message
     let progressMsg = null;
     if (ctx) {
-      progressMsg = await ctx.reply(`⏳ Начинаю изменение цен...\nТоваров: ${products.length}`);
+      progressMsg = await cleanReply(ctx, `⏳ Начинаю изменение цен...\nТоваров: ${products.length}`);
     }
 
     let successCount = 0;

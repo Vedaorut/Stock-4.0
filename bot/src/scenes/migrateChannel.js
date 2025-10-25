@@ -13,8 +13,8 @@
 import { Scenes, Markup } from 'telegraf';
 import api from '../utils/api.js';
 import logger from '../utils/logger.js';
-import * as messageCleanup from '../utils/messageCleanup.js';
 import * as smartMessage from '../utils/smartMessage.js';
+import { reply as cleanReply, replyHTML as cleanReplyHTML } from '../utils/cleanReply.js';
 
 const migrateChannelScene = new Scenes.WizardScene(
   'migrate_channel',
@@ -51,7 +51,7 @@ const migrateChannelScene = new Scenes.WizardScene(
           errorMessage += message || 'Неизвестная ошибка.';
         }
 
-        await ctx.reply(errorMessage, Markup.inlineKeyboard([
+        await cleanReply(ctx, errorMessage, Markup.inlineKeyboard([
           [Markup.button.callback('◀️ Назад', 'seller:main')]
         ]));
         return ctx.scene.leave();
@@ -76,7 +76,8 @@ const migrateChannelScene = new Scenes.WizardScene(
       
       confirmMessage += `Продолжить?`;
 
-      await ctx.replyWithHTML(
+      await cleanReplyHTML(
+        ctx,
         confirmMessage,
         Markup.inlineKeyboard([
           [Markup.button.callback('✅ Продолжить', 'migration:proceed')],
@@ -94,7 +95,7 @@ const migrateChannelScene = new Scenes.WizardScene(
       logger.error('[MigrateChannel] Step 1 error:', error);
       
       const errorMsg = error.response?.data?.error || error.message;
-      await ctx.reply(`❌ Ошибка проверки: ${errorMsg}`, Markup.inlineKeyboard([
+      await cleanReply(ctx, `❌ Ошибка проверки: ${errorMsg}`, Markup.inlineKeyboard([
         [Markup.button.callback('◀️ Назад', 'seller:main')]
       ]));
       
@@ -145,7 +146,7 @@ const migrateChannelScene = new Scenes.WizardScene(
     ctx.wizard.state.newChannelUrl = newChannelUrl;
 
     // Ask if there was an old channel
-    await ctx.reply(
+    await cleanReply(
       '📌 Хотите указать старую ссылку на канал? (опционально)\n\n' +
       'Это будет упомянуто в уведомлении подписчикам.\n\n' +
       'Отправьте старую ссылку или нажмите "Пропустить"',
@@ -210,18 +211,16 @@ const migrateChannelScene = new Scenes.WizardScene(
       await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
 
       // Show success message
-      await ctx.reply(
+      await cleanReplyHTML(
+        ctx,
         `✅ <b>Рассылка запущена!</b>\n\n` +
         `📊 Подписчиков: ${subscriberCount}\n` +
         `⏱ Примерное время: ~${estimatedDuration} сек\n\n` +
         `📢 Новый канал: ${newChannelUrl}\n\n` +
         `Все подписчики получат уведомление в течение нескольких минут.`,
-        {
-          parse_mode: 'HTML',
-          ...Markup.inlineKeyboard([
-            [Markup.button.callback('◀️ В главное меню', 'seller:main')]
-          ])
-        }
+        Markup.inlineKeyboard([
+          [Markup.button.callback('◀️ В главное меню', 'seller:main')]
+        ])
       );
 
       logger.info(`[MigrateChannel] Broadcast initiated for shop ${shopId}, ${subscriberCount} subscribers, ~${estimatedDuration}s`);
@@ -231,7 +230,8 @@ const migrateChannelScene = new Scenes.WizardScene(
       logger.error('[MigrateChannel] Broadcast error:', error);
       
       const errorMsg = error.response?.data?.error || error.message;
-      await ctx.reply(
+      await cleanReply(
+        ctx,
         `❌ Ошибка при рассылке: ${errorMsg}`,
         Markup.inlineKeyboard([
           [Markup.button.callback('◀️ Назад', 'seller:main')]
@@ -245,12 +245,6 @@ const migrateChannelScene = new Scenes.WizardScene(
 
 // Leave handler
 migrateChannelScene.leave(async (ctx) => {
-  // Cleanup wizard messages (keep final message)
-  await messageCleanup.cleanupWizard(ctx, {
-    keepFinalMessage: true,
-    keepWelcome: true
-  });
-
   ctx.wizard.state = {};
   logger.info('[MigrateChannel] Scene left');
 });

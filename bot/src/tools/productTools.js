@@ -128,7 +128,7 @@ export const productTools = [
     strict: true,
     function: {
       name: 'updateProduct',
-      description: 'Обновить товар (цену, название или количество). ALWAYS call this function when user wants to: "изменить цену", "переименовать", "выставить наличие", "поставить сток", "добавить количество", "обновить остаток". IMPORTANT: If user does not specify product name, ask which product to update. DO NOT respond with text, CALL the function.',
+      description: 'Обновить товар (цену, название или количество). ALWAYS call this when user просит "изменить цену", "переименовать", "выставить наличие", "поставить сток", "обновить остаток", "change/set quantity", "update stock". Keywords: сток, наличие, остаток, stock, quantity, qty. IMPORTANT: If user does not specify product name, ask which product to update. DO NOT respond with text, CALL the function.',
       parameters: {
         type: 'object',
         properties: {
@@ -150,7 +150,7 @@ export const productTools = [
               },
               stock_quantity: {
                 type: 'number',
-                description: 'Новое количество на складе (если меняем остаток). New stock quantity if changing stock.'
+                description: 'Новое количество на складе (сток/наличие/остаток). New stock quantity if changing stock/availability.'
               }
             },
             additionalProperties: false

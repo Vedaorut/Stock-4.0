@@ -4,8 +4,8 @@ import { sellerMenu, sellerToolsMenu } from '../keyboards/seller.js';
 import { walletApi } from '../utils/api.js';
 import logger from '../utils/logger.js';
 import { validateCryptoAddress, detectCryptoType } from '../utils/validation.js';
-import * as messageCleanup from '../utils/messageCleanup.js';
 import * as smartMessage from '../utils/smartMessage.js';
+import { reply as cleanReply, replyPhoto as cleanReplyPhoto } from '../utils/cleanReply.js';
 
 /**
  * Manage Wallets Scene - Redesigned with logical flow
@@ -26,8 +26,7 @@ function getEmoji(crypto) {
   const emojis = {
     BTC: '₿',
     ETH: '⟠',
-    USDT: '💲',
-    TON: '💎'
+    USDT: '💲'
   };
   return emojis[crypto] || '💰';
 }
@@ -95,7 +94,7 @@ async function showQRCode(ctx, crypto) {
     }, ctx.session.token);
 
     if (!response.success) {
-      await ctx.reply('Ошибка генерации QR кода');
+      await cleanReply(ctx, 'Ошибка генерации QR кода');
       return;
     }
 
@@ -104,7 +103,8 @@ async function showQRCode(ctx, crypto) {
     const buffer = Buffer.from(base64Data, 'base64');
 
     // Send QR code as photo
-    await ctx.replyWithPhoto(
+    await cleanReplyPhoto(
+      ctx,
       { source: buffer },
       {
         caption: `💼 ${crypto} Кошелек\n\n\`${address}\``,
@@ -119,7 +119,7 @@ async function showQRCode(ctx, crypto) {
 
   } catch (error) {
     logger.error('Error showing QR code:', error);
-    await ctx.reply('Ошибка отображения QR кода');
+    await cleanReply(ctx, 'Ошибка отображения QR кода');
   }
 }
 
@@ -148,8 +148,7 @@ const showWallets = async (ctx) => {
     const wallets = {
       BTC: shop.wallet_btc || null,
       ETH: shop.wallet_eth || null,
-      USDT: shop.wallet_usdt || null,
-      TON: shop.wallet_ton || null
+      USDT: shop.wallet_usdt || null
     };
 
     // Check if user has any wallets
@@ -333,20 +332,29 @@ const handleInput = async (ctx) => {
 
     // Handle text input (wallet address)
     if (ctx.message && ctx.message.text) {
+      const userMessageId = ctx.message.message_id;
       const address = ctx.message.text.trim();
+      const deleteUserInput = async () => {
+        if (userMessageId) {
+          await ctx.deleteMessage(userMessageId).catch(() => {});
+        }
+      };
 
       // Detect crypto type
       const detectedType = detectCryptoType(address);
 
       if (!detectedType) {
-        await smartMessage.send(ctx, {
-          text: '❌ Неизвестный формат адреса\n\n' +
-            'Поддерживаются:\n' +
-            '• BTC (1..., 3..., bc1...)\n' +
-            '• ETH (0x...)\n' +
-            '• USDT (TR...)\n' +
-            '• TON (EQ..., UQ...)'
-        });
+        await deleteUserInput();
+        await cleanReply(ctx, '❌ Неизвестный формат адреса\n\n' +
+          'Поддерживаются:\n' +
+          '• BTC (1..., 3..., bc1...)\n' +
+          '• ETH (0x...)\n' +
+          '• USDT (TR...)\n' +
+          '• TON (EQ..., UQ...)',
+          Markup.inlineKeyboard([
+            [Markup.button.callback('◀️ Назад', 'wallet:back')]
+          ])
+        );
         return;
       }
 
@@ -360,7 +368,10 @@ const handleInput = async (ctx) => {
       const isValid = validateCryptoAddress(address, detectedType);
 
       if (!isValid) {
-        await smartMessage.send(ctx, { text: `❌ Неверный формат ${detectedType} адреса` });
+        await deleteUserInput();
+        await cleanReply(ctx, `❌ Неверный формат ${detectedType} адреса`, Markup.inlineKeyboard([
+          [Markup.button.callback('◀️ Назад', 'wallet:back')]
+        ]));
         return;
       }
 
@@ -378,6 +389,8 @@ const handleInput = async (ctx) => {
         ctx.session.token
       );
 
+      await deleteUserInput();
+
       logger.info('wallet_saved', {
         shopId: ctx.session.shopId,
         crypto,
@@ -393,10 +406,17 @@ const handleInput = async (ctx) => {
       // Clear editing state
       ctx.wizard.state.editingWallet = null;
 
-      // Refresh wallets view
-      setTimeout(async () => {
-        ctx.wizard.selectStep(0);
-        await showWallets(ctx);
+      if (ctx.session.manageWalletsRefreshTimer) {
+        clearTimeout(ctx.session.manageWalletsRefreshTimer);
+      }
+
+      ctx.session.manageWalletsRefreshTimer = setTimeout(async () => {
+        try {
+          ctx.wizard.selectStep(0);
+          await showWallets(ctx);
+        } catch (refreshError) {
+          logger.error('Error refreshing wallets view:', refreshError);
+        }
       }, 1000);
       return;
     }
@@ -423,11 +443,10 @@ const manageWalletsScene = new Scenes.WizardScene(
 
 // Handle scene leave
 manageWalletsScene.leave(async (ctx) => {
-  // Cleanup wizard messages (keep final message)
-  await messageCleanup.cleanupWizard(ctx, {
-    keepFinalMessage: true,
-    keepWelcome: true
-  });
+  if (ctx.session.manageWalletsRefreshTimer) {
+    clearTimeout(ctx.session.manageWalletsRefreshTimer);
+    delete ctx.session.manageWalletsRefreshTimer;
+  }
 
   ctx.wizard.state = {};
   logger.info(`User ${ctx.from?.id} left manageWallets scene`);

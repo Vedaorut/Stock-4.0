@@ -25,7 +25,11 @@ export const handleWorkspaceRole = async (ctx) => {
     // Get shops where user is worker (not owner)
     try {
       const response = await shopApi.getWorkerShops(ctx.session.token);
-      const workerShops = response.data || [];
+      const workerShops = Array.isArray(response)
+        ? response
+        : Array.isArray(response?.data)
+          ? response.data
+          : [];
 
       if (workerShops.length === 0) {
         await ctx.editMessageText(
