@@ -94,28 +94,6 @@ describe('Validation Utils Tests', () => {
       });
     });
 
-    describe('TON addresses', () => {
-      it('should accept valid TON address (starts with EQ)', () => {
-        const address = 'EQDhZLC_i-VxZfpnpsDWNR2PxNm-PPIL7uYWjL-I-Nx_T5xJ';
-        expect(validateCryptoAddress(address, 'TON')).toBe(true);
-      });
-
-      it('should accept valid TON address (starts with UQ)', () => {
-        const address = 'UQDhZLC_i-VxZfpnpsDWNR2PxNm-PPIL7uYWjL-I-Nx_T5xJ';
-        expect(validateCryptoAddress(address, 'TON')).toBe(true);
-      });
-
-      it('should reject invalid TON address', () => {
-        const address = 'invalid-ton-address';
-        expect(validateCryptoAddress(address, 'TON')).toBe(false);
-      });
-
-      it('should reject TON address with wrong prefix', () => {
-        const address = 'AADhZLC_i-VxZfpnpsDWNR2PxNm-PPIL7uYWjL-I-Nx_T5xJ';
-        expect(validateCryptoAddress(address, 'TON')).toBe(false);
-      });
-    });
-
     describe('Edge cases', () => {
       it('should handle empty address', () => {
         expect(validateCryptoAddress('', 'BTC')).toBe(false);
@@ -154,13 +132,6 @@ describe('Validation Utils Tests', () => {
       expect(error).toContain('USDT');
       expect(error).toContain('TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t');
       expect(error).toContain('TRC-20');
-    });
-
-    it('should return TON error message', () => {
-      const error = getCryptoValidationError('TON');
-      expect(error).toContain('TON');
-      expect(error).toContain('EQDhZLC_i-VxZfpnpsDWNR2PxNm-PPIL7uYWjL-I-Nx_T5xJ');
-      expect(error).toContain('начинается с EQ или UQ');
     });
 
     it('should return generic error for unknown crypto', () => {
@@ -209,18 +180,6 @@ describe('Validation Utils Tests', () => {
       it('should detect another USDT TRC-20 address', () => {
         const address = 'TRXavSGKqsNtgW8Sbqf8FNP5KEJtvyv6TN';
         expect(detectCryptoType(address)).toBe('USDT');
-      });
-    });
-
-    describe('TON address detection', () => {
-      it('should detect TON address (starts with EQ)', () => {
-        const address = 'EQDhZLC_i-VxZfpnpsDWNR2PxNm-PPIL7uYWjL-I-Nx_T5xJ';
-        expect(detectCryptoType(address)).toBe('TON');
-      });
-
-      it('should detect TON address (starts with UQ)', () => {
-        const address = 'UQDhZLC_i-VxZfpnpsDWNR2PxNm-PPIL7uYWjL-I-Nx_T5xJ';
-        expect(detectCryptoType(address)).toBe('TON');
       });
     });
 

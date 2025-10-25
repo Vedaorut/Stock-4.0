@@ -73,6 +73,42 @@ export function useApi() {
     setError(null);
   }, []);
 
+  // Универсальный fetchApi wrapper (для совместимости с Settings modals)
+  const fetchApi = useCallback(async (endpoint, options = {}) => {
+    const method = options.method?.toUpperCase() || 'GET';
+    const data = options.body || null;
+    const config = { ...options };
+    delete config.method;
+    delete config.body;
+
+    let result;
+    switch (method) {
+      case 'GET':
+        result = await get(endpoint, config);
+        break;
+      case 'POST':
+        result = await post(endpoint, data, config);
+        break;
+      case 'PUT':
+        result = await put(endpoint, data, config);
+        break;
+      case 'DELETE':
+        result = await del(endpoint, config);
+        break;
+      case 'PATCH':
+        result = await patch(endpoint, data, config);
+        break;
+      default:
+        throw new Error(`Unsupported HTTP method: ${method}`);
+    }
+
+    // Возвращаем только data (для совместимости с fetch API)
+    if (result.error) {
+      throw new Error(result.error);
+    }
+    return result.data;
+  }, [get, post, put, del, patch]);
+
   return {
     loading,
     error,
@@ -81,6 +117,7 @@ export function useApi() {
     put,
     delete: del,
     patch,
+    fetchApi,
     clearError,
   };
 }

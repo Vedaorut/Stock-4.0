@@ -146,7 +146,7 @@ const migrateChannelScene = new Scenes.WizardScene(
     ctx.wizard.state.newChannelUrl = newChannelUrl;
 
     // Ask if there was an old channel
-    await cleanReply(
+    await cleanReply(ctx,
       '📌 Хотите указать старую ссылку на канал? (опционально)\n\n' +
       'Это будет упомянуто в уведомлении подписчикам.\n\n' +
       'Отправьте старую ссылку или нажмите "Пропустить"',

@@ -27,12 +27,16 @@ import subscriptionRoutes from './routes/subscriptions.js';
 import walletRoutes from './routes/wallets.js';
 import followRoutes from './routes/follows.js';
 import workerRoutes from './routes/workers.js';
+import webhookRoutes from './routes/webhooks.js';
 
 // Routes registration (will be added after middleware setup)
 
 // Import cron jobs
 import { startSyncCron, stopSyncCron } from './jobs/productSyncCron.js';
 import { startSubscriptionJobs, stopSubscriptionJobs } from './jobs/subscriptionChecker.js';
+
+// Import polling service for crypto payments
+import pollingService from './services/pollingService.js';
 
 // Import Telegram bot
 import { bot, startBot } from '../../bot/src/bot.js';
@@ -132,6 +136,7 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/wallets', walletRoutes);
 app.use('/api/follows', followRoutes);
+app.use('/webhooks', webhookRoutes); // Crypto payment webhooks
 
 /**
  * 404 handler
@@ -181,9 +186,13 @@ const startServer = async () => {
       startBot().then(() => {
         global.botInstance = bot;
         logger.info('Telegram bot integrated with backend');
-        
+
         // Start subscription cron jobs (requires bot instance)
         startSubscriptionJobs();
+
+        // Start polling service for ETH/TRON payments
+        pollingService.startPolling();
+        logger.info('Payment polling service started');
       }).catch((error) => {
         logger.error('Failed to start Telegram bot:', error);
         // Bot failure is not critical for backend - continue running
@@ -247,6 +256,10 @@ const startServer = async () => {
 
       // Stop subscription cron jobs
       stopSubscriptionJobs();
+
+      // Stop polling service
+      pollingService.stopPolling();
+      logger.info('Payment polling service stopped');
 
       // Stop Telegram bot
       if (global.botInstance) {

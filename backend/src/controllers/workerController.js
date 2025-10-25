@@ -41,6 +41,14 @@ export const workerController = {
         });
       }
 
+      // Check PRO tier (Workspace is PRO-only feature)
+      if (shop.tier !== 'pro') {
+        return res.status(403).json({
+          success: false,
+          error: 'Workspace feature requires PRO subscription. Upgrade your shop to add workers.'
+        });
+      }
+
       // Find user by telegram_id or username
       let workerUser;
       if (telegram_id) {

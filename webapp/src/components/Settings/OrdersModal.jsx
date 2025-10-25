@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import BottomSheet from '../common/BottomSheet';
+import { motion, AnimatePresence } from 'framer-motion';
+import PageHeader from '../common/PageHeader';
 import { useShopApi } from '../../hooks/useApi';
 import { useTelegram } from '../../hooks/useTelegram';
 import { useTranslation } from '../../i18n/useTranslation';
@@ -137,8 +137,18 @@ export default function OrdersModal({ isOpen, onClose }) {
   };
 
   return (
-    <BottomSheet isOpen={isOpen} onClose={onClose} title={t('orders.title')}>
-      <div className="space-y-4">
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          className="fixed inset-0 z-50 bg-dark-bg"
+          initial={{ x: '100%' }}
+          animate={{ x: 0 }}
+          exit={{ x: '100%' }}
+          transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+        >
+          <PageHeader title={t('orders.title')} onBack={onClose} />
+          <div className="min-h-screen pb-24 pt-20">
+            <div className="px-4 py-6 space-y-4">
         {/* Loading state */}
         {loading && (
           <div className="flex justify-center py-12">
@@ -217,7 +227,10 @@ export default function OrdersModal({ isOpen, onClose }) {
             ))}
           </div>
         )}
-      </div>
-    </BottomSheet>
+            </div>
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }

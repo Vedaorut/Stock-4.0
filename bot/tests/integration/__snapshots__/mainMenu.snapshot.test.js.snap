@@ -6,7 +6,7 @@ exports[`Main Menu - WebApp Button Position (P0) buyer menu: exactly 1 WebApp bu
     [
       {
         "hide": false,
-        "text": "📱 Открыть",
+        "text": "📱 Открыть Menu",
         "web_app": {
           "url": "https://your-domain.com",
         },
@@ -78,7 +78,7 @@ exports[`Main Menu - WebApp Button Position (P0) seller menu without shop: exact
     [
       {
         "hide": false,
-        "text": "📱 Открыть",
+        "text": "📱 Открыть Menu",
         "web_app": {
           "url": "https://your-domain.com",
         },
@@ -129,18 +129,13 @@ exports[`Main Menu - WebApp Button Position (P0) seller menu: exactly 1 WebApp b
     [
       {
         "hide": false,
-        "text": "📱 Открыть",
+        "text": "📱 Открыть Menu",
         "web_app": {
           "url": "https://your-domain.com",
         },
       },
     ],
     [
-      {
-        "callback_data": "seller:products",
-        "hide": false,
-        "text": "📦 Товары",
-      },
       {
         "callback_data": "seller:sales",
         "hide": false,

@@ -1,12 +1,13 @@
 /**
  * Product Limits Middleware
- * 
+ *
  * Enforces tier-based product limits:
  * - Basic tier: 4 products max
  * - Pro tier: unlimited products
  */
 
 import { pool } from '../config/database.js';
+import { workerQueries } from '../models/db.js';
 import logger from '../utils/logger.js';
 
 // Product limits per tier
@@ -42,9 +43,12 @@ export async function checkProductLimit(req, res, next) {
     }
     
     const shop = shopResult.rows[0];
-    
-    // Verify shop ownership (user must own the shop)
-    if (shop.owner_id !== req.user.id) {
+
+    // Verify authorization: owner OR worker
+    const isOwner = shop.owner_id === req.user.id;
+    const isWorker = isOwner ? false : !!(await workerQueries.findByShopAndUser(shopId, req.user.id));
+
+    if (!isOwner && !isWorker) {
       return res.status(403).json({
         error: 'Not authorized to manage this shop'
       });
@@ -117,9 +121,12 @@ export async function getProductLimitStatus(shopId, userId) {
     }
     
     const shop = shopResult.rows[0];
-    
-    // Verify ownership
-    if (shop.owner_id !== userId) {
+
+    // Verify authorization: owner OR worker
+    const isOwner = shop.owner_id === userId;
+    const isWorker = isOwner ? false : !!(await workerQueries.findByShopAndUser(shopId, userId));
+
+    if (!isOwner && !isWorker) {
       throw new Error('Not authorized to view this shop');
     }
     

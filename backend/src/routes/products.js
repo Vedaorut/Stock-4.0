@@ -1,7 +1,7 @@
 import express from 'express';
 import { productController } from '../controllers/productController.js';
 import { productValidation } from '../middleware/validation.js';
-import { verifyToken, requireShopOwner, requireShopAccess } from '../middleware/auth.js';
+import { verifyToken } from '../middleware/auth.js';
 import { checkProductLimit, getProductLimitStatus } from '../middleware/productLimits.js';
 
 const router = express.Router();
@@ -14,7 +14,6 @@ const router = express.Router();
 router.post(
   '/',
   verifyToken,
-  requireShopAccess,
   checkProductLimit,
   productValidation.create,
   productController.create
@@ -29,9 +28,9 @@ router.get('/limit-status/:shopId', verifyToken, async (req, res) => {
   try {
     const shopId = parseInt(req.params.shopId, 10);
     const userId = req.user.id;
-    
+
     const status = await getProductLimitStatus(shopId, userId);
-    
+
     res.json(status);
   } catch (error) {
     if (error.message === 'Shop not found') {
@@ -66,7 +65,6 @@ router.get('/:id', productValidation.getById, productController.getById);
 router.put(
   '/:id',
   verifyToken,
-  requireShopAccess,
   productValidation.update,
   productController.update
 );
@@ -79,7 +77,6 @@ router.put(
 router.delete(
   '/:id',
   verifyToken,
-  requireShopAccess,
   productValidation.getById,
   productController.delete
 );
@@ -92,20 +89,18 @@ router.delete(
 router.post(
   '/bulk-delete-all',
   verifyToken,
-  requireShopAccess,
   productValidation.bulkDeleteAll,
   productController.bulkDeleteAll
 );
 
 /**
- * @route   POST /api/products/bulk-delete
+ * @route   POST /api/products/bulk-delete-by-ids
  * @desc    Delete multiple products by IDs
  * @access  Private (Shop owner or worker)
  */
 router.post(
-  '/bulk-delete',
+  '/bulk-delete-by-ids',
   verifyToken,
-  requireShopAccess,
   productValidation.bulkDeleteByIds,
   productController.bulkDeleteByIds
 );

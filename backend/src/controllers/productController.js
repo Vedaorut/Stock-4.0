@@ -1,6 +1,22 @@
-import { productQueries, shopQueries } from '../models/db.js';
+import { productQueries, shopQueries, workerQueries } from '../models/db.js';
 import { dbErrorHandler } from '../middleware/errorHandler.js';
 import logger from '../utils/logger.js';
+
+/**
+ * Helper: Check if user is authorized to manage shop products
+ * (owner OR worker)
+ */
+async function isAuthorizedToManageShop(shopId, userId) {
+  const shop = await shopQueries.findById(shopId);
+  if (!shop) return false;
+
+  // Check if owner
+  if (shop.owner_id === userId) return true;
+
+  // Check if worker
+  const worker = await workerQueries.findByShopAndUser(shopId, userId);
+  return !!worker;
+}
 
 /**
  * Product Controller
@@ -21,7 +37,7 @@ export const productController = {
       // Currency is now legacy field - products are priced in USD only
       const currency = req.body.currency || 'USD';
 
-      // Verify shop belongs to user
+      // Verify shop exists and user is authorized (owner OR worker)
       const shop = await shopQueries.findById(shopId);
 
       if (!shop) {
@@ -31,10 +47,14 @@ export const productController = {
         });
       }
 
-      if (shop.owner_id !== req.user.id) {
+      // Check authorization: owner OR worker
+      const isOwner = shop.owner_id === req.user.id;
+      const isWorker = isOwner ? false : !!(await workerQueries.findByShopAndUser(shopId, req.user.id));
+
+      if (!isOwner && !isWorker) {
         return res.status(403).json({
           success: false,
-          error: 'You can only add products to your own shops'
+          error: 'You can only add products to shops you own or manage as a worker'
         });
       }
 
@@ -169,7 +189,7 @@ export const productController = {
       } = req.body;
       const stockQuantity = req.body.stockQuantity ?? req.body.stock;
 
-      // Check if product exists and belongs to user's shop
+      // Check if product exists
       const existingProduct = await productQueries.findById(id);
 
       if (!existingProduct) {
@@ -179,10 +199,12 @@ export const productController = {
         });
       }
 
-      if (existingProduct.owner_id !== req.user.id) {
+      // Check authorization via shop (owner OR worker)
+      const isAuthorized = await isAuthorizedToManageShop(existingProduct.shop_id, req.user.id);
+      if (!isAuthorized) {
         return res.status(403).json({
           success: false,
-          error: 'You can only update your own products'
+          error: 'You can only update products in shops you own or manage as a worker'
         });
       }
 
@@ -224,7 +246,7 @@ export const productController = {
     try {
       const { id } = req.params;
 
-      // Check if product exists and belongs to user's shop
+      // Check if product exists
       const existingProduct = await productQueries.findById(id);
 
       if (!existingProduct) {
@@ -234,10 +256,12 @@ export const productController = {
         });
       }
 
-      if (existingProduct.owner_id !== req.user.id) {
+      // Check authorization via shop (owner OR worker)
+      const isAuthorized = await isAuthorizedToManageShop(existingProduct.shop_id, req.user.id);
+      if (!isAuthorized) {
         return res.status(403).json({
           success: false,
-          error: 'You can only delete your own products'
+          error: 'You can only delete products in shops you own or manage as a worker'
         });
       }
 
@@ -273,7 +297,7 @@ export const productController = {
     try {
       const { shopId } = req.body;
 
-      // Verify shop belongs to user
+      // Verify shop exists and user is authorized
       const shop = await shopQueries.findById(shopId);
 
       if (!shop) {
@@ -283,10 +307,12 @@ export const productController = {
         });
       }
 
-      if (shop.owner_id !== req.user.id) {
+      // Check authorization (owner OR worker)
+      const isAuthorized = await isAuthorizedToManageShop(shopId, req.user.id);
+      if (!isAuthorized) {
         return res.status(403).json({
           success: false,
-          error: 'You can only delete products from your own shops'
+          error: 'You can only delete products from shops you own or manage as a worker'
         });
       }
 
@@ -333,7 +359,7 @@ export const productController = {
         });
       }
 
-      // Verify shop belongs to user
+      // Verify shop exists and user is authorized
       const shop = await shopQueries.findById(shopId);
 
       if (!shop) {
@@ -343,10 +369,12 @@ export const productController = {
         });
       }
 
-      if (shop.owner_id !== req.user.id) {
+      // Check authorization (owner OR worker)
+      const isAuthorized = await isAuthorizedToManageShop(shopId, req.user.id);
+      if (!isAuthorized) {
         return res.status(403).json({
           success: false,
-          error: 'You can only delete products from your own shops'
+          error: 'You can only delete products from shops you own or manage as a worker'
         });
       }
 

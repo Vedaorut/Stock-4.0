@@ -49,7 +49,7 @@ const upgradeShopScene = new Scenes.WizardScene(
 
       // Check if already PRO
       if (subscription?.tier === 'pro') {
-        await cleanReply(
+        await cleanReply(ctx,
           '✅ Ваш магазин уже на тарифе PRO 💎',
           Markup.inlineKeyboard([
             [Markup.button.callback('◀️ Назад', 'seller:main')]
@@ -60,7 +60,7 @@ const upgradeShopScene = new Scenes.WizardScene(
 
       // Check if has active BASIC subscription
       if (!subscription || subscription.tier !== 'basic' || subscription.status !== 'active') {
-        await cleanReply(
+        await cleanReply(ctx,
           '❌ Апгрейд доступен только для активных BASIC подписок.\n\n' +
           'Сначала оплатите базовую подписку.',
           Markup.inlineKeyboard([

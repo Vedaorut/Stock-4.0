@@ -187,3 +187,54 @@ export const getProductById = async (productId) => {
   );
   return result.rows[0];
 };
+
+/**
+ * Create test order
+ */
+export const createTestOrder = async (buyerId, productId, shopId, orderData = {}) => {
+  const pool = getTestPool();
+
+  const order = {
+    buyer_id: buyerId,
+    product_id: productId,
+    shop_id: shopId,
+    quantity: orderData.quantity || 1,
+    total_price: orderData.total_price || '99.99',
+    status: orderData.status || 'pending',
+    buyer_telegram_id: orderData.buyer_telegram_id || '123456789'
+  };
+
+  const result = await pool.query(
+    `INSERT INTO orders (buyer_id, product_id, shop_id, quantity, total_price, status, buyer_telegram_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
+     RETURNING *`,
+    [order.buyer_id, order.product_id, order.shop_id, order.quantity, order.total_price, order.status, order.buyer_telegram_id]
+  );
+
+  return result.rows[0];
+};
+
+/**
+ * Create test invoice
+ */
+export const createTestInvoice = async (orderId, invoiceData = {}) => {
+  const pool = getTestPool();
+
+  const invoice = {
+    order_id: orderId,
+    currency: invoiceData.currency || 'BTC',
+    chain: invoiceData.chain || 'btc',
+    expected_amount: invoiceData.expected_amount || 0.001,
+    payment_address: invoiceData.payment_address || 'bc1test123456789',
+    status: invoiceData.status || 'pending'
+  };
+
+  const result = await pool.query(
+    `INSERT INTO invoices (order_id, currency, chain, expected_amount, payment_address, status)
+     VALUES ($1, $2, $3, $4, $5, $6)
+     RETURNING *`,
+    [invoice.order_id, invoice.currency, invoice.chain, invoice.expected_amount, invoice.payment_address, invoice.status]
+  );
+
+  return result.rows[0];
+};

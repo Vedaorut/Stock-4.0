@@ -158,7 +158,8 @@ export const requireShopAccess = async (req, res, next) => {
     }
 
     // Check if user is worker
-    const isWorker = await workerQueries.isWorker(shopId, req.user.id);
+    const worker = await workerQueries.findByShopAndUser(shopId, req.user.id);
+    const isWorker = !!worker;
 
     if (isWorker) {
       req.shopAccess = {

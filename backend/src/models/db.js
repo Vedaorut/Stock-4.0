@@ -1,5 +1,6 @@
 import { query, getClient } from '../config/database.js';
 import { workerQueries } from './workerQueries.js';
+import { processedWebhookQueries } from './processedWebhookQueries.js';
 
 /**
  * User database queries
@@ -460,6 +461,88 @@ export const paymentQueries = {
 };
 
 /**
+ * Invoice database queries (Tatum address-per-payment)
+ */
+export const invoiceQueries = {
+  // Create invoice with generated address
+  create: async (invoiceData) => {
+    const { orderId, chain, address, addressIndex, expectedAmount, currency, tatumSubscriptionId, expiresAt } = invoiceData;
+    const result = await query(
+      `INSERT INTO invoices (order_id, chain, address, address_index, expected_amount, currency, tatum_subscription_id, expires_at, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending')
+       RETURNING *`,
+      [orderId, chain, address, addressIndex, expectedAmount, currency, tatumSubscriptionId, expiresAt]
+    );
+    return result.rows[0];
+  },
+
+  // Find invoice by payment address
+  findByAddress: async (address) => {
+    const result = await query(
+      'SELECT * FROM invoices WHERE address = $1',
+      [address]
+    );
+    return result.rows[0];
+  },
+
+  // Find invoice by order ID
+  findByOrderId: async (orderId) => {
+    const result = await query(
+      'SELECT * FROM invoices WHERE order_id = $1 ORDER BY created_at DESC LIMIT 1',
+      [orderId]
+    );
+    return result.rows[0];
+  },
+
+  // Get next address index for chain
+  getNextIndex: async (chain) => {
+    const result = await query(
+      `SELECT COALESCE(MAX(address_index), -1) + 1 as next_index
+       FROM invoices
+       WHERE chain = $1`,
+      [chain]
+    );
+    return result.rows[0].next_index;
+  },
+
+  // Update invoice status
+  updateStatus: async (id, status) => {
+    const result = await query(
+      `UPDATE invoices
+       SET status = $2, updated_at = NOW()
+       WHERE id = $1
+       RETURNING *`,
+      [id, status]
+    );
+    return result.rows[0];
+  },
+
+  // Find expired invoices (for cleanup)
+  findExpired: async () => {
+    const result = await query(
+      `SELECT * FROM invoices
+       WHERE status = 'pending'
+       AND expires_at < NOW()`,
+      []
+    );
+    return result.rows;
+  },
+
+  // Find pending invoices by chains (for polling service)
+  findPendingByChains: async (chains) => {
+    const result = await query(
+      `SELECT * FROM invoices
+       WHERE status = 'pending'
+       AND chain = ANY($1)
+       AND expires_at > NOW()
+       ORDER BY created_at ASC`,
+      [chains]
+    );
+    return result.rows;
+  }
+};
+
+/**
  * Subscription database queries
  */
 export const subscriptionQueries = {
@@ -540,7 +623,7 @@ export const subscriptionQueries = {
   }
 };
 
-export { workerQueries };
+export { workerQueries, processedWebhookQueries };
 
 export default {
   userQueries,
@@ -549,5 +632,7 @@ export default {
   orderQueries,
   paymentQueries,
   subscriptionQueries,
-  workerQueries
+  invoiceQueries,
+  workerQueries,
+  processedWebhookQueries
 };

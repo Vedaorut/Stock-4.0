@@ -16,8 +16,8 @@ import { reply as cleanReply } from '../utils/cleanReply.js';
 const enterShopName = async (ctx) => {
   try {
     logger.info('shop_create_step:name', { userId: ctx.from.id });
-    
-    await cleanReply(
+
+    await cleanReply(ctx,
       'Название (3-100 символов):',
       cancelButton
     );
@@ -69,7 +69,16 @@ const handleShopName = async (ctx) => {
         userId: ctx.from.id,
         session: ctx.session
       });
+
+      // Delete loading message first
+      try {
+        await ctx.deleteMessage(loadingMsg.message_id);
+      } catch (deleteError) {
+        logger.debug(`Could not delete loading message:`, deleteError.message);
+      }
+
       await cleanReply(
+        ctx,
         'Ошибка авторизации. Попробуйте снова через главное меню',
         successButtons
       );

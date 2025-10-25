@@ -166,7 +166,9 @@ export const handleSwitchMode = async (ctx) => {
       // Store followId in session for later use
       ctx.session.editingFollowId = followId;
       ctx.session.pendingModeSwitch = 'resell';  // Flag that this is a mode switch
-      await ctx.editMessageText('Новая наценка (%):\n\n1-500');
+
+      const promptMsg = await ctx.editMessageText('Новая наценка (%):\n\n1-500');
+      ctx.session.editingMessageId = promptMsg.message_id;  // Save message ID for error handling
       return;
     }
 

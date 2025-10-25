@@ -257,6 +257,49 @@ COMMENT ON COLUMN shop_subscriptions.period_end IS 'End date of subscription per
 COMMENT ON COLUMN shop_subscriptions.status IS 'active: valid, expired: period ended, cancelled: refunded';
 
 -- ============================================
+-- Shop Workers table (Workspace - PRO feature)
+-- ============================================
+CREATE TABLE shop_workers (
+  id SERIAL PRIMARY KEY,
+  shop_id INT NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
+  worker_user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  telegram_id BIGINT,
+  added_by INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE(shop_id, worker_user_id)
+);
+
+COMMENT ON TABLE shop_workers IS 'Workers assigned to shops (PRO feature: owner can share shop access)';
+COMMENT ON COLUMN shop_workers.worker_user_id IS 'User ID of the worker (must exist in users table)';
+COMMENT ON COLUMN shop_workers.added_by IS 'User ID of the person who added this worker (usually shop owner)';
+
+-- ============================================
+-- Invoices table (Tatum address-per-payment)
+-- ============================================
+CREATE TABLE invoices (
+  id SERIAL PRIMARY KEY,
+  order_id INT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  chain VARCHAR(20) NOT NULL CHECK (chain IN ('BTC', 'ETH', 'USDT_ERC20', 'USDT_TRC20', 'LTC', 'TON')),
+  address VARCHAR(255) UNIQUE NOT NULL,
+  address_index INT NOT NULL,
+  expected_amount DECIMAL(18, 8) NOT NULL CHECK (expected_amount > 0),
+  currency VARCHAR(10) NOT NULL,
+  tatum_subscription_id VARCHAR(255),
+  status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'paid', 'expired', 'cancelled')),
+  expires_at TIMESTAMP NOT NULL,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+COMMENT ON TABLE invoices IS 'Payment invoices with unique addresses generated via Tatum';
+COMMENT ON COLUMN invoices.chain IS 'Blockchain: BTC, ETH, USDT_ERC20, USDT_TRC20, LTC, TON';
+COMMENT ON COLUMN invoices.address IS 'Unique payment address generated from HD wallet';
+COMMENT ON COLUMN invoices.address_index IS 'Derivation index for HD wallet (m/44''/0''/0''/0/{index})';
+COMMENT ON COLUMN invoices.expected_amount IS 'Expected payment amount in crypto units';
+COMMENT ON COLUMN invoices.tatum_subscription_id IS 'Tatum webhook subscription ID for monitoring';
+COMMENT ON COLUMN invoices.expires_at IS 'Invoice expiration time (typically 1 hour)';
+
+-- ============================================
 -- Functions for updated_at timestamps
 -- ============================================
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -285,6 +328,9 @@ CREATE TRIGGER update_orders_updated_at BEFORE UPDATE ON orders
 CREATE TRIGGER update_payments_updated_at BEFORE UPDATE ON payments
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+CREATE TRIGGER update_invoices_updated_at BEFORE UPDATE ON invoices
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
 -- ============================================
 -- Indexes to improve query performance
 -- ============================================
@@ -307,3 +353,48 @@ CREATE INDEX IF NOT EXISTS idx_shop_subscriptions_status ON shop_subscriptions(s
 CREATE INDEX IF NOT EXISTS idx_shop_subscriptions_period_end ON shop_subscriptions(period_end);
 CREATE INDEX IF NOT EXISTS idx_shops_subscription_status ON shops(subscription_status);
 CREATE INDEX IF NOT EXISTS idx_shops_next_payment_due ON shops(next_payment_due);
+
+-- Shop workers indexes
+CREATE INDEX IF NOT EXISTS idx_shop_workers_shop ON shop_workers(shop_id);
+CREATE INDEX IF NOT EXISTS idx_shop_workers_user ON shop_workers(worker_user_id);
+CREATE INDEX IF NOT EXISTS idx_shop_workers_added_by ON shop_workers(added_by);
+
+-- Invoices indexes
+CREATE INDEX IF NOT EXISTS idx_invoices_order ON invoices(order_id);
+CREATE INDEX IF NOT EXISTS idx_invoices_address ON invoices(address);
+CREATE INDEX IF NOT EXISTS idx_invoices_status ON invoices(status);
+CREATE INDEX IF NOT EXISTS idx_invoices_chain ON invoices(chain);
+CREATE INDEX IF NOT EXISTS idx_invoices_expires_at ON invoices(expires_at);
+CREATE INDEX IF NOT EXISTS idx_invoices_status_expires ON invoices(status, expires_at);
+
+-- Additional performance indexes (from audit)
+CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
+CREATE INDEX IF NOT EXISTS idx_orders_buyer_status ON orders(buyer_id, status);
+CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_order_items_order_id ON order_items(order_id);
+CREATE INDEX IF NOT EXISTS idx_order_items_product_id ON order_items(product_id);
+CREATE INDEX IF NOT EXISTS idx_shop_follows_follower_status ON shop_follows(follower_shop_id, status);
+CREATE INDEX IF NOT EXISTS idx_shop_follows_source_status ON shop_follows(source_shop_id, status);
+
+-- ============================================
+-- Circular Follow Prevention Trigger
+-- ============================================
+CREATE OR REPLACE FUNCTION check_circular_follow()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM shop_follows
+    WHERE follower_shop_id = NEW.source_shop_id
+    AND source_shop_id = NEW.follower_shop_id
+    AND status != 'cancelled'
+  ) THEN
+    RAISE EXCEPTION 'Circular follow relationship not allowed: Shop % already follows Shop %',
+      NEW.source_shop_id, NEW.follower_shop_id;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER prevent_circular_follows
+BEFORE INSERT OR UPDATE ON shop_follows
+FOR EACH ROW EXECUTE FUNCTION check_circular_follow();

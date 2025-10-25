@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import BottomSheet from '../common/BottomSheet';
+import PageHeader from '../common/PageHeader';
 import { useStore } from '../../store/useStore';
 import { useTelegram } from '../../hooks/useTelegram';
 import { useTranslation } from '../../i18n/useTranslation';
@@ -138,8 +138,18 @@ export default function WalletsModal({ isOpen, onClose }) {
   };
 
   return (
-    <BottomSheet isOpen={isOpen} onClose={handleClose} title={t('wallet.title')}>
-      <div className="space-y-4">
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          className="fixed inset-0 z-50 bg-dark-bg"
+          initial={{ x: '100%' }}
+          animate={{ x: 0 }}
+          exit={{ x: '100%' }}
+          transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+        >
+          <PageHeader title={t('wallet.title')} onBack={handleClose} />
+          <div className="min-h-screen pb-24 pt-20">
+            <div className="px-4 py-6 space-y-4">
         {/* Кнопка добавления кошелька */}
         {!showForm && (
           <motion.button
@@ -276,7 +286,10 @@ export default function WalletsModal({ isOpen, onClose }) {
             </div>
           )
         )}
-      </div>
-    </BottomSheet>
+            </div>
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }

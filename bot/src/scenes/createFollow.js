@@ -112,8 +112,7 @@ const selectMode = async (ctx) => {
       sourceShopId: sourceShopId
     });
 
-    await cleanReply(
-      'Режим:',
+    await cleanReply(ctx, 'Режим:',
       Markup.inlineKeyboard([
         [Markup.button.callback('👀 Monitor', 'mode:monitor')],
         [Markup.button.callback('💰 Resell', 'mode:resell')],

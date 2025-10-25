@@ -137,19 +137,22 @@ export const createFollow = async (req, res) => {
       return res.status(409).json({ error: 'Already following this shop' });
     }
 
-    // Check FREE tier limit (TODO: Check PRO status from user/shop)
-    const activeCount = await shopFollowQueries.countActiveByFollowerShopId(followerId);
-    if (activeCount >= FREE_TIER_LIMIT) {
-      return res.status(402).json({
-        error: 'FREE tier limit reached',
-        data: {
-          limit: FREE_TIER_LIMIT,
-          count: activeCount,
-          remaining: 0,
-          reached: true,
-          canFollow: false
-        }
-      });
+    // Check FREE tier limit (PRO tier has unlimited follows)
+    const isPro = followerShop.tier === 'pro';
+    if (!isPro) {
+      const activeCount = await shopFollowQueries.countActiveByFollowerShopId(followerId);
+      if (activeCount >= FREE_TIER_LIMIT) {
+        return res.status(402).json({
+          error: 'FREE tier limit reached',
+          data: {
+            limit: FREE_TIER_LIMIT,
+            count: activeCount,
+            remaining: 0,
+            reached: true,
+            canFollow: false
+          }
+        });
+      }
     }
 
     // Check circular follows
@@ -352,13 +355,24 @@ export const checkFollowLimit = async (req, res) => {
       return res.status(400).json({ error: 'shopId must be a positive integer' });
     }
 
+    // Check subscription tier
+    const shop = await shopQueries.findById(shopId);
+    if (!shop) {
+      return res.status(404).json({ error: 'Shop not found' });
+    }
+
+    // PRO tier = unlimited follows, basic tier = 2 follows
+    const isPro = shop.tier === 'pro';
+    const limit = isPro ? null : FREE_TIER_LIMIT; // null = unlimited
+
     const activeCount = await shopFollowQueries.countActiveByFollowerShopId(shopId);
     const limitData = {
-      limit: FREE_TIER_LIMIT,
+      limit: limit,
       count: activeCount,
-      remaining: Math.max(0, FREE_TIER_LIMIT - activeCount),
-      reached: activeCount >= FREE_TIER_LIMIT,
-      canFollow: activeCount < FREE_TIER_LIMIT
+      remaining: isPro ? null : Math.max(0, FREE_TIER_LIMIT - activeCount),
+      reached: isPro ? false : (activeCount >= FREE_TIER_LIMIT),
+      canFollow: isPro ? true : (activeCount < FREE_TIER_LIMIT),
+      tier: isPro ? 'PRO' : 'FREE'
     };
 
     res.json({ data: limitData });
