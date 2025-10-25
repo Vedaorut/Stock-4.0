@@ -50,7 +50,8 @@ export async function checkProductLimit(req, res, next) {
 
     if (!isOwner && !isWorker) {
       return res.status(403).json({
-        error: 'Not authorized to manage this shop'
+        success: false,
+        error: 'You can only manage products in shops you own or manage as a worker'
       });
     }
     

@@ -125,9 +125,9 @@ describe('Product Controller - Integration Tests', () => {
         expect(response.body.success).toBe(true);
         expect(response.body.data).toMatchObject({
           name: 'New Product',
-          price: '29.99',
           shop_id: shop.id
         });
+        expect(parseFloat(response.body.data.price)).toBe(29.99);
 
         // Verify in database
         const result = await pool.query(
@@ -185,7 +185,7 @@ describe('Product Controller - Integration Tests', () => {
 
         expect(response.body.success).toBe(true);
         expect(response.body.data.name).toBe('Updated Product');
-        expect(response.body.data.price).toBe('99.99');
+        expect(parseFloat(response.body.data.price)).toBe(99.99);
 
         // Verify in database
         const result = await pool.query(
