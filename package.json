@@ -5,8 +5,10 @@
   "private": true,
   "scripts": {
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:webapp\" --names \"BACKEND,WEBAPP\" --prefix-colors \"blue,magenta\" --kill-others-on-fail",
+    "dev:all": "concurrently \"npm run dev:backend\" \"npm run dev:webapp\" \"npm run dev:bot\" --names \"BACKEND,WEBAPP,BOT\" --prefix-colors \"blue,magenta,green\" --kill-others-on-fail",
     "dev:backend": "cd backend && npm run dev",
     "dev:webapp": "cd webapp && npm run dev",
+    "dev:bot": "cd bot && npm start",
     "start": "npm run dev",
     "install:all": "npm install && cd backend && npm install && cd ../webapp && npm install && cd ../bot && npm install && cd ..",
     "clean": "rm -rf node_modules backend/node_modules webapp/node_modules bot/node_modules",

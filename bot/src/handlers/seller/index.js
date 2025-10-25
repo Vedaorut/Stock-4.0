@@ -397,16 +397,18 @@ export const setupSellerHandlers = (bot) => {
       message += `🏪 Магазин: ${shopName}\n\n`;
 
       // FIX BUG #2: Use status object from backend response
-      if (status.currentSubscription) {
-        const tier = status.tier === 'pro' ? 'PRO 💎' : 'BASIC';
-        const statusEmoji = status.status === 'active' ? '✅' :
-                            status.status === 'grace_period' ? '⚠️' : '❌';
+      const tierLabel = status.tier === 'pro' ? 'PRO 💎' : 'BASIC';
+      const statusEmoji = status.status === 'active' ? '✅' :
+                          status.status === 'grace_period' ? '⚠️' : '❌';
+      const isActive = status.status === 'active' || status.status === 'grace_period';
 
-        message += `📌 <b>Тариф:</b> ${tier}\n`;
+      if (status.currentSubscription || isActive) {
+        message += `📌 <b>Тариф:</b> ${tierLabel}\n`;
         message += `${statusEmoji} <b>Статус:</b> ${status.status}\n`;
 
-        if (status.nextPaymentDue) {
-          message += `📅 <b>Действует до:</b> ${new Date(status.nextPaymentDue).toLocaleDateString('ru-RU')}\n\n`;
+        const effectiveUntil = status.currentSubscription?.period_end || status.nextPaymentDue;
+        if (effectiveUntil) {
+          message += `📅 <b>Действует до:</b> ${new Date(effectiveUntil).toLocaleDateString('ru-RU')}\n\n`;
         }
 
         if (status.status === 'grace_period') {
