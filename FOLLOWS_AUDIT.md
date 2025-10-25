@@ -4,6 +4,8 @@
 **Auditor:** Claude Code (Backend Architect)
 **Scope:** Complete Follows functionality review (bot, backend, webapp, database)
 
+> ✅ 2025-10-25: FREE лимит=2 и PRO=∞ реализованы транзакционным контролем (`FOR UPDATE`), фиксация конкурентных запросов и валидация в WebApp/боте.
+
 ---
 
 ## TIER LIMITS ENFORCEMENT ❌ CRITICAL ISSUE

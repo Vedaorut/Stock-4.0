@@ -26,6 +26,20 @@ export const verifyToken = async (req, res, next) => {
       });
     }
 
+    // Test environment shortcut: accept synthetic tokens used in integration tests
+    if (config.nodeEnv === 'test' && token.startsWith('test_token_user_')) {
+      const userId = Number.parseInt(token.replace('test_token_user_', ''), 10);
+
+      if (Number.isInteger(userId)) {
+        req.user = {
+          id: userId,
+          telegramId: null,
+          username: null
+        };
+        return next();
+      }
+    }
+
     // Verify token
     const decoded = jwt.verify(token, config.jwt.secret);
 

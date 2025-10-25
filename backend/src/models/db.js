@@ -1,4 +1,4 @@
-import { query, getClient } from '../config/database.js';
+import { query } from '../config/database.js';
 import { workerQueries } from './workerQueries.js';
 import { processedWebhookQueries } from './processedWebhookQueries.js';
 
@@ -11,6 +11,19 @@ export const userQueries = {
     const result = await query(
       'SELECT * FROM users WHERE telegram_id = $1',
       [telegramId]
+    );
+    return result.rows[0];
+  },
+
+  // Find user by username (case-insensitive)
+  findByUsername: async (username) => {
+    if (!username) {
+      return null;
+    }
+
+    const result = await query(
+      `SELECT * FROM users WHERE LOWER(username) = LOWER($1) LIMIT 1`,
+      [username]
     );
     return result.rows[0];
   },
@@ -106,9 +119,9 @@ export const shopQueries = {
   // Search active shops by name with optional subscription context
   searchByName: async (name, limit = 10, userId = null) => {
     const params = [`%${name}%`, limit];
-    let paramIndex = params.length + 1;
+    const paramIndex = params.length + 1;
 
-    let queryText = `
+    const queryText = `
       SELECT
         s.*,
         u.username as seller_username,
@@ -448,8 +461,8 @@ export const paymentQueries = {
   updateStatus: async (id, status, confirmations = null) => {
     const result = await query(
       `UPDATE payments
-       SET status = $2,
-           confirmations = COALESCE($3, confirmations),
+       SET status = $2::VARCHAR,
+           confirmations = COALESCE($3::INT, confirmations),
            verified_at = CASE WHEN $2 = 'confirmed' THEN NOW() ELSE verified_at END,
            updated_at = NOW()
        WHERE id = $1

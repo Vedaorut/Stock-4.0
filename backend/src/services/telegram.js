@@ -85,6 +85,16 @@ class TelegramService {
    * @param {object} options - Additional options (reply_markup, parse_mode, etc.)
    */
   async sendMessage(chatId, text, options = {}) {
+    if (!this.botToken || !chatId) {
+      logger.warn('Telegram send skipped: missing token or chatId', { chatId });
+      return null;
+    }
+
+    if (config.nodeEnv === 'test') {
+      logger.debug('Telegram send mocked in test environment', { chatId, text });
+      return null;
+    }
+
     try {
       const response = await axios.post(`${this.apiUrl}/sendMessage`, {
         chat_id: chatId,

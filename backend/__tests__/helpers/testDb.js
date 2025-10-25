@@ -51,6 +51,10 @@ export const cleanupTestData = async () => {
     // Delete test users first - this will CASCADE to shops, which CASCADE to products
     await client.query('DELETE FROM users WHERE telegram_id >= 9000000000');
 
+    // Clean up webhook/invoice artifacts between tests
+    await client.query('DELETE FROM processed_webhooks');
+    await client.query('DELETE FROM invoices');
+
     // Clean up any orphaned records (in case of ON DELETE SET NULL)
     await client.query('DELETE FROM orders WHERE buyer_id IS NULL OR product_id IS NULL');
     await client.query('DELETE FROM order_items WHERE order_id IS NULL OR product_id IS NULL');
@@ -225,15 +229,15 @@ export const createTestInvoice = async (orderId, invoiceData = {}) => {
     currency: invoiceData.currency || 'BTC',
     chain: invoiceData.chain || 'btc',
     expected_amount: invoiceData.expected_amount || 0.001,
-    payment_address: invoiceData.payment_address || 'bc1test123456789',
+    address: invoiceData.address || invoiceData.payment_address || 'bc1test123456789',
     status: invoiceData.status || 'pending'
   };
 
   const result = await pool.query(
-    `INSERT INTO invoices (order_id, currency, chain, expected_amount, payment_address, status)
+    `INSERT INTO invoices (order_id, currency, chain, expected_amount, address, status)
      VALUES ($1, $2, $3, $4, $5, $6)
      RETURNING *`,
-    [invoice.order_id, invoice.currency, invoice.chain, invoice.expected_amount, invoice.payment_address, invoice.status]
+    [invoice.order_id, invoice.currency, invoice.chain, invoice.expected_amount, invoice.address, invoice.status]
   );
 
   return result.rows[0];

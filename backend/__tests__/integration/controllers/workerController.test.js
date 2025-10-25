@@ -155,6 +155,11 @@ describe('WorkerController Integration Tests', () => {
 
     beforeEach(async () => {
       // Add worker for deletion test
+      await query(
+        'DELETE FROM shop_workers WHERE shop_id = $1 AND worker_user_id = $2',
+        [proShop.id, testUser3.id]
+      );
+
       const workerRes = await query(
         `INSERT INTO shop_workers (shop_id, worker_user_id, added_by)
          VALUES ($1, $2, $3)

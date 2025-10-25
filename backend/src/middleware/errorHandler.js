@@ -17,7 +17,7 @@ export class ApiError extends Error {
 /**
  * Global error handler middleware
  */
-export const errorHandler = (err, req, res, next) => {
+export const errorHandler = (err, req, res, _next) => {
   // Log error
   logger.error('Error occurred', {
     error: err.message,

@@ -12,7 +12,7 @@ function FollowCard({ follow, onModeSwitch, onDelete }) {
   const handleModeSwitch = async () => {
     setSwitching(true);
     triggerHaptic('light');
-    await onModeSwitch(follow.id, follow.mode === 'monitor' ? 'resell' : 'monitor');
+    await onModeSwitch(follow, follow.mode === 'monitor' ? 'resell' : 'monitor');
     setSwitching(false);
   };
 
@@ -99,6 +99,8 @@ export default function FollowsModal({ isOpen, onClose }) {
 
   const [follows, setFollows] = useState([]);
   const [limitInfo, setLimitInfo] = useState(null);
+  const [myShop, setMyShop] = useState(null);
+  const [isPro, setIsPro] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -114,31 +116,86 @@ export default function FollowsModal({ isOpen, onClose }) {
   const loadData = async () => {
     setLoading(true);
     try {
-      // Get follows
-      const followsRes = await fetchApi('/follows/my');
-      setFollows(followsRes.data || []);
+      const shopsRes = await fetchApi('/shops/my');
+      const shopsPayload = shopsRes?.data ?? shopsRes ?? [];
+      const shop = Array.isArray(shopsPayload) ? shopsPayload[0] : null;
 
-      // Get limit info
-      const limitRes = await fetchApi('/follows/check-limit');
-      setLimitInfo(limitRes);
+      setMyShop(shop || null);
+
+      if (!shop) {
+        setIsPro(false);
+        setFollows([]);
+        setLimitInfo(null);
+        return;
+      }
+
+      const proTier = (shop.tier || '').toLowerCase() === 'pro';
+      setIsPro(proTier);
+
+      const [followsRes, limitRes] = await Promise.all([
+        fetchApi(`/follows/my?shopId=${shop.id}`),
+        fetchApi(`/follows/check-limit?shopId=${shop.id}`)
+      ]);
+
+      const followsPayload = followsRes?.data ?? followsRes ?? {};
+      const followsData = followsPayload?.data ?? followsPayload ?? [];
+      setFollows(Array.isArray(followsData) ? followsData : []);
+
+      const limitPayload = limitRes?.data ?? limitRes ?? null;
+      const limitData = limitPayload?.data ?? limitPayload ?? null;
+      if (limitData) {
+        setLimitInfo({
+          ...limitData,
+          count: limitData.count != null ? Number(limitData.count) : 0,
+          limit: limitData.limit === null || limitData.limit === undefined ? null : Number(limitData.limit),
+          remaining: limitData.remaining === null || limitData.remaining === undefined ? null : Number(limitData.remaining)
+        });
+      } else {
+        setLimitInfo(null);
+      }
     } catch (error) {
       console.error('Error loading follows:', error);
+      setFollows([]);
+      setLimitInfo(null);
+      setIsPro(false);
+      setMyShop(null);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleModeSwitch = async (followId, newMode) => {
+  const handleModeSwitch = async (follow, newMode) => {
     try {
-      await fetchApi(`/follows/${followId}/mode`, {
+      const requestBody = { mode: newMode };
+
+      if (newMode === 'resell') {
+        const defaultMarkup = follow.markup_percentage || 15;
+        const input = window.prompt('Наценка для реселла (1-500%)', defaultMarkup);
+
+        if (input === null) {
+          return false;
+        }
+
+        const parsed = Number.parseFloat(String(input).trim().replace(',', '.'));
+        if (!Number.isFinite(parsed) || parsed < 1 || parsed > 500) {
+          await alert('Наценка должна быть от 1 до 500%');
+          return false;
+        }
+
+        requestBody.markupPercentage = parsed;
+      }
+
+      await fetchApi(`/follows/${follow.id}/mode`, {
         method: 'PUT',
-        body: JSON.stringify({ mode: newMode })
+        body: JSON.stringify(requestBody)
       });
 
       triggerHaptic('success');
       await loadData();
+      return true;
     } catch (error) {
       await alert(error.message || 'Ошибка смены режима');
+      return false;
     }
   };
 
@@ -176,11 +233,17 @@ export default function FollowsModal({ isOpen, onClose }) {
   };
 
   const handleAddFollow = async (shopId) => {
+    if (!myShop) {
+      await alert('Сначала создайте магазин');
+      return;
+    }
+
     try {
       await fetchApi('/follows', {
         method: 'POST',
         body: JSON.stringify({
-          target_shop_id: shopId,
+          followerShopId: myShop.id,
+          sourceShopId: shopId,
           mode: 'monitor'
         })
       });
@@ -203,6 +266,51 @@ export default function FollowsModal({ isOpen, onClose }) {
     onClose();
   };
 
+  const canCreateFollow = limitInfo ? (limitInfo.canFollow !== false && !limitInfo.reached) : true;
+
+  if (!loading && !myShop) {
+    return (
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            className="fixed inset-0 z-50 bg-dark-bg"
+            initial={{ x: '100%' }}
+            animate={{ x: 0 }}
+            exit={{ x: '100%' }}
+            transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+          >
+            <PageHeader title="Follows" onBack={handleClose} />
+            <div className="min-h-screen pb-24 pt-20">
+              <div className="px-4 py-6">
+                <div className="text-center py-12">
+                  <svg
+                    className="w-20 h-20 mx-auto mb-4 text-gray-600"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1.5}
+                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                    />
+                  </svg>
+                  <h3 className="text-xl font-bold text-white mb-2">
+                    У вас ещё нет магазина
+                  </h3>
+                  <p className="text-gray-400 text-sm">
+                    Создайте магазин, чтобы управлять подписками Follows
+                  </p>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    );
+  }
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -220,11 +328,11 @@ export default function FollowsModal({ isOpen, onClose }) {
               !showAddForm && (
                 <motion.button
                   onClick={() => {
-                    if (limitInfo && limitInfo.canAdd) {
+                    if (canCreateFollow) {
                       triggerHaptic('light');
                       setShowAddForm(true);
                     } else {
-                      alert(`Лимит достигнут! Доступно: ${limitInfo?.tier}`);
+                      alert(`Лимит достигнут! Тариф: ${limitInfo?.tier || 'BASIC'}`);
                     }
                   }}
                   className="w-10 h-10 rounded-xl flex items-center justify-center text-orange-primary"
@@ -349,8 +457,8 @@ export default function FollowsModal({ isOpen, onClose }) {
                 </p>
                 {limitInfo && (
                   <p className="text-xs text-orange-primary">
-                    Лимит: {limitInfo.currentCount || 0} / {limitInfo.limit === 999999 ? '∞' : limitInfo.limit}
-                    {limitInfo.tier && ` (${limitInfo.tier})`}
+                    Лимит: {limitInfo.count ?? 0} / {limitInfo.limit === null ? '∞' : limitInfo.limit}
+                    {limitInfo.tier ? ` (${limitInfo.tier})` : ''}
                   </p>
                 )}
               </div>

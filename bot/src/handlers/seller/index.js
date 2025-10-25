@@ -1,6 +1,6 @@
 import { Markup } from 'telegraf';
 import { sellerMenu, sellerMenuNoShop, sellerToolsMenu, productsMenu, subscriptionStatusMenu } from '../../keyboards/seller.js';
-import { manageWorkersMenu } from '../../keyboards/workspace.js';
+import { manageWorkersMenu, confirmWorkerRemoval } from '../../keyboards/workspace.js';
 import { shopApi, authApi, productApi, orderApi, workerApi } from '../../utils/api.js';
 import { formatProductsList, formatSalesList } from '../../utils/minimalist.js';
 import logger from '../../utils/logger.js';
@@ -32,6 +32,70 @@ const editOrReply = async (ctx, text, markup, extra = {}) => {
 
     const sent = await ctx.reply(text, options);
     return sent;
+  }
+};
+
+const getWorkerDisplayName = (worker) => {
+  if (worker.username) {
+    return `@${worker.username}`;
+  }
+  if (worker.first_name) {
+    return worker.last_name
+      ? `${worker.first_name} ${worker.last_name}`
+      : worker.first_name;
+  }
+  if (worker.telegram_id) {
+    return `ID:${worker.telegram_id}`;
+  }
+  return `User#${worker.user_id}`;
+};
+
+const buildWorkersListKeyboard = (workers) => {
+  const buttons = workers.map((worker) => [
+    Markup.button.callback(`🗑 ${getWorkerDisplayName(worker)}`, `workers:remove:${worker.id}`)
+  ]);
+
+  buttons.push([Markup.button.callback('➕ Добавить', 'workers:add')]);
+  buttons.push([Markup.button.callback('◀️ Назад', 'seller:workers')]);
+
+  return Markup.inlineKeyboard(buttons);
+};
+
+const showWorkersList = async (ctx, options = {}) => {
+  const shopName = ctx.session.shopName || 'Магазин';
+
+  try {
+    const workers = await workerApi.listWorkers(ctx.session.shopId, ctx.session.token);
+    ctx.session.workerList = workers;
+
+    if (!Array.isArray(workers) || workers.length === 0) {
+      const prefix = options.successMessage ? `${options.successMessage}\n\n` : '';
+      await editOrReply(
+        ctx,
+        `${prefix}Работники магазина: ${shopName}\n\nПока нет работников`,
+        manageWorkersMenu(shopName)
+      );
+      return;
+    }
+
+    const lines = workers.map((worker, index) => {
+      const name = getWorkerDisplayName(worker);
+      return `${index + 1}. ${name}`;
+    }).join('\n');
+
+    const prefix = options.successMessage ? `${options.successMessage}\n\n` : '';
+    await editOrReply(
+      ctx,
+      `${prefix}Работники магазина: ${shopName}\n\n${lines}\n\nВыберите сотрудника для удаления:`,
+      buildWorkersListKeyboard(workers)
+    );
+  } catch (error) {
+    logger.error('Error fetching workers:', error);
+    await editOrReply(
+      ctx,
+      'Ошибка загрузки',
+      manageWorkersMenu(shopName)
+    );
   }
 };
 
@@ -86,6 +150,7 @@ export const handleSellerRole = async (ctx) => {
         const shop = shops[0];  // Get first shop
         ctx.session.shopId = shop.id;
         ctx.session.shopName = shop.name;
+        ctx.session.shopTier = shop.tier;
 
         logger.info('User shop loaded:', {
           userId: ctx.from.id,
@@ -99,6 +164,7 @@ export const handleSellerRole = async (ctx) => {
         logger.info(`User ${ctx.from.id} has no shops, showing create shop menu`);
         ctx.session.shopId = null;
         ctx.session.shopName = null;
+        ctx.session.shopTier = null;
         await editOrReply(ctx, 'Создать магазин — $25', sellerMenuNoShop);
       }
     } catch (error) {
@@ -108,11 +174,13 @@ export const handleSellerRole = async (ctx) => {
         // No shop found or auth failed
         ctx.session.shopId = null;
         ctx.session.shopName = null;
+        ctx.session.shopTier = null;
         await editOrReply(ctx, 'Создать магазин - $25', sellerMenuNoShop);
       } else {
         // Real error (network, server)
         ctx.session.shopId = null;
         ctx.session.shopName = null;
+        ctx.session.shopTier = null;
         await editOrReply(ctx, 'Ошибка загрузки', sellerMenuNoShop);
       }
     }
@@ -400,7 +468,10 @@ export const setupSellerHandlers = (bot) => {
 
       // Check if user is shop owner
       const shopResponse = await shopApi.getShop(ctx.session.shopId, ctx.session.token);
-      const isOwner = shopResponse.owner_id === ctx.from.id;
+      const isOwner = shopResponse.owner_id === ctx.session.user?.id;
+      if (shopResponse?.tier) {
+        ctx.session.shopTier = shopResponse.tier;
+      }
 
       await editOrReply(
         ctx,
@@ -533,6 +604,53 @@ const handleWorkers = async (ctx) => {
       return;
     }
 
+    if (!ctx.session.token) {
+      await editOrReply(
+        ctx,
+        'Необходима авторизация. Перезапустите бота командой /start',
+        sellerMenu(ctx.session.shopName || 'Магазин')
+      );
+      return;
+    }
+
+    let shopTier = ctx.session.shopTier;
+
+    if (!shopTier) {
+      try {
+        const shopDetails = await shopApi.getShop(ctx.session.shopId, ctx.session.token);
+        shopTier = shopDetails?.tier || null;
+        if (shopDetails?.tier) {
+          ctx.session.shopTier = shopDetails.tier;
+        }
+
+        if (shopDetails?.owner_id && shopDetails.owner_id !== ctx.session.user?.id) {
+          await editOrReply(
+            ctx,
+            'Только владелец магазина может управлять работниками.',
+            sellerMenu(ctx.session.shopName || 'Магазин')
+          );
+          return;
+        }
+      } catch (error) {
+        logger.error('Failed to load shop details for workers menu:', error);
+        await editOrReply(
+          ctx,
+          '❌ Ошибка загрузки данных магазина',
+          sellerMenu(ctx.session.shopName || 'Магазин')
+        );
+        return;
+      }
+    }
+
+    if (shopTier !== 'pro') {
+      await editOrReply(
+        ctx,
+        '👥 Работники доступны только на тарифе PRO ($35/мес).\n\nОткройте раздел «Подписка», чтобы апгрейдить магазин.',
+        sellerMenu(ctx.session.shopName || 'Магазин')
+      );
+      return;
+    }
+
     const shopName = ctx.session.shopName || 'Магазин';
     await editOrReply(ctx, `Работники магазина: ${shopName}`, manageWorkersMenu(shopName));
 
@@ -586,33 +704,10 @@ const handleWorkersList = async (ctx) => {
       );
       return;
     }
+    await showWorkersList(ctx);
 
-    // Get workers list
-    const workers = await workerApi.listWorkers(ctx.session.shopId, ctx.session.token);
-    const shopName = ctx.session.shopName || 'Магазин';
-
-    if (workers.length === 0) {
-      await editOrReply(
-        ctx,
-        `Работники магазина: ${shopName}\n\nПока нет работников`,
-        manageWorkersMenu(shopName)
-      );
-      return;
-    }
-
-    // Format workers list
-    const workersList = workers.map((w, index) => {
-      const name = w.username ? `@${w.username}` : w.first_name || `ID:${w.telegram_id}`;
-      return `${index + 1}. ${name} (ID: ${w.telegram_id})`;
-    }).join('\n');
-
-    await editOrReply(
-      ctx,
-      `Работники магазина: ${shopName}\n\n${workersList}`,
-      manageWorkersMenu(shopName)
-    );
-
-    logger.info(`User ${ctx.from.id} viewed workers list (${workers.length} total)`);
+    const workerCount = Array.isArray(ctx.session.workerList) ? ctx.session.workerList.length : 0;
+    logger.info(`User ${ctx.from.id} viewed workers list (${workerCount} total)`);
   } catch (error) {
     logger.error('Error fetching workers:', error);
     const shopName = ctx.session.shopName || 'Магазин';
@@ -625,10 +720,52 @@ const handleWorkersList = async (ctx) => {
  */
 const handleWorkerRemove = async (ctx) => {
   try {
-    await ctx.answerCbQuery('Функция в разработке');
-    // TODO: Implement worker removal with confirmation
+    await ctx.answerCbQuery();
+
+    if (!ctx.session.shopId) {
+      await editOrReply(ctx, 'Сначала создайте магазин', sellerMenuNoShop);
+      return;
+    }
+
+    if (!ctx.session.token) {
+      await editOrReply(
+        ctx,
+        'Необходима авторизация. Перезапустите бота командой /start',
+        sellerMenu(ctx.session.shopName || 'Магазин')
+      );
+      return;
+    }
+
+    const workerId = Number.parseInt(ctx.match[1], 10);
+    if (!Number.isInteger(workerId) || workerId <= 0) {
+      await ctx.answerCbQuery('Некорректный работник');
+      return;
+    }
+
+    let workers = Array.isArray(ctx.session.workerList) ? ctx.session.workerList : [];
+    let worker = workers.find((w) => w.id === workerId);
+
+    if (!worker) {
+      workers = await workerApi.listWorkers(ctx.session.shopId, ctx.session.token);
+      ctx.session.workerList = workers;
+      worker = workers.find((w) => w.id === workerId);
+    }
+
+    if (!worker) {
+      await ctx.answerCbQuery('Работник не найден');
+      await showWorkersList(ctx);
+      return;
+    }
+
+    const name = getWorkerDisplayName(worker);
+    await editOrReply(
+      ctx,
+      `Удалить сотрудника ${name}?\n\nДоступ к магазину будет немедленно отозван.`,
+      confirmWorkerRemoval(workerId)
+    );
   } catch (error) {
     logger.error('Error in worker remove handler:', error);
+    await ctx.answerCbQuery('❌ Ошибка');
   }
 };
 
@@ -637,9 +774,45 @@ const handleWorkerRemove = async (ctx) => {
  */
 const handleWorkerRemoveConfirm = async (ctx) => {
   try {
-    await ctx.answerCbQuery('Функция в разработке');
-    // TODO: Implement worker removal confirmation
+    await ctx.answerCbQuery();
+
+    if (!ctx.session.shopId) {
+      await editOrReply(ctx, 'Сначала создайте магазин', sellerMenuNoShop);
+      return;
+    }
+
+    if (!ctx.session.token) {
+      await editOrReply(
+        ctx,
+        'Необходима авторизация. Перезапустите бота командой /start',
+        sellerMenu(ctx.session.shopName || 'Магазин')
+      );
+      return;
+    }
+
+    const workerId = Number.parseInt(ctx.match[1], 10);
+    if (!Number.isInteger(workerId) || workerId <= 0) {
+      await ctx.answerCbQuery('Некорректный работник');
+      return;
+    }
+
+    await workerApi.removeWorker(ctx.session.shopId, workerId, ctx.session.token);
+
+    if (Array.isArray(ctx.session.workerList)) {
+      ctx.session.workerList = ctx.session.workerList.filter((worker) => worker.id !== workerId);
+    }
+
+    logger.info(`User ${ctx.from.id} removed worker ${workerId}`);
+
+    await showWorkersList(ctx, { successMessage: '✅ Работник удалён' });
   } catch (error) {
     logger.error('Error in worker remove confirm handler:', error);
+    const shopName = ctx.session.shopName || 'Магазин';
+
+    const message = error.response?.data?.error
+      ? `❌ ${error.response.data.error}`
+      : '❌ Ошибка удаления работника';
+
+    await editOrReply(ctx, message, manageWorkersMenu(shopName));
   }
 };

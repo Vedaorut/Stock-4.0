@@ -12,7 +12,8 @@
     "test:coverage": "NODE_OPTIONS=--experimental-vm-modules jest --coverage",
     "lint": "eslint src/ __tests__/ --fix",
     "lint:check": "eslint src/ __tests__/",
-    "test:all": "npm run lint:check && npm test"
+    "test:all": "npm run lint:check && npm test",
+    "test:ci": "NODE_ENV=test node database/migrations.cjs --apply && npm test"
   },
   "keywords": [
     "telegram",

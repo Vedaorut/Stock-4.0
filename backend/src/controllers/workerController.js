@@ -17,8 +17,11 @@ export const workerController = {
       const { shopId } = req.params;
       const { telegram_id, username } = req.body;
 
+      const hasTelegramId = telegram_id !== undefined && telegram_id !== null && String(telegram_id).trim() !== '';
+      const hasUsername = typeof username === 'string' && username.trim() !== '';
+
       // Validate input
-      if (!telegram_id && !username) {
+      if (!hasTelegramId && !hasUsername) {
         return res.status(400).json({
           success: false,
           error: 'Telegram ID or username is required'
@@ -50,19 +53,28 @@ export const workerController = {
       }
 
       // Find user by telegram_id or username
-      let workerUser;
-      if (telegram_id) {
-        workerUser = await userQueries.findByTelegramId(telegram_id);
-      } else if (username) {
-        // Remove @ if present
-        const cleanUsername = username.startsWith('@') ? username.slice(1) : username;
-        // Find by username
-        const users = await userQueries.findByTelegramId(null); // This won't work, need to add findByUsername
-        // For now, return error for username search
-        return res.status(400).json({
-          success: false,
-          error: 'Adding by username not yet supported. Please use Telegram ID.'
-        });
+      let normalizedTelegramId = null;
+      if (hasTelegramId) {
+        normalizedTelegramId = Number.parseInt(String(telegram_id).trim(), 10);
+        if (!Number.isInteger(normalizedTelegramId) || normalizedTelegramId <= 0) {
+          return res.status(400).json({
+            success: false,
+            error: 'Telegram ID must be a positive integer'
+          });
+        }
+      }
+
+      let workerUser = null;
+
+      if (normalizedTelegramId) {
+        workerUser = await userQueries.findByTelegramId(normalizedTelegramId);
+      }
+
+      if (!workerUser && hasUsername) {
+        const cleanUsername = username.trim().startsWith('@')
+          ? username.trim().slice(1)
+          : username.trim();
+        workerUser = await userQueries.findByUsername(cleanUsername);
       }
 
       if (!workerUser) {
@@ -71,6 +83,9 @@ export const workerController = {
           error: 'User not found. Make sure they have used the bot at least once.'
         });
       }
+
+      // Ensure Telegram ID is available (fallback to value from DB)
+      const workerTelegramId = Number(workerUser.telegram_id) || normalizedTelegramId;
 
       // Check if user is already the owner
       if (workerUser.id === shop.owner_id) {
@@ -91,9 +106,9 @@ export const workerController = {
 
       // Add worker
       const worker = await workerQueries.create({
-        shopId: parseInt(shopId),
+        shopId: parseInt(shopId, 10),
         workerUserId: workerUser.id,
-        telegramId: workerUser.telegram_id,
+        telegramId: workerTelegramId,
         addedBy: req.user.id
       });
 

@@ -1,6 +1,4 @@
 import express from 'express';
-import crypto from 'crypto';
-// import tatumService from '../services/tatumService.js'; // DISABLED: Tatum SDK removed
 import * as blockCypherService from '../services/blockCypherService.js';
 import { paymentQueries, invoiceQueries, orderQueries, processedWebhookQueries } from '../models/db.js';
 import { getClient } from '../config/database.js';
@@ -9,135 +7,7 @@ import logger from '../utils/logger.js';
 
 const router = express.Router();
 
-/**
- * Tatum Webhook Endpoint - DISABLED
- *
- * Receives ADDRESS_EVENT notifications when crypto payments arrive
- * Automatically updates order status to 'confirmed' when payment is verified
- *
- * NOTE: Tatum SDK was removed. Use BlockCypher webhooks instead.
- */
-/* DISABLED - Tatum SDK removed
-router.post('/tatum', async (req, res) => {
-  try {
-    const payload = req.body;
-    const signature = req.headers['x-payload-hash'];
-
-    logger.info('[Webhook] Tatum notification received:', {
-      address: payload.address,
-      txId: payload.txId,
-      amount: payload.amount
-    });
-
-    // Verify HMAC signature
-    if (!tatumService.verifyWebhookSignature(payload, signature)) {
-      logger.warn('[Webhook] Invalid HMAC signature');
-      return res.status(401).json({ error: 'Invalid signature' });
-    }
-
-    // Parse webhook payload
-    const paymentData = tatumService.parseWebhookPayload(payload);
-
-    // Find invoice by address
-    const invoice = await findInvoiceByAddress(paymentData.address);
-
-    if (!invoice) {
-      logger.warn(`[Webhook] No invoice found for address: ${paymentData.address}`);
-      return res.status(404).json({ error: 'Invoice not found' });
-    }
-
-    logger.info(`[Webhook] Invoice found: ${invoice.id} for order ${invoice.order_id}`);
-
-    // Verify amount matches expected
-    if (Math.abs(paymentData.amount - invoice.expected_amount) > invoice.expected_amount * 0.01) {
-      logger.warn(`[Webhook] Amount mismatch: expected ${invoice.expected_amount}, got ${paymentData.amount}`);
-
-      // Create payment record but don't confirm order
-      await paymentQueries.create({
-        order_id: invoice.order_id,
-        tx_hash: paymentData.txHash,
-        amount: paymentData.amount,
-        currency: paymentData.currency,
-        status: 'failed'
-      });
-
-      return res.status(400).json({ error: 'Amount mismatch' });
-    }
-
-    // Get transaction confirmations
-    const confirmations = await tatumService.getConfirmations(
-      paymentData.currency,
-      paymentData.txHash
-    );
-
-    logger.info(`[Webhook] Transaction ${paymentData.txHash} has ${confirmations} confirmations`);
-
-    // Check if payment already exists
-    const existingPayment = await paymentQueries.findByTxHash(paymentData.txHash);
-
-    if (existingPayment) {
-      // Update confirmations
-      const isConfirmed = tatumService.isPaymentConfirmed(paymentData.currency, confirmations);
-
-      if (isConfirmed && existingPayment.status !== 'confirmed') {
-        await paymentQueries.updateStatus(existingPayment.id, 'confirmed', confirmations);
-        await updateOrderStatus(invoice.order_id, 'confirmed');
-
-        logger.info(`[Webhook] Order ${invoice.order_id} confirmed!`);
-
-        // Send Telegram notification
-        await sendTelegramNotification(invoice.order_id, 'confirmed');
-      } else {
-        await paymentQueries.updateStatus(existingPayment.id, 'pending', confirmations);
-      }
-
-      return res.json({ status: 'updated', confirmations });
-    }
-
-    // Create new payment record
-    const payment = await paymentQueries.create({
-      order_id: invoice.order_id,
-      tx_hash: paymentData.txHash,
-      amount: paymentData.amount,
-      currency: paymentData.currency,
-      status: 'pending',
-      confirmations
-    });
-
-    logger.info(`[Webhook] Payment created: ${payment.id}`);
-
-    // Check if already confirmed
-    const isConfirmed = tatumService.isPaymentConfirmed(paymentData.currency, confirmations);
-
-    if (isConfirmed) {
-      await paymentQueries.updateStatus(payment.id, 'confirmed', confirmations);
-      await updateOrderStatus(invoice.order_id, 'confirmed');
-
-      logger.info(`[Webhook] Order ${invoice.order_id} confirmed!`);
-
-      // Send Telegram notification
-      await sendTelegramNotification(invoice.order_id, 'confirmed');
-    }
-
-    return res.json({
-      status: 'success',
-      payment_id: payment.id,
-      confirmations,
-      confirmed: isConfirmed
-    });
-  } catch (error) {
-    logger.error('[Webhook] Error processing Tatum webhook:', error);
-    return res.status(500).json({ error: 'Internal server error' });
-  }
-});
-*/ // End of disabled Tatum webhook
-
-/**
- * Helper: Find invoice by payment address
- */
-async function findInvoiceByAddress(address) {
-  return await invoiceQueries.findByAddress(address);
-}
+// Legacy Tatum webhook удалён; используются BlockCypher и polling сервисы.
 
 /**
  * Helper: Update order status
@@ -244,9 +114,9 @@ router.post('/blockcypher', async (req, res) => {
         if (output.addresses && output.addresses.length > 0) {
           for (const address of output.addresses) {
             invoice = await invoiceQueries.findByAddress(address);
-            if (invoice) break;
+            if (invoice) {break;}
           }
-          if (invoice) break;
+          if (invoice) {break;}
         }
       }
 

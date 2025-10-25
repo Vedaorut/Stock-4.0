@@ -1,5 +1,6 @@
 import { shopFollowQueries } from '../models/shopFollowQueries.js';
-import { shopQueries } from '../models/db.js';
+import { shopQueries, workerQueries } from '../models/db.js';
+import { getClient } from '../config/database.js';
 import { syncAllProductsForFollow, updateMarkupForFollow } from '../services/productSyncService.js';
 import logger from '../utils/logger.js';
 
@@ -64,6 +65,11 @@ export const getMyFollows = async (req, res) => {
       return res.status(400).json({ error: 'shopId must be a positive integer' });
     }
 
+    const access = await workerQueries.checkAccess(shopId, req.user.id);
+    if (!access.hasAccess) {
+      return res.status(403).json({ error: 'You do not have access to this shop' });
+    }
+
     const follows = await shopFollowQueries.findByFollowerShopId(shopId, 'active');
     const data = follows.map(formatFollowResponse);
 
@@ -83,10 +89,12 @@ export const getMyFollows = async (req, res) => {
  */
 export const createFollow = async (req, res) => {
   try {
-    const { followerShopId, sourceShopId, mode, markupPercentage } = req.body;
+    const followerShopIdRaw = req.body.followerShopId ?? req.body.follower_shop_id;
+    const sourceShopIdRaw = req.body.sourceShopId ?? req.body.source_shop_id ?? req.body.target_shop_id;
+    const { mode, markupPercentage } = req.body;
 
-    const followerId = Number.parseInt(followerShopId, 10);
-    const sourceId = Number.parseInt(sourceShopId, 10);
+    const followerId = Number.parseInt(followerShopIdRaw, 10);
+    const sourceId = Number.parseInt(sourceShopIdRaw, 10);
     const normalizedMode = typeof mode === 'string' ? mode.trim().toLowerCase() : '';
     const markupValue = markupPercentage !== undefined ? Number(markupPercentage) : undefined;
 
@@ -131,28 +139,15 @@ export const createFollow = async (req, res) => {
       return res.status(404).json({ error: 'Source shop not found' });
     }
 
+    const access = await workerQueries.checkAccess(followerId, req.user.id);
+    if (!access.hasAccess) {
+      return res.status(403).json({ error: 'You do not have access to this shop' });
+    }
+
     // Check if already following
     const existing = await shopFollowQueries.findByRelationship(followerId, sourceId);
     if (existing) {
       return res.status(409).json({ error: 'Already following this shop' });
-    }
-
-    // Check FREE tier limit (PRO tier has unlimited follows)
-    const isPro = followerShop.tier === 'pro';
-    if (!isPro) {
-      const activeCount = await shopFollowQueries.countActiveByFollowerShopId(followerId);
-      if (activeCount >= FREE_TIER_LIMIT) {
-        return res.status(402).json({
-          error: 'FREE tier limit reached',
-          data: {
-            limit: FREE_TIER_LIMIT,
-            count: activeCount,
-            remaining: 0,
-            reached: true,
-            canFollow: false
-          }
-        });
-      }
     }
 
     // Check circular follows
@@ -161,13 +156,62 @@ export const createFollow = async (req, res) => {
       return res.status(400).json({ error: 'Cannot create circular follow relationship' });
     }
 
-    // Create follow
-    const follow = await shopFollowQueries.create({
-      followerShopId: followerId,
-      sourceShopId: sourceId,
-      mode: normalizedMode,
-      markupPercentage: normalizedMode === 'resell' ? markupValue : 0
-    });
+    const followerTier = (followerShop.tier || '').toLowerCase();
+    const isPro = followerTier === 'pro';
+
+    const client = await getClient();
+    let follow;
+
+    try {
+      await client.query('BEGIN');
+
+      if (!isPro) {
+        const activeRows = await client.query(
+          `SELECT id FROM shop_follows WHERE follower_shop_id = $1 AND status = 'active' FOR UPDATE`,
+          [followerId]
+        );
+
+        if (activeRows.rowCount >= FREE_TIER_LIMIT) {
+          await client.query('ROLLBACK');
+          return res.status(402).json({
+            error: 'FREE tier limit reached',
+            data: {
+              limit: FREE_TIER_LIMIT,
+              count: activeRows.rowCount,
+              remaining: 0,
+              reached: true,
+              canFollow: false
+            }
+          });
+        }
+      }
+
+      const insertResult = await client.query(
+        `INSERT INTO shop_follows (follower_shop_id, source_shop_id, mode, markup_percentage, status)
+         VALUES ($1, $2, $3, $4, 'active')
+         RETURNING *`,
+        [
+          followerId,
+          sourceId,
+          normalizedMode,
+          normalizedMode === 'resell' ? markupValue : 0
+        ]
+      );
+
+      follow = insertResult.rows[0];
+
+      await client.query('COMMIT');
+    } catch (txError) {
+      await client.query('ROLLBACK');
+
+      if (txError.code === '23505') {
+        return res.status(409).json({ error: 'Already following this shop' });
+      }
+
+      throw txError;
+    } finally {
+      client.release();
+    }
 
     // If resell mode, sync all products
     if (normalizedMode === 'resell') {
@@ -227,6 +271,11 @@ export const updateFollowMarkup = async (req, res) => {
       return res.status(404).json({ error: 'Follow not found' });
     }
 
+    const access = await workerQueries.checkAccess(existingFollow.follower_shop_id, req.user.id);
+    if (!access.hasAccess) {
+      return res.status(403).json({ error: 'You do not have access to this follow' });
+    }
+
     if (existingFollow.mode !== 'resell') {
       return res.status(400).json({ error: 'Markup can only be updated in resell mode' });
     }
@@ -272,6 +321,11 @@ export const switchFollowMode = async (req, res) => {
     const existingFollow = await shopFollowQueries.findById(followId);
     if (!existingFollow) {
       return res.status(404).json({ error: 'Follow not found' });
+    }
+
+    const access = await workerQueries.checkAccess(existingFollow.follower_shop_id, req.user.id);
+    if (!access.hasAccess) {
+      return res.status(403).json({ error: 'You do not have access to this follow' });
     }
 
     // If switching to resell, validate markup first
@@ -322,11 +376,18 @@ export const deleteFollow = async (req, res) => {
       return res.status(400).json({ error: 'Invalid follow ID' });
     }
 
-    const follow = await shopFollowQueries.delete(followId);
+    const follow = await shopFollowQueries.findById(followId);
 
     if (!follow) {
       return res.status(404).json({ error: 'Follow not found' });
     }
+
+    const access = await workerQueries.checkAccess(follow.follower_shop_id, req.user.id);
+    if (!access.hasAccess) {
+      return res.status(403).json({ error: 'You do not have access to this follow' });
+    }
+
+    await shopFollowQueries.delete(followId);
 
     logger.info('Follow deleted', { followId });
     res.json({ data: { id: followId, deleted: true } });
@@ -361,8 +422,13 @@ export const checkFollowLimit = async (req, res) => {
       return res.status(404).json({ error: 'Shop not found' });
     }
 
+    const access = await workerQueries.checkAccess(shopId, req.user.id);
+    if (!access.hasAccess) {
+      return res.status(403).json({ error: 'You do not have access to this shop' });
+    }
+
     // PRO tier = unlimited follows, basic tier = 2 follows
-    const isPro = shop.tier === 'pro';
+    const isPro = (shop.tier || '').toLowerCase() === 'pro';
     const limit = isPro ? null : FREE_TIER_LIMIT; // null = unlimited
 
     const activeCount = await shopFollowQueries.countActiveByFollowerShopId(shopId);

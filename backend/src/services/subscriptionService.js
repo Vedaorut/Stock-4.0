@@ -388,8 +388,6 @@ async function sendExpirationReminders(bot) {
     
     // Reminders: 3 days before, 1 day before, and on expiration day
     const threeDaysFromNow = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
-    const oneDayFromNow = new Date(now.getTime() + 1 * 24 * 60 * 60 * 1000);
-    const today = new Date(now.getTime() + 24 * 60 * 60 * 1000); // Tomorrow actually
     
     logger.info('[Subscription] Sending expiration reminders...');
     
@@ -409,8 +407,11 @@ async function sendExpirationReminders(bot) {
     for (const shop of shopsResult.rows) {
       const { id, name, tier, next_payment_due, telegram_id, first_name } = shop;
       const daysUntilExpiry = Math.ceil((next_payment_due - now) / (1000 * 60 * 60 * 24));
-      
+
+      const ownerName = first_name ? `${first_name}` : 'владелец';
+
       let message = `🔔 <b>Напоминание о подписке</b>\n\n`;
+      message += `Привет, ${ownerName}!\n`;
       message += `Магазин: <b>${name}</b>\n`;
       message += `Tier: ${tier === 'pro' ? 'PRO' : 'Free'}\n`;
       message += `Стоимость: $${SUBSCRIPTION_PRICES[tier]}/месяц\n\n`;

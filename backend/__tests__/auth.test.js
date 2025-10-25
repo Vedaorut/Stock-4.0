@@ -7,7 +7,6 @@ import request from 'supertest';
 import jwt from 'jsonwebtoken';
 import { createTestApp } from './helpers/testApp.js';
 import { 
-  getTestPool, 
   closeTestDb, 
   cleanupTestData,
   createTestUser,
@@ -15,11 +14,6 @@ import {
 } from './helpers/testDb.js';
 
 const app = createTestApp();
-let testPool;
-
-beforeAll(() => {
-  testPool = getTestPool();
-});
 
 afterAll(async () => {
   await closeTestDb();

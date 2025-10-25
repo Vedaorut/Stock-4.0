@@ -2,7 +2,9 @@
 
 **Date:** 2025-10-25
 **Reviewed by:** Claude Code
-**Scope:** Full workspace/workers functionality audit
+**Scope:** Full workspace/workers functionality audit (обновлено после фиксов 2025-10-25)
+
+> ✅ 2025-10-25: PRO-check добавлен на backend и в бот/webapp, Workspace доступен только на PRO. Таблица ниже оставлена для истории.
 
 ---
 

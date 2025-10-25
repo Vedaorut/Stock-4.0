@@ -46,6 +46,35 @@ describe('Webhooks - Integration Tests', () => {
 
     // Set environment variable for webhook secret
     process.env.BLOCKCYPHER_WEBHOOK_SECRET = WEBHOOK_SECRET;
+
+    // Ensure required tables exist (in case migrations haven't been run in test DB)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS invoices (
+        id SERIAL PRIMARY KEY,
+        order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+        chain VARCHAR(20) NOT NULL,
+        address VARCHAR(255) UNIQUE NOT NULL,
+        address_index INTEGER DEFAULT 0,
+        expected_amount DECIMAL(18, 8) NOT NULL,
+        currency VARCHAR(10) NOT NULL,
+        status VARCHAR(20) DEFAULT 'pending',
+        tatum_subscription_id VARCHAR(255),
+        expires_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS processed_webhooks (
+        id SERIAL PRIMARY KEY,
+        webhook_id VARCHAR(255) UNIQUE NOT NULL,
+        source VARCHAR(50) NOT NULL CHECK (source IN ('blockcypher', 'etherscan', 'trongrid')),
+        tx_hash VARCHAR(255) NOT NULL,
+        processed_at TIMESTAMP DEFAULT NOW(),
+        payload JSONB
+      );
+    `);
   });
 
   beforeEach(async () => {
@@ -80,7 +109,7 @@ describe('Webhooks - Integration Tests', () => {
 
     // Create invoice
     const invoiceResult = await pool.query(
-      `INSERT INTO invoices (order_id, currency, chain, expected_amount, payment_address, status)
+      `INSERT INTO invoices (order_id, currency, chain, expected_amount, address, status)
        VALUES ($1, 'BTC', 'btc', 0.001, 'bc1test123456789', 'pending')
        RETURNING *`,
       [order.id]
@@ -103,7 +132,7 @@ describe('Webhooks - Integration Tests', () => {
       total: 100000, // satoshis
       outputs: [
         {
-          addresses: [invoice.payment_address],
+          addresses: [invoice.address],
           value: 100000
         }
       ]
@@ -245,7 +274,7 @@ describe('Webhooks - Integration Tests', () => {
           confirmations: 1,
           block_height: 700000,
           total: 100000,
-          outputs: [{ addresses: [invoice.payment_address], value: 100000 }]
+          outputs: [{ addresses: [invoice.address], value: 100000 }]
         };
 
         const response1 = await request(app)
@@ -457,7 +486,7 @@ describe('Webhooks - Integration Tests', () => {
               value: 100000
             },
             {
-              addresses: [invoice.payment_address], // Our address in second output
+              addresses: [invoice.address], // Our address in second output
               value: 100000
             }
           ]
@@ -481,7 +510,7 @@ describe('Webhooks - Integration Tests', () => {
           confirmations: 1,
           block_height: 700000,
           total: 100000,
-          outputs: [{ addresses: [invoice.payment_address], value: 100000 }]
+          outputs: [{ addresses: [invoice.address], value: 100000 }]
         };
 
         await request(app)

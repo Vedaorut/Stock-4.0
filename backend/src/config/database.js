@@ -54,7 +54,6 @@ export const query = async (text, params) => {
  */
 export const getClient = async () => {
   const client = await pool.connect();
-  const query = client.query.bind(client);
   const release = client.release.bind(client);
 
   // Set a timeout of 5 seconds, after which we will log this client's last query

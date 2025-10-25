@@ -24,7 +24,6 @@ let isPolling = false;
 // Configuration
 const POLLING_INTERVAL_MS = 60000; // 60 seconds
 const BATCH_SIZE = 10; // Process 10 invoices at a time
-const INVOICE_EXPIRY_HOURS = 24;
 
 // Statistics
 let stats = {
@@ -395,6 +394,12 @@ async function checkTronPayment(invoice) {
 async function handleConfirmedPayment(invoice, payment) {
   try {
     logger.info(`[PollingService] Handling confirmed payment for order ${invoice.order_id}`);
+    if (payment) {
+      logger.info('[PollingService] Payment details', {
+        paymentId: payment.id,
+        txHash: payment.tx_hash ?? payment.txHash
+      });
+    }
 
     // Update order status to confirmed
     await orderQueries.updateStatus(invoice.order_id, 'confirmed');

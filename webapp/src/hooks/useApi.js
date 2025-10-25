@@ -36,7 +36,8 @@ export function useApi() {
       setLoading(false);
       return { data: response.data, error: null };
     } catch (err) {
-      const errorMessage = err.response?.data?.message || err.message || 'Произошла ошибка';
+      const apiError = err.response?.data;
+      const errorMessage = apiError?.error || apiError?.message || err.message || 'Произошла ошибка';
       setError(errorMessage);
       setLoading(false);
       return { data: null, error: errorMessage };

@@ -12,7 +12,7 @@ jest.unstable_mockModule('../../config/database.js', () => ({
   }
 }));
 
-const { canMigrate, isProShop, validateMigration, getMigrationHistory } = await import('../rateLimit.js');
+const { canMigrate, isProShop, validateMigration } = await import('../rateLimit.js');
 
 describe('Rate Limit Service', () => {
   beforeEach(() => {
