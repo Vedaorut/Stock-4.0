@@ -406,8 +406,12 @@ function getCurrencyFromChain(chain) {
   }
 }
 
+// Re-export INVOICE_PURPOSES for backward compatibility with controllers
+export { INVOICE_PURPOSES };
+
 export default {
   generateSubscriptionInvoice,
   findActiveInvoiceForSubscription,
   SUBSCRIPTION_PRICES,
+  INVOICE_PURPOSES, // Also include in default export
 };
