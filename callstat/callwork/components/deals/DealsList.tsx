@@ -70,7 +70,7 @@ export function DealsList({ deals, loading = false, error, onToggleFocus }: Deal
             <div
               key={deal.id}
               className={`flex items-center justify-between gap-3 p-3 rounded-xl border transition-all ${
-                isFocused ? 'border-amber-300 bg-amber-50/50' : 'border-[var(--border)] bg-white'
+                isFocused ? 'border-amber-300 bg-amber-50/50' : 'border-[var(--border)] bg-[var(--card)]'
               }`}
             >
               <div className="flex-1 min-w-0">

@@ -35,7 +35,50 @@ export async function GET(request: Request) {
         }
       }
     })
+
+    // --- РАСЧЕТ ОБЩЕЙ СТАТИСТИКИ КОМАНДЫ (Менеджер + Сотрудники) ---
     
+    // 1. Получаем отчеты всей команды (включая менеджера) для корректного факта
+    const teamUserIds = [manager.id, ...employees.map(e => e.id)]
+    const allTeamReports = await prisma.report.findMany({
+      where: {
+        userId: { in: teamUserIds },
+        date: {
+          gte: startDate,
+          lte: endDate
+        }
+      }
+    })
+
+    // 2. Считаем статистику по всем отчетам
+    const teamStatsRaw = await calculateManagerStats(allTeamReports, manager.id)
+    
+    // 3. Добавляем расчеты конверсий для команды
+    const teamConversions = calculateConversions({
+      zoomBooked: teamStatsRaw.zoomBooked,
+      zoom1Held: teamStatsRaw.zoom1Held,
+      zoom2Held: teamStatsRaw.zoom2Held,
+      contractReview: teamStatsRaw.contractReview,
+      pushCount: teamStatsRaw.pushCount,
+      successfulDeals: teamStatsRaw.successfulDeals,
+      monthlySalesAmount: teamStatsRaw.salesAmount,
+    })
+
+    const teamStats = {
+      ...teamStatsRaw,
+      // Гарантируем что план берется из GoalService (уже внутри calculateManagerStats, но явно для надежности)
+      planSales: teamStatsRaw.planSales, 
+      planDeals: teamStatsRaw.planDeals,
+      bookedToZoom1: teamConversions.bookedToZoom1,
+      zoom1ToZoom2: teamConversions.zoom1ToZoom2,
+      zoom2ToContract: teamConversions.zoom2ToContract,
+      contractToPush: teamConversions.contractToPush,
+      pushToDeal: teamConversions.pushToDeal,
+      northStar: teamConversions.northStar,
+    }
+    
+    // ----------------------------------------------------------------
+
     // Для каждого работника посчитать статистику
     const employeesWithStats = await Promise.all(
       employees.map(async (employee) => {
@@ -52,17 +95,20 @@ export async function GET(request: Request) {
 
         return {
           ...employee,
-          stats: {
-            ...stats,
-            hasRedZone:
-              conversions.zoom1ToZoom2 < CONVERSION_BENCHMARKS.ZOOM1_TO_ZOOM2 ||
-              conversions.pushToDeal < CONVERSION_BENCHMARKS.PUSH_TO_DEAL,
-          }
+          ...stats,
+          planSales: stats.planSales,
+          planDeals: stats.planDeals,
+          hasRedZone:
+            conversions.zoom1ToZoom2 < CONVERSION_BENCHMARKS.ZOOM1_TO_ZOOM2 ||
+            conversions.pushToDeal < CONVERSION_BENCHMARKS.PUSH_TO_DEAL,
         }
       })
     )
     
-    return NextResponse.json({ employees: employeesWithStats })
+    return NextResponse.json({ 
+      employees: employeesWithStats,
+      teamStats // Возвращаем общую статистику
+    })
   } catch (error) {
     console.error('GET /api/employees error:', error)
     return NextResponse.json(

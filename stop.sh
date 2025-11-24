@@ -21,23 +21,35 @@ echo ""
 
 echo -e "${YELLOW}Stopping processes...${NC}"
 
-# Kill backend processes
-echo "  ├─ Backend processes..."
+# Stop by PID files (if they exist)
+if [ -f "$PROJECT_ROOT/.backend.pid" ]; then
+  echo "  ├─ Backend (by PID)..."
+  kill $(cat "$PROJECT_ROOT/.backend.pid") 2>/dev/null || true
+  rm -f "$PROJECT_ROOT/.backend.pid"
+fi
+
+if [ -f "$PROJECT_ROOT/.bot.pid" ]; then
+  echo "  ├─ Bot (by PID)..."
+  kill $(cat "$PROJECT_ROOT/.bot.pid") 2>/dev/null || true
+  rm -f "$PROJECT_ROOT/.bot.pid"
+fi
+
+if [ -f "$PROJECT_ROOT/.ngrok.pid" ]; then
+  echo "  ├─ ngrok (by PID)..."
+  kill $(cat "$PROJECT_ROOT/.ngrok.pid") 2>/dev/null || true
+  rm -f "$PROJECT_ROOT/.ngrok.pid"
+fi
+
+# Fallback: kill by pattern (if PID files don't exist)
+echo "  ├─ Fallback cleanup..."
 pkill -f "node.*server.js" 2>/dev/null || true
 pkill -f "nodemon.*server" 2>/dev/null || true
-lsof -ti:3000 | xargs kill -9 2>/dev/null || true
-
-# Kill bot processes
-echo "  ├─ Bot processes..."
 pkill -f "node.*bot.js" 2>/dev/null || true
 pkill -f "nodemon.*bot" 2>/dev/null || true
-
-# Kill webapp dev server
-echo "  ├─ Webapp processes..."
+pkill -f "npm.*dev" 2>/dev/null || true
+pkill -f "npm.*start" 2>/dev/null || true
+lsof -ti:3000 | xargs kill -9 2>/dev/null || true
 pkill -f "vite" 2>/dev/null || true
-
-# Kill ngrok
-echo "  └─ ngrok..."
 pkill -x ngrok 2>/dev/null || true
 
 sleep 2

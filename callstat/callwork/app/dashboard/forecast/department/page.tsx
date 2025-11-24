@@ -26,7 +26,7 @@ export default function DepartmentForecastPage() {
   }, [])
 
   if (loading) {
-    return <div className="animate-pulse h-96 bg-gray-100 rounded-2xl" />
+    return <div className="animate-pulse h-96 bg-[var(--card)] rounded-2xl border border-[var(--border)]" />
   }
 
   if (!data) return <div>Ошибка загрузки данных</div>
@@ -36,7 +36,7 @@ export default function DepartmentForecastPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-         <div className="flex items-center gap-2 text-sm text-gray-500 bg-white px-3 py-1.5 rounded-full border border-gray-200 shadow-sm w-fit">
+         <div className="flex items-center gap-2 text-sm text-[var(--muted-foreground)] bg-[var(--card)] px-3 py-1.5 rounded-full border border-[var(--border)] shadow-sm w-fit">
             <Users className="w-4 h-4" />
             <span>Размер команды: <b>{teamSize}</b></span>
          </div>

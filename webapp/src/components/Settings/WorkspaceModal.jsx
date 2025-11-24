@@ -337,7 +337,7 @@ export default function WorkspaceModal({ isOpen, onClose }) {
                     <div>
                       <p className="text-sm text-white font-medium mb-1">Доступно только на PRO</p>
                       <p className="text-xs text-gray-400">
-                        Апгрейд до PRO ($35/мес) откроет совместную работу: сотрудники смогут
+                        Апгрейд до PRO ($1/мес) откроет совместную работу: сотрудники смогут
                         управлять товарами и продажами. Перейдите в раздел «Подписка», чтобы
                         обновить тариф.
                       </p>

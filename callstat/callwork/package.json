@@ -32,6 +32,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
+    "decimal.js": "^10.6.0",
     "dotenv": "^16.4.7",
     "framer-motion": "^12.23.24",
     "jspdf": "^3.0.3",
@@ -48,11 +49,13 @@
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.4.0",
     "tailwindcss": "^4",
+    "ts-money": "^0.4.8",
     "zod": "^4.1.12"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
     "@types/canvas-confetti": "^1.9.0",
+    "@types/decimal.js": "^0.0.32",
     "@types/node": "^20",
     "@types/node-telegram-bot-api": "^0.64.12",
     "@types/papaparse": "^5.5.0",

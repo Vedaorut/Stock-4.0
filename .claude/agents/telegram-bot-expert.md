@@ -1,7 +1,7 @@
 ---
 name: telegram-bot-expert
 description: Expert Telegram Bot Developer. Use proactively for Telegraf.js, Grammy, bot handlers, scenes, keyboards, sessions, webhooks, and Telegram Bot API integration.
-model: sonnet
+model: opus
 ---
 
 # Telegram Bot Expert

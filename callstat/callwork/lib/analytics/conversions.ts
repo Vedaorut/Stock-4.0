@@ -1,3 +1,5 @@
+import { computeConversions } from '@/lib/calculations/metrics'
+
 export interface Stats {
   zoomBooked: number
   zoom1Held: number
@@ -19,22 +21,27 @@ export interface Conversions {
 }
 
 export function calculateConversions(stats: Stats): Conversions {
-  const safeDiv = (a: number, b: number) => (b > 0 ? Math.round((a / b) * 100) : 0)
+  const { stages, northStar, totalConversion } = computeConversions({
+    zoomBooked: stats.zoomBooked,
+    zoom1Held: stats.zoom1Held,
+    zoom2Held: stats.zoom2Held,
+    contractReview: stats.contractReview,
+    push: stats.pushCount,
+    deals: stats.successfulDeals,
+  })
 
-  const bookedToZoom1 = safeDiv(stats.zoom1Held, stats.zoomBooked)
-  const zoom1ToZoom2 = safeDiv(stats.zoom2Held, stats.zoom1Held)
-  const zoom2ToContract = safeDiv(stats.contractReview, stats.zoom2Held)
-  const contractToPush = safeDiv(stats.pushCount, stats.contractReview)
-  const pushToDeal = safeDiv(stats.successfulDeals, stats.pushCount)
+  const conversionsMap = Object.fromEntries(
+    stages.map((stage) => [stage.id, stage.conversion])
+  ) as Record<string, number>
 
   return {
-    bookedToZoom1,
-    zoom1ToZoom2,
-    zoom2ToContract,
-    contractToPush,
-    pushToDeal,
-    overallConversion: safeDiv(stats.successfulDeals, stats.zoomBooked),
-    northStar: safeDiv(stats.successfulDeals, stats.zoom1Held || stats.zoomBooked),
+    bookedToZoom1: conversionsMap.zoom1Held || 0,
+    zoom1ToZoom2: conversionsMap.zoom2Held || 0,
+    zoom2ToContract: conversionsMap.contractReview || 0,
+    contractToPush: conversionsMap.push || 0,
+    pushToDeal: conversionsMap.deal || 0,
+    overallConversion: totalConversion,
+    northStar,
   }
 }
 

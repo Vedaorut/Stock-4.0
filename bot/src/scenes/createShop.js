@@ -31,23 +31,6 @@ const enterShopName = async (ctx) => {
     if (subscriptionId) ctx.wizard.state.subscriptionId = subscriptionId;
     if (paidSubscription) ctx.wizard.state.paidSubscription = paidSubscription;
 
-    // IF PAID SUBSCRIPTION FLOW - simplified (trust the caller)
-    if (paidSubscription && subscriptionId) {
-      logger.info('[CreateShop] Entering with paid subscription', {
-        userId: ctx.from.id,
-        subscriptionId,
-        tier,
-      });
-      // We skip the redundant API check here to avoid "hanging" if the backend is slow to sync.
-      // The paySubscription scene already verified the payment before entering this scene.
-    } else if (promoCode) {
-      // PROMO CODE FLOW - no payment verification needed
-      logger.info('[CreateShop] Entering with promo code (no payment required)', {
-        userId: ctx.from.id,
-        tier,
-      });
-    }
-
     logger.info('shop_create_step:name', {
       userId: ctx.from.id,
       tier: ctx.wizard.state.tier,
@@ -55,9 +38,14 @@ const enterShopName = async (ctx) => {
       hasPaidSubscription: !!ctx.wizard.state.paidSubscription,
     });
 
-    const message = ctx.wizard.state.paidSubscription
-      ? `✅ Оплата подтверждена! Теперь создайте свой магазин.\n\n${sellerMessages.createShopNamePrompt}\n${sellerMessages.createShopNameHint}`
-      : `${sellerMessages.createShopNamePrompt}\n${sellerMessages.createShopNameHint}`;
+    // If coming from paySubscription (paid flow), the previous scene already
+    // sent the "Payment Verified! Enter name:" message.
+    // We skip sending it again to avoid garbage/duplication.
+    if (paidSubscription && subscriptionId) {
+      return ctx.wizard.next();
+    }
+
+    const message = `${sellerMessages.createShopNamePrompt}\n${sellerMessages.createShopNameHint}`;
 
     await cleanReply(ctx, message, cancelButton);
 

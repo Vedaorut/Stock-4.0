@@ -3,6 +3,11 @@ import {
   FUNNEL_STAGES,
   FunnelStageId,
 } from '@/lib/config/conversionBenchmarks'
+import { computeConversions, getStageLabel as getLabelFromConfig, resolveNorthStarStatus } from '@/lib/calculations/metrics'
+
+const round2 = (num: number) => Math.round(num * 100) / 100
+const getStageLabel = (id: FunnelStageId) => getLabelFromConfig(id)
+const safeRate = (value: number, base: number) => (base > 0 ? round2((value / base) * 100) : 0)
 
 export interface RefusalBreakdown {
   stageId: FunnelStageId
@@ -57,14 +62,15 @@ export interface FullFunnelResult {
   northStarKpi: NorthStarKpi
 }
 
-const round2 = (num: number) => Math.round(num * 100) / 100
-const safeRate = (value: number, base: number) => (base > 0 ? round2((value / base) * 100) : 0)
-
-const metaById = new Map(FUNNEL_STAGES.map((stage) => [stage.id, stage]))
-
-const getStageLabel = (id: FunnelStageId) => metaById.get(id)?.label ?? id
-
 export function calculateFullFunnel(totals: FunnelTotals): FullFunnelResult {
+  const { stages, northStar, totalConversion } = computeConversions({
+    zoomBooked: totals.zoomBooked,
+    zoom1Held: totals.zoom1Held,
+    zoom2Held: totals.zoom2Held,
+    contractReview: totals.contractReview,
+    push: totals.push,
+    deals: totals.deals,
+  })
   const values: Record<FunnelStageId, number> = {
     zoomBooked: totals.zoomBooked || 0,
     zoom1Held: totals.zoom1Held || 0,
@@ -74,72 +80,18 @@ export function calculateFullFunnel(totals: FunnelTotals): FullFunnelResult {
     deal: totals.deals || 0,
   }
 
-  const conversionPairs: Array<{
-    id: FunnelStageId
-    prevId: FunnelStageId
-    benchmark: number
-    label: string
-  }> = [
-    {
-      id: 'zoom1Held',
-      prevId: 'zoomBooked',
-      benchmark: CONVERSION_BENCHMARKS.BOOKED_TO_ZOOM1,
-      label: getStageLabel('zoom1Held'),
-    },
-    {
-      id: 'zoom2Held',
-      prevId: 'zoom1Held',
-      benchmark: CONVERSION_BENCHMARKS.ZOOM1_TO_ZOOM2,
-      label: getStageLabel('zoom2Held'),
-    },
-    {
-      id: 'contractReview',
-      prevId: 'zoom2Held',
-      benchmark: CONVERSION_BENCHMARKS.ZOOM2_TO_CONTRACT,
-      label: getStageLabel('contractReview'),
-    },
-    {
-      id: 'push',
-      prevId: 'contractReview',
-      benchmark: CONVERSION_BENCHMARKS.CONTRACT_TO_PUSH,
-      label: getStageLabel('push'),
-    },
-    {
-      id: 'deal',
-      prevId: 'push',
-      benchmark: CONVERSION_BENCHMARKS.PUSH_TO_DEAL,
-      label: getStageLabel('deal'),
-    },
-  ]
+  const funnel: FunnelStage[] = stages.map((stage) => ({
+    id: stage.id,
+    stage: getStageLabel(stage.id),
+    value: stage.value,
+    conversion: stage.conversion,
+    benchmark: stage.benchmark,
+    isRedZone: stage.isRedZone,
+  }))
 
-  const funnel: FunnelStage[] = [
-    {
-      id: 'zoomBooked',
-      stage: getStageLabel('zoomBooked'),
-      value: values.zoomBooked,
-      conversion: 100,
-      benchmark: 100,
-      isRedZone: false,
-    },
-    ...conversionPairs.map(({ id, prevId, benchmark, label }) => {
-      const conversion = safeRate(values[id], values[prevId])
-      return {
-        id,
-        stage: label,
-        value: values[id],
-        conversion,
-        benchmark,
-        isRedZone: conversion < benchmark,
-      }
-    }),
-  ]
-
-  const northStarValue = safeRate(values.deal, values.zoom1Held)
   const northStarKpi: NorthStarKpi = {
-    value: northStarValue,
-    target: CONVERSION_BENCHMARKS.ZOOM1_TO_DEAL_KPI,
-    delta: round2(northStarValue - CONVERSION_BENCHMARKS.ZOOM1_TO_DEAL_KPI),
-    isOnTrack: northStarValue >= CONVERSION_BENCHMARKS.ZOOM1_TO_DEAL_KPI,
+    value: northStar,
+    ...resolveNorthStarStatus(northStar),
   }
 
   // Отказы по этапам (fallback: считаем все после 1-го Zoom)

@@ -16,10 +16,11 @@ export const invoiceQueries = {
       currency,
       webhookSubscriptionId,
       expiresAt,
+      purpose = 'order',
     } = invoiceData;
     const result = await query(
-      `INSERT INTO invoices (order_id, chain, address, address_index, expected_amount, currency, tatum_subscription_id, expires_at, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending')
+      `INSERT INTO invoices (order_id, chain, address, address_index, expected_amount, currency, tatum_subscription_id, expires_at, status, purpose)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending', $9)
        RETURNING *`,
       [
         orderId,
@@ -30,6 +31,7 @@ export const invoiceQueries = {
         currency,
         webhookSubscriptionId,
         expiresAt,
+        purpose,
       ]
     );
     return result.rows[0];

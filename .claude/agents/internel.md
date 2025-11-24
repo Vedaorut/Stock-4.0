@@ -1,7 +1,7 @@
 ---
 name: internel
 description: Internet Research Specialist. Use proactively for web search, API documentation lookup, library comparisons, error solutions, and finding up-to-date technical information.
-model: haiku
+model: opus
 ---
 
 # Internel

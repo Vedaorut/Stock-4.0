@@ -93,6 +93,12 @@ export const subscriptionQueries = {
     ]);
     return parseInt(result.rows[0].count, 10);
   },
+
+  // Find shop subscription (billing) by ID
+  findShopSubscriptionById: async (id) => {
+    const result = await query('SELECT * FROM shop_subscriptions WHERE id = $1', [id]);
+    return result.rows[0] || null;
+  },
 };
 
 export default subscriptionQueries;

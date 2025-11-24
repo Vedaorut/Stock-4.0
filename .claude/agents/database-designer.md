@@ -1,7 +1,7 @@
 ---
 name: database-designer
 description: Senior PostgreSQL Database Designer. Use proactively for database schema design, migrations, SQL query optimization, indexes, constraints, and data integrity.
-model: sonnet
+model: opus
 ---
 
 # Database Designer

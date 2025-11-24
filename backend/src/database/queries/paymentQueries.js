@@ -47,8 +47,9 @@ export const paymentQueries = {
   },
 
   // Update payment status
-  updateStatus: async (id, status, confirmations = null) => {
-    const result = await query(
+  updateStatus: async (id, status, confirmations = null, client = null) => {
+    const queryFn = client ? client.query.bind(client) : query;
+    const result = await queryFn(
       `UPDATE payments
        SET status = $2::VARCHAR,
            confirmations = COALESCE($3::INT, confirmations),

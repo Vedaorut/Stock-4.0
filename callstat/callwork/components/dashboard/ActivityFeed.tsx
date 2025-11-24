@@ -121,7 +121,7 @@ export function ActivityFeed() {
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: 20 }}
                 transition={{ delay: index * 0.05 }}
-                className="flex items-start gap-3 p-3 rounded-xl hover:bg-[var(--muted)] transition-colors"
+                className="flex items-start gap-3 p-3 rounded-xl hover:bg-[var(--secondary)] transition-colors"
               >
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${colorClass}`}>
                   <Icon className="w-4 h-4" />

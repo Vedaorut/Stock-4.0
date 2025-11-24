@@ -1,25 +1,15 @@
 import { prisma } from '@/lib/prisma'
 import { calculateMonthlyForecast } from '@/lib/calculations/forecast'
+import { MOTIVATION_GRADE_PRESETS } from '@/lib/config/motivationGrades'
+import { calculateMotivation, resolveCommissionRate } from '@/lib/motivation/motivationCalculator'
 
 export class MotivationCalculatorService {
-  // Progressive scale (turnover -> percent)
-  // This could be fetched from DB (MotivationGrade), but hardcoded for robustness per prompt requirements
-  private readonly GRADES = [
-    { min: 0, percent: 0.05 },       // 0 - ... : 5%
-    { min: 500000, percent: 0.07 },  // 500k+   : 7%
-    { min: 1000000, percent: 0.08 }, // 1m+     : 8%
-    { min: 1500000, percent: 0.09 }, // 1.5m+   : 9%
-    { min: 2000000, percent: 0.10 }, // 2m+     : 10%
-  ]
-
   private getCommissionRate(turnover: number): number {
-    let rate = 0.05
-    for (const grade of this.GRADES) {
-      if (turnover >= grade.min) {
-        rate = grade.percent
-      }
-    }
-    return rate
+    return resolveCommissionRate(turnover, MOTIVATION_GRADE_PRESETS.map((g) => ({
+      minTurnover: g.minTurnover,
+      maxTurnover: g.maxTurnover ?? null,
+      commissionRate: g.commissionRate ?? (g as any).percent ?? 0,
+    })))
   }
 
   async calculateIncomeForecast(userId: string) {
@@ -35,7 +25,7 @@ export class MotivationCalculatorService {
          sales: { current: 0, projected: 0, optimistic: 0, goal: 0, focusDealsAmount: 0 },
          rates: { current: 0.05, projected: 0.05, optimistic: 0.05 },
          income: { current: 0, projected: 0, optimistic: 0, projectedGrowth: 0, potentialGrowth: 0 },
-         grades: this.GRADES
+         grades: MOTIVATION_GRADE_PRESETS
        }
     }
     const monthlyGoal = Number(user.monthlyGoal || 0)
@@ -119,7 +109,7 @@ export class MotivationCalculatorService {
         projectedGrowth: projectedCommission - currentCommission,
         potentialGrowth: optimisticCommission - projectedCommission
       },
-      grades: this.GRADES,
+      grades: MOTIVATION_GRADE_PRESETS.map((g) => ({ min: g.minTurnover, percent: g.commissionRate })),
       deals: openDeals // Return the list for the UI
     }
   }

@@ -1,8 +1,10 @@
 /**
  * Demo Data Simulator - для выставочного режима TV Dashboard
  *
- * Генерирует случайные изменения данных и события для демонстрации
+ * Генерирует мягкие изменения данных на базе единого демо-датасета,
+ * чтобы все экраны использовали один источник правды.
  */
+import { cloneDemoTvData } from '@/lib/demoData'
 
 // --- TYPES ---
 
@@ -54,7 +56,7 @@ export interface DemoEvent {
  * Симулирует изменения KPI с реалистичными колебаниями
  */
 export function simulateKPIChange(currentData: TVData): TVData {
-  const newData = JSON.parse(JSON.stringify(currentData)) as TVData
+  const newData = JSON.parse(JSON.stringify(currentData || cloneDemoTvData())) as TVData
 
   // Изменения выручки: ±10k-50k₽
   const salesDelta = Math.floor(Math.random() * 40000) + 10000
@@ -99,7 +101,7 @@ export function simulateKPIChange(currentData: TVData): TVData {
  * Симулирует изменения в таблице лидеров
  */
 export function simulateLeaderboardChange(leaderboard: TVData['leaderboard']): TVData['leaderboard'] {
-  const newLeaderboard = JSON.parse(JSON.stringify(leaderboard))
+  const newLeaderboard = JSON.parse(JSON.stringify(leaderboard.length ? leaderboard : cloneDemoTvData().leaderboard))
 
   // Выбираем случайного сотрудника (не первого, чтобы была динамика)
   const randomIndex = Math.floor(Math.random() * (newLeaderboard.length - 1)) + 1
@@ -197,8 +199,9 @@ export function simulateFullUpdate(currentData: TVData): {
   data: TVData
   event: DemoEvent | null
 } {
+  const seed = currentData || cloneDemoTvData()
   // 1. Обновляем KPI
-  const newData = simulateKPIChange(currentData)
+  const newData = simulateKPIChange(seed)
 
   // 2. Обновляем leaderboard (50% вероятность)
   if (Math.random() > 0.5) {
@@ -209,4 +212,8 @@ export function simulateFullUpdate(currentData: TVData): {
   const event = generateRandomEvent(newData)
 
   return { data: newData, event }
+}
+
+export function getDemoDataset(): TVData {
+  return cloneDemoTvData()
 }

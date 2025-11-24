@@ -59,11 +59,11 @@ export function FocusDealsTable({ deals, onUpdate }: FocusDealsTableProps) {
   if (localDeals.length === 0) {
       return (
           <div className="glass-card p-8 flex flex-col items-center justify-center text-center">
-              <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mb-3 text-gray-400">
+              <div className="w-12 h-12 bg-[var(--secondary)] rounded-full flex items-center justify-center mb-3 text-[var(--muted-foreground)]">
                   <Search className="w-6 h-6" />
               </div>
-              <h3 className="text-gray-900 font-medium">Нет активных сделок</h3>
-              <p className="text-sm text-gray-500 mt-1">Здесь появятся открытые сделки из CRM</p>
+              <h3 className="text-[var(--foreground)] font-medium">Нет активных сделок</h3>
+              <p className="text-sm text-[var(--muted-foreground)] mt-1">Здесь появятся открытые сделки из CRM</p>
           </div>
       )
   }
@@ -107,7 +107,7 @@ export function FocusDealsTable({ deals, onUpdate }: FocusDealsTableProps) {
                         disabled={isUpdating === deal.id}
                         className={`
                             w-10 h-6 rounded-full relative transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-[var(--primary)]
-                            ${deal.isFocus ? 'bg-[var(--primary)]' : 'bg-gray-200'}
+                            ${deal.isFocus ? 'bg-[var(--primary)]' : 'bg-[var(--muted)] border border-[var(--border)]'}
                             ${isUpdating === deal.id ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
                         `}
                     >

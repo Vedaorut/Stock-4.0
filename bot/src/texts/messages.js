@@ -597,7 +597,7 @@ ${channel}
     createCircular: 'Взаимные подписки не поддерживаются. Удалите обратную связь и повторите.',
     createError: 'Не удалось оформить подписку. Попробуйте ещё раз.',
     createCancelled: 'Создание подписки отменено.',
-    limitReachedBasicToPro: 'Лимит подписок\n\nBASIC — до 2 магазинов\nPRO — безлимит ($35/мес)',
+    limitReachedBasicToPro: 'Лимит подписок\n\nBASIC — до 2 магазинов\nPRO — безлимит ($1/мес)',
     createCircularDetailed:
       'Циклическая подписка\n\nЭтот магазин уже подписан на ваш магазин. Взаимные подписки не разрешены',
     cancelOperationError: 'Произошла ошибка при отмене\n\nПопробуйте позже',
@@ -662,6 +662,7 @@ ${channel}
       LTC: 'Litecoin (LTC)',
       ETH: 'Ethereum (ETH)',
       USDT_ERC20: 'USDT (ERC-20)',
+      USDT_TRC20: 'USDT (TRC-20)',
     },
   },
   workspace: {

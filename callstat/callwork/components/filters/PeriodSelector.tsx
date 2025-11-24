@@ -99,19 +99,19 @@ export function PeriodSelector({
   return (
     <div 
       ref={containerRef}
-      className={`bg-white rounded-2xl shadow-md border border-[#E5E5E7] transition-all duration-300 relative
+      className={`bg-[var(--card)] rounded-2xl shadow-md border border-[var(--border)] transition-all duration-300 relative
         ${isVertical ? 'p-2 w-[64px] flex flex-col items-center gap-2' : 'p-4 w-full sm:w-[280px] space-y-3'}
       `}
     >
       {/* Header */}
       {isVertical ? (
-         <div className="text-[#007AFF] p-1">
+         <div className="text-[var(--primary)] p-1">
             <Calendar className="w-5 h-5" />
          </div>
       ) : (
         <div className="flex items-center gap-2">
-            <Calendar className="w-5 h-5 text-[#007AFF]" />
-            <span className="text-sm font-semibold text-[#1D1D1F]">{title}</span>
+            <Calendar className="w-5 h-5 text-[var(--primary)]" />
+            <span className="text-sm font-semibold text-[var(--foreground)]">{title}</span>
         </div>
       )}
 
@@ -119,30 +119,30 @@ export function PeriodSelector({
         {isVertical ? (
              <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="w-10 h-10 mx-auto flex items-center justify-center bg-[#F5F5F7] hover:bg-[#E5E5E7] text-[#1D1D1F] text-xs font-bold rounded-full transition-colors duration-200 border border-transparent focus:border-[#007AFF] outline-none"
+                className="w-10 h-10 mx-auto flex items-center justify-center bg-[var(--secondary)] hover:bg-[var(--muted)] text-[var(--foreground)] text-xs font-bold rounded-full transition-colors duration-200 border border-transparent focus:border-[var(--primary)] outline-none"
              >
                 {activeShort}
              </button>
         ) : (
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="w-full flex items-center justify-between bg-[#F5F5F7] hover:bg-[#E5E5E7] text-[#1D1D1F] text-sm font-medium px-3 py-2 rounded-lg transition-colors duration-200 border border-transparent focus:border-[#007AFF] outline-none"
+                className="w-full flex items-center justify-between bg-[var(--secondary)] hover:bg-[var(--muted)] text-[var(--foreground)] text-sm font-medium px-3 py-2 rounded-lg transition-colors duration-200 border border-transparent focus:border-[var(--primary)] outline-none"
             >
                 <span className="truncate">{activeLabel}: {formattedRange}</span>
-                <ChevronDown className={`w-4 h-4 text-[#86868B] transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+                <ChevronDown className={`w-4 h-4 text-[var(--muted-foreground)] transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
             </button>
         )}
 
         {isOpen && (
-            <div className={`absolute bg-white border border-[#E5E5E7] rounded-xl shadow-xl z-50 p-4 space-y-4
+            <div className={`absolute bg-[var(--card)] border border-[var(--border)] rounded-xl shadow-xl z-50 p-4 space-y-4
                 ${isVertical 
                     ? 'right-full top-0 mr-3 w-[320px]' 
                     : 'top-full right-0 mt-2 w-[320px]'
                 }
             `}>
                 <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-semibold text-[#1D1D1F]">Выберите период</span>
-                    <button onClick={() => setIsOpen(false)} className="text-[#86868B] hover:text-[#1D1D1F]">
+                    <span className="text-sm font-semibold text-[var(--foreground)]">Выберите период</span>
+                    <button onClick={() => setIsOpen(false)} className="text-[var(--muted-foreground)] hover:text-[var(--foreground)]">
                         <X className="w-4 h-4" />
                     </button>
                 </div>
@@ -154,8 +154,8 @@ export function PeriodSelector({
                         onClick={() => handlePreset(item.key)}
                         className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 text-center ${
                         selectedPreset === item.key
-                            ? 'bg-[#007AFF] text-white shadow-sm'
-                            : 'bg-[#F5F5F7] text-[#1D1D1F] hover:bg-[#E5E5E7]'
+                            ? 'bg-[var(--primary)] text-white shadow-sm'
+                            : 'bg-[var(--secondary)] text-[var(--foreground)] hover:bg-[var(--muted)]'
                         }`}
                     >
                         {item.label}
@@ -163,23 +163,23 @@ export function PeriodSelector({
                     ))}
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 pt-3 border-t border-[#E5E5E7]">
+                <div className="grid grid-cols-2 gap-3 pt-3 border-t border-[var(--border)]">
                     <div className="space-y-1">
-                        <label className="text-xs font-medium text-[#86868B]">Начало</label>
+                        <label className="text-xs font-medium text-[var(--muted-foreground)]">Начало</label>
                         <input
                             type="date"
                             value={toDateInputValue(range.start)}
                             onChange={(e) => handleCustomChange('start', e.target.value)}
-                            className="w-full rounded-lg border border-[#E5E5E7] bg-[#F5F5F7] px-3 py-2 text-sm focus:border-[#007AFF] focus:bg-white transition-colors outline-none"
+                            className="w-full rounded-lg border border-[var(--border)] bg-[var(--secondary)] px-3 py-2 text-sm text-[var(--foreground)] focus:border-[var(--primary)] focus:bg-[var(--card)] transition-colors outline-none"
                         />
                     </div>
                     <div className="space-y-1">
-                        <label className="text-xs font-medium text-[#86868B]">Конец</label>
+                        <label className="text-xs font-medium text-[var(--muted-foreground)]">Конец</label>
                         <input
                             type="date"
                             value={toDateInputValue(range.end)}
                             onChange={(e) => handleCustomChange('end', e.target.value)}
-                            className="w-full rounded-lg border border-[#E5E5E7] bg-[#F5F5F7] px-3 py-2 text-sm focus:border-[#007AFF] focus:bg-white transition-colors outline-none"
+                            className="w-full rounded-lg border border-[var(--border)] bg-[var(--secondary)] px-3 py-2 text-sm text-[var(--foreground)] focus:border-[var(--primary)] focus:bg-[var(--card)] transition-colors outline-none"
                         />
                     </div>
                 </div>
@@ -188,7 +188,7 @@ export function PeriodSelector({
       </div>
       
       {!isVertical && (
-       <p className="text-[10px] text-[#86868B]">
+       <p className="text-[10px] text-[var(--muted-foreground)]">
         {range.start.toLocaleDateString('ru-RU')} — {range.end.toLocaleDateString('ru-RU')}
       </p>
       )}

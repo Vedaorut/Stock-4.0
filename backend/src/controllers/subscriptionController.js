@@ -9,14 +9,11 @@
 
 import * as subscriptionService from '../services/subscriptionService.js';
 import * as subscriptionInvoiceService from '../services/subscriptionInvoiceService.js';
-import { handleSubscriptionPayment } from '../services/pollingService.js';
-import paymentVerificationService from '../services/paymentVerificationService.js';
-import { invoiceQueries, paymentQueries } from '../database/queries/index.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
-import { NotFoundError, UnauthorizedError, ValidationError } from '../utils/errors.js';
+import { ValidationError } from '../utils/errors.js';
 import logger from '../utils/logger.js';
-import { SUPPORTED_CURRENCIES } from '../utils/constants.js';
 import { query, getClient } from '../config/database.js';
+import invoicePaymentService from '../services/invoicePaymentService.js';
 
 /**
  * Pay for subscription (monthly renewal or new subscription)
@@ -418,7 +415,10 @@ const generatePaymentInvoice = asyncHandler(async (req, res) => {
 
     // Check if there's already an active invoice
     const activeInvoice =
-      await subscriptionInvoiceService.findActiveInvoiceForSubscription(subscriptionId);
+      await subscriptionInvoiceService.findActiveInvoiceForSubscription(
+        subscriptionId,
+        subscriptionInvoiceService.INVOICE_PURPOSES.SUBSCRIPTION
+      );
 
     if (activeInvoice) {
       logger.info(
@@ -443,7 +443,8 @@ const generatePaymentInvoice = asyncHandler(async (req, res) => {
     // Generate new invoice
     const invoiceData = await subscriptionInvoiceService.generateSubscriptionInvoice(
       subscriptionId,
-      chain.toUpperCase()
+      chain.toUpperCase(),
+      { purpose: subscriptionInvoiceService.INVOICE_PURPOSES.SUBSCRIPTION }
     );
 
     logger.info(`[SubscriptionController] Invoice generated for subscription ${subscriptionId}`);
@@ -483,7 +484,10 @@ const getPaymentStatus = asyncHandler(async (req, res) => {
 
     // Find active invoice
     const activeInvoice =
-      await subscriptionInvoiceService.findActiveInvoiceForSubscription(subscriptionId);
+      await subscriptionInvoiceService.findActiveInvoiceForSubscription(
+        subscriptionId,
+        subscriptionInvoiceService.INVOICE_PURPOSES.SUBSCRIPTION
+      );
 
     if (!activeInvoice) {
       return res.status(404).json({
@@ -516,6 +520,200 @@ const getPaymentStatus = asyncHandler(async (req, res) => {
 });
 
 /**
+ * Generate payment invoice for upgrading active subscription to PRO
+ * POST /api/subscriptions/:id/upgrade/payment/generate
+ */
+const generateUpgradePaymentInvoice = asyncHandler(async (req, res) => {
+  try {
+    const subscriptionId = parseInt(req.params.id, 10);
+    const { chain } = req.body;
+    const userId = req.user.id;
+
+    const validChains = ['BTC', 'LTC', 'ETH', 'USDT_TRC20'];
+    if (!chain || !validChains.includes(chain.toUpperCase())) {
+      throw new ValidationError('Invalid chain. Supported: BTC, LTC, ETH, USDT_TRC20');
+    }
+
+    const ownershipCheck = await verifySubscriptionOwnership(subscriptionId, userId);
+    if (!ownershipCheck.success) {
+      return res.status(ownershipCheck.status).json({ error: ownershipCheck.error });
+    }
+
+    const subscription = ownershipCheck.subscription;
+    if (!subscription.shop_id) {
+      return res.status(400).json({ error: 'Subscription is not attached to a shop' });
+    }
+
+    if ((subscription.tier || '').toLowerCase() === 'pro') {
+      return res.status(400).json({ error: 'Shop is already on PRO tier' });
+    }
+
+    const upgradeInfo = await subscriptionService.calculateUpgradeCost(subscription.shop_id);
+    if (upgradeInfo.alreadyPro) {
+      return res.status(400).json({ error: 'Shop is already on PRO tier' });
+    }
+
+    if (!upgradeInfo.amount || upgradeInfo.amount <= 0) {
+      return res.status(400).json({ error: 'Upgrade amount is invalid or zero' });
+    }
+
+    const activeInvoice =
+      await subscriptionInvoiceService.findActiveInvoiceForSubscription(
+        subscriptionId,
+        subscriptionInvoiceService.INVOICE_PURPOSES.UPGRADE
+      );
+
+    if (activeInvoice) {
+      return res.status(200).json({
+        success: true,
+        invoice: {
+          invoiceId: activeInvoice.id,
+          address: activeInvoice.address,
+          expectedAmount: parseFloat(activeInvoice.expected_amount),
+          cryptoAmount: parseFloat(activeInvoice.crypto_amount),
+          currency: activeInvoice.currency,
+          expiresAt: activeInvoice.expires_at,
+          status: activeInvoice.status,
+          purpose: activeInvoice.purpose,
+        },
+        message: 'Using existing active upgrade invoice',
+      });
+    }
+
+    const invoiceData = await subscriptionInvoiceService.generateSubscriptionInvoice(
+      subscriptionId,
+      chain.toUpperCase(),
+      {
+        purpose: subscriptionInvoiceService.INVOICE_PURPOSES.UPGRADE,
+        usdAmountOverride: upgradeInfo.amount,
+      }
+    );
+
+    res.status(201).json({
+      success: true,
+      invoice: {
+        invoiceId: invoiceData.invoice.id,
+        address: invoiceData.address,
+        expectedAmount: invoiceData.expectedAmount,
+        cryptoAmount: invoiceData.cryptoAmount,
+        currency: invoiceData.currency,
+        expiresAt: invoiceData.expiresAt,
+        purpose: subscriptionInvoiceService.INVOICE_PURPOSES.UPGRADE,
+      },
+      message: 'Upgrade invoice generated successfully',
+    });
+  } catch (error) {
+    logger.error('[SubscriptionController] Error generating upgrade invoice:', error);
+    throw error;
+  }
+});
+
+/**
+ * Get upgrade payment status for subscription
+ * GET /api/subscriptions/:id/upgrade/payment/status
+ */
+const getUpgradePaymentStatus = asyncHandler(async (req, res) => {
+  try {
+    const subscriptionId = parseInt(req.params.id, 10);
+    const userId = req.user.id;
+
+    const ownershipCheck = await verifySubscriptionOwnership(subscriptionId, userId);
+    if (!ownershipCheck.success) {
+      return res.status(ownershipCheck.status).json({ error: ownershipCheck.error });
+    }
+
+    const activeInvoice =
+      await subscriptionInvoiceService.findActiveInvoiceForSubscription(
+        subscriptionId,
+        subscriptionInvoiceService.INVOICE_PURPOSES.UPGRADE
+      );
+
+    if (!activeInvoice) {
+      return res.status(404).json({
+        error: 'No active upgrade invoice found for this subscription',
+        subscriptionId,
+      });
+    }
+
+    const now = new Date();
+    const expiresAt = new Date(activeInvoice.expires_at);
+    const isExpired = now > expiresAt;
+
+    res.json({
+      success: true,
+      payment: {
+        status: isExpired ? 'expired' : activeInvoice.status,
+        address: activeInvoice.address,
+        expectedAmount: parseFloat(activeInvoice.expected_amount),
+        cryptoAmount: parseFloat(activeInvoice.crypto_amount),
+        currency: activeInvoice.currency,
+        expiresAt: activeInvoice.expires_at,
+        paidAt: activeInvoice.paid_at || null,
+        invoiceId: activeInvoice.id,
+        purpose: activeInvoice.purpose,
+      },
+    });
+  } catch (error) {
+    logger.error('[SubscriptionController] Error getting upgrade payment status:', error);
+    throw error;
+  }
+});
+
+/**
+ * Confirm upgrade payment by tx hash (upgrade to PRO)
+ * POST /api/subscriptions/:id/upgrade/payment/confirm
+ */
+const confirmUpgradePaymentWithTxHash = asyncHandler(async (req, res) => {
+  const subscriptionId = parseInt(req.params.id, 10);
+  const { txHash, paymentLink, txLink, transactionUrl } = req.body || {};
+  const proof = txHash || paymentLink || txLink || transactionUrl;
+
+  if (!proof) {
+    throw new ValidationError('txHash or payment link is required');
+  }
+
+  // Ensure invoice exists to avoid processing wrong purpose
+  const activeInvoice =
+    await subscriptionInvoiceService.findActiveInvoiceForSubscription(
+      subscriptionId,
+      subscriptionInvoiceService.INVOICE_PURPOSES.UPGRADE
+    );
+
+  if (!activeInvoice) {
+    return res.status(404).json({
+      error: 'No active upgrade invoice found for this subscription',
+      subscriptionId,
+    });
+  }
+
+  const result = await invoicePaymentService.processSubscriptionPayment({
+    subscriptionId,
+    txHash,
+    paymentLink: paymentLink || txLink || transactionUrl || null,
+    actorUserId: req.user.id,
+    mode: 'upgrade',
+    purpose: subscriptionInvoiceService.INVOICE_PURPOSES.UPGRADE,
+    invoiceId: activeInvoice.id,
+  });
+
+  if (!result.ok) {
+    return res.status(400).json({
+      success: false,
+      error: result.message,
+      code: result.code || 'PAYMENT_NOT_VERIFIED',
+      state: result.state,
+    });
+  }
+
+  return res.json({
+    success: true,
+    state: result.state,
+    idempotent: result.idempotent || false,
+    payment: result.payment || null,
+  });
+});
+
+/**
  * Manually confirm subscription payment by tx hash (single source of truth: blockchain)
  * POST /api/subscriptions/:id/payment/confirm
  *
@@ -524,122 +722,35 @@ const getPaymentStatus = asyncHandler(async (req, res) => {
 const confirmPaymentWithTxHash = asyncHandler(async (req, res) => {
   const subscriptionId = parseInt(req.params.id, 10);
   const { txHash, paymentLink, txLink, transactionUrl } = req.body || {};
-  const userId = req.user.id;
-
   const proof = txHash || paymentLink || txLink || transactionUrl;
+
   if (!proof) {
     throw new ValidationError('txHash or payment link is required');
   }
-  const normalizedHash = txHash || paymentVerificationService.extractTxHash(proof);
 
-  // Ownership check
-  const ownershipCheck = await verifySubscriptionOwnership(subscriptionId, userId);
-  if (!ownershipCheck.success) {
-    return res.status(ownershipCheck.status).json({ error: ownershipCheck.error });
-  }
-
-  // Get latest invoice for this subscription (allow pending/expired within 24h)
-  const invoiceResult = await query(
-    `SELECT *
-       FROM invoices
-      WHERE subscription_id = $1
-      ORDER BY created_at DESC
-      LIMIT 1`,
-    [subscriptionId]
-  );
-
-  if (invoiceResult.rows.length === 0) {
-    return res.status(404).json({ error: 'Invoice not found for this subscription' });
-  }
-
-  const invoice = invoiceResult.rows[0];
-  const chain = (invoice.chain || '').toUpperCase();
-  const paymentCurrency = (invoice.currency || 'USDT').toUpperCase();
-
-  const expectedAmount = parseFloat(invoice.crypto_amount || invoice.expected_amount);
-  const address = invoice.address;
-  const minConfirm = SUPPORTED_CURRENCIES[paymentCurrency]?.confirmations || 0;
-
-  const verification = await paymentVerificationService.verifyIncomingPayment({
-    txHash: normalizedHash,
-    paymentLink: paymentLink || txLink || transactionUrl,
-    address,
-    amount: expectedAmount,
-    currency: paymentCurrency,
-    chain,
+  // Ownership check happens inside the service, but we still do lightweight validation here
+  const result = await invoicePaymentService.processSubscriptionPayment({
+    subscriptionId,
+    txHash,
+    paymentLink: paymentLink || txLink || transactionUrl || null,
+    actorUserId: req.user.id,
+    purpose: subscriptionInvoiceService.INVOICE_PURPOSES.SUBSCRIPTION,
   });
 
-  if (!verification?.verified) {
+  if (!result.ok) {
     return res.status(400).json({
-      error: verification?.error || 'Payment not verified on blockchain',
-      confirmations: verification?.confirmations || 0,
-      code: verification?.code || 'PAYMENT_NOT_VERIFIED',
+      success: false,
+      error: result.message,
+      code: result.code || 'PAYMENT_NOT_VERIFIED',
+      state: result.state,
     });
-  }
-
-  const confirmations = verification.confirmations ?? 0;
-  const status =
-    verification.status || (confirmations >= minConfirm ? 'confirmed' : 'pending');
-  const verifiedTxHash = verification.txHash || normalizedHash;
-
-  // Upsert payment record (always save that we saw the tx)
-  const payment = await paymentQueries.create({
-    orderId: invoice.order_id || null,
-    subscriptionId: invoice.subscription_id || null,
-    txHash: verifiedTxHash,
-    amount: verification.amount ?? expectedAmount,
-    currency: paymentCurrency,
-    status,
-  });
-
-  // Update confirmations if present
-  if (verification.confirmations !== undefined) {
-    await paymentQueries.updateStatus(payment.id, status, verification.confirmations);
-  }
-
-  let activation = 'pending_confirmations';
-
-  // CRITICAL FIX: Only mark invoice as PAID if blockchain actually confirmed it
-  if (status === 'confirmed') {
-    // Mark invoice as paid with tx hash
-    await invoiceQueries.updateStatus(invoice.id, 'paid', verifiedTxHash);
-
-    // Activate subscription
-    try {
-      // Make sure invoice object has the tx_hash for the handler
-      invoice.tx_hash = verifiedTxHash;
-      await handleSubscriptionPayment(invoice);
-      activation = 'activated';
-    } catch (e) {
-      logger.error('[SubscriptionController] Activation failed after manual confirm', {
-        error: e.message,
-        subscriptionId,
-        invoiceId: invoice.id,
-      });
-      activation = `activation_error: ${e.message}`;
-    }
-  } else {
-    logger.info(`[SubscriptionController] Payment found but pending confirmations (${confirmations}/${minConfirm})`, {
-      subscriptionId,
-      txHash: verifiedTxHash,
-      chain
-    });
-    // Save tx_hash but keep status='pending' for polling to track
-    // This avoids unnecessary API calls in polling service
-    await invoiceQueries.updateStatus(invoice.id, 'pending', verifiedTxHash);
   }
 
   return res.json({
     success: true,
-    status,
-    confirmations,
-    activation,
-    payment: {
-      id: payment.id,
-      txHash: payment.tx_hash,
-      amount: payment.amount,
-      currency: payment.currency,
-    },
+    state: result.state,
+    idempotent: result.idempotent || false,
+    payment: result.payment || null,
   });
 });
 
@@ -700,7 +811,12 @@ const createPendingSubscription = asyncHandler(async (req, res) => {
       const now = new Date();
       const periodEnd = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
       const tempTxHash = `pending-${userId}-${Date.now()}`;
-      const amount = tier === 'pro' ? 35.0 : 25.0;
+      const amount = subscriptionService.SUBSCRIPTION_PRICES[tier];
+
+      // VALIDATION FIX: Ensure amount is valid
+      if (!amount || Number.isNaN(amount) || amount <= 0) {
+        throw new ValidationError(`Invalid subscription amount for tier '${tier}': ${amount}`);
+      }
 
       const subscriptionResult = await client.query(
         `INSERT INTO shop_subscriptions
@@ -811,7 +927,10 @@ export {
   getUserSubscriptions,
   getMyShopSubscriptions,
   generatePaymentInvoice,
+  generateUpgradePaymentInvoice,
   getPaymentStatus,
+  getUpgradePaymentStatus,
   confirmPaymentWithTxHash,
+  confirmUpgradePaymentWithTxHash,
   createPendingSubscription,
 };

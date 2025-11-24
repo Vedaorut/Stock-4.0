@@ -43,16 +43,16 @@ export function PulseGrid({ stats, northStarKpi }: PulseGridProps) {
               {formatMoney(stats.salesAmount)}
             </h3>
           </div>
-          <div className="p-2 bg-blue-50 rounded-lg text-blue-600">
+          <div className="p-2 bg-[var(--info)]/10 rounded-lg text-[var(--info)]">
             <DollarSign className="w-5 h-5" />
           </div>
         </div>
-        <div className="relative h-4 bg-gray-100 rounded-full overflow-hidden mb-2">
+        <div className="relative h-4 bg-[var(--secondary)] rounded-full overflow-hidden mb-2">
           <div
-            className="absolute top-0 left-0 h-full bg-blue-500 transition-all duration-500"
+            className="absolute top-0 left-0 h-full bg-[var(--info)] transition-all duration-500"
             style={{ width: `${salesProgress}%` }}
           />
-          <div className="absolute top-0 bottom-0 w-0.5 bg-black/20 left-[80%]" />
+          <div className="absolute top-0 bottom-0 w-0.5 bg-[var(--foreground)]/20 left-[80%]" />
         </div>
         <div className="flex justify-between text-xs text-[var(--muted-foreground)]">
           <span>Факт: {Math.round(salesProgress)}%</span>
@@ -73,11 +73,11 @@ export function PulseGrid({ stats, northStarKpi }: PulseGridProps) {
               {stats.successfulDeals}
             </h3>
           </div>
-          <div className="p-2 bg-purple-50 rounded-lg text-purple-600">
+          <div className="p-2 bg-purple-500/10 rounded-lg text-purple-500">
             <Target className="w-5 h-5" />
           </div>
         </div>
-        <div className="relative h-4 bg-gray-100 rounded-full overflow-hidden mb-2">
+        <div className="relative h-4 bg-[var(--secondary)] rounded-full overflow-hidden mb-2">
           <div
             className="absolute top-0 left-0 h-full bg-purple-500 transition-all duration-500"
             style={{ width: `${dealsProgress}%` }}
@@ -102,18 +102,18 @@ export function PulseGrid({ stats, northStarKpi }: PulseGridProps) {
               {stats.totalConversion}%
             </h3>
           </div>
-          <div className={`p-2 rounded-lg ${isConversionUp ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}`}>
+          <div className={`p-2 rounded-lg ${isConversionUp ? 'bg-[var(--success)]/10 text-[var(--success)]' : 'bg-[var(--danger)]/10 text-[var(--danger)]'}`}>
             <Activity className="w-5 h-5" />
           </div>
         </div>
 
         <div className="flex items-center gap-2 mt-2">
           {isConversionUp ? (
-            <TrendingUp className="w-4 h-4 text-green-600" />
+            <TrendingUp className="w-4 h-4 text-[var(--success)]" />
           ) : (
-            <TrendingDown className="w-4 h-4 text-red-600" />
+            <TrendingDown className="w-4 h-4 text-[var(--danger)]" />
           )}
-          <span className={`text-sm font-medium ${isConversionUp ? 'text-green-600' : 'text-red-600'}`}>
+          <span className={`text-sm font-medium ${isConversionUp ? 'text-[var(--success)]' : 'text-[var(--danger)]'}`}>
             {Math.abs(conversionDiff)}% к прошлому периоду
           </span>
         </div>
@@ -136,7 +136,7 @@ export function PulseGrid({ stats, northStarKpi }: PulseGridProps) {
             </h3>
             <p className="text-xs text-[var(--muted-foreground)]">1-й Zoom → Оплата</p>
           </div>
-          <div className={`p-2 rounded-lg ${northStarGood ? 'bg-green-50 text-green-600' : 'bg-amber-50 text-amber-600'}`}>
+          <div className={`p-2 rounded-lg ${northStarGood ? 'bg-[var(--success)]/10 text-[var(--success)]' : 'bg-[var(--warning)]/10 text-[var(--warning)]'}`}>
             <Target className="w-5 h-5" />
           </div>
         </div>

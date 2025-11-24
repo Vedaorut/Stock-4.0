@@ -1,5 +1,6 @@
 import { Report } from '@prisma/client'
-import { CONVERSION_BENCHMARKS, FUNNEL_STAGES } from '@/lib/config/conversionBenchmarks'
+import { CONVERSION_BENCHMARKS, FUNNEL_STAGES, KPI_BENCHMARKS, PLAN_HEURISTICS } from '@/lib/config/metrics'
+import { computeConversions, stageBenchmarkById } from '@/lib/calculations/metrics'
 
 export interface FunnelStage {
   id: string
@@ -49,8 +50,8 @@ export const BENCHMARKS = {
   zoom2ToContract: CONVERSION_BENCHMARKS.ZOOM2_TO_CONTRACT,
   contractToPush: CONVERSION_BENCHMARKS.CONTRACT_TO_PUSH,
   pushToDeal: CONVERSION_BENCHMARKS.PUSH_TO_DEAL,
-  northStar: CONVERSION_BENCHMARKS.ZOOM1_TO_DEAL_KPI,
-  activityScore: 80,
+  northStar: KPI_BENCHMARKS.NORTH_STAR,
+  activityScore: KPI_BENCHMARKS.ACTIVITY_SCORE,
 }
 
 export function getHeatmapColor(value: number, benchmark: number): string {
@@ -101,15 +102,16 @@ export function calculateManagerStatsClient(
     }
   )
 
-  const safeDiv = (a: number, b: number) => (b > 0 ? Math.round((a / b) * 100) : 0)
+  const { stages, northStar, totalConversion } = computeConversions({
+    zoomBooked: totals.zoomBooked,
+    zoom1Held: totals.zoom1Held,
+    zoom2Held: totals.zoom2Held,
+    contractReview: totals.contractReview,
+    push: totals.pushCount,
+    deals: totals.successfulDeals,
+  })
 
-  const bookedToZoom1 = safeDiv(totals.zoom1Held, totals.zoomBooked)
-  const zoom1ToZoom2 = safeDiv(totals.zoom2Held, totals.zoom1Held)
-  const zoom2ToContract = safeDiv(totals.contractReview, totals.zoom2Held)
-  const contractToPush = safeDiv(totals.pushCount, totals.contractReview)
-  const pushToDeal = safeDiv(totals.successfulDeals, totals.pushCount)
-  const northStar = safeDiv(totals.successfulDeals, totals.zoom1Held)
-
+  const convMap = Object.fromEntries(stages.map((stage) => [stage.id, stage.conversion]))
   const expectedActivity = totals.zoomBooked > 0 ? 100 : 0
   const actualActivity = Math.min(
     100,
@@ -122,15 +124,15 @@ export function calculateManagerStatsClient(
 
   return {
     ...totals,
-    bookedToZoom1,
-    zoom1ToZoom2,
-    zoom2ToContract,
-    contractToPush,
-    pushToDeal,
+    bookedToZoom1: (convMap.zoom1Held as number) || 0,
+    zoom1ToZoom2: (convMap.zoom2Held as number) || 0,
+    zoom2ToContract: (convMap.contractReview as number) || 0,
+    contractToPush: (convMap.push as number) || 0,
+    pushToDeal: (convMap.deal as number) || 0,
     northStar,
-    totalConversion: safeDiv(totals.successfulDeals, totals.zoomBooked),
+    totalConversion,
     planSales,
-    planDeals,
+    planDeals: planDeals || Math.max(1, Math.round(planSales / PLAN_HEURISTICS.SALES_PER_DEAL)),
     activityScore,
     trend,
   }
@@ -158,15 +160,7 @@ export function getFunnelData(stats: Omit<ManagerStats, 'id' | 'name'>): FunnelS
     const prevStage = FUNNEL_STAGES[index - 1]
     const prevValue = prevStage ? stageMap[prevStage.id as keyof typeof stageMap] : undefined
     const conversion = conversionMap[stage.id] ?? 100
-    const benchmark =
-      {
-        zoomBooked: 100,
-        zoom1Held: BENCHMARKS.bookedToZoom1,
-        zoom2Held: BENCHMARKS.zoom1ToZoom2,
-        contractReview: BENCHMARKS.zoom2ToContract,
-        push: BENCHMARKS.contractToPush,
-        deal: BENCHMARKS.pushToDeal,
-      }[stage.id] || 100
+    const benchmark = stageBenchmarkById(stage.id as any)
 
     return {
       id: stage.id,

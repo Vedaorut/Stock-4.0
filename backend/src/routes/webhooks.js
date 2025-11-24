@@ -13,6 +13,7 @@ import { getClient } from '../config/database.js';
 import telegramService from '../services/telegram.js';
 import logger from '../utils/logger.js';
 import { amountsMatchWithTolerance } from '../utils/paymentTolerance.js';
+import invoicePaymentService from '../services/invoicePaymentService.js';
 
 const router = express.Router();
 
@@ -25,113 +26,6 @@ const router = express.Router();
 async function updateOrderStatus(orderId, status) {
   await orderQueries.updateStatus(orderId, status);
   logger.info(`[Webhook] Order ${orderId} status updated to ${status}`);
-}
-
-/**
- * Helper: Handle confirmed subscription payment
- * @param {object} invoice - Invoice record with subscription_id
- * @param {object} client - Database client (transaction)
- */
-async function handleSubscriptionPayment(invoice, client, txHash = null) {
-  try {
-    logger.info(
-      `[Webhook] Processing subscription payment for subscription ${invoice.subscription_id}`
-    );
-
-    // Get subscription details
-    const subResult = await client.query(
-      'SELECT shop_id, tier, user_id FROM shop_subscriptions WHERE id = $1',
-      [invoice.subscription_id]
-    );
-
-    if (subResult.rows.length === 0) {
-      logger.error('[Webhook] Subscription not found:', {
-        subscriptionId: invoice.subscription_id,
-      });
-      // Don't throw - just mark webhook as processed
-      return;
-    }
-
-    const subscription = subResult.rows[0];
-
-    // Update subscription status to 'active' and set verified_at
-    await client.query(
-      `UPDATE shop_subscriptions 
-       SET status = 'active', 
-           verified_at = NOW()
-       WHERE id = $1`,
-      [invoice.subscription_id]
-    );
-
-    // Update shop subscription status
-    const periodStart = new Date();
-    const periodEnd = new Date(periodStart.getTime() + 30 * 24 * 60 * 60 * 1000);
-
-    await client.query(
-      `UPDATE shops 
-       SET tier = $1,
-           subscription_status = 'active',
-           next_payment_due = $2,
-           grace_period_until = NULL,
-           registration_paid = true,
-           is_active = true,
-           updated_at = NOW()
-       WHERE id = $3`,
-      [subscription.tier, periodEnd, subscription.shop_id]
-    );
-
-    // Update invoice status (tx_hash from webhook/polling)
-    await invoiceQueries.updateStatus(invoice.id, 'paid', txHash);
-
-    logger.info('[Webhook] Subscription activated successfully', {
-      subscriptionId: invoice.subscription_id,
-      shopId: subscription.shop_id,
-      tier: subscription.tier,
-    });
-
-    try {
-      if (subscription.shop_id) {
-        const ownerResult = await client.query(
-          `SELECT s.name AS shop_name, u.telegram_id
-             FROM shops s
-             JOIN users u ON s.owner_id = u.id
-            WHERE s.id = $1`,
-          [subscription.shop_id]
-        );
-
-        const owner = ownerResult.rows[0];
-        if (owner?.telegram_id) {
-          await telegramService.notifySubscriptionActivated(owner.telegram_id, {
-            shopName: owner.shop_name,
-            tier: subscription.tier,
-            nextPaymentDue: periodEnd,
-          });
-        }
-      } else {
-        const subscriberResult = await client.query('SELECT telegram_id FROM users WHERE id = $1', [
-          subscription.user_id,
-        ]);
-        const subscriber = subscriberResult.rows[0];
-        if (subscriber?.telegram_id) {
-          await telegramService.notifySubscriptionPendingSetup(subscriber.telegram_id, {
-            tier: subscription.tier,
-          });
-        }
-      }
-    } catch (notifError) {
-      logger.error('[Webhook] Subscription notification error', {
-        error: notifError.message,
-        subscriptionId: invoice.subscription_id,
-      });
-    }
-  } catch (error) {
-    logger.error('[Webhook] Failed to handle subscription payment:', {
-      error: error.message,
-      invoiceId: invoice.id,
-      subscriptionId: invoice.subscription_id,
-    });
-    throw error;
-  }
 }
 
 /**
@@ -326,7 +220,23 @@ router.post('/blockcypher', async (req, res) => {
         // Verify amount if it's an order payment
         if (isOrderPayment) {
           const expectedAmount = parseFloat(invoice.crypto_amount || invoice.expected_amount);
-          const receivedAmount = verifiedTx.total / 100000000; // Convert satoshis to BTC/LTC
+          
+          // Find output to invoice address (instead of using total)
+          const invoiceOutput = verifiedTx.outputs.find(
+            (out) => out.addresses && out.addresses.includes(invoice.address)
+          );
+          
+          if (!invoiceOutput) {
+            logger.error('[Webhook] Invoice address not found in tx outputs', {
+              invoiceAddress: invoice.address,
+              txHash: paymentData.txHash,
+              outputs: verifiedTx.outputs.map(o => o.addresses),
+            });
+            await client.query('COMMIT');
+            return res.status(400).json({ error: 'Invoice address not in transaction outputs' });
+          }
+          
+          const receivedAmount = invoiceOutput.value / 100000000; // Convert satoshis to BTC/LTC
           const chain = invoice.chain.toUpperCase();
 
           if (!amountsMatchWithTolerance(receivedAmount, expectedAmount, undefined, chain)) {
@@ -359,16 +269,34 @@ router.post('/blockcypher', async (req, res) => {
 
       if (existingPayment) {
         // Update existing payment
-        await paymentQueries.updateStatus(existingPayment.id, status, paymentData.confirmations);
+        await paymentQueries.updateStatus(existingPayment.id, status, paymentData.confirmations, client);
 
         // If newly confirmed, update order or subscription
         if (status === 'confirmed' && existingPayment.status !== 'confirmed') {
           if (isSubscriptionPayment) {
-            await handleSubscriptionPayment(invoice, client, paymentData.txHash);
+            // COMMIT current transaction before delegating to invoicePaymentService
+            // invoicePaymentService has its own transaction management
             await client.query('COMMIT');
-            logger.info(
-              `[Webhook] Subscription ${invoice.subscription_id} activated via BlockCypher!`
-            );
+
+            // Delegate to invoicePaymentService (single source of truth)
+            const result = await invoicePaymentService.processSubscriptionPayment({
+              subscriptionId: invoice.subscription_id,
+              txHash: paymentData.txHash,
+              invoiceId: invoice.id,
+              purpose: invoice.purpose,
+              mode: invoice.purpose === 'subscription_upgrade' ? 'upgrade' : null,
+            });
+
+            if (result.ok) {
+              logger.info(
+                `[Webhook] Subscription ${invoice.subscription_id} activated via BlockCypher (delegated to invoicePaymentService)!`
+              );
+            } else if (result.state !== 'already_processed') {
+              logger.error('[Webhook] invoicePaymentService failed:', {
+                result,
+                invoiceId: invoice.id,
+              });
+            }
           } else {
             await updateOrderStatus(invoice.order_id, 'confirmed');
             await invoiceQueries.updateStatus(invoice.id, 'paid', paymentData.txHash);
@@ -391,16 +319,32 @@ router.post('/blockcypher', async (req, res) => {
         });
       }
 
-      // Handle subscription payments (no payment record needed)
+      // Handle subscription payments - delegate to invoicePaymentService
       if (isSubscriptionPayment) {
+        // COMMIT current transaction before delegating
+        await client.query('COMMIT');
+
         if (status === 'confirmed') {
-          await handleSubscriptionPayment(invoice, client, paymentData.txHash);
-          await client.query('COMMIT');
-          logger.info(
-            `[Webhook] Subscription ${invoice.subscription_id} activated via BlockCypher!`
-          );
+          // Delegate to invoicePaymentService (single source of truth)
+          const result = await invoicePaymentService.processSubscriptionPayment({
+            subscriptionId: invoice.subscription_id,
+            txHash: paymentData.txHash,
+            invoiceId: invoice.id,
+            purpose: invoice.purpose,
+            mode: invoice.purpose === 'subscription_upgrade' ? 'upgrade' : null,
+          });
+
+          if (result.ok) {
+            logger.info(
+              `[Webhook] Subscription ${invoice.subscription_id} activated via BlockCypher (delegated to invoicePaymentService)!`
+            );
+          } else if (result.state !== 'already_processed') {
+            logger.error('[Webhook] invoicePaymentService failed:', {
+              result,
+              invoiceId: invoice.id,
+            });
+          }
         } else {
-          await client.query('COMMIT');
           logger.info(
             `[Webhook] Subscription payment pending (${paymentData.confirmations} confirmations)`
           );
@@ -423,7 +367,7 @@ router.post('/blockcypher', async (req, res) => {
       });
 
       // Update payment with confirmations
-      await paymentQueries.updateStatus(payment.id, status, paymentData.confirmations);
+      await paymentQueries.updateStatus(payment.id, status, paymentData.confirmations, client);
 
       logger.info(
         `[Webhook] Payment created: ${payment.id} with ${paymentData.confirmations} confirmations`

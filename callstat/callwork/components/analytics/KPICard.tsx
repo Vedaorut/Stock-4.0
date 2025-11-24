@@ -54,7 +54,7 @@ export const KPICard = memo(function KPICard({
             </p>
           </div>
           {icon && (
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--primary)]/10 to-[var(--primary)]/20 flex items-center justify-center text-[var(--primary)] shadow-sm">
+            <div className="w-10 h-10 rounded-full bg-[var(--primary)]/10 flex items-center justify-center text-[var(--primary)] shadow-sm">
               {icon}
             </div>
           )}

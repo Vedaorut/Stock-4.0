@@ -640,6 +640,38 @@ export const subscriptionApi = {
     return data.data || data;
   },
 
+  async generateUpgradeInvoice(subscriptionId, chain, token) {
+    const { data } = await paymentAxios.post(
+      `/subscriptions/${subscriptionId}/upgrade/payment/generate`,
+      { chain },
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    );
+    return data.invoice || data.data || data;
+  },
+
+  async getUpgradePaymentStatus(subscriptionId, token) {
+    const { data } = await paymentAxios.get(
+      `/subscriptions/${subscriptionId}/upgrade/payment/status`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    );
+    return data.payment || data.data || data;
+  },
+
+  async confirmUpgradePayment(subscriptionId, txHash, token) {
+    const { data } = await paymentAxios.post(
+      `/subscriptions/${subscriptionId}/upgrade/payment/confirm`,
+      { txHash },
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    );
+    return data.data || data;
+  },
+
   // Create pending subscription (first-time shop creation)
   async createPending(tier, token) {
     const { data } = await api.post(

@@ -50,29 +50,29 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#F5F5F7] to-[#E5E5E7] p-4">
+    <div className="min-h-screen flex items-center justify-center bg-[var(--background)] p-4 transition-colors">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         className="w-full max-w-md"
       >
-        <div className="bg-white rounded-[24px] shadow-[0_8px_24px_rgba(0,0,0,0.12)] p-8">
+        <div className="bg-[var(--card)] rounded-[24px] border border-[var(--border)] shadow-[var(--shadow-lg)] p-8 transition-colors">
           <div className="text-center mb-8">
-            <h1 className="text-4xl font-bold text-[#1D1D1F] mb-2">
+            <h1 className="text-4xl font-bold text-[var(--foreground)] mb-2">
               Callwork
             </h1>
-            <p className="text-[#86868B]">
+            <p className="text-[var(--muted-foreground)]">
               Система учёта статистики call-центра
             </p>
           </div>
 
-          <div className="flex gap-2 mb-6 p-1 bg-[#F5F5F7] rounded-[12px]">
+          <div className="flex gap-2 mb-6 p-1 bg-[var(--muted)] rounded-[12px]">
             <button
               onClick={() => setActiveTab('login')}
               className={`flex-1 py-2.5 rounded-[8px] text-sm font-medium transition-all duration-200 ${
                 activeTab === 'login'
-                  ? 'bg-white text-[#1D1D1F] shadow-sm'
-                  : 'text-[#86868B] hover:text-[#1D1D1F]'
+                  ? 'bg-[var(--card)] text-[var(--foreground)] shadow-sm'
+                  : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
               }`}
             >
               Вход
@@ -81,8 +81,8 @@ export default function LoginPage() {
               onClick={() => setActiveTab('register')}
               className={`flex-1 py-2.5 rounded-[8px] text-sm font-medium transition-all duration-200 ${
                 activeTab === 'register'
-                  ? 'bg-white text-[#1D1D1F] shadow-sm'
-                  : 'text-[#86868B] hover:text-[#1D1D1F]'
+                  ? 'bg-[var(--card)] text-[var(--foreground)] shadow-sm'
+                  : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
               }`}
             >
               Регистрация

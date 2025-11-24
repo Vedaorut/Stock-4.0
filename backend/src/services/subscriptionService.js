@@ -27,6 +27,7 @@ function addDays(date, days) {
  * Process subscription payment
  * Verifies crypto transaction and creates subscription record
  *
+ * @deprecated Use invoicePaymentService.processSubscriptionPayment instead
  * @param {number} shopId - Shop ID
  * @param {string} tier - Subscription tier ('basic' or 'pro')
  * @param {string} txHash - Blockchain transaction hash
@@ -138,6 +139,7 @@ async function processSubscriptionPayment(
  * Upgrade shop from free to PRO tier
  * Calculates prorated amount based on remaining time
  *
+ * @deprecated Use invoicePaymentService.processUpgradePayment instead
  * @param {number} shopId - Shop ID
  * @param {string} txHash - Blockchain transaction hash for upgrade payment
  * @param {string} currency - Cryptocurrency
@@ -803,4 +805,7 @@ export {
   getUserSubscriptions,
   getMyShopSubscriptions,
   activatePromoSubscription,
+  SUBSCRIPTION_PRICES,
+  SUBSCRIPTION_PRICES_YEARLY,
+  GRACE_PERIOD_DAYS,
 };

@@ -15,6 +15,7 @@ import * as cryptoPriceService from './cryptoPriceService.js';
 import { invoiceQueries } from '../database/queries/index.js';
 import { query } from '../config/database.js';
 import { SUBSCRIPTION_PRICES } from '../config/subscriptionPricing.js';
+import { INVOICE_PURPOSES } from '../constants/invoice.js';
 
 // Invoice expiration time (30 minutes)
 const INVOICE_EXPIRATION_MINUTES = 30;
@@ -30,8 +31,7 @@ function getXpubs() {
     USDT_TRC20:
       process.env.TRX_XPUB ||
       process.env.HD_XPUB_TRON ||
-      process.env.ETH_XPUB ||
-      process.env.HD_XPUB_ETH, // USDT TRC20 uses Tron addresses (fallback to ETH)
+      null, // USDT TRC20 requires Tron xpub - NO fallback to ETH!
   };
 }
 
@@ -49,10 +49,15 @@ function getWebhookBaseUrl() {
  * @param {string} chain - Blockchain (BTC, LTC, ETH, USDT_TRC20)
  * @returns {Promise<object>} { invoice, address, expectedAmount, currency, expiresAt }
  */
-export async function generateSubscriptionInvoice(subscriptionId, chain) {
+export async function generateSubscriptionInvoice(subscriptionId, chain, options = {}) {
+  const {
+    purpose = INVOICE_PURPOSES.SUBSCRIPTION,
+    usdAmountOverride = null,
+  } = options;
+
   try {
     logger.info(
-      `[SubscriptionInvoice] Generating invoice for subscription ${subscriptionId}, chain: ${chain}`
+      `[SubscriptionInvoice] Generating invoice for subscription ${subscriptionId}, chain: ${chain}, purpose: ${purpose}`
     );
 
     // 1. Get subscription details
@@ -74,13 +79,15 @@ export async function generateSubscriptionInvoice(subscriptionId, chain) {
     const { tier, shop_name } = subscription;
 
     // 2. Determine expected amount from tier (in USD)
-    const usdAmount = SUBSCRIPTION_PRICES[tier];
+    const usdAmount = usdAmountOverride ?? SUBSCRIPTION_PRICES[tier];
 
-    if (!usdAmount) {
-      throw new Error(`Invalid subscription tier: ${tier}`);
+    if (!usdAmount || Number.isNaN(usdAmount) || usdAmount <= 0) {
+      throw new Error(`Invalid subscription amount for tier '${tier}': ${usdAmount}. Check SUBSCRIPTION_PRICES configuration.`);
     }
 
-    logger.info(`[SubscriptionInvoice] Subscription tier: ${tier}, USD amount: $${usdAmount}`);
+    logger.info(
+      `[SubscriptionInvoice] Subscription tier: ${tier}, USD amount: $${usdAmount} (purpose: ${purpose})`
+    );
 
     // 3. Normalize chain name
     const normalizedChain = normalizeChain(chain);
@@ -92,8 +99,9 @@ export async function generateSubscriptionInvoice(subscriptionId, chain) {
 
     try {
       const conversionResult = await cryptoPriceService.convertAndRound(usdAmount, normalizedChain);
-      cryptoAmount = conversionResult.cryptoAmount;
-      usdRate = conversionResult.usdRate;
+      // CRITICAL FIX: Convert string to float to avoid precision issues
+      cryptoAmount = parseFloat(conversionResult.cryptoAmount);
+      usdRate = parseFloat(conversionResult.usdRate);
 
       logger.info(
         `[SubscriptionInvoice] Price conversion: $${usdAmount} USD = ${cryptoAmount} ${currency} (rate: $${usdRate})`
@@ -172,8 +180,8 @@ export async function generateSubscriptionInvoice(subscriptionId, chain) {
     // 10. Create invoice record with crypto_amount and usd_rate (migration 016)
     const invoiceResult = await query(
       `INSERT INTO invoices
-       (subscription_id, chain, address, address_index, expected_amount, crypto_amount, usd_rate, currency, tatum_subscription_id, expires_at, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'pending')
+       (subscription_id, chain, address, address_index, expected_amount, crypto_amount, usd_rate, currency, tatum_subscription_id, expires_at, status, purpose)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'pending', $11)
        RETURNING *`,
       [
         subscriptionId,
@@ -186,6 +194,7 @@ export async function generateSubscriptionInvoice(subscriptionId, chain) {
         currency,
         webhookSubscriptionId,
         expiresAt,
+        purpose,
       ]
     );
 
@@ -232,22 +241,33 @@ export async function generateSubscriptionInvoice(subscriptionId, chain) {
  * Find active (pending, not expired) invoice for subscription
  *
  * @param {number} subscriptionId - Shop subscription ID
+ * @param {string|null} purpose - Optional invoice purpose filter
  * @returns {Promise<object|null>} Invoice or null
  */
-export async function findActiveInvoiceForSubscription(subscriptionId) {
+export async function findActiveInvoiceForSubscription(subscriptionId, purpose = null) {
   try {
     logger.debug('[SubscriptionInvoice] Searching for active invoice', {
       subscriptionId,
+      purpose,
       searchConditions: {
         status: 'pending',
         expires_at: 'must be > NOW()',
       },
     });
 
+    const params = [subscriptionId];
+    let purposeFilter = '';
+
+    if (purpose) {
+      purposeFilter = 'AND purpose = $2';
+      params.push(purpose);
+    }
+
     // Main query - Relaxed to include PAID invoices so the UI doesn't crash after payment
     const result = await query(
       `SELECT * FROM invoices
        WHERE subscription_id = $1
+       ${purposeFilter}
        AND (
          (status = 'pending' AND expires_at > NOW())
          OR
@@ -255,7 +275,7 @@ export async function findActiveInvoiceForSubscription(subscriptionId) {
        )
        ORDER BY created_at DESC
        LIMIT 1`,
-      [subscriptionId]
+      params
     );
 
     if (result.rows.length === 0) {
@@ -275,9 +295,10 @@ export async function findActiveInvoiceForSubscription(subscriptionId) {
           created_at
         FROM invoices 
         WHERE subscription_id = $1
+        ${purposeFilter}
         ORDER BY created_at DESC
         LIMIT 5`,
-        [subscriptionId]
+        params
       );
 
       if (diagnosticResult.rows.length === 0) {

@@ -1,7 +1,7 @@
 ---
 name: debug-master
 description: Senior Debugging Specialist. Use proactively for finding and fixing bugs, error analysis, import resolution, runtime debugging, database issues, and test failures.
-model: sonnet
+model: opus
 ---
 
 # Debug Master

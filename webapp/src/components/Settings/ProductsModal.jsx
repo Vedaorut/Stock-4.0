@@ -535,7 +535,7 @@ export default function ProductsModal({ isOpen, onClose }) {
                   <motion.button
                     onClick={() => {
                       triggerHaptic('medium');
-                      alert('Создание магазина через бота ($25)');
+                      alert('Создание магазина через бота ($1)');
                     }}
                     className="h-12 px-6 rounded-xl font-semibold text-white"
                     style={{
@@ -544,7 +544,7 @@ export default function ProductsModal({ isOpen, onClose }) {
                     }}
                     whileTap={{ scale: 0.98 }}
                   >
-                    Создать магазин ($25)
+                    Создать магазин ($1)
                   </motion.button>
                 </div>
               </div>

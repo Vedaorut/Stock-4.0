@@ -51,31 +51,31 @@ export function ManagersTable({ managers }: ManagersTableProps) {
             return (
               <tr
                 key={manager.id}
-                className="bg-white/50 hover:bg-white/80 transition-colors shadow-sm rounded-lg group"
+                className="bg-[var(--card)]/50 hover:bg-[var(--card)] transition-colors shadow-sm rounded-lg group"
               >
-                <td className="px-4 py-3 font-bold text-[var(--foreground)] bg-gray-50/50 rounded-l-lg text-center w-12 border-r border-gray-100">
+                <td className="px-4 py-3 font-bold text-[var(--foreground)] bg-[var(--secondary)]/50 rounded-l-lg text-center w-12 border-r border-[var(--border)]">
                   {rank}
                 </td>
 
                 <td className="px-4 py-3 font-medium text-[var(--foreground)]">
                   <div className="flex items-center gap-2">
                     {manager.name}
-                    {manager.trend === 'up' && <ArrowUp className="w-3 h-3 text-green-500" />}
-                    {manager.trend === 'down' && <ArrowDown className="w-3 h-3 text-red-500" />}
-                    {manager.trend === 'flat' && <Minus className="w-3 h-3 text-gray-400" />}
+                    {manager.trend === 'up' && <ArrowUp className="w-3 h-3 text-[var(--success)]" />}
+                    {manager.trend === 'down' && <ArrowDown className="w-3 h-3 text-[var(--danger)]" />}
+                    {manager.trend === 'flat' && <Minus className="w-3 h-3 text-[var(--muted-foreground)]" />}
                   </div>
                 </td>
 
                 <td className="px-4 py-3">
                   <div className="w-32">
                     <div className="flex justify-between text-xs mb-1">
-                      <span className="font-medium">{formatMoney(manager.salesAmount)}</span>
+                      <span className="font-medium text-[var(--foreground)]">{formatMoney(manager.salesAmount)}</span>
                       <span className="text-[var(--muted-foreground)]">{Math.round(planProgress)}%</span>
                     </div>
-                    <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                    <div className="h-1.5 bg-[var(--secondary)] rounded-full overflow-hidden">
                       <div
                         className={`h-full rounded-full ${
-                          planProgress >= 100 ? 'bg-green-500' : 'bg-blue-500'
+                          planProgress >= 100 ? 'bg-[var(--success)]' : 'bg-[var(--info)]'
                         }`}
                         style={{ width: `${planProgress}%` }}
                       />
@@ -85,10 +85,10 @@ export function ManagersTable({ managers }: ManagersTableProps) {
 
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-2">
-                    <span className="font-bold w-6">{manager.successfulDeals}</span>
-                    <div className="h-1.5 bg-purple-100 rounded-full flex-1 max-w-[60px]">
+                    <span className="font-bold w-6 text-[var(--foreground)]">{manager.successfulDeals}</span>
+                    <div className="h-1.5 bg-purple-500/20 rounded-full flex-1 max-w-[60px]">
                       <div
-                        className="h-full bg-purple-600 rounded-full"
+                        className="h-full bg-purple-500 rounded-full"
                         style={{ width: `${Math.min(100, (manager.successfulDeals / 10) * 100)}%` }}
                       />
                     </div>
@@ -96,27 +96,27 @@ export function ManagersTable({ managers }: ManagersTableProps) {
                 </td>
 
                 <td
-                  className={`px-4 py-3 text-center font-mono font-medium border-l border-white ${getHeatmapColor(manager.bookedToZoom1, BENCHMARKS.bookedToZoom1)}`}
+                  className={`px-4 py-3 text-center font-mono font-medium border-l border-[var(--border)] ${getHeatmapColor(manager.bookedToZoom1, BENCHMARKS.bookedToZoom1)}`}
                 >
                   {manager.bookedToZoom1}%
                 </td>
                 <td
-                  className={`px-4 py-3 text-center font-mono font-medium border-l border-white ${getHeatmapColor(manager.zoom1ToZoom2, BENCHMARKS.zoom1ToZoom2)}`}
+                  className={`px-4 py-3 text-center font-mono font-medium border-l border-[var(--border)] ${getHeatmapColor(manager.zoom1ToZoom2, BENCHMARKS.zoom1ToZoom2)}`}
                 >
                   {manager.zoom1ToZoom2}%
                 </td>
                 <td
-                  className={`px-4 py-3 text-center font-mono font-medium border-l border-white ${getHeatmapColor(manager.zoom2ToContract, BENCHMARKS.zoom2ToContract)}`}
+                  className={`px-4 py-3 text-center font-mono font-medium border-l border-[var(--border)] ${getHeatmapColor(manager.zoom2ToContract, BENCHMARKS.zoom2ToContract)}`}
                 >
                   {manager.zoom2ToContract}%
                 </td>
                 <td
-                  className={`px-4 py-3 text-center font-mono font-medium border-l border-white ${getHeatmapColor(manager.contractToPush, BENCHMARKS.contractToPush)}`}
+                  className={`px-4 py-3 text-center font-mono font-medium border-l border-[var(--border)] ${getHeatmapColor(manager.contractToPush, BENCHMARKS.contractToPush)}`}
                 >
                   {manager.contractToPush}%
                 </td>
                 <td
-                  className={`px-4 py-3 text-center font-mono font-medium border-l border-white ${getHeatmapColor(manager.pushToDeal, BENCHMARKS.pushToDeal)}`}
+                  className={`px-4 py-3 text-center font-mono font-medium border-l border-[var(--border)] ${getHeatmapColor(manager.pushToDeal, BENCHMARKS.pushToDeal)}`}
                 >
                   {manager.pushToDeal}%
                 </td>
@@ -125,8 +125,8 @@ export function ManagersTable({ managers }: ManagersTableProps) {
                   <div
                     className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
                       manager.activityScore >= BENCHMARKS.activityScore
-                        ? 'bg-gray-100 text-gray-700'
-                        : 'bg-red-50 text-red-600'
+                        ? 'bg-[var(--secondary)] text-[var(--foreground)]'
+                        : 'bg-[var(--danger)]/10 text-[var(--danger)]'
                     }`}
                   >
                     {manager.activityScore}

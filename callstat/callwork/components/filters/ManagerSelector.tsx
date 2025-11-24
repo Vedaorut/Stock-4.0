@@ -43,20 +43,20 @@ export function ManagerSelector({
   return (
     <div 
       ref={containerRef}
-      className={`bg-white rounded-2xl shadow-md border border-[#E5E5E7] transition-all duration-300 relative
+      className={`bg-[var(--card)] rounded-2xl shadow-md border border-[var(--border)] transition-all duration-300 relative
         ${isVertical ? 'p-2 w-[64px] flex flex-col items-center gap-2' : 'p-4 w-full sm:w-[280px] space-y-3'}
       `}
     >
       {/* Header (Icon + Title) */}
       {isVertical ? (
          // Vertical: Just the icon, maybe tooltip later
-         <div className="text-[#007AFF] p-1">
+         <div className="text-[var(--primary)] p-1">
             <Users className="w-5 h-5" />
          </div>
       ) : (
         <div className="flex items-center gap-2">
-          <Users className="w-5 h-5 text-[#007AFF]" />
-          <span className="text-sm font-semibold text-[#1D1D1F]">{title}</span>
+          <Users className="w-5 h-5 text-[var(--primary)]" />
+          <span className="text-sm font-semibold text-[var(--foreground)]">{title}</span>
         </div>
       )}
 
@@ -66,7 +66,7 @@ export function ManagerSelector({
             // Vertical Button (Compact)
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="w-10 h-10 mx-auto flex items-center justify-center bg-[#F5F5F7] hover:bg-[#E5E5E7] text-[#1D1D1F] text-xs font-bold rounded-full transition-colors duration-200 border border-transparent focus:border-[#007AFF] outline-none"
+                className="w-10 h-10 mx-auto flex items-center justify-center bg-[var(--secondary)] hover:bg-[var(--muted)] text-[var(--foreground)] text-xs font-bold rounded-full transition-colors duration-200 border border-transparent focus:border-[var(--primary)] outline-none"
             >
                 {displayInitials}
             </button>
@@ -74,16 +74,16 @@ export function ManagerSelector({
             // Horizontal Button (Full)
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="w-full flex items-center justify-between bg-[#F5F5F7] hover:bg-[#E5E5E7] text-[#1D1D1F] text-sm font-medium px-3 py-2 rounded-lg transition-colors duration-200 border border-transparent focus:border-[#007AFF] outline-none"
+                className="w-full flex items-center justify-between bg-[var(--secondary)] hover:bg-[var(--muted)] text-[var(--foreground)] text-sm font-medium px-3 py-2 rounded-lg transition-colors duration-200 border border-transparent focus:border-[var(--primary)] outline-none"
             >
                 <span className="truncate">{displayName}</span>
-                <ChevronDown className={`w-4 h-4 text-[#86868B] transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+                <ChevronDown className={`w-4 h-4 text-[var(--muted-foreground)] transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
             </button>
         )}
 
         {/* Dropdown Menu */}
         {isOpen && (
-          <div className={`absolute bg-white border border-[#E5E5E7] rounded-lg shadow-xl z-50 overflow-y-auto py-1
+          <div className={`absolute bg-[var(--card)] border border-[var(--border)] rounded-lg shadow-xl z-50 overflow-y-auto py-1
             ${isVertical 
                 ? 'right-full top-0 mr-3 w-[260px] max-h-[400px]' // Pop to left
                 : 'top-full left-0 right-0 mt-1 max-h-[240px]'   // Pop down
@@ -91,8 +91,8 @@ export function ManagerSelector({
           `}>
              {/* Header for Vertical Mode */}
              {isVertical && (
-                <div className="px-3 py-2 border-b border-[#E5E5E7] mb-1">
-                    <span className="text-xs font-bold text-[#86868B] uppercase tracking-wider">{title}</span>
+                <div className="px-3 py-2 border-b border-[var(--border)] mb-1">
+                    <span className="text-xs font-bold text-[var(--muted-foreground)] uppercase tracking-wider">{title}</span>
                 </div>
              )}
 
@@ -101,15 +101,15 @@ export function ManagerSelector({
                 onSelectManager('all')
                 setIsOpen(false)
               }}
-              className="w-full flex items-center justify-between px-3 py-2 text-sm text-left hover:bg-[#F5F5F7] transition-colors"
+              className="w-full flex items-center justify-between px-3 py-2 text-sm text-left hover:bg-[var(--secondary)] transition-colors"
             >
-              <span className={selectedManagerId === 'all' ? 'text-[#007AFF] font-medium' : 'text-[#1D1D1F]'}>
+              <span className={selectedManagerId === 'all' ? 'text-[var(--primary)] font-medium' : 'text-[var(--foreground)]'}>
                 Вся команда
               </span>
-              {selectedManagerId === 'all' && <Check className="w-4 h-4 text-[#007AFF]" />}
+              {selectedManagerId === 'all' && <Check className="w-4 h-4 text-[var(--primary)]" />}
             </button>
             
-            {managers.length > 0 && <div className="h-px bg-[#E5E5E7] my-1" />}
+            {managers.length > 0 && <div className="h-px bg-[var(--border)] my-1" />}
             
             {managers.map((manager) => (
               <button
@@ -118,12 +118,12 @@ export function ManagerSelector({
                   onSelectManager(manager.id)
                   setIsOpen(false)
                 }}
-                className="w-full flex items-center justify-between px-3 py-2 text-sm text-left hover:bg-[#F5F5F7] transition-colors"
+                className="w-full flex items-center justify-between px-3 py-2 text-sm text-left hover:bg-[var(--secondary)] transition-colors"
               >
-                <span className={selectedManagerId === manager.id ? 'text-[#007AFF] font-medium' : 'text-[#1D1D1F]'}>
+                <span className={selectedManagerId === manager.id ? 'text-[var(--primary)] font-medium' : 'text-[var(--foreground)]'}>
                   {manager.name}
                 </span>
-                {selectedManagerId === manager.id && <Check className="w-4 h-4 text-[#007AFF]" />}
+                {selectedManagerId === manager.id && <Check className="w-4 h-4 text-[var(--primary)]" />}
               </button>
             ))}
           </div>
@@ -131,7 +131,7 @@ export function ManagerSelector({
       </div>
       
       {!isVertical && (
-        <p className="text-[10px] text-[#86868B]">
+        <p className="text-[10px] text-[var(--muted-foreground)]">
             {selectedManagerId === 'all' ? 'Статистика по всему отделу' : 'Персональная статистика'}
         </p>
       )}

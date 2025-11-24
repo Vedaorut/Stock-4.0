@@ -78,7 +78,7 @@ export function DashboardContent({ user }: DashboardContentProps) {
     }
   }
 
-  const recomputeViews = useCallback((employeesList: any[], managerFilter = selectedManagerId) => {
+  const recomputeViews = useCallback((employeesList: any[], managerFilter = selectedManagerId, serverTeamStats: any = null) => {
     const filteredEmployees =
       managerFilter === 'all'
         ? employeesList
@@ -87,18 +87,69 @@ export function DashboardContent({ user }: DashboardContentProps) {
     const effectiveEmployees = filteredEmployees.length > 0 ? filteredEmployees : employeesList
 
     const processedStats = effectiveEmployees.map((emp: any) => {
-      const stats = calculateManagerStatsClient(emp.reports || [])
+      // Используем данные напрямую из API, где уже есть правильные planSales/planDeals
       return {
         id: emp.id,
         name: emp.name,
-        ...stats,
+        ...emp,
       }
     })
 
     setManagerStats(processedStats)
 
-    const teamReports = effectiveEmployees.flatMap((e: any) => e.reports || [])
-    const tStats = calculateManagerStatsClient(teamReports)
+    // Если выбран "Весь отдел" и у нас есть серверная статистика (Менеджер + Сотрудники) - используем её
+    // Это гарантирует совпадение плана (14 млн) и факта с прогнозами
+    let tStats: any
+    let teamReports: any[] = []
+
+    if (managerFilter === 'all' && serverTeamStats) {
+      tStats = { ...serverTeamStats }
+      // Для графиков трендов нам все равно нужны отчеты. 
+      // Так как мы не тянем отчеты менеджера в employeesList, тренд будет строиться по сотрудникам.
+      // Это компромисс, но цифры KPI (сверху) будут точными (14 млн).
+      teamReports = effectiveEmployees.flatMap((e: any) => e.reports || [])
+    } else {
+      // Если выбран конкретный сотрудник - считаем только по нему
+      teamReports = effectiveEmployees.flatMap((e: any) => e.reports || [])
+
+      // Агрегируем статистику команды из сотрудников
+      const safeDiv = (a: number, b: number) => (b > 0 ? Math.round((a / b) * 100) : 0)
+
+      const tStatsRaw = {
+        zoomBooked: effectiveEmployees.reduce((sum: number, e: any) => sum + (e.zoomBooked || 0), 0),
+        zoom1Held: effectiveEmployees.reduce((sum: number, e: any) => sum + (e.zoom1Held || 0), 0),
+        zoom2Held: effectiveEmployees.reduce((sum: number, e: any) => sum + (e.zoom2Held || 0), 0),
+        contractReview: effectiveEmployees.reduce((sum: number, e: any) => sum + (e.contractReview || 0), 0),
+        pushCount: effectiveEmployees.reduce((sum: number, e: any) => sum + (e.pushCount || 0), 0),
+        successfulDeals: effectiveEmployees.reduce((sum: number, e: any) => sum + (e.successfulDeals || 0), 0),
+        salesAmount: effectiveEmployees.reduce((sum: number, e: any) => sum + (e.salesAmount || 0), 0),
+        planSales: effectiveEmployees.reduce((sum: number, e: any) => sum + (e.planSales || 0), 0),
+        planDeals: effectiveEmployees.reduce((sum: number, e: any) => sum + (e.planDeals || 0), 0),
+        refusals: effectiveEmployees.reduce((sum: number, e: any) => sum + (e.refusals || 0), 0),
+        warming: effectiveEmployees.reduce((sum: number, e: any) => sum + (e.warming || 0), 0),
+      }
+
+      tStats = {
+        ...tStatsRaw,
+        bookedToZoom1: safeDiv(tStatsRaw.zoom1Held, tStatsRaw.zoomBooked),
+        zoom1ToZoom2: safeDiv(tStatsRaw.zoom2Held, tStatsRaw.zoom1Held),
+        zoom2ToContract: safeDiv(tStatsRaw.contractReview, tStatsRaw.zoom2Held),
+        contractToPush: safeDiv(tStatsRaw.pushCount, tStatsRaw.contractReview),
+        pushToDeal: safeDiv(tStatsRaw.successfulDeals, tStatsRaw.pushCount),
+        northStar: safeDiv(tStatsRaw.successfulDeals, tStatsRaw.zoom1Held),
+        totalConversion: safeDiv(tStatsRaw.successfulDeals, tStatsRaw.zoomBooked),
+        activityScore: 0,
+        trend: 'flat'
+      }
+
+      const expectedActivity = tStatsRaw.zoomBooked > 0 ? 100 : 0
+      const actualActivity = Math.min(100, Math.round((tStatsRaw.zoom1Held / Math.max(1, tStatsRaw.zoomBooked)) * 100))
+      tStats.activityScore = Math.round((expectedActivity + actualActivity) / 2)
+
+      const progress = tStatsRaw.planSales > 0 ? (tStatsRaw.salesAmount / tStatsRaw.planSales) * 100 : 0
+      tStats.trend = progress >= 80 ? 'up' : progress >= 50 ? 'flat' : 'down'
+    }
+
     setTeamStats(tStats)
     setTeamFunnel(getFunnelData(tStats))
 
@@ -160,6 +211,9 @@ export function DashboardContent({ user }: DashboardContentProps) {
     setAlerts(newAlerts)
   }, [selectedManagerId])
 
+  // Store server-side team stats to reuse when filtering
+  const [serverTeamStats, setServerTeamStats] = useState<any>(null)
+
   useEffect(() => {
     async function fetchData() {
       if (user.role !== 'MANAGER') return
@@ -170,8 +224,11 @@ export function DashboardContent({ user }: DashboardContentProps) {
         )
         const data = await response.json()
         const employeesList = data.employees || []
+        const tStats = data.teamStats || null
+        
         setRawEmployees(employeesList)
-        recomputeViews(employeesList, selectedManagerId)
+        setServerTeamStats(tStats)
+        recomputeViews(employeesList, selectedManagerId, tStats)
       } catch (error) {
         console.error('Error fetching data:', error)
       } finally {
@@ -180,7 +237,13 @@ export function DashboardContent({ user }: DashboardContentProps) {
     }
 
     fetchData()
-  }, [user.role, dateRange.start, dateRange.end, recomputeViews, selectedManagerId])
+  }, [user.role, dateRange.start, dateRange.end, selectedManagerId]) 
+
+  // Update recompute effect to use the stored server stats
+  useEffect(() => {
+    if (rawEmployees.length === 0) return
+    recomputeViews(rawEmployees, selectedManagerId, serverTeamStats)
+  }, [selectedManagerId, rawEmployees, serverTeamStats, recomputeViews])
 
   useEffect(() => {
     if (user.role !== 'MANAGER') return
@@ -365,7 +428,7 @@ export function DashboardContent({ user }: DashboardContentProps) {
           pointerEvents: isHeaderVisible ? 'auto' : 'none'
         }}
         transition={{ duration: 0.3 }}
-        className="relative z-30 bg-[#F5F5F7]/95 backdrop-blur supports-[backdrop-filter]:bg-[#F5F5F7]/60 py-4 border-b border-[var(--border)] -mx-4 px-4 sm:-mx-8 sm:px-8 mb-8"
+        className="relative z-30 bg-[var(--background)]/90 backdrop-blur supports-[backdrop-filter]:bg-[var(--background)]/75 py-4 border-b border-[var(--border)] -mx-4 px-4 sm:-mx-8 sm:px-8 mb-8 transition-colors"
       >
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
            {/* Left Side: Page Title */}

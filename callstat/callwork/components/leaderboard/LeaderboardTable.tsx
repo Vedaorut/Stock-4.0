@@ -40,19 +40,19 @@ export function LeaderboardTable({ leaderboard, period, onPeriodChange }: Leader
   }
 
   return (
-    <div className="space-y-6">
-      {/* Period selector */}
-      <div className="flex gap-2">
-        {['day', 'week', 'month'].map((p) => (
-          <button
-            key={p}
-            onClick={() => onPeriodChange(p)}
-            className={`px-4 py-2 rounded-xl font-medium transition-all ${
-              period === p
-                ? 'bg-blue-500 text-white'
-                : 'bg-white text-gray-600 hover:bg-gray-100'
-            }`}
-          >
+      <div className="space-y-6">
+        {/* Period selector */}
+        <div className="flex gap-2">
+          {['day', 'week', 'month'].map((p) => (
+            <button
+              key={p}
+              onClick={() => onPeriodChange(p)}
+              className={`px-4 py-2 rounded-xl font-medium transition-all ${
+                period === p
+                ? 'bg-[var(--primary)] text-[var(--primary-foreground)]'
+                : 'bg-[var(--card)] text-[var(--muted-foreground)] hover:bg-[var(--muted)] border border-[var(--border)]'
+              }`}
+            >
             {p === 'day' ? 'День' : p === 'week' ? 'Неделя' : 'Месяц'}
           </button>
         ))}
@@ -69,13 +69,13 @@ export function LeaderboardTable({ leaderboard, period, onPeriodChange }: Leader
             className={`p-6 rounded-2xl border-2 transition-all hover:scale-[1.02] ${
               item.medal
                 ? 'bg-gradient-to-r ' + getMedalColor(item.medal) + ' text-white border-transparent'
-                : 'bg-white border-gray-200'
+                : 'bg-[var(--card)] border-[var(--border)] text-[var(--foreground)]'
             }`}
           >
             <div className="flex items-center gap-4">
               {/* Rank */}
               <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-xl ${
-                item.medal ? 'bg-white/20' : 'bg-gray-100'
+                item.medal ? 'bg-white/20' : 'bg-[var(--muted)] text-[var(--foreground)]'
               }`}>
                 {item.rank}
               </div>
@@ -88,7 +88,7 @@ export function LeaderboardTable({ leaderboard, period, onPeriodChange }: Leader
               {/* Name */}
               <div className="flex-1">
                 <h3 className="text-xl font-bold">{item.name}</h3>
-                <p className={`text-sm ${item.medal ? 'text-white/80' : 'text-gray-500'}`}>
+                <p className={`text-sm ${item.medal ? 'text-white/80' : 'text-[var(--muted-foreground)]'}`}>
                   {item.deals} сделок • {formatMoney(item.sales)}
                 </p>
               </div>
@@ -96,13 +96,13 @@ export function LeaderboardTable({ leaderboard, period, onPeriodChange }: Leader
               {/* Stats */}
               <div className="grid grid-cols-2 gap-4 text-right">
                 <div>
-                  <p className={`text-xs ${item.medal ? 'text-white/80' : 'text-gray-500'}`}>
+                  <p className={`text-xs ${item.medal ? 'text-white/80' : 'text-[var(--muted-foreground)]'}`}>
                     Средний чек
                   </p>
                   <p className="text-lg font-bold">{formatMoney(item.avgCheck)}</p>
                 </div>
                 <div>
-                  <p className={`text-xs ${item.medal ? 'text-white/80' : 'text-gray-500'}`}>
+                  <p className={`text-xs ${item.medal ? 'text-white/80' : 'text-[var(--muted-foreground)]'}`}>
                     Конверсия
                   </p>
                   <p className="text-lg font-bold">{item.finalConversion}%</p>

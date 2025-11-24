@@ -52,7 +52,7 @@ export function ForecastChart({ data, userName }: ForecastChartProps) {
     const data = payload[0].payload
 
     return (
-      <div className="glass-card p-4 rounded-xl shadow-lg border border-[var(--border)]">
+      <div className="bg-[var(--card)] p-4 rounded-xl shadow-xl border border-[var(--border)] backdrop-blur-md">
         <p className="font-semibold mb-2 text-[var(--foreground)]">День {data.day}</p>
         {data.plan && (
           <p className="text-sm text-[var(--muted-foreground)]">
@@ -96,7 +96,7 @@ export function ForecastChart({ data, userName }: ForecastChartProps) {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="p-6 bg-[var(--primary)]/5 rounded-[16px] border border-[var(--primary)]/20 shadow-sm"
+          className="p-6 bg-[var(--primary)]/10 rounded-[16px] border border-[var(--primary)]/20 shadow-sm"
         >
           <div className="flex items-center gap-3 mb-3">
             <div className="w-10 h-10 bg-[var(--primary)] rounded-full flex items-center justify-center">
@@ -115,7 +115,7 @@ export function ForecastChart({ data, userName }: ForecastChartProps) {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="p-6 bg-[var(--warning)]/5 rounded-[16px] border border-[var(--warning)]/20 shadow-sm"
+          className="p-6 bg-[var(--warning)]/10 rounded-[16px] border border-[var(--warning)]/20 shadow-sm"
         >
           <div className="flex items-center gap-3 mb-3">
             <div className="w-10 h-10 bg-[var(--warning)] rounded-full flex items-center justify-center">
@@ -135,8 +135,8 @@ export function ForecastChart({ data, userName }: ForecastChartProps) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
           className={`p-6 rounded-[16px] border-2 ${forecast.isPacingGood
-              ? 'bg-[var(--success)]/5 border-[var(--success)]/20 shadow-sm'
-              : 'bg-[var(--danger)]/5 border-[var(--danger)]/20 shadow-sm'
+              ? 'bg-[var(--success)]/10 border-[var(--success)]/20 shadow-sm'
+              : 'bg-[var(--danger)]/10 border-[var(--danger)]/20 shadow-sm'
             }`}
         >
           <div className="flex items-center gap-3 mb-3">
@@ -169,7 +169,7 @@ export function ForecastChart({ data, userName }: ForecastChartProps) {
       >
         <ResponsiveContainer width="100%" height={400}>
           <LineChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.5} />
             <XAxis
               dataKey="day"
               stroke="var(--muted-foreground)"
@@ -230,7 +230,7 @@ export function ForecastChart({ data, userName }: ForecastChartProps) {
 
       {/* Дополнительная аналитика */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="p-6 bg-[var(--muted)]/30 rounded-[16px]">
+        <div className="p-6 bg-[var(--secondary)] rounded-[16px]">
           <h3 className="font-semibold text-[var(--foreground)] mb-2 flex items-center gap-2">
             <Target className="w-4 h-4" />
             Для достижения цели
@@ -243,7 +243,7 @@ export function ForecastChart({ data, userName }: ForecastChartProps) {
           </p>
         </div>
 
-        <div className="p-6 bg-[var(--muted)]/30 rounded-[16px]">
+        <div className="p-6 bg-[var(--secondary)] rounded-[16px]">
           <h3 className="font-semibold text-[var(--foreground)] mb-2">Ожидалось к текущему дню</h3>
           <p className="text-3xl font-semibold text-[var(--foreground)] tracking-tight">
             {formatMoney(forecast.expectedByNow)}

@@ -61,6 +61,19 @@ else
   echo -e "  ${GREEN}✓${NC} All project processes stopped"
 fi
 
+# Check if services already running (prevent duplicates)
+if lsof -ti:3000 >/dev/null 2>&1; then
+  echo -e "  ${RED}✗${NC} Backend already running on port 3000"
+  echo -e "  ${YELLOW}!${NC} Run ${BLUE}./stop.sh${NC} first, then restart"
+  exit 1
+fi
+
+if pgrep -f "node.*bot.js" >/dev/null 2>&1; then
+  echo -e "  ${RED}✗${NC} Bot already running"
+  echo -e "  ${YELLOW}!${NC} Run ${BLUE}./stop.sh${NC} first, then restart"
+  exit 1
+fi
+
 echo ""
 
 #############################################
@@ -70,6 +83,7 @@ echo -e "${YELLOW}[2/6]${NC} Starting ngrok tunnel..."
 
 ngrok http 3000 --log=stdout > "$LOG_DIR/ngrok.log" 2>&1 &
 NGROK_PID=$!
+echo $NGROK_PID > "$PROJECT_ROOT/.ngrok.pid"
 
 # Wait for ngrok to start
 echo "  └─ Waiting for ngrok to initialize..."
@@ -156,6 +170,7 @@ echo -e "${YELLOW}[5/6]${NC} Starting Backend..."
 cd "$PROJECT_ROOT/backend"
 npm run dev > "$LOG_DIR/backend.log" 2>&1 &
 BACKEND_PID=$!
+echo $BACKEND_PID > "$PROJECT_ROOT/.backend.pid"
 
 echo "  └─ Waiting for backend to initialize..."
 sleep 5
@@ -179,6 +194,7 @@ echo -e "${YELLOW}[6/7]${NC} Starting Telegram Bot..."
 cd "$PROJECT_ROOT/bot"
 npm start > "$LOG_DIR/bot.log" 2>&1 &
 BOT_PID=$!
+echo $BOT_PID > "$PROJECT_ROOT/.bot.pid"
 
 echo "  └─ Waiting for bot to initialize..."
 sleep 3

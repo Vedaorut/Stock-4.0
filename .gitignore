@@ -50,5 +50,10 @@ temp/
 *.tmp
 .vercel
 
+# Process PID files (created by start.sh)
+.backend.pid
+.bot.pid
+.ngrok.pid
+
 # Nested projects (have their own git repos)
 callstat/

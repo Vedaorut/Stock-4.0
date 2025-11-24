@@ -19,8 +19,16 @@ import { reply as cleanReply, replyHTML as cleanReplyHTML } from '../utils/clean
 import { messages, buttons as buttonText } from '../texts/messages.js';
 import { showSellerMainMenu } from '../utils/sellerNavigation.js';
 import { generateQRWithTimeout } from '../utils/qrHelper.js';
+import {
+  normalizePaymentState,
+  paymentStateKeyboard,
+  paymentStateMessage,
+} from '../utils/paymentUi.js';
 
 const { general: generalMessages, subscription: subMessages } = messages;
+
+const BASIC_PRICE_LABEL = '$1';
+const PRO_PRICE_LABEL = '$1';
 
 // Chain mappings (Bot → Backend API format)
 const CHAIN_MAPPINGS = {
@@ -62,7 +70,7 @@ const paySubscriptionScene = new Scenes.WizardScene(
         ctx.wizard.state.tier = enteredWithTier;
         ctx.wizard.state.subscriptionId = subscriptionId;
         ctx.wizard.state.createShopAfter = createShopAfter;
-        const amount = enteredWithTier === 'pro' ? '$1' : '$1';
+        const amount = enteredWithTier === 'pro' ? PRO_PRICE_LABEL : BASIC_PRICE_LABEL;
         ctx.wizard.state.amount = amount;
 
         // Skip to crypto selection (Step 3)
@@ -170,7 +178,7 @@ const paySubscriptionScene = new Scenes.WizardScene(
 
     await ctx.answerCbQuery();
 
-    const amount = tier === 'pro' ? '$1' : '$1';
+    const amount = tier === 'pro' ? PRO_PRICE_LABEL : BASIC_PRICE_LABEL;
     ctx.wizard.state.tier = tier;
     ctx.wizard.state.amount = amount;
 
@@ -342,125 +350,100 @@ const paySubscriptionScene = new Scenes.WizardScene(
       const inputText = ctx.message.text.trim();
       
       // Logic to extract hash from link or text
-      // Matches 64-char hex string, optionally starting with 0x
       const hashRegex = /\b(0x)?[a-fA-F0-9]{64}\b/;
       const match = inputText.match(hashRegex);
-      
-      // Use extracted hash or fallback to full text
       const txHash = match ? match[0] : inputText;
 
-      const { subscriptionId } = ctx.wizard.state;
+      const { subscriptionId, tier, createShopAfter } = ctx.wizard.state;
       const token = ctx.session.token;
 
       let statusMsg;
       try {
         statusMsg = await cleanReply(ctx, '⏳ Проверяем транзакцию...');
-
-        // Helper delay function
+        
         const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
-        // Initial verification
-        let result = await subscriptionApi.confirmSubscriptionPayment(
-          subscriptionId,
-          txHash,
-          token
-        );
-
-        let status =
-          result.status ||
-          (result.confirmed ? 'confirmed' : result.confirmed === false ? 'pending' : null);
-        let confirmations = result.confirmations || 0;
-
-        // If pending, try polling a few times (short polling)
-        if (status === 'pending') {
-          for (let i = 1; i <= 3; i++) {
-            try {
-              await ctx.telegram.editMessageText(
-                ctx.chat.id,
-                statusMsg.message_id,
-                null,
-                `⏳ Платёж найден. Ждём подтверждения сети (${i}/3)...`
-              );
-            } catch (e) { /* ignore edit error */ }
-            
-            await delay(3000); // Wait 3 seconds
-
-            // Check status again with error handling
-            try {
-              const check = await subscriptionApi.getSubscriptionPaymentStatus(subscriptionId, token);
-              if (check.status === 'paid' || check.status === 'confirmed') {
-                status = 'confirmed';
-                result = check;
-                break;
-              }
-            } catch (pollError) {
-               logger.warn('[PaySubscription] Polling status failed, continuing...', pollError.message);
-               // If error is 404/No Active Invoice, it MIGHT mean it's already processed.
-               // Let's try to check subscription status directly as a fallback
-               try {
-                 const subCheck = await subscriptionApi.getStatus(ctx.wizard.state.shopId, token);
-                 if (subCheck.currentSubscription?.status === 'active') {
-                    status = 'confirmed';
-                    break;
-                 }
-               } catch (e) { /* ignore */ }
-            }
+        let result = null;
+        
+        // Silent retry loop (handle propagation delays)
+        for (let i = 0; i < 3; i++) {
+          try {
+            result = await subscriptionApi.confirmSubscriptionPayment(
+              subscriptionId,
+              txHash,
+              token
+            );
+            // If we get here, we have a result (pending or confirmed)
+            break;
+          } catch (err) {
+            // Only retry if it's a 404/400 (not found yet)
+            // Log it but don't spam user
+            if (i === 2) throw err; // Throw on last attempt
+            await delay(4000);
           }
         }
 
-        const { tier, createShopAfter } = ctx.wizard.state;
+        let status = normalizePaymentState(result);
 
+        // If still pending (seen but unconfirmed), poll quietly
+        if (status === 'pending') {
+          await ctx.telegram.editMessageText(
+             ctx.chat.id, 
+             statusMsg.message_id, 
+             null, 
+             '✅ Оплата найдена! Ожидаем подтверждения сети...'
+          );
+
+          // Poll for up to 60 seconds
+          for (let j = 0; j < 10; j++) {
+            await delay(6000);
+            try {
+              const check = await subscriptionApi.getSubscriptionPaymentStatus(subscriptionId, token);
+              status = normalizePaymentState(check, 'pending');
+              if (status === 'paid' || status === 'confirmed' || status === 'expired' || status === 'failed') {
+                result = check;
+                break;
+              }
+            } catch (e) { /* ignore polling errors */ }
+          }
+        }
+
+        // SUCCESS FLOW
         if (status === 'confirmed' || status === 'paid') {
-           // Success logic (unchanged)
-          const endDate = new Date();
-          endDate.setDate(endDate.getDate() + 30);
-          const formattedDate = endDate.toLocaleDateString('ru-RU');
+          try {
+             await ctx.telegram.deleteMessage(ctx.chat.id, statusMsg.message_id);
+          } catch (e) {}
 
+          // Check if user already has a shop (for renewal vs new)
           let hasShop = Boolean(ctx.session.shopId);
           if (!hasShop && token) {
             try {
               const myShops = await shopApi.getMyShop(token);
               if (Array.isArray(myShops) && myShops.length > 0) {
-                const [primaryShop] = myShops;
-                ctx.session.shopId = primaryShop.id;
-                ctx.session.shopName = primaryShop.name || ctx.session.shopName;
-                ctx.session.shopTier = primaryShop.tier || ctx.session.shopTier;
-                hasShop = true;
+                 hasShop = true;
+                 ctx.session.shopId = myShops[0].id;
               }
-            } catch (shopError) {
-              logger.warn('[PaySubscription] Failed to fetch user shops after payment', {
-                userId: ctx.from.id,
-                error: shopError.message,
-              });
-            }
+            } catch (e) {}
           }
 
-          const shouldCreateShop = createShopAfter && subscriptionId && !hasShop;
-          let successMessage = subMessages.verificationSuccess(tier, formattedDate, subscriptionId);
-          if (tier === 'pro') {
-            successMessage += `\n\n${subMessages.proBenefits}`;
-          }
-
-          try {
-             await ctx.telegram.deleteMessage(ctx.chat.id, statusMsg.message_id);
-          } catch (e) {}
-
-          if (shouldCreateShop) {
-            await ctx.reply(`✅ ${successMessage}\n\n📝 Теперь создайте свой магазин:`, {
-              parse_mode: 'HTML',
-            });
+          // If new shop creation flow
+          if (createShopAfter && !hasShop) {
+            await ctx.reply(
+              '✅ Оплата получена! Магазин оплачен.\n\n📝 Введите название для вашего магазина:', 
+              { parse_mode: 'HTML' }
+            );
+            
+            // Transition immediately
+            ctx.wizard.state.awaitingTxHash = false;
             await ctx.scene.leave();
-            await ctx.scene.enter('createShop', {
+            return ctx.scene.enter('createShop', {
               tier,
               subscriptionId,
-              paidSubscription: true,
+              paidSubscription: true, // Flag to skip payment check
             });
-            ctx.wizard.state.awaitingTxHash = false;
-            return;
           }
 
-          await ctx.reply(successMessage, {
-            parse_mode: 'HTML',
+          // Renewal / Existing Shop Flow
+          await ctx.reply(`✅ Подписка успешно продлена!`, {
             ...Markup.inlineKeyboard([[Markup.button.callback(buttonText.mainMenu, 'seller:menu')]]),
           });
 
@@ -471,39 +454,31 @@ const paySubscriptionScene = new Scenes.WizardScene(
           return;
         }
 
-        // Still pending after polling
-        try {
-             await ctx.telegram.deleteMessage(ctx.chat.id, statusMsg.message_id);
-        } catch (e) {}
-
         await ctx.reply(
-          `✅ Оплата найдена, но сеть ещё не подтвердила транзакцию.\nЭто нормально, просто подождите пару минут.`,
+          paymentStateMessage(status, { hint: 'Ждём подтверждения сети.' }),
           {
-            ...Markup.inlineKeyboard([
-              [Markup.button.callback('🔄 Проверить статус', 'subscription:status')],
-              [Markup.button.callback(buttonText.cancel, 'seller:menu')],
-            ]),
+            ...paymentStateKeyboard(status, {
+              retryCb: 'subscription:retry',
+              cancelCb: 'seller:menu',
+            }),
           }
         );
-        // We stay in the scene, waiting for user to click check later
-        ctx.wizard.state.awaitingTxHash = false; 
+        ctx.wizard.state.awaitingTxHash = false;
         return;
 
       } catch (error) {
-        logger.error('[PaySubscription] Manual tx confirm failed', error);
+        logger.error('[PaySubscription] Verification failed', error);
         
         try {
              if(statusMsg) await ctx.telegram.deleteMessage(ctx.chat.id, statusMsg.message_id);
         } catch (e) {}
 
-        const msg =
-          error.response?.data?.error ||
-          'Не удалось проверить транзакцию. Проверьте хэш и попробуйте снова.';
+        const msg = error.response?.data?.error || 'Транзакция пока не найдена. Попробуйте через минуту.';
           
-        await ctx.reply(`❌ ${msg}`, {
+        await ctx.reply(`⏳ ${msg}`, {
           parse_mode: 'HTML',
           ...Markup.inlineKeyboard([
-            [Markup.button.callback('🔄 Попробовать снова', 'subscription:paid')],
+            [Markup.button.callback('🔄 Проверить снова', 'subscription:paid')],
             [Markup.button.callback(buttonText.cancel, 'seller:menu')],
           ]),
         });
@@ -537,20 +512,26 @@ const paySubscriptionScene = new Scenes.WizardScene(
           token
         );
 
-        if (paymentStatus.status === 'paid') {
-          await cleanReply(ctx, '✅ Оплата уже подтверждена. Если магазин не активировался, напишите поддержку.');
+        const status = normalizePaymentState(paymentStatus, paymentStatus?.status);
+
+        if (status === 'paid' || status === 'confirmed') {
+          await cleanReply(ctx, '✅ Оплата подтверждена!');
+           // Try to move forward if possible, or just let them leave
           return;
         }
 
         await cleanReply(
           ctx,
-          `Пока нет подтверждения. Статус: ${paymentStatus.status || 'pending'}. Если оплатили, отправьте TX hash.`
+          paymentStateMessage(status, { hint: 'Если оплатили, отправьте TX hash.' }),
+          paymentStateKeyboard(status, {
+            retryCb: 'subscription:retry',
+            cancelCb: 'seller:menu',
+          })
         );
-        ctx.wizard.state.awaitingTxHash = true;
+        ctx.wizard.state.awaitingTxHash = !['confirmed', 'paid'].includes(status);
         return;
       } catch (err) {
-        logger.error('[PaySubscription] Status check failed', err);
-        await cleanReply(ctx, 'Не удалось проверить статус. Отправьте TX hash или попробуйте позже.');
+        await cleanReply(ctx, 'Не удалось проверить статус.');
         return;
       }
     }
@@ -560,16 +541,16 @@ const paySubscriptionScene = new Scenes.WizardScene(
       await ctx.answerCbQuery();
       await cleanReply(
         ctx,
-        'Отправьте <b>ссылку на транзакцию</b> или <b>хэш</b> (TXID).\nБот сам найдёт нужные данные в ссылке.'
+        'Отправьте <b>ссылку на транзакцию</b> или <b>хэш</b> (TXID).'
       );
       ctx.wizard.state.awaitingTxHash = true;
       return;
     }
 
-    // Handle retry (go back to crypto selection)
+    // Handle retry
     if (data === 'subscription:retry') {
       await ctx.answerCbQuery();
-      return ctx.wizard.selectStep(1); // Go back to tier selection
+      return ctx.wizard.selectStep(1);
     }
   }
 );

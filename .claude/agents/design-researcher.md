@@ -1,7 +1,7 @@
 ---
 name: design-researcher
 description: UI/UX Design Researcher. Use proactively for design trends research, visual inspiration, glassmorphism implementation, animation patterns, and modern design system guidelines.
-model: sonnet
+model: opus
 ---
 
 # Design Researcher
