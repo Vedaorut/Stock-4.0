@@ -773,10 +773,10 @@ export async function processSubscriptionPayment({
   const invoiceParams = [subscriptionId];
 
   if (invoiceId) {
-    invoiceFilter += ` AND id = ${invoiceParams.length + 1}`;
+    invoiceFilter += ` AND id = $${invoiceParams.length + 1}`;
     invoiceParams.push(invoiceId);
   } else if (purpose) {
-    invoiceFilter += ` AND purpose = ${invoiceParams.length + 1}`;
+    invoiceFilter += ` AND purpose = $${invoiceParams.length + 1}`;
     invoiceParams.push(purpose);
   }
 
