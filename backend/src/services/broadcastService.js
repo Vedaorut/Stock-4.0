@@ -191,7 +191,9 @@ async function sendMigrationMessage(
   telegramId,
   shopName,
   newChannelUrl,
-  oldChannelUrl = null
+  oldChannelUrl = null,
+  shopId = null,
+  userId = null
 ) {
   try {
     let message = `🔔 <b>Важное обновление от магазина "${shopName}"</b>\n\n`;
@@ -217,8 +219,30 @@ async function sendMigrationMessage(
     // Handle specific Telegram errors
     if (error.response?.error_code === 403) {
       logger.warn(`[Broadcast] User ${telegramId} blocked the bot`);
+      if (shopId && userId) {
+        await pool
+          .query('DELETE FROM subscriptions WHERE shop_id = $1 AND user_id = $2', [shopId, userId])
+          .catch((cleanupErr) =>
+            logger.error('[Broadcast] Failed to cleanup blocked subscriber', {
+              shopId,
+              userId,
+              error: cleanupErr.message,
+            })
+          );
+      }
     } else if (error.response?.error_code === 400) {
       logger.warn(`[Broadcast] User ${telegramId} not found or chat invalid`);
+      if (shopId && userId) {
+        await pool
+          .query('DELETE FROM subscriptions WHERE shop_id = $1 AND user_id = $2', [shopId, userId])
+          .catch((cleanupErr) =>
+            logger.error('[Broadcast] Failed to cleanup invalid subscriber', {
+              shopId,
+              userId,
+              error: cleanupErr.message,
+            })
+          );
+      }
     } else {
       logger.error(`[Broadcast] Error sending to ${telegramId}:`, error.message);
     }
@@ -273,7 +297,9 @@ async function broadcastMigration(
         subscriber.telegram_id,
         shopName,
         newChannelUrl,
-        oldChannelUrl
+        oldChannelUrl,
+        shopId,
+        subscriber.user_id
       );
 
       // Update counters

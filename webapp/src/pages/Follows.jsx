@@ -11,6 +11,7 @@ export default function Follows() {
   const { get } = useApi();
   const token = useStore((state) => state.token);
   const myShop = useStore((state) => state.myShop);
+  const setMyShop = useStore((state) => state.setMyShop);
   const { triggerHaptic } = useTelegram();
   const { t } = useTranslation();
 
@@ -20,25 +21,33 @@ export default function Follows() {
 
   const loadFollows = useCallback(
     async (signal) => {
-      const { data: shopsResponse, error: shopsError } = await get('/shops/my', { signal });
+      // First, load user's shop if not already loaded
+      let shop = myShop;
 
-      if (signal?.aborted) return { status: 'aborted' };
+      if (!shop) {
+        const { data: shopsResponse, error: shopsError } = await get('/shops/my', { signal });
 
-      if (shopsError) {
-        console.error('[Follows] Error loading shops:', shopsError);
-        return { status: 'error', error: 'Не удалось загрузить подписки' };
+        if (signal?.aborted) return { status: 'aborted' };
+
+        if (shopsError) {
+          console.error('[Follows] Error loading shops:', shopsError);
+          return { status: 'error', error: 'Не удалось загрузить магазин' };
+        }
+
+        const shops = Array.isArray(shopsResponse?.data) ? shopsResponse.data : [];
+
+        if (!shops.length) {
+          setFollows([]);
+          useStore.getState().setHasFollows(false);
+          return { status: 'success' };
+        }
+
+        shop = shops[0];
+        // Save myShop to store for future use
+        setMyShop(shop);
       }
 
-      const shops = Array.isArray(shopsResponse?.data) ? shopsResponse.data : [];
-
-      if (!shops.length) {
-        setFollows([]);
-        // ✅ FIX: Use getState() for stable reference
-        useStore.getState().setHasFollows(false);
-        return { status: 'success' };
-      }
-
-      const shop = shops[0];
+      // Load follows using consistent endpoint
       const { data: followsResponse, error: followsError } = await get('/follows/my', {
         params: { shopId: shop.id },
         signal,
@@ -55,15 +64,14 @@ export default function Follows() {
         ? followsResponse.data
         : followsResponse || [];
       setFollows(list);
-      // ✅ FIX: Use getState() for stable reference
       useStore.getState().setHasFollows(list.length > 0);
       return { status: 'success' };
     },
-    [get]
-  ); // ✅ FIX: Removed setHasFollows from deps
+    [get, myShop, setMyShop]
+  );
 
   useEffect(() => {
-    if (!myShop?.id || !token) {
+    if (!token) {
       setIsLoading(false);
       return;
     }
@@ -78,7 +86,6 @@ export default function Follows() {
         if (!controller.signal.aborted && result?.status === 'error') {
           setError(result.error);
           setFollows([]);
-          // ✅ FIX: Use getState() for stable reference
           useStore.getState().setHasFollows(false);
         }
       })
@@ -89,7 +96,7 @@ export default function Follows() {
       });
 
     return () => controller.abort();
-  }, [myShop?.id, token, loadFollows]);
+  }, [token, loadFollows]);
 
   const handleFollowClick = useCallback(
     (followId) => {

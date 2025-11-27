@@ -11,7 +11,7 @@ export const processedWebhookQueries = {
    * @param {string} webhookId - Unique webhook identifier (tx_hash + source)
    * @returns {Promise<boolean>}
    */
-  async isProcessed(webhookId) {
+  async isProcessed(webhookId, client = null) {
     const query = `
       SELECT 1 FROM processed_webhooks
       WHERE webhook_id = $1
@@ -19,7 +19,8 @@ export const processedWebhookQueries = {
     `;
 
     try {
-      const result = await pool.query(query, [webhookId]);
+      const queryFn = client ? client.query.bind(client) : pool.query.bind(pool);
+      const result = await queryFn(query, [webhookId]);
       return result.rowCount > 0;
     } catch (error) {
       logger.error('[ProcessedWebhookQueries] Error checking if processed', {
@@ -39,7 +40,7 @@ export const processedWebhookQueries = {
    * @param {Object} data.payload - Original webhook payload
    * @returns {Promise<Object>}
    */
-  async markAsProcessed({ webhookId, source, txHash, payload = null }) {
+  async markAsProcessed({ webhookId, source, txHash, payload = null }, client = null) {
     const query = `
       INSERT INTO processed_webhooks (webhook_id, source, tx_hash, payload)
       VALUES ($1, $2, $3, $4)
@@ -48,7 +49,8 @@ export const processedWebhookQueries = {
     `;
 
     try {
-      const result = await pool.query(query, [
+      const queryFn = client ? client.query.bind(client) : pool.query.bind(pool);
+      const result = await queryFn(query, [
         webhookId,
         source,
         txHash,

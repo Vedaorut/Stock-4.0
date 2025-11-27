@@ -212,6 +212,19 @@ export const syncedProductQueries = {
   },
 
   /**
+   * Delete synced product records by source product ID
+   * @param {number} sourceProductId - Source product ID
+   * @returns {Promise<number>} Number of deleted records
+   */
+  deleteBySourceProductId: async (sourceProductId) => {
+    const result = await query(
+      'DELETE FROM synced_products WHERE source_product_id = $1 RETURNING id',
+      [sourceProductId]
+    );
+    return result.rows.length;
+  },
+
+  /**
    * Delete synced product by synced product ID
    * Called when follower manually deletes their synced product
    * @param {number} syncedProductId - Synced product ID
@@ -234,6 +247,7 @@ export const syncedProductQueries = {
     const result = await query(
       `SELECT 
         sp.*,
+        sp.conflict_status,
         sf.follower_shop_id,
         sf.markup_percentage,
         sf.mode,
@@ -249,7 +263,7 @@ export const syncedProductQueries = {
        JOIN products p_synced ON sp.synced_product_id = p_synced.id
        WHERE sf.mode = 'resell' 
          AND sf.status = 'active'
-         AND sp.conflict_status = 'synced'
+         AND sp.conflict_status IN ('synced', 'conflict')
          AND sp.last_synced_at < NOW() - INTERVAL '${staleMinutes} minutes'
        ORDER BY sp.last_synced_at ASC
        LIMIT 100`,

@@ -124,8 +124,9 @@ export const orderQueries = {
   },
 
   // Update order status
-  updateStatus: async (id, status) => {
-    const result = await query(
+  updateStatus: async (id, status, client = null) => {
+    const queryFn = client ? client.query.bind(client) : query;
+    const result = await queryFn(
       `UPDATE orders
        SET status = $2,
            updated_at = NOW()

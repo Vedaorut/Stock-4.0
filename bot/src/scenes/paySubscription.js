@@ -1,41 +1,38 @@
 /**
  * Pay Subscription Scene
  *
- * Multi-step wizard for paying monthly shop subscription
+ * Multi-step wizard for paying monthly shop subscription via CrystalPay
  *
  * Steps:
- * 1. Show pricing and select tier (basic $25 or pro $35)
- * 2. Select cryptocurrency
- * 3. Auto-generate payment address via Backend API
- * 4. User clicks "I paid" button
- * 5. Auto-verify payment and activate subscription
+ * 1. Show pricing and select tier (basic or pro)
+ * 2. Select payment method (BTC or LTC)
+ * 3. Create CrystalPay invoice via Backend API
+ * 4. Show payment link button + check payment button
+ * 5. Wait for webhook or manual status check
  */
 
 import { Scenes, Markup } from 'telegraf';
-import { subscriptionApi, walletApi, shopApi } from '../utils/api.js';
+import { subscriptionApi, shopApi } from '../utils/api.js';
 import logger from '../utils/logger.js';
 import * as smartMessage from '../utils/smartMessage.js';
 import { reply as cleanReply, replyHTML as cleanReplyHTML } from '../utils/cleanReply.js';
 import { messages, buttons as buttonText } from '../texts/messages.js';
 import { showSellerMainMenu } from '../utils/sellerNavigation.js';
-import { generateQRWithTimeout } from '../utils/qrHelper.js';
-import {
-  normalizePaymentState,
-  paymentStateKeyboard,
-  paymentStateMessage,
-} from '../utils/paymentUi.js';
 
 const { general: generalMessages, subscription: subMessages } = messages;
 
-const BASIC_PRICE_LABEL = '$1';
-const PRO_PRICE_LABEL = '$1';
+const BASIC_PRICE_RUB = 990;
+const PRO_PRICE_RUB = 1490;
 
-// Chain mappings (Bot → Backend API format)
-const CHAIN_MAPPINGS = {
-  BTC: 'BTC',
-  LTC: 'LTC',
-  ETH: 'ETH',
-  USDT: 'USDT_TRC20',
+// CrystalPay payment methods
+const PAYMENT_METHODS = {
+  BTC: 'BITCOIN',
+  LTC: 'LITECOIN',
+};
+
+const PAYMENT_METHOD_LABELS = {
+  BTC: '₿ Bitcoin',
+  LTC: 'Ł Litecoin',
 };
 
 const paySubscriptionScene = new Scenes.WizardScene(
@@ -70,20 +67,21 @@ const paySubscriptionScene = new Scenes.WizardScene(
         ctx.wizard.state.tier = enteredWithTier;
         ctx.wizard.state.subscriptionId = subscriptionId;
         ctx.wizard.state.createShopAfter = createShopAfter;
-        const amount = enteredWithTier === 'pro' ? PRO_PRICE_LABEL : BASIC_PRICE_LABEL;
+        const amount = enteredWithTier === 'pro' ? PRO_PRICE_RUB : BASIC_PRICE_RUB;
         ctx.wizard.state.amount = amount;
 
         // Skip to crypto selection (Step 3)
-        const message = subMessages.confirmPrompt(enteredWithTier, amount);
+        const message = `📦 <b>Подписка:</b> ${enteredWithTier === 'pro' ? 'Pro' : 'Basic'}
+💰 <b>Стоимость:</b> ${amount} ₽
+
+Выберите способ оплаты:`;
 
         await cleanReplyHTML(
           ctx,
           message,
           Markup.inlineKeyboard([
-            [Markup.button.callback('₿ Bitcoin (BTC)', 'subscription:crypto:BTC')],
-            [Markup.button.callback('Ł Litecoin (LTC)', 'subscription:crypto:LTC')],
-            [Markup.button.callback('Ξ Ethereum (ETH)', 'subscription:crypto:ETH')],
-            [Markup.button.callback('₮ Tether USDT (TRC20)', 'subscription:crypto:USDT')],
+            [Markup.button.callback('₿ Bitcoin (BTC)', 'subscription:method:BTC')],
+            [Markup.button.callback('Ł Litecoin (LTC)', 'subscription:method:LTC')],
             [Markup.button.callback(buttonText.cancel, 'seller:menu')],
           ])
         );
@@ -178,19 +176,20 @@ const paySubscriptionScene = new Scenes.WizardScene(
 
     await ctx.answerCbQuery();
 
-    const amount = tier === 'pro' ? PRO_PRICE_LABEL : BASIC_PRICE_LABEL;
+    const amount = tier === 'pro' ? PRO_PRICE_RUB : BASIC_PRICE_RUB;
     ctx.wizard.state.tier = tier;
     ctx.wizard.state.amount = amount;
 
-    const message = subMessages.confirmPrompt(tier, amount);
+    const message = `📦 <b>Подписка:</b> ${tier === 'pro' ? 'Pro' : 'Basic'}
+💰 <b>Стоимость:</b> ${amount} ₽
+
+Выберите способ оплаты:`;
 
     await ctx.editMessageText(message, {
       parse_mode: 'HTML',
       ...Markup.inlineKeyboard([
-        [Markup.button.callback(buttonText.cryptoBTC, 'subscription:crypto:BTC')],
-        [Markup.button.callback(buttonText.cryptoLTC, 'subscription:crypto:LTC')],
-        [Markup.button.callback(buttonText.cryptoETH, 'subscription:crypto:ETH')],
-        [Markup.button.callback(buttonText.cryptoUSDT, 'subscription:crypto:USDT')],
+        [Markup.button.callback('₿ Bitcoin (BTC)', 'subscription:method:BTC')],
+        [Markup.button.callback('Ł Litecoin (LTC)', 'subscription:method:LTC')],
         [Markup.button.callback(buttonText.back, 'subscription:back')],
       ]),
     });
@@ -198,7 +197,7 @@ const paySubscriptionScene = new Scenes.WizardScene(
     return ctx.wizard.next();
   },
 
-  // Step 3: Handle crypto selection and generate payment address
+  // Step 3: Handle payment method selection and create CrystalPay invoice
   async (ctx) => {
     if (!ctx.callbackQuery) {
       return;
@@ -220,15 +219,15 @@ const paySubscriptionScene = new Scenes.WizardScene(
       return;
     }
 
-    // Parse crypto selection
-    if (!data.startsWith('subscription:crypto:')) {
+    // Parse payment method selection
+    if (!data.startsWith('subscription:method:')) {
       await ctx.answerCbQuery(generalMessages.invalidChoice);
       return;
     }
 
-    const currency = data.replace('subscription:crypto:', '');
-    if (!['BTC', 'LTC', 'ETH', 'USDT'].includes(currency)) {
-      await ctx.answerCbQuery(subMessages.invalidCrypto);
+    const methodKey = data.replace('subscription:method:', '');
+    if (!['BTC', 'LTC'].includes(methodKey)) {
+      await ctx.answerCbQuery('Неверный метод оплаты');
       return;
     }
 
@@ -236,98 +235,77 @@ const paySubscriptionScene = new Scenes.WizardScene(
 
     try {
       // Show loading message
-      await ctx.editMessageText(subMessages.generatingInvoice, { parse_mode: 'HTML' });
+      await ctx.editMessageText('⏳ Создаём счёт на оплату...', { parse_mode: 'HTML' });
 
-      const { tier, amount, subscriptionId } = ctx.wizard.state;
+      const { tier, amount, subscriptionId, createShopAfter } = ctx.wizard.state;
       const token = ctx.session.token;
 
-      // Map currency to chain format (USDT → USDT_ERC20)
-      const chain = CHAIN_MAPPINGS[currency];
+      // Check auth token before API call
+      if (!token) {
+        logger.error('[PaySubscription] No auth token in Step 3', {
+          userId: ctx.from.id,
+          subscriptionId,
+        });
+        await ctx.editMessageText(generalMessages.authorizationRequired, {
+          parse_mode: 'HTML',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback(buttonText.cancel, 'seller:menu')],
+          ]),
+        });
+        return;
+      }
 
-      // Generate payment invoice via Backend API
-      const invoice = await subscriptionApi.generateSubscriptionInvoice(
+      // Map to CrystalPay method format
+      const paymentMethod = PAYMENT_METHODS[methodKey];
+
+      // Determine purpose based on context
+      const purpose = createShopAfter ? 'subscription_new' : 'subscription_renewal';
+
+      // Create CrystalPay invoice via Backend API
+      const invoiceResponse = await subscriptionApi.createCrystalPayInvoice(
         subscriptionId,
-        chain,
+        paymentMethod,
+        purpose,
         token
       );
 
-      // Save invoice details (support both snake_case and camelCase from API)
-      ctx.wizard.state.currency = currency;
-      ctx.wizard.state.invoiceId = invoice.invoiceId;
-      ctx.wizard.state.address = invoice.address;
-      ctx.wizard.state.expectedAmount = invoice.expectedAmount; // USD amount
-      ctx.wizard.state.cryptoAmount = invoice.cryptoAmount || invoice.crypto_amount; // Exact crypto amount
-      ctx.wizard.state.expiresAt = invoice.expiresAt;
+      // Save invoice details to wizard state
+      ctx.wizard.state.paymentMethod = paymentMethod;
+      ctx.wizard.state.invoiceId = invoiceResponse.invoiceId;
+      ctx.wizard.state.crystalPayId = invoiceResponse.crystalPayId;
+      ctx.wizard.state.crystalPayUrl = invoiceResponse.paymentUrl;
 
-      // Display currency name for user
-      const currencyDisplayName = subMessages.chainMappings[chain] || currency;
+      // Display payment method label
+      const methodLabel = PAYMENT_METHOD_LABELS[methodKey];
 
-      // P0-BOT-8 FIX: Generate QR code via backend (non-blocking)
-      // Backend generates QR, bot just fetches it with timeout protection
-      const qrResponse = await generateQRWithTimeout(
-        () =>
-          walletApi.generateQR(
-            {
-              address: invoice.address,
-              amount: invoice.crypto_amount || invoice.cryptoAmount || invoice.expectedAmount,
-              currency: currency,
-            },
-            token
-          ),
-        10000 // 10 second timeout
-      );
+      // Prepare message
+      const message = [
+        `📦 <b>Подписка:</b> ${tier === 'pro' ? 'Pro' : 'Basic'}`,
+        `💰 <b>Стоимость:</b> $${amount}`,
+        `💳 <b>Метод:</b> ${methodLabel}`,
+        '',
+        '💡 <i>Поле "Email" — вводите что угодно, нам не нужен</i>',
+        '',
+        'Нажмите кнопку для оплаты:',
+      ].join('\n');
 
-      if (!qrResponse || !qrResponse.success || !qrResponse.data?.qrCode) {
-        throw new Error('Failed to generate QR code from backend');
-      }
-
-      // Convert base64 to buffer
-      const base64Data = qrResponse.data.qrCode.replace(/^data:image\/png;base64,/, '');
-      const qrCodeBuffer = Buffer.from(base64Data, 'base64');
-
-      // Prepare message with crypto amount from wizard state
-      const cryptoAmount = ctx.wizard.state.cryptoAmount || null;
-      const message = subMessages.invoiceGenerated(
-        tier,
-        amount,
-        currencyDisplayName,
-        invoice.address,
-        invoice.expiresAt,
-        cryptoAmount  // Exact crypto amount to send
-      );
-
-      // Delete loading message and send QR code with caption
-      try {
-        await ctx.deleteMessage();
-      } catch {
-        // Ignore delete errors
-      }
-
-      await ctx.replyWithPhoto(
-        { source: qrCodeBuffer },
-        {
-          caption: message,
-          parse_mode: 'HTML',
-          ...Markup.inlineKeyboard([
-            [Markup.button.callback('🔗 Ввести TX Hash', 'subscription:paid')],
-            [Markup.button.callback('🔄 Проверить статус', 'subscription:status')],
-            [Markup.button.callback(buttonText.cancel, 'seller:menu')],
-          ]),
-        }
-      );
+      await ctx.editMessageText(message, {
+        parse_mode: 'HTML',
+        ...Markup.inlineKeyboard([
+          [Markup.button.url('💳 Оплатить', invoiceResponse.paymentUrl)],
+          [Markup.button.callback('🔄 Проверить оплату', 'subscription:check_payment')],
+          [Markup.button.callback(buttonText.cancel, 'seller:menu')],
+        ]),
+      });
 
       return ctx.wizard.next();
     } catch (error) {
-      logger.error('[PaySubscription] Invoice generation error:', error);
+      logger.error('[PaySubscription] CrystalPay invoice creation error:', error);
 
       const errorData = error.response?.data;
-      let errorMessage = subMessages.invoiceError;
+      let errorMessage = '❌ Не удалось создать счёт на оплату.';
 
-      // Check if error is QR generation timeout
-      if (error.message === 'QR_GENERATION_TIMEOUT') {
-        errorMessage =
-          'QR код генерируется слишком долго. Попробуйте выбрать другую криптовалюту или попробуйте позже.';
-      } else if (errorData?.error) {
+      if (errorData?.error) {
         errorMessage += `\n\n${errorData.error}`;
       }
 
@@ -343,150 +321,8 @@ const paySubscriptionScene = new Scenes.WizardScene(
     }
   },
 
-  // Step 4: Handle "I paid" button and manual tx-hash confirmation
+  // Step 4: Handle payment status check via CrystalPay
   async (ctx) => {
-    // If waiting for tx hash and user sends text
-    if (ctx.wizard.state.awaitingTxHash && ctx.message?.text) {
-      const inputText = ctx.message.text.trim();
-      
-      // Logic to extract hash from link or text
-      const hashRegex = /\b(0x)?[a-fA-F0-9]{64}\b/;
-      const match = inputText.match(hashRegex);
-      const txHash = match ? match[0] : inputText;
-
-      const { subscriptionId, tier, createShopAfter } = ctx.wizard.state;
-      const token = ctx.session.token;
-
-      let statusMsg;
-      try {
-        statusMsg = await cleanReply(ctx, '⏳ Проверяем транзакцию...');
-        
-        const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-        let result = null;
-        
-        // Silent retry loop (handle propagation delays)
-        for (let i = 0; i < 3; i++) {
-          try {
-            result = await subscriptionApi.confirmSubscriptionPayment(
-              subscriptionId,
-              txHash,
-              token
-            );
-            // If we get here, we have a result (pending or confirmed)
-            break;
-          } catch (err) {
-            // Only retry if it's a 404/400 (not found yet)
-            // Log it but don't spam user
-            if (i === 2) throw err; // Throw on last attempt
-            await delay(4000);
-          }
-        }
-
-        let status = normalizePaymentState(result);
-
-        // If still pending (seen but unconfirmed), poll quietly
-        if (status === 'pending') {
-          await ctx.telegram.editMessageText(
-             ctx.chat.id, 
-             statusMsg.message_id, 
-             null, 
-             '✅ Оплата найдена! Ожидаем подтверждения сети...'
-          );
-
-          // Poll for up to 60 seconds
-          for (let j = 0; j < 10; j++) {
-            await delay(6000);
-            try {
-              const check = await subscriptionApi.getSubscriptionPaymentStatus(subscriptionId, token);
-              status = normalizePaymentState(check, 'pending');
-              if (status === 'paid' || status === 'confirmed' || status === 'expired' || status === 'failed') {
-                result = check;
-                break;
-              }
-            } catch (e) { /* ignore polling errors */ }
-          }
-        }
-
-        // SUCCESS FLOW
-        if (status === 'confirmed' || status === 'paid') {
-          try {
-             await ctx.telegram.deleteMessage(ctx.chat.id, statusMsg.message_id);
-          } catch (e) {}
-
-          // Check if user already has a shop (for renewal vs new)
-          let hasShop = Boolean(ctx.session.shopId);
-          if (!hasShop && token) {
-            try {
-              const myShops = await shopApi.getMyShop(token);
-              if (Array.isArray(myShops) && myShops.length > 0) {
-                 hasShop = true;
-                 ctx.session.shopId = myShops[0].id;
-              }
-            } catch (e) {}
-          }
-
-          // If new shop creation flow
-          if (createShopAfter && !hasShop) {
-            await ctx.reply(
-              '✅ Оплата получена! Магазин оплачен.\n\n📝 Введите название для вашего магазина:', 
-              { parse_mode: 'HTML' }
-            );
-            
-            // Transition immediately
-            ctx.wizard.state.awaitingTxHash = false;
-            await ctx.scene.leave();
-            return ctx.scene.enter('createShop', {
-              tier,
-              subscriptionId,
-              paidSubscription: true, // Flag to skip payment check
-            });
-          }
-
-          // Renewal / Existing Shop Flow
-          await ctx.reply(`✅ Подписка успешно продлена!`, {
-            ...Markup.inlineKeyboard([[Markup.button.callback(buttonText.mainMenu, 'seller:menu')]]),
-          });
-
-          ctx.wizard.state.awaitingTxHash = false;
-          await ctx.scene.leave();
-          const { showSellerMainMenu } = await import('../handlers/seller/index.js');
-          await showSellerMainMenu(ctx);
-          return;
-        }
-
-        await ctx.reply(
-          paymentStateMessage(status, { hint: 'Ждём подтверждения сети.' }),
-          {
-            ...paymentStateKeyboard(status, {
-              retryCb: 'subscription:retry',
-              cancelCb: 'seller:menu',
-            }),
-          }
-        );
-        ctx.wizard.state.awaitingTxHash = false;
-        return;
-
-      } catch (error) {
-        logger.error('[PaySubscription] Verification failed', error);
-        
-        try {
-             if(statusMsg) await ctx.telegram.deleteMessage(ctx.chat.id, statusMsg.message_id);
-        } catch (e) {}
-
-        const msg = error.response?.data?.error || 'Транзакция пока не найдена. Попробуйте через минуту.';
-          
-        await ctx.reply(`⏳ ${msg}`, {
-          parse_mode: 'HTML',
-          ...Markup.inlineKeyboard([
-            [Markup.button.callback('🔄 Проверить снова', 'subscription:paid')],
-            [Markup.button.callback(buttonText.cancel, 'seller:menu')],
-          ]),
-        });
-        ctx.wizard.state.awaitingTxHash = false;
-        return;
-      }
-    }
-
     if (!ctx.callbackQuery) {
       return;
     }
@@ -501,56 +337,140 @@ const paySubscriptionScene = new Scenes.WizardScene(
       return;
     }
 
-    // Handle "check status" without tx hash (legacy)
-    if (data === 'subscription:status') {
-      await ctx.answerCbQuery();
+    // Handle check payment status
+    if (data === 'subscription:check_payment') {
+      await ctx.answerCbQuery('Проверяем статус оплаты...');
+
       try {
-        const { subscriptionId } = ctx.wizard.state;
+        const { invoiceId, tier, createShopAfter, subscriptionId, crystalPayUrl, amount, paymentMethod } = ctx.wizard.state;
         const token = ctx.session.token;
-        const paymentStatus = await subscriptionApi.getSubscriptionPaymentStatus(
-          subscriptionId,
-          token
-        );
 
-        const status = normalizePaymentState(paymentStatus, paymentStatus?.status);
-
-        if (status === 'paid' || status === 'confirmed') {
-          await cleanReply(ctx, '✅ Оплата подтверждена!');
-           // Try to move forward if possible, or just let them leave
+        // Check auth token before API call
+        if (!token) {
+          logger.error('[PaySubscription] No auth token in Step 4', {
+            userId: ctx.from.id,
+            invoiceId,
+          });
+          await ctx.editMessageText(generalMessages.authorizationRequired, {
+            parse_mode: 'HTML',
+            ...Markup.inlineKeyboard([
+              [Markup.button.callback(buttonText.cancel, 'seller:menu')],
+            ]),
+          });
           return;
         }
 
-        await cleanReply(
-          ctx,
-          paymentStateMessage(status, { hint: 'Если оплатили, отправьте TX hash.' }),
-          paymentStateKeyboard(status, {
-            retryCb: 'subscription:retry',
-            cancelCb: 'seller:menu',
-          })
+        // Check invoice status via backend
+        const statusResponse = await subscriptionApi.getInvoiceStatus(invoiceId, token);
+        const status = statusResponse.status;
+
+        logger.info(`[PaySubscription] Invoice ${invoiceId} status: ${status}`);
+
+        // SUCCESS FLOW
+        if (status === 'paid' || status === 'confirmed') {
+          // Check if user already has a shop (for renewal vs new)
+          let hasShop = Boolean(ctx.session.shopId);
+          if (!hasShop && token) {
+            try {
+              const myShops = await shopApi.getMyShop(token);
+              if (Array.isArray(myShops) && myShops.length > 0) {
+                hasShop = true;
+                ctx.session.shopId = myShops[0].id;
+              }
+            } catch { /* Intentionally ignored */ }
+          }
+
+          // If new shop creation flow
+          if (createShopAfter && !hasShop) {
+            await ctx.editMessageText(
+              '✅ Оплата получена! Магазин оплачен.\n\n📝 Введите название для вашего магазина:',
+              { parse_mode: 'HTML' }
+            );
+
+            const transitionData = {
+              tier,
+              subscriptionId,
+              paidSubscription: true, // Flag to skip payment check
+            };
+            // Clear wizard state before leaving
+            ctx.wizard.state = {};
+            await ctx.scene.leave();
+            return ctx.scene.enter('createShop', transitionData);
+          }
+
+          // Renewal / Existing Shop Flow
+          await ctx.editMessageText('✅ Подписка успешно продлена!', {
+            parse_mode: 'HTML',
+            ...Markup.inlineKeyboard([[Markup.button.callback(buttonText.mainMenu, 'seller:menu')]]),
+          });
+
+          await ctx.scene.leave();
+          return;
+        }
+
+        // EXPIRED FLOW
+        if (status === 'expired') {
+          await ctx.editMessageText(
+            '❌ Время на оплату истекло.\n\nВыберите метод оплаты заново:',
+            {
+              parse_mode: 'HTML',
+              ...Markup.inlineKeyboard([
+                [Markup.button.callback('₿ Bitcoin (BTC)', 'subscription:method:BTC')],
+                [Markup.button.callback('Ł Litecoin (LTC)', 'subscription:method:LTC')],
+                [Markup.button.callback(buttonText.cancel, 'seller:menu')],
+              ]),
+            }
+          );
+          return ctx.wizard.selectStep(2);
+        }
+
+        // PENDING FLOW - still waiting for payment
+        const methodLabel = PAYMENT_METHOD_LABELS[
+          Object.keys(PAYMENT_METHODS).find(k => PAYMENT_METHODS[k] === paymentMethod) || 'BTC'
+        ];
+
+        await ctx.editMessageText(
+          [
+            `📦 <b>Подписка:</b> ${tier === 'pro' ? 'Pro' : 'Basic'}`,
+            `💰 <b>Стоимость:</b> ${amount} ₽`,
+            `💳 <b>Метод:</b> ${methodLabel}`,
+            '',
+            '⏳ <b>Оплата пока не получена.</b>',
+            '',
+            'Нажмите кнопку для оплаты или проверьте статус позже:',
+          ].join('\n'),
+          {
+            parse_mode: 'HTML',
+            ...Markup.inlineKeyboard([
+              [Markup.button.url('💳 Оплатить', crystalPayUrl)],
+              [Markup.button.callback('🔄 Проверить оплату', 'subscription:check_payment')],
+              [Markup.button.callback(buttonText.cancel, 'seller:menu')],
+            ]),
+          }
         );
-        ctx.wizard.state.awaitingTxHash = !['confirmed', 'paid'].includes(status);
+
         return;
-      } catch (err) {
-        await cleanReply(ctx, 'Не удалось проверить статус.');
+      } catch (error) {
+        logger.error('[PaySubscription] Status check error:', error);
+
+        await ctx.editMessageText(
+          '❌ Не удалось проверить статус оплаты. Попробуйте позже.',
+          {
+            parse_mode: 'HTML',
+            ...Markup.inlineKeyboard([
+              [Markup.button.callback('🔄 Проверить снова', 'subscription:check_payment')],
+              [Markup.button.callback(buttonText.cancel, 'seller:menu')],
+            ]),
+          }
+        );
         return;
       }
     }
 
-    // Handle "I paid" button -> ask for tx hash
-    if (data === 'subscription:paid') {
-      await ctx.answerCbQuery();
-      await cleanReply(
-        ctx,
-        'Отправьте <b>ссылку на транзакцию</b> или <b>хэш</b> (TXID).'
-      );
-      ctx.wizard.state.awaitingTxHash = true;
-      return;
-    }
-
-    // Handle retry
+    // Handle retry (go back to payment method selection)
     if (data === 'subscription:retry') {
       await ctx.answerCbQuery();
-      return ctx.wizard.selectStep(1);
+      return ctx.wizard.selectStep(2);
     }
   }
 );

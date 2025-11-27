@@ -3,9 +3,7 @@ import { getWebAppUrl } from '../utils/webappUrl.js';
 import { buttons as buttonText } from '../texts/messages.js';
 
 // Seller menu (with active shop) - redesigned hierarchical structure
-export const sellerMenu = (activeOrdersCount = 0, options = {}) => {
-  const { hasFollows = false } = options;
-
+export const sellerMenu = (activeOrdersCount = 0) => {
   const buttons = [
     [Markup.button.webApp(buttonText.openCatalog, getWebAppUrl())],
     [

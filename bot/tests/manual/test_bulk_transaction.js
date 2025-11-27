@@ -139,7 +139,7 @@ async function testAccessDenied(token, products) {
   console.log('='.repeat(60));
 
   // Assuming product belongs to different shop
-  const updates = [
+  const _updates = [
     {
       productId: products[0].id,
       updates: { price: 100 },

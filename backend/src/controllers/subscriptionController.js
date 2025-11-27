@@ -12,65 +12,21 @@ import * as subscriptionInvoiceService from '../services/subscriptionInvoiceServ
 import { asyncHandler } from '../middleware/errorHandler.js';
 import { ValidationError } from '../utils/errors.js';
 import logger from '../utils/logger.js';
-import { query, getClient } from '../config/database.js';
 import invoicePaymentService from '../services/invoicePaymentService.js';
 
 /**
  * Pay for subscription (monthly renewal or new subscription)
  * POST /api/subscriptions/pay
  *
- * Body: {
- *   shopId: number,
- *   tier: 'basic' | 'pro',
- *   txHash: string,
- *   currency: 'BTC' | 'ETH' | 'USDT',
- *   paymentAddress: string
- * }
+ * DEPRECATED: Direct blockchain payments removed. Use CrystalPay via /api/payments/subscription/crystalpay
  */
 const paySubscription = asyncHandler(async (req, res) => {
-  try {
-    const { shopId, tier, txHash, currency, paymentAddress, paymentLink, txLink, transactionUrl } =
-      req.body;
-    const userId = req.user.id;
-
-    const paymentProof = txHash || paymentLink || txLink || transactionUrl;
-
-    // Validate required fields
-    if (!shopId || !tier || !paymentProof || !currency || !paymentAddress) {
-      throw new ValidationError(
-        'Missing required fields: shopId, tier, txHash/paymentLink, currency, paymentAddress'
-      );
-    }
-
-    // Verify shop ownership
-    const ownershipCheck = await verifyShopOwnership(shopId, userId);
-    if (!ownershipCheck.success) {
-      return res.status(ownershipCheck.status).json({ error: ownershipCheck.error });
-    }
-
-    // Process subscription payment
-    const subscription = await subscriptionService.processSubscriptionPayment(
-      shopId,
-      tier,
-      txHash,
-      currency,
-      paymentAddress,
-      paymentLink || txLink || transactionUrl
-    );
-
-    logger.info(
-      `[SubscriptionController] Subscription payment processed for shop ${shopId}, tier: ${tier}`
-    );
-
-    res.status(201).json({
-      success: true,
-      subscription,
-      message: `Subscription activated: ${tier} tier for 30 days`,
-    });
-  } catch (error) {
-    logger.error('[SubscriptionController] Error processing subscription payment:', error);
-    throw error;
-  }
+  // HD wallet system was removed - direct crypto payments not available
+  return res.status(410).json({
+    error: 'Прямые криптоплатежи отключены. Используйте CrystalPay.',
+    deprecated: true,
+    alternativeEndpoint: '/api/payments/subscription/crystalpay'
+  });
 });
 
 /**
@@ -381,90 +337,16 @@ const getMyShopSubscriptions = asyncHandler(async (req, res) => {
  * Generate payment invoice for subscription
  * POST /api/subscriptions/:id/payment/generate
  *
- * Body: {
- *   chain: 'BTC' | 'LTC' | 'ETH' | 'USDT_TRC20'
- * }
+ * DEPRECATED: HD wallet payments removed. Use /api/payments/subscription/crystalpay instead.
  */
 const generatePaymentInvoice = asyncHandler(async (req, res) => {
-  try {
-    const subscriptionId = parseInt(req.params.id, 10);
-    const { chain } = req.body;
-    const userId = req.user.id;
-
-    // Validate chain
-    const validChains = ['BTC', 'LTC', 'ETH', 'USDT_TRC20'];
-    if (!chain || !validChains.includes(chain.toUpperCase())) {
-      throw new ValidationError('Invalid chain. Supported: BTC, LTC, ETH, USDT_TRC20');
-    }
-
-    // Verify subscription exists and user owns it
-    const ownershipCheck = await verifySubscriptionOwnership(subscriptionId, userId);
-    if (!ownershipCheck.success) {
-      return res.status(ownershipCheck.status).json({ error: ownershipCheck.error });
-    }
-
-    const subscription = ownershipCheck.subscription;
-
-    // Check subscription status (only pending or failed can generate invoices)
-    if (subscription.status !== 'pending' && subscription.status !== 'failed') {
-      return res.status(400).json({
-        error: `Cannot generate invoice for subscription with status: ${subscription.status}`,
-        currentStatus: subscription.status,
-      });
-    }
-
-    // Check if there's already an active invoice
-    const activeInvoice =
-      await subscriptionInvoiceService.findActiveInvoiceForSubscription(
-        subscriptionId,
-        subscriptionInvoiceService.INVOICE_PURPOSES.SUBSCRIPTION
-      );
-
-    if (activeInvoice) {
-      logger.info(
-        `[SubscriptionController] Active invoice already exists for subscription ${subscriptionId}`
-      );
-
-      return res.status(200).json({
-        success: true,
-        invoice: {
-          invoiceId: activeInvoice.id,
-          address: activeInvoice.address,
-          expectedAmount: parseFloat(activeInvoice.expected_amount), // USD amount
-          cryptoAmount: parseFloat(activeInvoice.crypto_amount),     // EXACT crypto amount
-          currency: activeInvoice.currency,
-          expiresAt: activeInvoice.expires_at,
-          status: activeInvoice.status,
-        },
-        message: 'Using existing active invoice',
-      });
-    }
-
-    // Generate new invoice
-    const invoiceData = await subscriptionInvoiceService.generateSubscriptionInvoice(
-      subscriptionId,
-      chain.toUpperCase(),
-      { purpose: subscriptionInvoiceService.INVOICE_PURPOSES.SUBSCRIPTION }
-    );
-
-    logger.info(`[SubscriptionController] Invoice generated for subscription ${subscriptionId}`);
-
-    res.status(201).json({
-      success: true,
-      invoice: {
-        invoiceId: invoiceData.invoice.id,
-        address: invoiceData.address,
-        expectedAmount: invoiceData.expectedAmount, // USD amount (for reference)
-        cryptoAmount: invoiceData.cryptoAmount,     // EXACT crypto amount to send
-        currency: invoiceData.currency,
-        expiresAt: invoiceData.expiresAt,
-      },
-      message: 'Payment invoice generated successfully',
-    });
-  } catch (error) {
-    logger.error('[SubscriptionController] Error generating payment invoice:', error);
-    throw error;
-  }
+  // HD wallet system was removed - direct crypto payments not available
+  // Users should use CrystalPay payment flow via /api/payments/subscription/crystalpay
+  return res.status(410).json({
+    error: 'Прямые криптоплатежи отключены. Используйте CrystalPay.',
+    deprecated: true,
+    alternativeEndpoint: '/api/payments/subscription/crystalpay'
+  });
 });
 
 /**
@@ -522,90 +404,17 @@ const getPaymentStatus = asyncHandler(async (req, res) => {
 /**
  * Generate payment invoice for upgrading active subscription to PRO
  * POST /api/subscriptions/:id/upgrade/payment/generate
+ *
+ * DEPRECATED: HD wallet payments removed. Use /api/payments/subscription/crystalpay instead.
  */
 const generateUpgradePaymentInvoice = asyncHandler(async (req, res) => {
-  try {
-    const subscriptionId = parseInt(req.params.id, 10);
-    const { chain } = req.body;
-    const userId = req.user.id;
-
-    const validChains = ['BTC', 'LTC', 'ETH', 'USDT_TRC20'];
-    if (!chain || !validChains.includes(chain.toUpperCase())) {
-      throw new ValidationError('Invalid chain. Supported: BTC, LTC, ETH, USDT_TRC20');
-    }
-
-    const ownershipCheck = await verifySubscriptionOwnership(subscriptionId, userId);
-    if (!ownershipCheck.success) {
-      return res.status(ownershipCheck.status).json({ error: ownershipCheck.error });
-    }
-
-    const subscription = ownershipCheck.subscription;
-    if (!subscription.shop_id) {
-      return res.status(400).json({ error: 'Subscription is not attached to a shop' });
-    }
-
-    if ((subscription.tier || '').toLowerCase() === 'pro') {
-      return res.status(400).json({ error: 'Shop is already on PRO tier' });
-    }
-
-    const upgradeInfo = await subscriptionService.calculateUpgradeCost(subscription.shop_id);
-    if (upgradeInfo.alreadyPro) {
-      return res.status(400).json({ error: 'Shop is already on PRO tier' });
-    }
-
-    if (!upgradeInfo.amount || upgradeInfo.amount <= 0) {
-      return res.status(400).json({ error: 'Upgrade amount is invalid or zero' });
-    }
-
-    const activeInvoice =
-      await subscriptionInvoiceService.findActiveInvoiceForSubscription(
-        subscriptionId,
-        subscriptionInvoiceService.INVOICE_PURPOSES.UPGRADE
-      );
-
-    if (activeInvoice) {
-      return res.status(200).json({
-        success: true,
-        invoice: {
-          invoiceId: activeInvoice.id,
-          address: activeInvoice.address,
-          expectedAmount: parseFloat(activeInvoice.expected_amount),
-          cryptoAmount: parseFloat(activeInvoice.crypto_amount),
-          currency: activeInvoice.currency,
-          expiresAt: activeInvoice.expires_at,
-          status: activeInvoice.status,
-          purpose: activeInvoice.purpose,
-        },
-        message: 'Using existing active upgrade invoice',
-      });
-    }
-
-    const invoiceData = await subscriptionInvoiceService.generateSubscriptionInvoice(
-      subscriptionId,
-      chain.toUpperCase(),
-      {
-        purpose: subscriptionInvoiceService.INVOICE_PURPOSES.UPGRADE,
-        usdAmountOverride: upgradeInfo.amount,
-      }
-    );
-
-    res.status(201).json({
-      success: true,
-      invoice: {
-        invoiceId: invoiceData.invoice.id,
-        address: invoiceData.address,
-        expectedAmount: invoiceData.expectedAmount,
-        cryptoAmount: invoiceData.cryptoAmount,
-        currency: invoiceData.currency,
-        expiresAt: invoiceData.expiresAt,
-        purpose: subscriptionInvoiceService.INVOICE_PURPOSES.UPGRADE,
-      },
-      message: 'Upgrade invoice generated successfully',
-    });
-  } catch (error) {
-    logger.error('[SubscriptionController] Error generating upgrade invoice:', error);
-    throw error;
-  }
+  // HD wallet system was removed - direct crypto payments not available
+  // Users should use CrystalPay payment flow via /api/payments/subscription/crystalpay
+  return res.status(410).json({
+    error: 'Прямые криптоплатежи отключены. Используйте CrystalPay.',
+    deprecated: true,
+    alternativeEndpoint: '/api/payments/subscription/crystalpay'
+  });
 });
 
 /**

@@ -59,7 +59,7 @@ async function testCommand(userMessage, category) {
           console.log(
             `       Arguments: ${JSON.stringify(parsed, null, 2).replace(/\n/g, '\n       ')}`
           );
-        } catch (e) {
+        } catch {
           console.log(`       Arguments: ${call.function.arguments}`);
         }
       });

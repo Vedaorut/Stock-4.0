@@ -34,7 +34,6 @@ import productRoutes from './routes/products.js';
 import orderRoutes from './routes/orders.js';
 import paymentRoutes from './routes/payments.js';
 import subscriptionRoutes from './routes/subscriptions.js';
-import walletRoutes from './routes/wallets.js';
 import followRoutes from './routes/follows.js';
 import workerRoutes from './routes/workers.js';
 import webhookRoutes from './routes/webhooks.js';
@@ -47,9 +46,6 @@ import debugRoutes from './routes/debug.js';
 // Import cron jobs
 import { startSyncCron, stopSyncCron } from './jobs/productSyncCron.js';
 import { startSubscriptionJobs, stopSubscriptionJobs } from './jobs/subscriptionChecker.js';
-
-// Import polling service for crypto payments
-import pollingService from './services/pollingService.js';
 
 // Import order cleanup service
 import orderCleanupService from './services/orderCleanupService.js';
@@ -125,60 +121,21 @@ async function validateDatabaseSequences() {
 }
 
 /**
- * ENV Validation - check critical crypto xpubs
- * Validates required environment variables before server startup
- * to catch configuration issues early (fail-fast approach)
- *
- * Supports both naming schemes:
- * - New: BTC_XPUB, ETH_XPUB, LTC_XPUB
- * - Legacy: HD_XPUB_BTC, HD_XPUB_ETH, HD_XPUB_LTC
+ * ENV Validation - check critical environment variables
  */
 function validateEnvironment() {
-  const required = [
-    { name: 'BTC', new: 'BTC_XPUB', legacy: 'HD_XPUB_BTC' },
-    { name: 'ETH', new: 'ETH_XPUB', legacy: 'HD_XPUB_ETH' },
-    { name: 'LTC', new: 'LTC_XPUB', legacy: 'HD_XPUB_LTC' },
-    // USDT uses same as ETH (ERC20 and TRC20)
-  ];
+  // CrystalPay credentials check
+  const crystalPayLogin = process.env.CRYSTALPAY_LOGIN;
+  const crystalPaySecret = process.env.CRYSTALPAY_SECRET;
 
-  const missing = [];
-  const configured = [];
-
-  for (const { name, new: newKey, legacy } of required) {
-    const newValue = process.env[newKey];
-    const legacyValue = process.env[legacy];
-
-    // Check if at least one format is configured
-    if ((!newValue || newValue === 'undefined') && (!legacyValue || legacyValue === 'undefined')) {
-      missing.push({ name, newKey, legacy });
-    } else {
-      // Track which key is actually used
-      const usedKey = newValue && newValue !== 'undefined' ? newKey : legacy;
-      configured.push(usedKey);
-    }
-  }
-
-  if (missing.length > 0) {
-    logger.error('❌ CRITICAL: Missing required environment variables!');
-    logger.error('');
-    logger.error('Missing crypto xpubs:');
-    missing.forEach(({ name, newKey, legacy }) => {
-      logger.error(`  ${name}: ${newKey} or ${legacy}`);
-    });
-    logger.error('');
-    logger.error('Please configure these variables in backend/.env:');
-    missing.forEach(({ newKey, legacy }) => {
-      logger.error(`  ${newKey}=xpub...   (or ${legacy}=xpub...)`);
-    });
-    logger.error('');
-    logger.error('Example: Generate using HD wallet (BIP32/BIP44)');
-    logger.error('Exiting...');
-
-    process.exit(1); // Stop server startup
+  if (!crystalPayLogin || !crystalPaySecret) {
+    logger.warn('⚠️ CrystalPay credentials not configured (CRYSTALPAY_LOGIN, CRYSTALPAY_SECRET)');
+    logger.warn('Payment processing will not work without CrystalPay configuration');
+  } else {
+    logger.info('✓ CrystalPay credentials configured');
   }
 
   logger.info('✓ Environment validation passed');
-  logger.info(`✓ Crypto xpubs configured: ${configured.join(', ')}`);
 }
 
 // Call validation BEFORE starting server
@@ -407,7 +364,6 @@ app.use('/api/products', productRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
-app.use('/api/wallets', walletRoutes);
 app.use('/api/follows', followRoutes);
 app.use('/api/shop-follows', followRoutes);
 app.use('/api/ai', aiRoutes);
@@ -492,10 +448,6 @@ const startServer = async () => {
 
       // Start subscription cron jobs
       startSubscriptionJobs();
-
-      // Start polling service for ETH/TRON payments
-      pollingService.startPolling();
-      logger.info('Payment polling service started');
 
       // Start order cleanup service
       orderCleanupService.startOrderCleanup();
@@ -606,10 +558,6 @@ const startServer = async () => {
 
       // Stop subscription cron jobs
       stopSubscriptionJobs();
-
-      // Stop polling service
-      pollingService.stopPolling();
-      logger.info('Payment polling service stopped');
 
       // Stop Telegram bot
       if (global.botInstance) {

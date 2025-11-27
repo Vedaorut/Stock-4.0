@@ -149,111 +149,6 @@ export const updateOrderStatusWithStockLogic = async (orderId, newStatus, curren
 };
 
 /**
- * Generate crypto invoice for order
- *
- * @param {number} orderId - Order ID
- * @param {string} chain - Blockchain chain (BTC, ETH, LTC, USDT_TRC20)
- * @returns {Object} - Invoice data: { invoice, walletAddress, cryptoAmount, chain }
- * @throws {NotFoundError} - If order not found
- */
-export const generateOrderInvoice = async (orderId, chain) => {
-  const { generateAddress } = await import('./walletService.js');
-  const {
-    getCryptoPrice,
-    convertUsdToCrypto,
-    roundCryptoAmount,
-  } = await import('./cryptoPriceService.js');
-
-  logger.debug('Generating invoice', { orderId, chain });
-
-  // Get order data
-  const order = await orderQueries.findById(orderId);
-  if (!order) {
-    throw new NotFoundError('Order');
-  }
-
-  logger.debug('Order found', { orderId, totalPrice: order.total_price });
-
-  // Get next invoice index for HD wallet
-  const addressIndex = await invoiceQueries.getNextIndex(chain);
-  logger.debug('Address index', { chain, addressIndex });
-
-  // Get xpub from environment
-  const xpubKey = `HD_XPUB_${chain.split('_')[0]}`; // BTC, ETH, LTC, USDT
-  const xpub = process.env[xpubKey];
-
-  if (!xpub) {
-    logger.error(`Missing xpub for ${chain}: ${xpubKey}`);
-    throw new Error(`Payment system not configured for ${chain}. Please contact support.`);
-  }
-
-  // Generate unique HD wallet address
-  const { address, derivationPath } = await generateAddress(
-    chain.split('_')[0], // Remove _ERC20/_TRC20 suffix
-    xpub,
-    addressIndex
-  );
-
-  logger.info('Wallet generated', { address, derivationPath });
-
-  // Get real-time crypto price
-  const priceChain = chain.startsWith('USDT') ? 'USDT_TRC20' : chain;
-  const cryptoPrice = await getCryptoPrice(priceChain);
-
-  if (!cryptoPrice) {
-    logger.error('Unable to fetch crypto price', { chain: priceChain });
-    throw new Error(`Unable to fetch ${chain} price. Please try again later.`);
-  }
-
-  logger.debug('Crypto price fetched', { chain: priceChain, price: cryptoPrice });
-
-  // Convert USD to crypto amount with proper precision
-  const rawCryptoAmount = convertUsdToCrypto(parseFloat(order.total_price), cryptoPrice);
-  const cryptoAmount = roundCryptoAmount(rawCryptoAmount, priceChain);
-
-  logger.debug('Crypto amount calculated', {
-    usdAmount: order.total_price,
-    cryptoPrice,
-    rawCryptoAmount,
-    roundedCryptoAmount: cryptoAmount,
-  });
-
-  // Calculate expiration (1 hour from now)
-  const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
-
-  // Create invoice in database
-  const invoice = await invoiceQueries.create({
-    orderId: parseInt(orderId),
-    chain,
-    address,
-    addressIndex,
-    expectedAmount: cryptoAmount,
-    currency: chain,
-    webhookSubscriptionId: null, // Will be set by webhook service
-    expiresAt,
-  });
-
-  logger.info('Invoice created', {
-    invoiceId: invoice.id,
-    orderId,
-    chain,
-    address,
-    cryptoAmount,
-    usdAmount: order.total_price,
-  });
-
-  return {
-    invoice,
-    walletAddress: address,
-    cryptoAmount,
-    chain,
-    usdAmount: parseFloat(order.total_price),
-    cryptoPrice,
-    expiresAt: invoice.expires_at,
-  };
-};
-
-/**
  * Get order analytics for user (seller)
  *
  * @param {number} userId - User ID
@@ -332,6 +227,5 @@ export default {
   createOrderWithItems,
   returnStockForCancelledOrder,
   updateOrderStatusWithStockLogic,
-  generateOrderInvoice,
   getOrderAnalytics,
 };

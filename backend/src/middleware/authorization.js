@@ -95,7 +95,7 @@ export const requireFollowOwner = async (req, res, next) => {
  * If you need subscription ownership verification, implement it in the controller
  * or refactor subscription routes to use subscription IDs.
  */
-export const requireSubscriptionOwner = async (req, res, next) => {
+export const requireSubscriptionOwner = async (req, res, _next) => {
   logger.warn('[DEPRECATED] requireSubscriptionOwner middleware called but NOT IN USE', {
     subscriptionId: req.params.id,
     userId: req.user?.id,

@@ -2,6 +2,9 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import axios from 'axios';
 import { useToastStore } from '../hooks/useToast';
+import { getApiBaseUrl } from '../utils/apiBase';
+
+const API_URL = getApiBaseUrl();
 
 export const normalizeProduct = (product) => {
   const rawStock = product?.stock_quantity ?? product?.stock ?? 0;
@@ -181,6 +184,10 @@ export const useStore = create(
       currentShop: null,
       setCurrentShop: (shop) => set({ currentShop: shop }),
 
+      // My shop (seller's own shop for Follows page)
+      myShop: null,
+      setMyShop: (shop) => set({ myShop: shop }),
+
       // Subscriptions
       subscriptions: [],
       setSubscriptions: (subscriptions) => set({ subscriptions }),
@@ -297,7 +304,6 @@ export const useStore = create(
 
         let timeoutId; // ✅ Moved BEFORE try block for finally access
         try {
-          const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
           const initData = window.Telegram?.WebApp?.initData || '';
 
           const controller = new AbortController();
@@ -443,9 +449,6 @@ export const useStore = create(
               }
             }
 
-            // Generate invoice
-            const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
-
             // ✅ FIX: Get token for authorization
             const { token } = get();
 
@@ -541,7 +544,6 @@ export const useStore = create(
         try {
           timeoutId = setTimeout(() => controller.abort(), 10000);
 
-          const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
           const response = await axios.post(
             `${API_URL}/payments/verify`,
             {
@@ -673,7 +675,6 @@ export const useStore = create(
       // WebSocket actions
       refetchProducts: async (shopId) => {
         try {
-          const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
           const response = await axios.get(`${API_URL}/products`, {
             params: { shopId },
           });
@@ -728,6 +729,7 @@ export const useStore = create(
       partialize: (state) => ({
         token: state.token, // ✅ Fix: Persist token across page refresh
         pendingOrders: state.pendingOrders,
+        cart: state.cart, // ✅ Fix: Persist cart across page refresh
       }),
     }
   )

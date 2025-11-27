@@ -15,281 +15,63 @@ import {
   SUBSCRIPTION_PRICES_YEARLY,
   SUBSCRIPTION_PERIOD_DAYS,
   GRACE_PERIOD_DAYS,
-  calculateProratedUpgrade as calculateUpgradeAmountFromConfig,
 } from '../config/subscriptionPricing.js';
-import paymentVerificationService from './paymentVerificationService.js';
+// paymentVerificationService removed - only CrystalPay payments supported
 
 function addDays(date, days) {
   return new Date(date.getTime() + days * 24 * 60 * 60 * 1000);
 }
 
 /**
- * Process subscription payment
- * Verifies crypto transaction and creates subscription record
+ * Calculate prorated upgrade amount from basic to pro tier
  *
- * @deprecated Use invoicePaymentService.processSubscriptionPayment instead
- * @param {number} shopId - Shop ID
- * @param {string} tier - Subscription tier ('basic' or 'pro')
- * @param {string} txHash - Blockchain transaction hash
- * @param {string} currency - Cryptocurrency (BTC, ETH, USDT, LTC)
- * @param {string} expectedAddress - Expected payment address
- * @param {string} paymentLink - Optional explorer/payment link for hash extraction
- * @returns {Promise<object>} Subscription record
+ * @param {Date} periodStart - Start of current subscription period
+ * @param {Date} periodEnd - End of current subscription period
+ * @param {number} basicPrice - Price of basic tier per month
+ * @param {number} proPrice - Price of pro tier per month
+ * @returns {number} Prorated upgrade cost
  */
-async function processSubscriptionPayment(
-  shopId,
-  tier,
-  txHash,
-  currency,
-  expectedAddress,
-  paymentLink = null
-) {
-  const client = await pool.connect();
+function calculateUpgradeAmount(periodStart, periodEnd, basicPrice, proPrice) {
+  const now = new Date();
+  const start = new Date(periodStart);
+  const end = new Date(periodEnd);
 
-  try {
-    await client.query('BEGIN');
-
-    // Validate tier
-    if (!['basic', 'pro'].includes(tier)) {
-      throw new Error('Invalid subscription tier. Use "basic" or "pro"');
-    }
-
-    const amount = SUBSCRIPTION_PRICES[tier];
-
-    // Verify transaction on blockchain
-    logger.info(`[Subscription] Verifying ${currency} transaction ${txHash || paymentLink}`);
-    const verification = await paymentVerificationService.verifyIncomingPayment({
-      txHash,
-      paymentLink,
-      address: expectedAddress,
-      amount,
-      currency,
-    });
-
-    if (!verification.verified) {
-      logger.error(`[Subscription] Transaction verification failed: ${verification.error}`);
-      throw new Error(verification.error || 'Transaction verification failed');
-    }
-
-    // Calculate subscription period
-    const now = new Date();
-    const periodStart = now;
-    const periodEnd = new Date(now.getTime() + SUBSCRIPTION_PERIOD_DAYS * 24 * 60 * 60 * 1000);
-    const nextPaymentDue = periodEnd;
-
-    // Create subscription record with idempotency (ON CONFLICT)
-    // If tx_hash already exists and status is 'pending', activate it
-    // If tx_hash already exists and status is already 'active', return existing record (idempotent)
-    const subscriptionResult = await client.query(
-      `INSERT INTO shop_subscriptions
-       (shop_id, tier, amount, tx_hash, currency, period_start, period_end, status, verified_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 'active', NOW())
-       ON CONFLICT (tx_hash) DO UPDATE
-       SET status = CASE
-         WHEN shop_subscriptions.status = 'pending' THEN 'active'
-         ELSE shop_subscriptions.status
-       END,
-       verified_at = CASE
-         WHEN shop_subscriptions.status = 'pending' THEN NOW()
-         ELSE shop_subscriptions.verified_at
-       END
-       RETURNING *`,
-      [shopId, tier, amount, txHash, currency, periodStart, periodEnd]
-    );
-
-    const subscription = subscriptionResult.rows[0];
-
-    // Update shop record
-    await client.query(
-      `UPDATE shops 
-       SET tier = $1,
-           subscription_status = 'active',
-           next_payment_due = $2,
-           grace_period_until = NULL,
-           registration_paid = true,
-           is_active = true,
-           updated_at = NOW()
-       WHERE id = $3`,
-      [tier, nextPaymentDue, shopId]
-    );
-
-    await client.query('COMMIT');
-
-    logger.info(
-      `[Subscription] Subscription created for shop ${shopId}, tier: ${tier}, period: ${periodStart.toISOString()} - ${periodEnd.toISOString()}`
-    );
-
-    return subscription;
-  } catch (error) {
-    // CRITICAL: Catch rollback errors to prevent connection leak
-    try {
-      await client.query('ROLLBACK');
-    } catch (rollbackError) {
-      logger.error('[Subscription] Rollback error:', rollbackError);
-    }
-    logger.error('[Subscription] Error processing subscription payment:', error);
-    throw error;
-  } finally {
-    // CRITICAL: Always release client (prevents connection leak)
-    client.release();
+  // Total period in days
+  const totalDays = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
+  if (totalDays <= 0) {
+    return proPrice - basicPrice; // Full difference if period is invalid
   }
+
+  // Remaining days in period
+  const remainingDays = Math.ceil((end - now) / (1000 * 60 * 60 * 24));
+  if (remainingDays <= 0) {
+    return proPrice; // Full pro price if no time remaining
+  }
+
+  // Prorated difference: (pro - basic) * (remaining / total)
+  const priceDifference = proPrice - basicPrice;
+  const proratedAmount = (priceDifference * remainingDays) / totalDays;
+
+  // Round to 2 decimal places
+  return Math.round(proratedAmount * 100) / 100;
+}
+
+/**
+ * Process subscription payment
+ *
+ * @deprecated HD wallet payments removed. Use CrystalPay via invoicePaymentService.
+ */
+async function processSubscriptionPayment() {
+  throw new Error('Direct blockchain payments not supported. Use CrystalPay via /api/payments/subscription/crystalpay');
 }
 
 /**
  * Upgrade shop from free to PRO tier
- * Calculates prorated amount based on remaining time
  *
- * @deprecated Use invoicePaymentService.processUpgradePayment instead
- * @param {number} shopId - Shop ID
- * @param {string} txHash - Blockchain transaction hash for upgrade payment
- * @param {string} currency - Cryptocurrency
- * @param {string} expectedAddress - Expected payment address
- * @param {string} paymentLink - Optional explorer/payment link for hash extraction
- * @returns {Promise<object>} Upgraded subscription record
+ * @deprecated HD wallet payments removed. Use CrystalPay.
  */
-async function upgradeShopToPro(
-  shopId,
-  txHash,
-  currency,
-  expectedAddress,
-  paymentLink = null
-) {
-  const client = await pool.connect();
-
-  try {
-    await client.query('BEGIN');
-
-    // Get current shop and subscription
-    const shopResult = await client.query('SELECT * FROM shops WHERE id = $1', [shopId]);
-
-    if (shopResult.rows.length === 0) {
-      throw new Error('Shop not found');
-    }
-
-    const shop = shopResult.rows[0];
-
-    if (shop.tier === 'pro') {
-      throw new Error('Shop is already PRO tier');
-    }
-
-    // Get current active subscription
-    const currentSubResult = await client.query(
-      `SELECT * FROM shop_subscriptions 
-       WHERE shop_id = $1 
-       AND status = 'active'
-       AND period_end > NOW()
-       ORDER BY period_end DESC
-       LIMIT 1`,
-      [shopId]
-    );
-
-    if (currentSubResult.rows.length === 0) {
-      throw new Error('No active subscription found. Please renew subscription first.');
-    }
-
-    const currentSub = currentSubResult.rows[0];
-
-    // Calculate prorated upgrade amount
-    const upgradeAmount = calculateUpgradeAmount(
-      currentSub.period_start,
-      currentSub.period_end,
-      SUBSCRIPTION_PRICES.basic,
-      SUBSCRIPTION_PRICES.pro
-    );
-
-    logger.info(`[Subscription] Upgrade amount calculated: $${upgradeAmount} (prorated)`);
-
-    // Verify transaction
-    const verification = await paymentVerificationService.verifyIncomingPayment({
-      txHash,
-      paymentLink,
-      address: expectedAddress,
-      amount: upgradeAmount,
-      currency,
-    });
-
-    if (!verification.verified) {
-      throw new Error(verification.error || 'Transaction verification failed');
-    }
-
-    // Check for duplicate tx_hash
-    const duplicateCheck = await client.query(
-      'SELECT id FROM shop_subscriptions WHERE tx_hash = $1',
-      [txHash]
-    );
-
-    if (duplicateCheck.rows.length > 0) {
-      throw new Error('Transaction already processed');
-    }
-
-    // Create PRO subscription record (replaces current subscription period)
-    const subscriptionResult = await client.query(
-      `INSERT INTO shop_subscriptions 
-       (shop_id, tier, amount, tx_hash, currency, period_start, period_end, status, verified_at)
-       VALUES ($1, 'pro', $2, $3, $4, $5, $6, 'active', NOW())
-       RETURNING *`,
-      [shopId, upgradeAmount, txHash, currency, currentSub.period_start, currentSub.period_end]
-    );
-
-    const newSubscription = subscriptionResult.rows[0];
-
-    // Mark old subscription as cancelled
-    await client.query(
-      `UPDATE shop_subscriptions 
-       SET status = 'cancelled'
-       WHERE id = $1`,
-      [currentSub.id]
-    );
-
-    // Update shop to PRO tier
-    await client.query(
-      `UPDATE shops 
-       SET tier = 'pro',
-           updated_at = NOW()
-       WHERE id = $1`,
-      [shopId]
-    );
-
-    await client.query('COMMIT');
-
-    logger.info(`[Subscription] Shop ${shopId} upgraded to PRO tier`);
-
-    return newSubscription;
-  } catch (error) {
-    // CRITICAL: Catch rollback errors to prevent connection leak
-    try {
-      await client.query('ROLLBACK');
-    } catch (rollbackError) {
-      logger.error('[Subscription] Rollback error:', rollbackError);
-    }
-    logger.error('[Subscription] Error upgrading shop to PRO:', error);
-    throw error;
-  } finally {
-    // CRITICAL: Always release client (prevents connection leak)
-    client.release();
-  }
-}
-
-/**
- * Calculate prorated upgrade amount
- * @deprecated Use calculateProratedUpgrade from config/subscriptionPricing.js
- * @param {Date} periodStart - Subscription period start
- * @param {Date} periodEnd - Subscription period end
- * @param {number} oldPrice - Old tier price
- * @param {number} newPrice - New tier price
- * @returns {number} Prorated upgrade amount
- */
-function calculateUpgradeAmount(periodStart, periodEnd, oldPrice, newPrice) {
-  const now = new Date();
-  const totalDays = Math.ceil((periodEnd - periodStart) / (1000 * 60 * 60 * 24));
-  const remainingDays = Math.ceil((periodEnd - now) / (1000 * 60 * 60 * 24));
-
-  // Prorated difference
-  const dailyDifference = (newPrice - oldPrice) / totalDays;
-  const upgradeAmount = dailyDifference * remainingDays;
-
-  // Round to 2 decimal places
-  return Math.max(0.01, Math.round(upgradeAmount * 100) / 100);
+async function upgradeShopToPro() {
+  throw new Error('Direct blockchain payments not supported. Use CrystalPay.');
 }
 
 /**

@@ -35,7 +35,7 @@ const deepseek = new OpenAI({
 
 // Use real productTools from source
 // const tools = productTools; // УДАЛЕНО - заменили на импорт выше
-const toolsOLD = [
+const _toolsOLD = [
   {
     type: 'function',
     function: {

@@ -92,15 +92,18 @@ function App() {
         const shops = Array.isArray(shopsResponse?.data) ? shopsResponse.data : [];
 
         if (!shops.length) {
-          // ✅ FIX: Use getState() for stable reference
           useStore.getState().setHasFollows(false);
           setFollowsChecked(true);
           return;
         }
 
         const primaryShop = shops[0];
-        const { data: followsResponse } = await get('/shop-follows', {
-          params: { shop_id: primaryShop.id },
+        // Save myShop to store for Follows page
+        useStore.getState().setMyShop(primaryShop);
+
+        // Use consistent endpoint: /follows/my with shopId param
+        const { data: followsResponse } = await get('/follows/my', {
+          params: { shopId: primaryShop.id },
           signal: controller.signal,
         });
 
@@ -110,12 +113,11 @@ function App() {
         const list = Array.isArray(followsResponse?.data)
           ? followsResponse.data
           : followsResponse || [];
-        // ✅ FIX: Use getState() for stable reference
         useStore.getState().setHasFollows(list.length > 0);
       } catch (fetchError) {
         // Ignore abort errors
         if (fetchError.name === 'AbortError') return;
-        // Silent failure – tab will appear once пользователь откроет раздел вручную
+        // Silent failure - tab will appear once user opens section manually
       } finally {
         if (!controller.signal.aborted) {
           setFollowsChecked(true);
@@ -129,7 +131,7 @@ function App() {
     return () => {
       controller.abort();
     };
-  }, [isReady, token, followsChecked, hasFollows, get]); // ✅ FIX: Removed setHasFollows from deps
+  }, [isReady, token, followsChecked, hasFollows, get]);
 
   // Page transition variants
   const pageVariants = {

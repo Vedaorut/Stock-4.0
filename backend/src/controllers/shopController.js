@@ -3,7 +3,7 @@ import { dbErrorHandler, asyncHandler } from '../middleware/errorHandler.js';
 import { NotFoundError, UnauthorizedError, ValidationError, ConflictError, PaymentRequiredError } from '../utils/errors.js';
 import logger from '../utils/logger.js';
 import { activatePromoSubscription } from '../services/subscriptionService.js';
-import { validateAddress } from '../services/walletService.js';
+import { validateAddress } from '../utils/addressValidation.js';
 import * as promoCodeQueries from '../../database/queries/promoCodeQueries.js';
 
 /**
@@ -618,7 +618,7 @@ export const shopController = {
         );
 
         if (duplicateCheck.rows.length > 0) {
-          const conflictShop = duplicateCheck.rows[0];
+          const _conflictShop = duplicateCheck.rows[0];
           throw new ConflictError(`Wallet address already in use by another shop`);
         }
       }

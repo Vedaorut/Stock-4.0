@@ -90,9 +90,15 @@ const getTabsConfig = (t, includeFollows = false) => {
 const TabBar = memo(function TabBar() {
   const { activeTab, setActiveTab, setCartOpen, setPaymentStep, hasFollows, setFollowDetailId } =
     useStore();
+  const paymentStep = useStore((state) => state.paymentStep);
   const { triggerHaptic } = useTelegram();
   const { t } = useTranslation();
   const platform = usePlatform();
+
+  // Hide TabBar during payment flow to prevent user interruption
+  if (paymentStep !== 'idle') {
+    return null;
+  }
 
   const tabs = useMemo(() => getTabsConfig(t, hasFollows), [t, hasFollows]);
 

@@ -106,24 +106,27 @@ export const handleBuyerRole = async (ctx) => {
     }
 
     // Check if buyer has shop (for CTA to create shop)
-    try {
-      // MEDIUM severity fix - add token check
-      if (ctx.session.token) {
-        const shops = await shopApi.getMyShop(ctx.session.token);
-
-        if (!shops || shops.length === 0) {
-          // No shop - show CTA to create shop
-          await smartMessage.send(ctx, {
-            text: buyerMessages.panel,
-            keyboard: buyerMenuNoShop,
-          });
-          logger.info(`Buyer ${ctx.from.id} has no shop, showing CTA`);
-          return;
+    // STABILITY FIX #2: Use explicit .catch() for graceful fallback on 401/403
+    if (ctx.session.token) {
+      const shops = await shopApi.getMyShop(ctx.session.token).catch((error) => {
+        // Graceful fallback: on 401/403 or any error, return null to show normal menu
+        if (error.response?.status === 401 || error.response?.status === 403) {
+          logger.debug('Token expired or forbidden when checking shop for buyer, showing normal menu');
+        } else {
+          logger.error('Failed to check shop for buyer:', error);
         }
+        return null;
+      });
+
+      if (shops !== null && (!shops || shops.length === 0)) {
+        // No shop - show CTA to create shop
+        await smartMessage.send(ctx, {
+          text: buyerMessages.panel,
+          keyboard: buyerMenuNoShop,
+        });
+        logger.info(`Buyer ${ctx.from.id} has no shop, showing CTA`);
+        return;
       }
-    } catch (error) {
-      logger.error('Failed to check shop for buyer:', error);
-      // Continue to show normal buyer menu on error
     }
 
     await smartMessage.send(ctx, {

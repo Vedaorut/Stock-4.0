@@ -65,6 +65,15 @@ export const verifyTelegramInitData = (req, res, next) => {
       .update(dataCheckString)
       .digest('hex');
 
+    // DEBUG: Log validation details
+    logger.info('Telegram validation debug', {
+      botTokenPrefix: config.telegram.botToken?.substring(0, 10) + '...',
+      dataCheckStringLength: dataCheckString.length,
+      dataCheckStringPreview: dataCheckString.substring(0, 100),
+      calculatedHash: calculatedHash.substring(0, 16) + '...',
+      providedHash: hash.substring(0, 16) + '...',
+    });
+
     // Compare hashes using constant-time comparison to prevent timing attacks
     // CRITICAL: Must use crypto.timingSafeEqual() instead of === operator
     const hashBuffer = Buffer.from(hash, 'hex');
@@ -77,8 +86,8 @@ export const verifyTelegramInitData = (req, res, next) => {
       logger.warn('Invalid Telegram initData signature', {
         ip: req.ip,
         path: req.path,
-        expectedHash: calculatedHash.substring(0, 8) + '...',
-        providedHash: hash.substring(0, 8) + '...',
+        expectedHash: calculatedHash.substring(0, 16) + '...',
+        providedHash: hash.substring(0, 16) + '...',
       });
       return res.status(401).json({
         success: false,
@@ -89,7 +98,23 @@ export const verifyTelegramInitData = (req, res, next) => {
     // Check auth_date to prevent replay attacks (recommended)
     const authDate = parseInt(params.get('auth_date'));
     const currentTime = Math.floor(Date.now() / 1000);
-    const maxAge = 24 * 60 * 60; // 24 hours
+    const maxAge = 15 * 60; // 15 minutes (security: shorter window reduces replay attack risk)
+    const maxClockSkew = 60; // 60 seconds tolerance for clock skew
+
+    // B2 FIX: Protect against future timestamps (clock skew attack)
+    if (authDate > currentTime + maxClockSkew) {
+      logger.warn('Telegram initData from future detected (possible clock skew attack)', {
+        ip: req.ip,
+        path: req.path,
+        authDate,
+        currentTime,
+        skew: authDate - currentTime,
+      });
+      return res.status(401).json({
+        success: false,
+        error: 'Unauthorized: Invalid Telegram timestamp',
+      });
+    }
 
     if (currentTime - authDate > maxAge) {
       logger.warn('Expired Telegram initData', {
@@ -98,6 +123,7 @@ export const verifyTelegramInitData = (req, res, next) => {
         authDate,
         currentTime,
         age: currentTime - authDate,
+        maxAge,
       });
       return res.status(401).json({
         success: false,

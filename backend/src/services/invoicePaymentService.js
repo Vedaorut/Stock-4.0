@@ -8,10 +8,8 @@ import {
   subscriptionQueries,
   userQueries,
 } from '../database/queries/index.js';
-import paymentVerificationService from './paymentVerificationService.js';
 import telegramService from './telegram.js';
 import logger from '../utils/logger.js';
-import { amountsMatchWithTolerance } from '../utils/paymentTolerance.js';
 import { SUBSCRIPTION_PERIOD_DAYS } from '../config/subscriptionPricing.js';
 import { NotFoundError, UnauthorizedError, ValidationError } from '../utils/errors.js';
 import { INVOICE_PURPOSES, INVOICE_STATES } from '../constants/invoice.js';
@@ -21,28 +19,6 @@ const ORDER_STATES = {
   CONFIRMED: 'confirmed',
   CANCELLED: 'cancelled',
 };
-
-/**
- * Normalize invoice amounts/currency for verification.
- */
-function buildPaymentContext(invoice) {
-  // CRITICAL FIX: crypto_amount is REQUIRED - no fallback to USD expected_amount
-  if (!invoice.crypto_amount) {
-    throw new ValidationError('Invoice missing crypto_amount - cannot verify payment');
-  }
-
-  const amount = parseFloat(invoice.crypto_amount);
-  if (!amount || Number.isNaN(amount) || amount <= 0) {
-    throw new ValidationError('Invoice has invalid crypto_amount for verification');
-  }
-
-  return {
-    address: invoice.address,
-    amount,
-    currency: (invoice.currency || invoice.chain || 'USDT').toUpperCase(),
-    chain: (invoice.chain || invoice.currency || 'USDT').toUpperCase(),
-  };
-}
 
 async function ensureInvoiceActive(invoice, client) {
   const now = new Date();
@@ -65,7 +41,9 @@ async function ensureInvoiceActive(invoice, client) {
 }
 
 async function guardTxReuse(client, txHash, { orderId = null, subscriptionId = null }) {
-  if (!txHash) return null;
+  if (!txHash) {
+    return null;
+  }
 
   const existing = await client.query('SELECT * FROM payments WHERE tx_hash = $1 FOR UPDATE', [
     txHash,
@@ -507,7 +485,9 @@ async function finalizeSubscriptionPayment(client, { subscription, invoice, veri
 async function notifyOrderConfirmed(orderId) {
   // Fetch fresh order/product/shop data outside the transaction for notifications
   const order = await orderQueries.findById(orderId);
-  if (!order) return;
+  if (!order) {
+    return;
+  }
 
   const product = await productQueries.findById(order.product_id);
   const shop = product ? await shopQueries.findById(product.shop_id) : null;
@@ -552,7 +532,9 @@ async function notifyOrderConfirmed(orderId) {
 async function notifySubscriptionActivated(subscriptionId) {
   try {
     const subscription = await subscriptionQueries.findShopSubscriptionById(subscriptionId);
-    if (!subscription || !subscription.shop_id) return;
+    if (!subscription || !subscription.shop_id) {
+      return;
+    }
 
     const shop = await shopQueries.findById(subscription.shop_id);
     const owner = shop ? await userQueries.findById(shop.owner_id) : null;
@@ -641,7 +623,6 @@ export async function processOrderPayment({ orderId, txHash, paymentLink, actorU
       };
     }
 
-    const paymentContext = buildPaymentContext(invoice);
     const guardedPayment = txHash
       ? await guardTxReuse(client, txHash, { orderId })
       : null;
@@ -653,89 +634,16 @@ export async function processOrderPayment({ orderId, txHash, paymentLink, actorU
       return { ok: true, state: 'confirmed', idempotent: true };
     }
 
-    const verification = await paymentVerificationService.verifyIncomingPayment({
-      txHash,
-      paymentLink,
-      address: paymentContext.address,
-      amount: paymentContext.amount,
-      currency: paymentContext.currency,
-      chain: paymentContext.chain,
-    });
-
-    if (!verification.verified) {
-      if (txHash) {
-        await paymentQueries.create(
-          {
-            orderId,
-            txHash,
-            amount: paymentContext.amount,
-            currency: paymentContext.currency,
-            status: 'failed',
-          },
-          client
-        );
-      }
-
-      await client.query('COMMIT');
-      return {
-        ok: false,
-        state: 'failed',
-        code: verification.code || 'PAYMENT_NOT_VERIFIED',
-        message: verification.error || 'Payment verification failed',
-      };
-    }
-
-    const verifiedTxHash = verification.txHash || txHash;
-
-    if (!amountsMatchWithTolerance(verification.amount, paymentContext.amount, undefined, paymentContext.currency)) {
-      await client.query('COMMIT');
-      return {
-        ok: false,
-        state: 'failed',
-        code: 'AMOUNT_MISMATCH',
-        message: `Payment amount insufficient. Expected ${paymentContext.amount}, received ${verification.amount}`,
-      };
-    }
-
-    // Re-guard with normalized hash
-    const reusedPayment = await guardTxReuse(client, verifiedTxHash, { orderId });
-
-    const payment = await attachPaymentRecord(client, {
-      invoice,
-      verification: { ...verification, txHash: verifiedTxHash },
-      orderId,
-      subscriptionId: null,
-    });
-
-    if (verification.status !== 'confirmed') {
-      await client.query(
-        `UPDATE invoices SET tx_hash = COALESCE($2, tx_hash), updated_at = NOW() WHERE id = $1`,
-        [invoice.id, verifiedTxHash]
-      );
-      await client.query('COMMIT');
-
-      return {
-        ok: true,
-        state: 'pending',
-        payment,
-        invoice: { ...invoice, tx_hash: verifiedTxHash },
-      };
-    }
-
-    const finalizeResult = await finalizeOrderPayment(client, {
-      order,
-      invoice: { ...invoice, tx_hash: verifiedTxHash },
-      verification: { ...verification, txHash: verifiedTxHash },
-      payment,
-    });
-
+    // HD wallet blockchain verification removed - only CrystalPay payments supported for orders
+    // Order payments should use CrystalPay gateway which handles verification externally
+    logger.error(`[InvoicePayment] Order ${orderId} - direct blockchain verification not available`);
     await client.query('COMMIT');
-
-    if (finalizeResult.ok && finalizeResult.state === 'confirmed') {
-      await notifyOrderConfirmed(order.id);
-    }
-
-    return finalizeResult;
+    return {
+      ok: false,
+      state: 'failed',
+      code: 'UNSUPPORTED_PAYMENT_METHOD',
+      message: 'Direct blockchain payments not supported. Use CrystalPay payment gateway.',
+    };
   } catch (error) {
     try {
       await client.query('ROLLBACK');
@@ -808,38 +716,32 @@ export async function processSubscriptionPayment({
     return { ok: false, state: 'expired', code: 'INVOICE_EXPIRED', message: 'Invoice expired' };
   }
 
-  // 1.3. Build payment context
-  const paymentContext = buildPaymentContext(invoice);
+  // 1.3. Skip verification for CrystalPay (external payment gateway handles verification)
+  const isCrystalPay = invoice.chain === 'CRYSTALPAY';
+  let verifiedTxHash = txHash;
+  let verification;
 
-  // 1.4. ⚠️ BLOCKCHAIN VERIFICATION (SLOW PART - 10-30 seconds)
-  logger.info(`[InvoicePayment] Phase 1: Starting blockchain verification for invoice ${invoice.id}...`);
-  const verification = await paymentVerificationService.verifyIncomingPayment({
-    txHash,
-    paymentLink,
-    address: paymentContext.address,
-    amount: paymentContext.amount,
-    currency: paymentContext.currency,
-    chain: paymentContext.chain,
-  });
+  if (isCrystalPay) {
+    // CrystalPay webhook already verified payment - trust the gateway
+    logger.info(`[InvoicePayment] CrystalPay invoice ${invoice.id} - skipping blockchain verification (gateway verified)`);
 
-  if (!verification.verified) {
-    return {
-      ok: false,
-      state: 'failed',
-      code: verification.code || 'PAYMENT_NOT_VERIFIED',
-      message: verification.error || 'Payment not found on blockchain'
+    // Create verification object for CrystalPay (gateway already verified)
+    verification = {
+      verified: true,
+      txHash: verifiedTxHash || txHash,
+      amount: parseFloat(invoice.crypto_amount) || parseFloat(invoice.expected_amount),
+      currency: invoice.currency || invoice.chain,
+      status: 'confirmed',
+      confirmations: 0
     };
-  }
-
-  const verifiedTxHash = verification.txHash || txHash;
-
-  // 1.5. Check amount match (with 1% tolerance)
-  if (!amountsMatchWithTolerance(verification.amount, paymentContext.amount, undefined, paymentContext.currency)) {
+  } else {
+    // HD wallet blockchain verification removed - only CrystalPay payments supported
+    logger.error(`[InvoicePayment] Non-CrystalPay invoice ${invoice.id} - blockchain verification not available`);
     return {
       ok: false,
       state: 'failed',
-      code: 'AMOUNT_MISMATCH',
-      message: `Amount mismatch. Expected ${paymentContext.amount}, got ${verification.amount}`
+      code: 'UNSUPPORTED_CHAIN',
+      message: 'Direct blockchain payments not supported. Use CrystalPay.'
     };
   }
 

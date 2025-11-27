@@ -40,7 +40,8 @@ import { setupAIProductHandlers } from './handlers/seller/aiProducts.js';
 import { setupWorkspaceHandlers } from './handlers/workspace/index.js';
 import { handleHealthCommand } from './commands/health.js'; // P1-BOT-015
 
-dotenv.config();
+// Override is needed when system env already has vars (e.g., from shell)
+dotenv.config({ override: true });
 
 // Validate required environment variables
 if (!config.botToken) {

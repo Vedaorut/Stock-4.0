@@ -239,7 +239,7 @@ manageWorkersScene.command('cancel', async (ctx) => {
     logger.error('Error in cancel command handler:', error);
     try {
       await ctx.reply(generalMessages.actionFailed);
-    } catch (e) {}
+    } catch { /* Intentionally ignored */ }
   }
 });
 

@@ -5,7 +5,6 @@ import logger from '../utils/logger.js';
 import * as smartMessage from '../utils/smartMessage.js';
 import { reply as cleanReply } from '../utils/cleanReply.js';
 import { messages } from '../texts/messages.js';
-import { showSellerToolsMenu } from '../utils/sellerNavigation.js';
 
 const { general: generalMessages, follows: followMessages } = messages;
 

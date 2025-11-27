@@ -33,7 +33,7 @@ export function clampTolerance(value, context = 'Payment') {
     return TOLERANCE_BOUNDS.DEFAULT_TOLERANCE;
   }
 
-  const { MIN_TOLERANCE, MAX_TOLERANCE, DEFAULT_TOLERANCE } = TOLERANCE_BOUNDS;
+  const { MIN_TOLERANCE, MAX_TOLERANCE, DEFAULT_TOLERANCE: _DEFAULT_TOLERANCE } = TOLERANCE_BOUNDS;
 
   // If already in bounds, return as-is
   if (value >= MIN_TOLERANCE && value <= MAX_TOLERANCE) {

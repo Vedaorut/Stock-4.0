@@ -11,14 +11,13 @@ import app from '../../src/server.js';
 import { config } from '../../src/config/env.js';
 import { userQueries, shopQueries, productQueries } from '../../src/database/queries/index.js';
 import { getClient } from '../../src/config/database.js';
-import { shopFollowQueries } from '../../src/models/shopFollowQueries.js';
 
 describe('Authorization - IDOR Prevention Tests', () => {
   let user1, user2;
   let token1, token2;
   let shop1, shop2;
   let follow1, follow2;
-  let product1, product2;
+  let _product1, _product2;
 
   beforeAll(async () => {
     // Create two test users
@@ -67,7 +66,7 @@ describe('Authorization - IDOR Prevention Tests', () => {
     });
 
     // Create products for both shops
-    product1 = await productQueries.create({
+    _product1 = await productQueries.create({
       shop_id: shop1.id,
       name: 'Test Product 1',
       description: 'Description 1',
@@ -76,7 +75,7 @@ describe('Authorization - IDOR Prevention Tests', () => {
       stock: 10,
     });
 
-    product2 = await productQueries.create({
+    _product2 = await productQueries.create({
       shop_id: shop2.id,
       name: 'Test Product 2',
       description: 'Description 2',

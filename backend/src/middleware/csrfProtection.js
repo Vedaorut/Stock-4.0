@@ -2,16 +2,6 @@ import logger from '../utils/logger.js';
 import { config } from '../config/env.js';
 
 /**
- * User agents exempt from CSRF protection
- * These are trusted server-to-server requests from our bot
- */
-const CSRF_EXEMPT_USER_AGENTS = [
-  'TelegramBot',
-  'axios/1.13', // Bot client
-  'node-fetch',
-];
-
-/**
  * CSRF Protection Middleware
  *
  * Security: P0-SEC-5
@@ -20,9 +10,12 @@ const CSRF_EXEMPT_USER_AGENTS = [
  * How it works:
  * - GET, HEAD, OPTIONS requests are allowed (safe methods)
  * - POST, PUT, DELETE, PATCH require valid Origin or Referer header
- * - Bot requests (identified by User-Agent) are exempted
+ * - Requests with valid JWT Authorization header are exempted (JWT is sufficient CSRF protection)
  * - Webhook endpoints are exempted (they don't send Origin headers)
  * - Origin must match one of the allowed origins (FRONTEND_URL, localhost)
+ *
+ * B3 FIX: Removed User-Agent based bypass - it was trivially spoofable!
+ * Now uses JWT Authorization header as CSRF protection for bot requests.
  *
  * Attack prevented:
  * ```html
@@ -56,16 +49,28 @@ export const validateOrigin = (req, res, next) => {
     return next();
   }
 
+  // Skip for bot authentication endpoints (no JWT token on initial auth)
+  // These endpoints are secured by other means (rate limiting, input validation)
+  // Using startsWith to handle all auth routes regardless of prefix
+  if (req.path.startsWith('/api/auth/') || req.path.startsWith('/auth/') || req.path.includes('/auth/register')) {
+    logger.debug('CSRF bypassed for auth endpoint', { path: req.path, method: req.method });
+    return next();
+  }
+
   // Skip CSRF validation in test environment
   if (process.env.NODE_ENV === 'test') {
     return next();
   }
 
-  // Skip CSRF for bot requests (trusted server-to-server calls)
-  const userAgent = req.headers['user-agent'] || '';
-  if (CSRF_EXEMPT_USER_AGENTS.some((ua) => userAgent.includes(ua))) {
-    logger.debug('CSRF check bypassed for bot user-agent:', {
-      userAgent,
+  // B3 FIX: Skip CSRF for requests with JWT Authorization header
+  // JWT token is a secret that cannot be sent by malicious sites (no cookies involved)
+  // This is secure because:
+  // 1. Attacker cannot read the JWT from another origin (Same-Origin Policy)
+  // 2. JWT is sent via Authorization header, not cookies (no automatic inclusion)
+  // 3. Bot uses JWT for all API calls, so this allows bot-to-backend communication
+  const authHeader = req.headers['authorization'];
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    logger.debug('CSRF check bypassed for JWT authenticated request', {
       path: req.path,
       method: req.method,
     });

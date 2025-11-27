@@ -540,6 +540,16 @@ export const switchFollowMode = asyncHandler(async (req, res) => {
     } else {
       // Switching to monitor mode resets markup to 0
       await shopFollowQueries.updateMarkup(followId, 0);
+
+      // Clean up synced products created in resell mode
+      const synced = await syncedProductQueries.findByFollowId(followId);
+      if (synced.length > 0) {
+        const syncedProductIds = synced.map((row) => row.synced_product_id);
+        // Remove follower copies
+        await productQueries.bulkDeleteByIds(syncedProductIds, existingFollow.follower_shop_id);
+        // Remove sync mappings
+        await syncedProductQueries.deleteByFollowId(followId);
+      }
     }
 
     const updatedFollow = await shopFollowQueries.findById(followId);

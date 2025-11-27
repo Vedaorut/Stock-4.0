@@ -180,15 +180,22 @@ export async function handleSourceProductDelete(sourceProductId) {
   try {
     const syncedProducts = await syncedProductQueries.findBySourceProductId(sourceProductId);
 
-    // OPTIMIZED: Batch deactivate with Promise.all (parallel execution)
+    // OPTIMIZED: Batch deactivate follower products with Promise.all
     await Promise.all(
       syncedProducts.map((sync) =>
         productQueries.update(sync.synced_product_id, { isActive: false })
       )
     );
 
+    // Remove sync mappings to avoid stale records/counts
+    if (syncedProducts.length > 0) {
+      await syncedProductQueries.deleteBySourceProductId(sourceProductId);
+    }
+
     const count = syncedProducts.length;
-    logger.info(`Source product ${sourceProductId} deleted, deactivated ${count} synced products`);
+    logger.info(
+      `Source product ${sourceProductId} deleted, deactivated ${count} synced products and removed sync mappings`
+    );
     return count;
   } catch (error) {
     logger.error(`Error handling source product deletion ${sourceProductId}:`, error);
@@ -268,21 +275,44 @@ export async function updateMarkupForFollow(followId, newMarkupPercentage) {
   const client = await getClient();
 
   try {
-    const syncedProducts = await syncedProductQueries.findByFollowId(followId);
+    // Begin transaction FIRST to prevent race condition with follow deletion
+    await client.query('BEGIN');
+    logger.info(`updateMarkupForFollow: Transaction started for follow ${followId}`);
+
+    // Lock the follow row FIRST to prevent concurrent deletion
+    const followResult = await client.query(
+      'SELECT id FROM shop_follows WHERE id = $1 FOR UPDATE',
+      [followId]
+    );
+
+    // Check if follow still exists after acquiring lock
+    if (followResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      logger.warn(`updateMarkupForFollow: Follow ${followId} not found or was deleted`);
+      return 0;
+    }
+
+    // Now read synced products WITH FOR UPDATE lock (inside transaction)
+    const syncedResult = await client.query(
+      `SELECT sp.id, sp.synced_product_id, sp.source_product_id, sp.conflict_status,
+              p.price as source_product_price
+       FROM synced_products sp
+       JOIN products p ON p.id = sp.source_product_id
+       WHERE sp.follow_id = $1
+       FOR UPDATE OF sp`,
+      [followId]
+    );
 
     // Filter synced products only
-    const productsToUpdate = syncedProducts.filter((sync) => sync.conflict_status === 'synced');
+    const productsToUpdate = syncedResult.rows.filter((sync) => sync.conflict_status === 'synced');
 
     if (productsToUpdate.length === 0) {
+      await client.query('COMMIT');
       logger.info(`No products to update for follow ${followId}`);
       return 0;
     }
 
-    // Begin transaction with row-level locks to prevent race conditions
-    await client.query('BEGIN');
-    logger.info(`updateMarkupForFollow: Transaction started for follow ${followId}`, {
-      productsCount: productsToUpdate.length,
-    });
+    logger.info(`updateMarkupForFollow: Processing ${productsToUpdate.length} products for follow ${followId}`);
 
     // Sequential update with FOR UPDATE locks (not parallel to avoid deadlocks)
     for (const sync of productsToUpdate) {
@@ -369,22 +399,44 @@ export async function runPeriodicSync() {
         const stockChanged = sync.source_stock !== sync.synced_stock;
         const activeChanged = sync.source_active !== sync.synced_active;
 
-        if (priceChanged || stockChanged || activeChanged) {
-          // Update synced product with direct SQL (within transaction)
-          await client.query(
-            `UPDATE products
-             SET price = $1,
-                 stock_quantity = $2,
-                 is_active = $3,
-                 updated_at = NOW()
-             WHERE id = $4`,
-            [expectedPrice, sync.source_stock, sync.source_active, sync.synced_product_id]
-          );
+        const isConflict = sync.conflict_status === 'conflict';
+        const conflictResolved = isConflict && !priceChanged;
 
-          // Update last synced timestamp
-          await client.query('UPDATE synced_products SET last_synced_at = NOW() WHERE id = $1', [
-            sync.id,
-          ]);
+        if (conflictResolved || priceChanged || stockChanged || activeChanged) {
+          if (isConflict && priceChanged && !(stockChanged || activeChanged)) {
+            // Preserve manual price edits but still refresh stock/active timestamp
+            await client.query(
+              `UPDATE products
+               SET stock_quantity = $1,
+                   is_active = $2,
+                   updated_at = NOW()
+               WHERE id = $3`,
+              [sync.source_stock, sync.source_active, sync.synced_product_id]
+            );
+          } else {
+            // Update synced product with direct SQL (within transaction)
+            await client.query(
+              `UPDATE products
+               SET price = $1,
+                   stock_quantity = $2,
+                   is_active = $3,
+                   updated_at = NOW()
+               WHERE id = $4`,
+              [expectedPrice, sync.source_stock, sync.source_active, sync.synced_product_id]
+            );
+          }
+
+          // Update last synced timestamp and clear conflict if resolved
+          await client.query(
+            `UPDATE synced_products 
+             SET last_synced_at = NOW(),
+                 conflict_status = CASE 
+                   WHEN $2 THEN 'synced' 
+                   ELSE conflict_status 
+                 END
+             WHERE id = $1`,
+            [sync.id, conflictResolved]
+          );
 
           stats.updated++;
           logger.debug(

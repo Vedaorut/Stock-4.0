@@ -1,6 +1,7 @@
 import { query } from '../config/database.js';
 import { workerQueries } from './workerQueries.js';
 import { processedWebhookQueries } from './processedWebhookQueries.js';
+import logger from '../utils/logger.js';
 
 /**
  * User database queries

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useStore } from '../store/useStore';
+import { getApiBaseUrl, getWebSocketUrl } from '../utils/apiBase';
 
 /**
  * WebSocket hook for real-time updates
@@ -25,7 +26,7 @@ export const useWebSocket = () => {
   }, []);
 
   useEffect(() => {
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+    const API_URL = getApiBaseUrl();
 
     // ✅ Skip WebSocket on ngrok (free tier doesn't support WS)
     if (API_URL.includes('ngrok')) {
@@ -33,7 +34,7 @@ export const useWebSocket = () => {
       return;
     }
 
-    const wsUrl = API_URL.replace(/^http/, 'ws').replace(/\/api$/, '');
+    const wsUrl = getWebSocketUrl(API_URL);
     let mounted = true; // ✅ Mounted flag to prevent actions after unmount
 
     function connect() {

@@ -112,7 +112,7 @@ ${ordersList}
       } else {
         await ctx.reply(errorMsg, backToMenuKeyboard);
       }
-    } catch (msgError) {
+    } catch {
       // Fallback to reply if edit fails
       try {
         await ctx.reply(errorMsg, backToMenuKeyboard);
@@ -274,7 +274,7 @@ ${ordersList}
       } else {
         await ctx.reply(errorMsg, backToMenuKeyboard);
       }
-    } catch (msgError) {
+    } catch {
       // Fallback to reply if edit fails
       try {
         await ctx.reply(errorMsg, backToMenuKeyboard);
@@ -362,10 +362,11 @@ export const handleCancelOrder = async (ctx) => {
  */
 export const handleOrderHistoryPage = async (ctx) => {
   try {
+    const MAX_PAGE = 1000; // M19 FIX: Upper limit to prevent DoS
     const page = parseInt(ctx.match[1], 10);
 
-    // Validate page number
-    if (!page || page < 1) {
+    // Validate page number (M19 FIX: added upper limit)
+    if (!page || page < 1 || page > MAX_PAGE) {
       await ctx.answerCbQuery('❌ Некорректная страница');
       return;
     }

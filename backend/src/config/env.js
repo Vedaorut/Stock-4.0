@@ -1,6 +1,8 @@
 import dotenv from 'dotenv';
 
-dotenv.config();
+// CRITICAL: override: true ensures .env file values override system environment variables
+// Without this, stale system env vars (like placeholder TELEGRAM_BOT_TOKEN) would be used
+dotenv.config({ override: true });
 
 /**
  * Validate required environment variables

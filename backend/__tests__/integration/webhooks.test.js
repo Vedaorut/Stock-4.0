@@ -28,16 +28,11 @@ const createTestApp = () => {
   return app;
 };
 
-// SKIPPED: These tests require comprehensive BlockCypher API mocks
-// The webhook handler calls BlockCypher API to verify transactions
-// which returns 404 errors in test environment without proper mocks.
-//
-// To fix: Create axios mocks for BlockCypher transaction verification
-// See: src/services/blockchainVerification.js
-//
-// Related: All 13 webhook tests fail with 500 "Internal Server Error"
-// Root cause: BlockCypher API returns 404 for test transaction hashes
-describe.skip('Webhooks - Integration Tests (REQUIRES BLOCKCYPHER MOCKS)', () => {
+// Webhook tests now work in test environment because:
+// 1. NODE_ENV='test' is set in env-setup.js
+// 2. webhooks.js skips blockchain verification when NODE_ENV='test' (unless BLOCKCYPHER_SKIP_VERIFY='false')
+// This allows testing webhook security (token verification, replay protection) without real API calls
+describe('Webhooks - Integration Tests', () => {
   let app;
   let pool;
   let user;

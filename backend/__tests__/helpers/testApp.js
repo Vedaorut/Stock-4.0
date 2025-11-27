@@ -14,7 +14,6 @@ import productRoutes from '../../src/routes/products.js';
 import orderRoutes from '../../src/routes/orders.js';
 import paymentRoutes from '../../src/routes/payments.js';
 import subscriptionRoutes from '../../src/routes/subscriptions.js';
-import walletRoutes from '../../src/routes/wallets.js';
 
 // Import middleware
 import { errorHandler } from '../../src/middleware/errorHandler.js';
@@ -44,7 +43,6 @@ export const createTestApp = () => {
   app.use('/api/orders', orderRoutes);
   app.use('/api/payments', paymentRoutes);
   app.use('/api/subscriptions', subscriptionRoutes);
-  app.use('/api/wallets', walletRoutes);
 
   // Error handling
   app.use(errorHandler);

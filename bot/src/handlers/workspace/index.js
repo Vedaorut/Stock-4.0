@@ -2,6 +2,7 @@ import { workspaceMenu, workspaceShopSelection } from '../../keyboards/workspace
 import { shopApi } from '../../utils/api.js';
 import logger from '../../utils/logger.js';
 import { messages } from '../../texts/messages.js';
+import { handleOrderHistory } from '../seller/orders.js';
 
 const { workspace: workspaceMessages, general: generalMessages } = messages;
 
@@ -183,6 +184,9 @@ export const setupWorkspaceHandlers = (bot) => {
 
   // Back button
   bot.action('workspace:back', handleWorkspaceBack);
+
+  // Sales/Order history for workers (reuses seller order history handler)
+  bot.action('seller:sales', (ctx) => handleOrderHistory(ctx, 1));
 
   logger.info('Workspace handlers registered');
 };

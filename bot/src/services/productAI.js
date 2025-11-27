@@ -127,7 +127,7 @@ function formatUsd(price) {
   return `$${formatted}`;
 }
 
-function formatProductLine(product, index = null) {
+function _formatProductLine(product, index = null) {
   const prefix = index !== null ? `${index + 1}. ` : '';
   let line = `${prefix}**${product.name}**`;
 
@@ -826,7 +826,7 @@ export async function processProductCommand(userCommand, context) {
     // NO initial message - first chunk will create it
 
     // onChunk callback for streaming updates
-    const onChunk = async (chunk, fullText) => {
+    const _onChunk = async (chunk, fullText) => {
       if (!ctx) return;
 
       // Count words
@@ -1234,7 +1234,8 @@ async function executeToolCall(functionName, args, context) {
  * Add product handler
  */
 async function handleAddProduct(args, shopId, token) {
-  const { name, price, stock } = args;
+  const { name, stock } = args;
+  let { price } = args;
 
   // Validate
   if (!name || name.length < 3) {

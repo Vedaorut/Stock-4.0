@@ -360,7 +360,7 @@ const upgradeShopScene = new Scenes.WizardScene(
         if (loadingMsg) {
           await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id);
         }
-      } catch (e) {
+      } catch {
         /* ignore delete errors */
       }
 
@@ -372,9 +372,9 @@ const upgradeShopScene = new Scenes.WizardScene(
           if (updated?.period_end) {
             endDateLabel = new Date(updated.period_end).toLocaleDateString('ru-RU');
           }
-        } catch (e) {
+        } catch {
           logger.warn('[UpgradeShop] Could not fetch updated subscription status', {
-            message: e.message,
+            message: 'fetch status failed',
           });
         }
 

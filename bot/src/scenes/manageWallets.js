@@ -186,6 +186,18 @@ const handleInput = async (ctx) => {
         const crypto = action.replace('wallet:add:', '');
         await ctx.answerCbQuery();
 
+        // M21 FIX: Validate crypto type before using
+        if (!SUPPORTED_CRYPTOS.includes(crypto)) {
+          logger.warn('Invalid crypto type in wallet:add action', { crypto, userId: ctx.from.id });
+          await ctx.editMessageText(
+            'Неподдерживаемый тип кошелька.',
+            Markup.inlineKeyboard([
+              [Markup.button.callback(buttonText.backToWallets, 'wallet:back')],
+            ])
+          );
+          return;
+        }
+
         ctx.wizard.state.editingWallet = crypto;
 
         await ctx.editMessageText(
@@ -259,6 +271,18 @@ const handleInput = async (ctx) => {
         const crypto = action.replace('wallet:change:', '');
         await ctx.answerCbQuery();
 
+        // M21 FIX: Validate crypto type before using
+        if (!SUPPORTED_CRYPTOS.includes(crypto)) {
+          logger.warn('Invalid crypto type in wallet:change action', { crypto, userId: ctx.from.id });
+          await ctx.editMessageText(
+            'Неподдерживаемый тип кошелька.',
+            Markup.inlineKeyboard([
+              [Markup.button.callback(buttonText.backToWallets, 'wallet:back')],
+            ])
+          );
+          return;
+        }
+
         ctx.wizard.state.editingWallet = crypto;
 
         // Crypto-specific examples
@@ -328,6 +352,11 @@ const handleInput = async (ctx) => {
       // Back to wallets list
       if (action === 'wallet:back') {
         await ctx.answerCbQuery();
+        // B6 FIX: Clear refreshTimer to prevent race condition after navigation
+        if (ctx.wizard.state.refreshTimer) {
+          clearTimeout(ctx.wizard.state.refreshTimer);
+          delete ctx.wizard.state.refreshTimer;
+        }
         ctx.wizard.state.editingWallet = null;
         ctx.wizard.selectStep(0);
         await showWallets(ctx);
@@ -343,9 +372,19 @@ const handleInput = async (ctx) => {
     if (ctx.message && ctx.message.text) {
       const userMessageId = ctx.message.message_id;
       const address = ctx.message.text.trim();
+      // M20 FIX: Improved error logging for deleteMessage
       const deleteUserInput = async () => {
         if (userMessageId) {
-          await ctx.deleteMessage(userMessageId).catch(() => {});
+          await ctx.deleteMessage(userMessageId).catch((err) => {
+            const status = err.response?.error_code || err.code;
+            if (status !== 400 && status !== 429) {
+              logger.warn('Unexpected deleteMessage error (wallet input)', {
+                messageId: userMessageId,
+                error: err.message,
+                status,
+              });
+            }
+          });
         }
       };
 

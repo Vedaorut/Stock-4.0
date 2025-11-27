@@ -1,6 +1,7 @@
 import dotenv from 'dotenv';
 
-dotenv.config();
+// Override system env vars with local .env values
+dotenv.config({ override: true });
 
 const config = {
   // Bot configuration

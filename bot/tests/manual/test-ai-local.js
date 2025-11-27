@@ -118,7 +118,7 @@ let passed = 0;
 let failed = 0;
 
 console.log('═'.repeat(60));
-tests.forEach((test, index) => {
+tests.forEach((test, _index) => {
   const errors = validateResult(test.name, test.result);
 
   if (errors.length === 0) {

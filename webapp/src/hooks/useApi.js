@@ -1,9 +1,11 @@
 import { useRef } from 'react';
 import axios from 'axios';
 import { useStore } from '../store/useStore';
+import { refreshAuthToken, isTokenRefreshInitialized } from '../utils/tokenRefresh';
+import { getApiBaseUrl } from '../utils/apiBase';
 
 // Базовый URL API (можно вынести в .env)
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+const API_BASE_URL = getApiBaseUrl();
 
 /**
  * Hook для API вызовов с stable reference
@@ -23,15 +25,13 @@ export function useApi() {
     const createRequest =
       (tokenGetter) =>
       async (method, endpoint, data = null, config = {}) => {
-        // Store abort controller for cleanup if needed
-        let abortController = null;
+        // Track retry attempt to prevent infinite loops
+        const isRetry = config._isRetryAfter401 || false;
 
-        try {
-          // Получаем initData из Telegram WebApp для авторизации
+        // Helper function to make the actual request
+        const makeRequest = async (currentToken) => {
           const initData = window.Telegram?.WebApp?.initData || '';
-          const currentToken = tokenGetter();
 
-          // Формируем axios config
           const axiosConfig = {
             method,
             url: `${API_BASE_URL}${endpoint}`,
@@ -41,44 +41,64 @@ export function useApi() {
               ...(currentToken && { Authorization: `Bearer ${currentToken}` }),
               ...config.headers,
             },
-            // ✅ FIX: Используем native axios timeout вместо внутреннего AbortController
-            timeout: config.timeout || 15000, // 15 секунд по умолчанию
-            // ✅ FIX: Используем только внешний signal из config (из useEffect cleanup)
+            timeout: config.timeout || 15000,
             signal: config.signal,
             ...config,
           };
 
-          // Добавляем data только для методов которые его поддерживают
-          // GET и DELETE не должны иметь body
+          // Remove internal flag from config
+          delete axiosConfig._isRetryAfter401;
+
           if (method !== 'GET' && method !== 'DELETE' && data !== null) {
             axiosConfig.data = data;
           }
 
-          const response = await axios(axiosConfig);
+          return await axios(axiosConfig);
+        };
+
+        try {
+          const currentToken = tokenGetter();
+          const response = await makeRequest(currentToken);
           return { data: response.data, error: null };
         } catch (err) {
           console.error(`API ${method} ${endpoint} error:`, err);
 
-          // ✅ FIX: Обработка axios native timeout
+          // Handle axios native timeout
           if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
             return { data: null, error: 'Request timeout - please check your connection' };
           }
 
-          // ✅ FIX: Обработка внешнего AbortSignal (из useEffect cleanup)
+          // Handle external AbortSignal (from useEffect cleanup)
           if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') {
             return { data: null, error: 'Request cancelled' };
           }
 
-          // Обычные ошибки
+          // Handle 401 Unauthorized - attempt token refresh and retry ONCE
+          if (err.response?.status === 401 && !isRetry && isTokenRefreshInitialized()) {
+            console.log('[useApi] 401 received, attempting token refresh...');
+
+            try {
+              await refreshAuthToken();
+              console.log('[useApi] Token refreshed successfully, retrying request...');
+
+              // Get fresh token after refresh
+              const newToken = tokenGetter();
+
+              // Retry the request with new token (mark as retry to prevent infinite loop)
+              const retryResponse = await makeRequest(newToken);
+              return { data: retryResponse.data, error: null };
+            } catch (refreshError) {
+              console.error('[useApi] Token refresh failed:', refreshError);
+              // Token refresh failed - return original 401 error
+              return { data: null, error: 'Session expired. Please restart the app.' };
+            }
+          }
+
+          // Regular errors
           const apiError = err.response?.data;
           const errorMessage =
             apiError?.error || apiError?.message || err.message || 'Произошла ошибка';
           return { data: null, error: errorMessage };
-        } finally {
-          // Cleanup: Abort any pending requests if AbortController was used
-          if (abortController) {
-            abortController.abort();
-          }
         }
       };
 

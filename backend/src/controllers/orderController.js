@@ -1,6 +1,6 @@
 import { orderQueries, shopQueries, invoiceQueries } from '../database/queries/index.js';
 import { getClient } from '../config/database.js';
-import { asyncHandler } from '../middleware/errorHandler.js';
+import { asyncHandler, dbErrorHandler } from '../middleware/errorHandler.js';
 import telegramService from '../services/telegram.js';
 import logger from '../utils/logger.js';
 import { validateStatusTransition } from '../utils/orderStateValidator.js';
@@ -14,7 +14,6 @@ import {
 import {
   createOrderWithItems,
   updateOrderStatusWithStockLogic,
-  generateOrderInvoice,
   getOrderAnalytics,
 } from '../services/orderService.js';
 
@@ -80,6 +79,15 @@ export const orderController = {
 
       // Validate products (fetch, lock, check stock/shop/currency)
       const validatedData = await validateProductsForOrder(cartItems, client);
+
+      // Prevent self-ordering (buyer = seller)
+      const ownerResult = await client.query('SELECT owner_id FROM shops WHERE id = $1', [
+        validatedData.shopId,
+      ]);
+      const ownerId = ownerResult.rows[0]?.owner_id;
+      if (ownerId && ownerId === userId) {
+        throw new ValidationError('You cannot order your own products');
+      }
 
       logger.info('All products validated', {
         shopId: validatedData.shopId,
@@ -474,74 +482,12 @@ export const orderController = {
   },
 
   /**
-   * Generate invoice for order with HD wallet address generation
+   * Generate invoice for order
+   * NOTE: HD wallet system removed - order crypto payments temporarily disabled
    */
   generateInvoice: asyncHandler(async (req, res) => {
-    const { id: orderId } = req.params;
-    const { chain } = req.body;
-
-    logger.debug('Generating invoice', { orderId, chain, userId: req.user.id });
-
-    // Map chain names for consistency
-    const chainMapping = {
-      BTC: 'BTC',
-      ETH: 'ETH',
-      LTC: 'LTC',
-      USDT: 'USDT_TRC20', // USDT uses TRC-20 only (TRON network)
-      USDT_TRC20: 'USDT_TRC20',
-    };
-
-    const normalizedChain = chain ? chainMapping[chain.toUpperCase()] : null;
-    const supportedChains = ['BTC', 'ETH', 'LTC', 'USDT_TRC20'];
-
-    if (!normalizedChain || !supportedChains.includes(normalizedChain)) {
-      throw new ValidationError(`Invalid chain. Supported: ${supportedChains.join(', ')}`);
-    }
-
-    // Get order
-    const order = await orderQueries.findById(orderId);
-    if (!order) {
-      throw new NotFoundError('Order');
-    }
-
-    // Check ownership
-    validateOrderAccess(order, req.user.id);
-
-    // Check if invoice already exists
-    const existingInvoice = await invoiceQueries.findByOrderId(orderId);
-    if (existingInvoice && existingInvoice.status === 'pending') {
-      logger.info('Existing invoice found, returning', { invoiceId: existingInvoice.id });
-      return res.json({
-        success: true,
-        data: {
-          id: existingInvoice.id,
-          address: existingInvoice.address,
-          cryptoAmount: parseFloat(existingInvoice.expected_amount),
-          chain: existingInvoice.chain,
-          currency: existingInvoice.currency,
-          expiresAt: existingInvoice.expires_at,
-          status: existingInvoice.status,
-        },
-      });
-    }
-
-    // Generate new invoice (delegates to service)
-    const invoiceData = await generateOrderInvoice(orderId, normalizedChain);
-
-    return res.json({
-      success: true,
-      data: {
-        id: invoiceData.invoice.id,
-        address: invoiceData.walletAddress,
-        cryptoAmount: invoiceData.cryptoAmount,
-        chain: invoiceData.chain,
-        currency: invoiceData.chain,
-        usdAmount: invoiceData.usdAmount,
-        cryptoPrice: invoiceData.cryptoPrice,
-        expiresAt: invoiceData.expiresAt,
-        status: invoiceData.invoice.status,
-      },
-    });
+    // HD wallet system was removed - order crypto payments not available
+    throw new ValidationError('Криптовалютная оплата заказов временно недоступна. Используйте другой способ оплаты.');
   }),
 
   /**

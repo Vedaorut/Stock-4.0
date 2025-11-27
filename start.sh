@@ -118,6 +118,7 @@ echo -e "${YELLOW}[3/6]${NC} Updating configuration files..."
 if [ -f "$PROJECT_ROOT/backend/.env" ]; then
   sed -i '' "s|FRONTEND_URL=.*|FRONTEND_URL=$NGROK_URL|g" "$PROJECT_ROOT/backend/.env"
   sed -i '' "s|WEBAPP_URL=.*|WEBAPP_URL=$NGROK_URL|g" "$PROJECT_ROOT/backend/.env"
+  sed -i '' "s|CRYSTALPAY_CALLBACK_URL=.*|CRYSTALPAY_CALLBACK_URL=$NGROK_URL/api/webhooks/crystalpay|g" "$PROJECT_ROOT/backend/.env"
   echo -e "  ${GREEN}✓${NC} Updated backend/.env"
 else
   echo -e "  ${RED}✗${NC} backend/.env not found"

@@ -693,6 +693,28 @@ export const subscriptionApi = {
     // Unwrap response: return data.data instead of wrapper
     return data.data || data;
   },
+
+  // Create CrystalPay invoice for subscription payment
+  async createCrystalPayInvoice(subscriptionId, method, purpose, token) {
+    const { data } = await api.post(
+      `/payments/subscriptions/${subscriptionId}/invoice/crystalpay`,
+      { method, purpose },
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    );
+    // Unwrap response: return invoice data
+    return data.data || data;
+  },
+
+  // Get invoice status (for CrystalPay webhooks)
+  async getInvoiceStatus(invoiceId, token) {
+    const { data } = await api.get(`/invoices/${invoiceId}/status`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    // Unwrap response: return status data
+    return data.data || data;
+  },
 };
 
 export const notificationApi = {

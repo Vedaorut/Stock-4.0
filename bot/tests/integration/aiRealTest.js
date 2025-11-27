@@ -26,7 +26,7 @@ const api = axios.create({
 
 let testToken = null;
 let testShop = null;
-let createdProductIds = [];
+const createdProductIds = [];
 
 // Утилиты
 async function authenticateTestUser() {
@@ -133,7 +133,7 @@ async function testAddProduct() {
   let products = await getProductsFromDB();
 
   try {
-    const result = await processProductCommand('добавь iPhone 999', {
+    const _result = await processProductCommand('добавь iPhone 999', {
       shopId: testShop.id,
       shopName: testShop.name,
       token: testToken,

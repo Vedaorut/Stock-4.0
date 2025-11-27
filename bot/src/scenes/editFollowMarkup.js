@@ -86,14 +86,33 @@ const handleMarkupInput = async (ctx) => {
 
     if (isNaN(markup) || markup < 1 || markup > 500) {
       await ctx.reply(followMessages.markupInvalid);
-      // Delete invalid input message
-      await ctx.deleteMessage(userMsgId).catch(() => {});
+      // Delete invalid input message (M20 FIX: improved error logging)
+      await ctx.deleteMessage(userMsgId).catch((err) => {
+        // Log WARN for unexpected errors (not 400 Bad Request or 429 rate limit)
+        const status = err.response?.error_code || err.code;
+        if (status !== 400 && status !== 429) {
+          logger.warn('Unexpected deleteMessage error (invalid input)', {
+            messageId: userMsgId,
+            error: err.message,
+            status,
+          });
+        }
+      });
       return;
     }
 
-    // Delete user message (clean chat pattern)
+    // Delete user message (clean chat pattern) - M20 FIX: improved logging
     await ctx.deleteMessage(userMsgId).catch((err) => {
-      logger.debug(`Could not delete user message ${userMsgId}:`, err.message);
+      const status = err.response?.error_code || err.code;
+      if (status !== 400 && status !== 429) {
+        logger.warn('Unexpected deleteMessage error (markup input)', {
+          messageId: userMsgId,
+          error: err.message,
+          status,
+        });
+      } else {
+        logger.debug(`Could not delete user message ${userMsgId}:`, err.message);
+      }
     });
 
     const followId = ctx.scene.state.followId;

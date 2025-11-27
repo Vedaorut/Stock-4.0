@@ -9,6 +9,8 @@ import {
 } from 'react';
 import axios from 'axios';
 import { useStore } from '../store/useStore';
+import { setTokenRefreshCallback } from '../utils/tokenRefresh';
+import { getApiBaseUrl } from '../utils/apiBase';
 import {
   initTelegramApp,
   showMainButton,
@@ -51,7 +53,7 @@ export function TelegramProvider({ children }) {
 
   const validateTelegramAuth = useCallback(async (initData) => {
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+      const API_URL = getApiBaseUrl();
 
       const response = await axios.post(
         `${API_URL}/auth/telegram-validate`,
@@ -73,12 +75,25 @@ export function TelegramProvider({ children }) {
 
       setError(null);
     } catch (err) {
-      console.error('❌ Telegram auth validation failed:', err);
+      console.error('Telegram auth validation failed:', err);
       const errorMessage = err.response?.data?.error || err.message;
       setError(errorMessage);
       throw new Error(errorMessage);
     }
   }, []); // Stable forever
+
+  // Register token refresh callback for useApi auto-refresh on 401
+  useEffect(() => {
+    const refreshToken = async () => {
+      const initData = window.Telegram?.WebApp?.initData;
+      if (!initData) {
+        throw new Error('No Telegram initData available for token refresh');
+      }
+      await validateTelegramAuth(initData);
+    };
+
+    setTokenRefreshCallback(refreshToken);
+  }, [validateTelegramAuth]);
 
   useEffect(() => {
     // ✅ CRITICAL: Prevent multiple initializations across components

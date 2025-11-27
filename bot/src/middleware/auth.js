@@ -13,15 +13,22 @@ const authMiddleware = async (ctx, next) => {
     }
 
     // Check if user already authenticated in session
+    // IMPORTANT: Both token AND user must be truthy (not null/undefined)
     if (ctx.session?.token && ctx.session?.user) {
       return next();
     }
 
+    // Force re-auth if token is null but user exists (corrupted session state)
+    if (ctx.session?.user && !ctx.session?.token) {
+      logger.info(`Forcing re-auth for user ${ctx.from.id} (token was null)`);
+    }
+
     // Extract user data from Telegram
+    // Fallback for firstName: Telegram requires first_name, but just in case
     const userData = {
-      username: ctx.from.username,
-      firstName: ctx.from.first_name,
-      lastName: ctx.from.last_name,
+      username: ctx.from.username || null,
+      firstName: ctx.from.first_name || ctx.from.username || 'User',
+      lastName: ctx.from.last_name || null,
       languageCode: ctx.from.language_code,
     };
 

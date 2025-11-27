@@ -25,50 +25,79 @@ const { seller: sellerMessages, general: generalMessages } = messages;
 
 /**
  * Get seller menu with active orders count
+ * @returns {Object} { menu, tokenExpired } - menu keyboard and token expiration flag
  */
 const getSellerMenu = async (ctx) => {
   let activeCount = 0;
   let hasFollows = false;
+  let tokenExpired = false;
 
   const shopId = ctx.session.shopId;
   const token = ctx.session.token;
 
   if (shopId) {
     try {
-      const [count, follows] = await Promise.all([
+      const [countResult, followsResult] = await Promise.all([
         // Active orders count requires token (user-specific data)
         token
           ? orderApi.getActiveOrdersCount(shopId, token).catch((error) => {
               logger.error('Failed to get active orders count:', error);
-              return 0;
+              // STABILITY FIX #1: Track token expiration
+              if (error.response?.status === 401) {
+                return { count: 0, tokenExpired: true };
+              }
+              return { count: 0, tokenExpired: false };
             })
-          : Promise.resolve(0),
+          : Promise.resolve({ count: 0, tokenExpired: false }),
         // Follows list - use HTTP API with token
         token
           ? followApi.getMyFollows(shopId, token).catch((error) => {
-              // ✅ 401 - это нормально если токен expired или юзер новый
+              // STABILITY FIX #1: Track token expiration for re-auth message
               if (error.response?.status === 401) {
                 logger.debug('Token expired or user not authenticated for follows menu');
-              } else {
-                logger.error('Failed to get follows for menu:', error);
+                return { follows: [], tokenExpired: true };
               }
-              return [];
+              logger.error('Failed to get follows for menu:', error);
+              return { follows: [], tokenExpired: false };
             })
-          : Promise.resolve([]),
+          : Promise.resolve({ follows: [], tokenExpired: false }),
       ]);
 
-      activeCount = count || 0;
-      hasFollows = Array.isArray(follows) && follows.length > 0;
+      // Handle both old format (number/array) and new format (object with tokenExpired)
+      if (typeof countResult === 'object' && 'count' in countResult) {
+        activeCount = countResult.count || 0;
+        tokenExpired = tokenExpired || countResult.tokenExpired;
+      } else {
+        activeCount = countResult || 0;
+      }
+
+      if (typeof followsResult === 'object' && 'follows' in followsResult) {
+        hasFollows = Array.isArray(followsResult.follows) && followsResult.follows.length > 0;
+        tokenExpired = tokenExpired || followsResult.tokenExpired;
+      } else {
+        hasFollows = Array.isArray(followsResult) && followsResult.length > 0;
+      }
     } catch (error) {
       logger.error('Failed to compose seller menu data:', error);
-      // ✅ Гарантия что значения установлены
+      // Гарантия что значения установлены
       activeCount = 0;
       hasFollows = false;
     }
   }
 
   ctx.session.hasFollows = hasFollows;
-  return sellerMenu(activeCount, { hasFollows });
+  
+  // STABILITY FIX #1: Return both menu and tokenExpired flag
+  return { menu: sellerMenu(activeCount, { hasFollows }), tokenExpired };
+};
+
+/**
+ * Helper to get just the menu keyboard (backward compatible)
+ * For places that only need the keyboard without tokenExpired check
+ */
+const getSellerMenuKeyboard = async (ctx) => {
+  const result = await getSellerMenu(ctx);
+  return result.menu;
 };
 
 const getWorkerDisplayName = (worker) => {
@@ -163,14 +192,18 @@ const buildSubscriptionKeyboard = (data) => {
 export * from './follows.js';
 
 // Export getSellerMenu helper for use in other seller modules
-export { getSellerMenu };
+// Export both full getSellerMenu (returns {menu, tokenExpired}) and keyboard-only helper
+export { getSellerMenu, getSellerMenuKeyboard };
 
 /**
  * Handle seller role selection
  */
 export const handleSellerRole = async (ctx) => {
   try {
-    await ctx.answerCbQuery();
+    // M12 FIX: Only answer callback query if this is actually a callback query
+    if (ctx.callbackQuery) {
+      await ctx.answerCbQuery();
+    }
 
     ctx.session.role = 'seller';
     logger.info(`User ${ctx.from.id} selected seller role`);
@@ -353,7 +386,7 @@ const handleAddProduct = async (ctx) => {
     logger.error('Error entering addProduct scene:', error);
     // Local error handling - don't throw to avoid infinite spinner
     try {
-      const menu = await getSellerMenu(ctx);
+      const menu = await getSellerMenuKeyboard(ctx);
       await ctx.reply(generalMessages.actionFailed, menu);
     } catch (replyError) {
       logger.error('Failed to send error message:', replyError);
@@ -379,7 +412,7 @@ const handleWallets = async (ctx) => {
     logger.error('Error entering manageWallets scene:', error);
     // Local error handling - don't throw to avoid infinite spinner
     try {
-      const menu = await getSellerMenu(ctx);
+      const menu = await getSellerMenuKeyboard(ctx);
       await ctx.reply(generalMessages.actionFailed, menu);
     } catch (replyError) {
       logger.error('Failed to send error message:', replyError);
@@ -414,7 +447,7 @@ export const setupSellerHandlers = (bot) => {
       await ctx.scene.enter('markOrdersShipped');
     } catch (error) {
       logger.error('Error entering markOrdersShipped scene:', error);
-      await ctx.reply(generalMessages.actionFailed, await getSellerMenu(ctx));
+      await ctx.reply(generalMessages.actionFailed, await getSellerMenuKeyboard(ctx));
     }
   });
   bot.action(/^order:ship:(\d+)$/, handleMarkShipped);
@@ -497,7 +530,7 @@ export const setupSellerHandlers = (bot) => {
       await ctx.scene.enter('pay_subscription');
     } catch (error) {
       logger.error('Error entering pay_subscription scene:', error);
-      await ctx.reply(generalMessages.actionFailed, await getSellerMenu(ctx));
+      await ctx.reply(generalMessages.actionFailed, await getSellerMenuKeyboard(ctx));
     }
   });
 
@@ -513,7 +546,7 @@ export const setupSellerHandlers = (bot) => {
       await ctx.scene.enter('upgrade_shop');
     } catch (error) {
       logger.error('Error entering upgrade_shop scene:', error);
-      await ctx.reply(generalMessages.actionFailed, await getSellerMenu(ctx));
+      await ctx.reply(generalMessages.actionFailed, await getSellerMenuKeyboard(ctx));
     }
   });
 
@@ -560,7 +593,7 @@ export const setupSellerHandlers = (bot) => {
       await ctx.answerCbQuery();
 
       if (!ctx.session.shopId || !ctx.session.token) {
-        const menu = await getSellerMenu(ctx);
+        const menu = await getSellerMenuKeyboard(ctx);
         await ctx.reply(generalMessages.authorizationRequired, menu);
         return;
       }
@@ -578,7 +611,7 @@ export const setupSellerHandlers = (bot) => {
       logger.info(`User ${ctx.from.id} opened tools submenu`);
     } catch (error) {
       logger.error('Error in tools submenu handler:', error);
-      const menu = await getSellerMenu(ctx);
+      const menu = await getSellerMenuKeyboard(ctx);
       await ctx.reply(sellerMessages.toolsError, menu);
     }
   });
@@ -594,7 +627,7 @@ export const setupSellerHandlers = (bot) => {
       }
 
       if (!ctx.session.token) {
-        const menu = await getSellerMenu(ctx);
+        const menu = await getSellerMenuKeyboard(ctx);
         await ctx.reply(generalMessages.authorizationRequired, menu);
         return;
       }
@@ -621,7 +654,7 @@ export const setupSellerHandlers = (bot) => {
       logger.info(`User ${ctx.from.id} opened subscription hub (tier: ${subscriptionData.tier})`);
     } catch (error) {
       logger.error('Error in subscription hub handler:', error);
-      const menu = await getSellerMenu(ctx);
+      const menu = await getSellerMenuKeyboard(ctx);
       await ctx.reply(sellerMessages.subscriptionStatusError, menu);
     }
   });
@@ -644,7 +677,7 @@ const handleWorkers = async (ctx) => {
     }
 
     if (!ctx.session.token) {
-      const menu = await getSellerMenu(ctx);
+      const menu = await getSellerMenuKeyboard(ctx);
       await ctx.reply(generalMessages.authorizationRequired, menu);
       return;
     }
@@ -660,20 +693,20 @@ const handleWorkers = async (ctx) => {
         }
 
         if (shopDetails?.owner_id && shopDetails.owner_id !== ctx.session.user?.id) {
-          const menu = await getSellerMenu(ctx);
+          const menu = await getSellerMenuKeyboard(ctx);
           await ctx.reply(sellerMessages.workersOwnerOnly, menu);
           return;
         }
       } catch (error) {
         logger.error('Failed to load shop details for workers menu:', error);
-        const menu = await getSellerMenu(ctx);
+        const menu = await getSellerMenuKeyboard(ctx);
         await ctx.reply(generalMessages.actionFailed, menu);
         return;
       }
     }
 
     if (shopTier !== 'pro') {
-      const menu = await getSellerMenu(ctx);
+      const menu = await getSellerMenuKeyboard(ctx);
       await ctx.reply(sellerMessages.workersProOnly, menu);
       return;
     }
@@ -686,13 +719,13 @@ const handleWorkers = async (ctx) => {
     logger.error('Error in workers menu handler:', error);
 
     try {
-      const menu = await getSellerMenu(ctx);
-      // ✅ Edit message вместо reply (не создаёт новое сообщение)
+      const menu = await getSellerMenuKeyboard(ctx);
+      // Edit message вместо reply (не создаёт новое сообщение)
       await ctx.editMessageText(generalMessages.actionFailed, menu);
     } catch (editError) {
-      // ✅ Fallback если edit не удался (например, сообщение удалено)
+      // Fallback если edit не удался (например, сообщение удалено)
       logger.debug('Failed to edit message, using reply fallback:', editError.message);
-      const menu = await getSellerMenu(ctx);
+      const menu = await getSellerMenuKeyboard(ctx);
       await ctx.reply(generalMessages.actionFailed, menu);
     }
   }
@@ -757,7 +790,7 @@ const handleWorkerRemove = async (ctx) => {
     }
 
     if (!ctx.session.token) {
-      const menu = await getSellerMenu(ctx);
+      const menu = await getSellerMenuKeyboard(ctx);
       await ctx.reply(generalMessages.authorizationRequired, menu);
       return;
     }
@@ -804,7 +837,7 @@ const handleWorkerRemoveConfirm = async (ctx) => {
     }
 
     if (!ctx.session.token) {
-      const menu = await getSellerMenu(ctx);
+      const menu = await getSellerMenuKeyboard(ctx);
       await ctx.reply(generalMessages.authorizationRequired, menu);
       return;
     }

@@ -1,4 +1,4 @@
-import { sellerMenu, sellerMenuNoShop } from '../keyboards/seller.js';
+import { sellerMenuNoShop } from '../keyboards/seller.js';
 import { shopApi } from './api.js';
 import logger from './logger.js';
 

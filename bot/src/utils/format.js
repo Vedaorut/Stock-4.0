@@ -3,6 +3,19 @@
  */
 
 /**
+ * Экранирует специальные HTML-символы для безопасной отправки с parse_mode HTML
+ * @param {string} value - Произвольная строка
+ * @returns {string} Экранированная строка
+ */
+export const escapeHtml = (value = '') =>
+  String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
+/**
  * Форматирует цену в USD
  * @param {number|string} price - Цена
  * @returns {string} Отформатированная цена с символом $ (например "$25" или "$25.50")

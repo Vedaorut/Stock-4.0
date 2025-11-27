@@ -32,8 +32,9 @@ export const paymentQueries = {
   },
 
   // Find payment by transaction hash
-  findByTxHash: async (txHash) => {
-    const result = await query('SELECT * FROM payments WHERE tx_hash = $1', [txHash]);
+  findByTxHash: async (txHash, client = null) => {
+    const queryFn = client ? client.query.bind(client) : query;
+    const result = await queryFn('SELECT * FROM payments WHERE tx_hash = $1', [txHash]);
     return result.rows[0];
   },
 

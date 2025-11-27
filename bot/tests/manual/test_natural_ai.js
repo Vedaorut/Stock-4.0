@@ -11,8 +11,6 @@
  * - No more template strings in responses
  */
 
-import productAI from '../../src/services/productAI.js';
-
 async function testNaturalAIResponses() {
   console.log('🧪 Test: AI Natural Responses (No Templates)\n');
 
