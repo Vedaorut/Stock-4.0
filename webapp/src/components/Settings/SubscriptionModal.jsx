@@ -269,7 +269,7 @@ export default function SubscriptionModal({ isOpen, onClose }) {
             exit={{ x: '100%' }}
             transition={{ type: 'spring', damping: 30, stiffness: 300 }}
           >
-            <PageHeader title="Подписка" onBack={handleClose} />
+            <PageHeader title="Подписка" onBack={handleClose} variant="close" />
             <div
               className="flex-1 overflow-y-auto"
               style={{

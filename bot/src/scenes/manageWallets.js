@@ -477,8 +477,10 @@ ${formatted}`,
       return;
     }
 
-    // No input
-    await smartMessage.send(ctx, { text: sellerMessages.walletsUseButtons });
+    // No input - user sent non-text message
+    await smartMessage.send(ctx, {
+      text: 'Пожалуйста, отправьте адрес кошелька текстом.\n\n' + sellerMessages.walletsUseButtons,
+    });
   } catch (error) {
     logger.error('Error in handleInput:', error);
     await smartMessage.send(ctx, {

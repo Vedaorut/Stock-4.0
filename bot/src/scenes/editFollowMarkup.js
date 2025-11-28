@@ -75,7 +75,7 @@ const showMarkupPrompt = async (ctx) => {
 const handleMarkupInput = async (ctx) => {
   try {
     if (!ctx.message || !ctx.message.text) {
-      await ctx.reply(followMessages.markupPrompt);
+      await ctx.reply('Пожалуйста, отправьте наценку текстом (только число).\n\n' + followMessages.markupPrompt);
       return;
     }
 

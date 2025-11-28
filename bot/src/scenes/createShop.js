@@ -61,7 +61,10 @@ const handleShopNameAndCreate = async (ctx) => {
   try {
     // Get shop name from message
     if (!ctx.message || !ctx.message.text) {
-      await cleanReply(ctx, sellerMessages.createShopNamePrompt);
+      await cleanReply(
+        ctx,
+        'Пожалуйста, отправьте название магазина текстом.\n\n' + sellerMessages.createShopNamePrompt
+      );
       return;
     }
 

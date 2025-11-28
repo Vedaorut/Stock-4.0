@@ -191,7 +191,7 @@ export default function OrdersModal({ isOpen, onClose }) {
           exit={{ x: '100%' }}
           transition={{ type: 'spring', damping: 30, stiffness: 300 }}
         >
-          <PageHeader title={t('orders.title')} onBack={handleClose} />
+          <PageHeader title={t('orders.title')} onBack={handleClose} variant="close" />
           <div
             className="flex-1 overflow-y-auto"
             style={{

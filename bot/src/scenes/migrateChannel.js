@@ -90,6 +90,9 @@ const migrateChannelScene = new Scenes.WizardScene(
     }
 
     if (!ctx.message || !ctx.message.text) {
+      await smartMessage.send(ctx, {
+        text: 'Пожалуйста, отправьте ссылку на канал или @username текстом.',
+      });
       return;
     }
 

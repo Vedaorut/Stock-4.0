@@ -107,14 +107,15 @@ export default function WorkspaceModal({ isOpen, onClose }) {
     }
   }, [isOpen]);
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+  const loadData = useCallback(async (signal) => {
     try {
       // Get shop - simplified parsing
       const shopsRes = await fetchApi('/shops/my', {
+        signal,
         timeout: 10000, // 10 second timeout to prevent infinite loading
       });
+
+      if (signal?.aborted) return { status: 'aborted' };
 
       // Extract shop data - handle both {data: [...]} and [...] responses
       let shopsList = [];
@@ -133,7 +134,7 @@ export default function WorkspaceModal({ isOpen, onClose }) {
         setIsPro(false);
         setWorkers([]);
         setShowForm(false);
-        return;
+        return { status: 'success' };
       }
 
       // Check PRO tier
@@ -143,28 +144,51 @@ export default function WorkspaceModal({ isOpen, onClose }) {
       if (proTier) {
         // Load workers for PRO shops
         const workersRes = await fetchApi(`/shops/${shop.id}/workers`, {
+          signal,
           timeout: 10000, // 10 second timeout to prevent infinite loading
         });
+
+        if (signal?.aborted) return { status: 'aborted' };
+
         const workersList = Array.isArray(workersRes?.data) ? workersRes.data : [];
         setWorkers(workersList);
       } else {
         setWorkers([]);
         setShowForm(false);
       }
+
+      return { status: 'success' };
     } catch (err) {
+      if (signal?.aborted) return { status: 'aborted' };
+
       setError(err.message || 'Failed to load data');
       setIsPro(false);
       setWorkers([]);
       setMyShop(null);
-    } finally {
-      setLoading(false);
+      return { status: 'error', error: err.message };
     }
   }, [fetchApi]);
 
   useEffect(() => {
-    if (isOpen) {
-      loadData();
-    }
+    if (!isOpen) return;
+
+    setLoading(true);
+    setError(null);
+
+    const controller = new AbortController();
+
+    loadData(controller.signal)
+      .then((result) => {
+        if (!controller.signal.aborted && result?.status === 'error') {
+          console.error('Failed to load workspace data:', result.error);
+        }
+      })
+      .finally(() => {
+        // Always reset loading, even on abort
+        setLoading(false);
+      });
+
+    return () => controller.abort();
   }, [isOpen, loadData]);
 
   const handleAddWorker = async () => {
@@ -225,7 +249,18 @@ export default function WorkspaceModal({ isOpen, onClose }) {
 
   // Retry function for error recovery
   const handleRetry = useCallback(() => {
-    loadData();
+    setError(null);
+    setLoading(true);
+    const controller = new AbortController();
+    loadData(controller.signal)
+      .then((result) => {
+        if (!controller.signal.aborted && result?.status === 'error') {
+          console.error('Failed to load workspace data:', result.error);
+        }
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   }, [loadData]);
 
   // Error state - show error with retry button
@@ -240,7 +275,7 @@ export default function WorkspaceModal({ isOpen, onClose }) {
             exit={{ x: '100%' }}
             transition={{ type: 'spring', damping: 30, stiffness: 300 }}
           >
-            <PageHeader title="Workspace" onBack={handleClose} />
+            <PageHeader title="Workspace" onBack={handleClose} variant="close" />
             <div
               className="flex-1 overflow-y-auto"
               style={{

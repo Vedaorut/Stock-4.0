@@ -54,7 +54,7 @@ export default function LanguageModal({ isOpen, onClose }) {
           exit={{ x: '100%' }}
           transition={{ type: 'spring', damping: 30, stiffness: 300 }}
         >
-          <PageHeader title={t('language.title')} onBack={handleClose} />
+          <PageHeader title={t('language.title')} onBack={handleClose} variant="close" />
           <div
             className="flex-1 overflow-y-auto"
             style={{

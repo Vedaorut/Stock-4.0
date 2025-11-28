@@ -192,7 +192,7 @@ const chooseTierScene = new Scenes.WizardScene(
 
     // Wait for text message with promo code
     if (!ctx.message?.text) {
-      await cleanReply(ctx, subMessages.promoTextPrompt);
+      await cleanReply(ctx, 'Пожалуйста, отправьте промокод текстом.\n\n' + subMessages.promoTextPrompt);
       return;
     }
 

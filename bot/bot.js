@@ -302,6 +302,41 @@ bot.on('photo', async (ctx) => {
   }
 });
 
+// Catch-all для неподдерживаемых типов сообщений
+bot.on('message', async (ctx) => {
+  const state = ctx.session?.state;
+  const messageType = ctx.message?.sticker
+    ? 'стикер'
+    : ctx.message?.voice
+      ? 'голосовое сообщение'
+      : ctx.message?.video
+        ? 'видео'
+        : ctx.message?.document
+          ? 'документ'
+          : ctx.message?.audio
+            ? 'аудио'
+            : ctx.message?.animation
+              ? 'GIF'
+              : ctx.message?.video_note
+                ? 'видеосообщение'
+                : ctx.message?.contact
+                  ? 'контакт'
+                  : ctx.message?.location
+                    ? 'геолокацию'
+                    : 'этот тип сообщения';
+
+  if (state) {
+    await ctx.reply(
+      `Сейчас я жду текстовое сообщение, а не ${messageType}.\n` +
+        'Пожалуйста, введите текст или нажмите /cancel для отмены.'
+    );
+  } else {
+    await ctx.reply(
+      `Я не понимаю ${messageType}.\n` + 'Используйте кнопки меню или команду /start'
+    );
+  }
+});
+
 // ====== START BOT ======
 
 // Graceful shutdown

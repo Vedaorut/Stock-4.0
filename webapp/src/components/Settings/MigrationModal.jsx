@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ClockIcon } from '@heroicons/react/24/outline';
 import PageHeader from '../common/PageHeader';
@@ -101,29 +101,21 @@ export default function MigrationModal({ isOpen, onClose }) {
     }
   });
 
-  // Step 2: Check eligibility when opening modal
-  useEffect(() => {
-    if (isOpen) {
-      // Defined below - function hoisted
-      checkEligibility();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen]);
-
-  const checkEligibility = async () => {
-    setLoading(true);
-    setErrorMessage(null); // Сброс ошибки перед проверкой
-
+  // Check eligibility function with AbortController support
+  const checkEligibility = useCallback(async (signal) => {
     try {
       // Get user's shop
       const { data: shopsResponse, error: shopsError } = await get('/shops/my', {
+        signal,
         timeout: 10000, // 10 second timeout to prevent infinite loading
       });
+
+      if (signal?.aborted) return { status: 'aborted' };
 
       if (shopsError) {
         setErrorMessage('Ошибка загрузки магазина. Попробуйте позже.');
         setStep(1);
-        return;
+        return { status: 'error' };
       }
 
       const shops = Array.isArray(shopsResponse?.data) ? shopsResponse.data : [];
@@ -131,7 +123,7 @@ export default function MigrationModal({ isOpen, onClose }) {
       if (!shops.length) {
         setErrorMessage('У вас нет магазина. Создайте магазин через бота.');
         setStep(1);
-        return;
+        return { status: 'error' };
       }
 
       const primaryShop = shops[0];
@@ -141,14 +133,17 @@ export default function MigrationModal({ isOpen, onClose }) {
       const { data: eligibilityData, error: eligibilityError } = await get(
         `/shops/${primaryShop.id}/migration/check`,
         {
+          signal,
           timeout: 10000, // 10 second timeout to prevent infinite loading
         }
       );
 
+      if (signal?.aborted) return { status: 'aborted' };
+
       if (eligibilityError) {
         setErrorMessage('Ошибка проверки прав на миграцию. Попробуйте позже.');
         setStep(1);
-        return;
+        return { status: 'error' };
       }
 
       setEligibility(eligibilityData);
@@ -157,19 +152,44 @@ export default function MigrationModal({ isOpen, onClose }) {
         const reason = eligibilityData?.reason || eligibilityData?.message || 'Миграция недоступна';
         setErrorMessage(reason);
         setStep(1);
-        return;
+        return { status: 'error' };
       }
 
       // Success - переход к step 3 (input)
       setStep(3);
+      return { status: 'success' };
     } catch (err) {
+      if (signal?.aborted) return { status: 'aborted' };
+
       console.error('Eligibility check failed:', err);
       setErrorMessage('Ошибка проверки прав. Попробуйте позже.');
       setStep(1);
-    } finally {
-      setLoading(false);
+      return { status: 'error' };
     }
-  };
+  }, [get]);
+
+  // Step 2: Check eligibility when opening modal
+  useEffect(() => {
+    if (!isOpen) return;
+
+    setLoading(true);
+    setErrorMessage(null); // Сброс ошибки перед проверкой
+
+    const controller = new AbortController();
+
+    checkEligibility(controller.signal)
+      .then((result) => {
+        if (!controller.signal.aborted && result?.status === 'error') {
+          console.error('Failed to check eligibility');
+        }
+      })
+      .finally(() => {
+        // Always reset loading, even on abort
+        setLoading(false);
+      });
+
+    return () => controller.abort();
+  }, [isOpen, checkEligibility]);
 
   const handleNext = () => {
     triggerHaptic('light');
@@ -257,6 +277,7 @@ export default function MigrationModal({ isOpen, onClose }) {
                     : 'Готово'
             }
             onBack={step === 1 ? onClose : () => setStep(step - 1)}
+            variant="close"
           />
 
           <div
@@ -306,11 +327,15 @@ export default function MigrationModal({ isOpen, onClose }) {
 
                         {/* Retry Button */}
                         <motion.button
-                          onClick={async () => {
+                          onClick={() => {
                             setErrorMessage(null);
                             triggerHaptic('light');
+                            setLoading(true);
                             setStep(2); // Перейти в loading state
-                            await checkEligibility();
+                            const controller = new AbortController();
+                            checkEligibility(controller.signal).finally(() => {
+                              setLoading(false);
+                            });
                           }}
                           disabled={loading}
                           className="text-sm text-orange-500 hover:text-orange-400 disabled:opacity-50

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import PageHeader from '../common/PageHeader';
 import { useTelegram } from '../../hooks/useTelegram';
@@ -202,6 +202,7 @@ export default function ProductsModal({ isOpen, onClose }) {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState(null);
   const [lastAIPrompt, setLastAIPrompt] = useState('');
+  const aiAbortControllerRef = useRef(null);
 
   const handleOpenAIChat = () => {
     triggerHaptic('medium');
@@ -209,9 +210,15 @@ export default function ProductsModal({ isOpen, onClose }) {
   };
 
   const handleCloseAIChat = useCallback(() => {
+    // Cancel any pending AI request on close
+    if (aiAbortControllerRef.current) {
+      aiAbortControllerRef.current.abort();
+      aiAbortControllerRef.current = null;
+    }
     setShowAIChat(false);
     setAiError(null);
     setLastAIPrompt('');
+    setAiLoading(false);
   }, []);
 
   const [myShop, setMyShop] = useState(null);
@@ -285,6 +292,12 @@ export default function ProductsModal({ isOpen, onClose }) {
     const value = text.trim();
     if (!value) return;
 
+    // Cancel any pending AI request
+    if (aiAbortControllerRef.current) {
+      aiAbortControllerRef.current.abort();
+    }
+    aiAbortControllerRef.current = new AbortController();
+
     setLastAIPrompt(value); // Save for retry
     const optimisticHistory = [...aiHistory, { role: 'user', content: value }];
     setAiHistory(optimisticHistory);
@@ -301,6 +314,7 @@ export default function ProductsModal({ isOpen, onClose }) {
           message: value,
           history: historyPayload,
         }),
+        signal: aiAbortControllerRef.current.signal,
       });
 
       if (response?.data) {
@@ -537,7 +551,7 @@ export default function ProductsModal({ isOpen, onClose }) {
             exit={{ x: '100%' }}
             transition={{ type: 'spring', damping: 30, stiffness: 300 }}
           >
-            <PageHeader title="Мои товары" onBack={handleClose} />
+            <PageHeader title="Мои товары" onBack={handleClose} variant="close" />
             <div
               className="flex-1 overflow-y-auto"
               style={{
@@ -600,7 +614,7 @@ export default function ProductsModal({ isOpen, onClose }) {
             exit={{ x: '100%' }}
             transition={{ type: 'spring', damping: 30, stiffness: 300 }}
           >
-            <PageHeader title="Мои товары" onBack={handleClose} />
+            <PageHeader title="Мои товары" onBack={handleClose} variant="close" />
             <div
               className="flex-1 overflow-y-auto"
               style={{
@@ -661,7 +675,7 @@ export default function ProductsModal({ isOpen, onClose }) {
           exit={{ x: '100%' }}
           transition={{ type: 'spring', damping: 30, stiffness: 300 }}
         >
-          <PageHeader title="Мои товары" onBack={handleClose} />
+          <PageHeader title="Мои товары" onBack={handleClose} variant="close" />
           <div
             className="flex-1 overflow-y-auto"
             style={{
@@ -820,7 +834,7 @@ export default function ProductsModal({ isOpen, onClose }) {
           exit={{ x: '100%' }}
           transition={{ type: 'spring', damping: 32, stiffness: 300 }}
         >
-          <PageHeader title="AI ассистент" onBack={handleCloseAIChat} />
+          <PageHeader title="AI ассистент" onBack={handleCloseAIChat} variant="close" />
           <div
             className="flex flex-col min-h-screen"
             style={{ paddingTop: 'calc(env(safe-area-inset-top) + 56px)' }}

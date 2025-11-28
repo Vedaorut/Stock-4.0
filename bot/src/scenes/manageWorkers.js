@@ -38,7 +38,9 @@ const enterTelegramId = async (ctx) => {
 const confirmAndAdd = async (ctx) => {
   try {
     if (!ctx.message || !ctx.message.text) {
-      await smartMessage.send(ctx, { text: sellerMessages.workerPrompt });
+      await smartMessage.send(ctx, {
+        text: 'Пожалуйста, отправьте Telegram ID или @username текстом.\n\n' + sellerMessages.workerPrompt,
+      });
       return;
     }
 

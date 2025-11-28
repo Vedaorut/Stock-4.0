@@ -67,7 +67,9 @@ const selectMode = async (ctx) => {
   try {
     // Get shop ID from message
     if (!ctx.message || !ctx.message.text) {
-      await smartMessage.send(ctx, { text: followMessages.createEnterId });
+      await smartMessage.send(ctx, {
+        text: 'Пожалуйста, отправьте ID магазина текстом (только число).\n\n' + followMessages.createEnterId,
+      });
       return;
     }
 
@@ -184,7 +186,9 @@ const selectMode = async (ctx) => {
 const handleModeSelection = async (ctx) => {
   try {
     if (!ctx.callbackQuery) {
-      await smartMessage.send(ctx, { text: followMessages.createModePrompt });
+      await smartMessage.send(ctx, {
+        text: 'Пожалуйста, выберите режим с помощью кнопок выше.\n\n' + followMessages.createModePrompt,
+      });
       return;
     }
 
@@ -256,7 +260,9 @@ const handleModeSelection = async (ctx) => {
 const handleMarkup = async (ctx) => {
   try {
     if (!ctx.message || !ctx.message.text) {
-      await smartMessage.send(ctx, { text: followMessages.createResellPrompt });
+      await smartMessage.send(ctx, {
+        text: 'Пожалуйста, отправьте наценку текстом (только число).\n\n' + followMessages.createResellPrompt,
+      });
       return;
     }
 

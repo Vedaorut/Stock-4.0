@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import PageHeader from '../common/PageHeader';
 import { useTelegram } from '../../hooks/useTelegram';
@@ -108,8 +108,14 @@ export default function FollowsModal({ isOpen, onClose }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [searching, setSearching] = useState(false);
+  const searchAbortControllerRef = useRef(null);
 
   const handleClose = useCallback(() => {
+    // Cancel any pending search request
+    if (searchAbortControllerRef.current) {
+      searchAbortControllerRef.current.abort();
+      searchAbortControllerRef.current = null;
+    }
     setSearchQuery('');
     setSearchResults([]);
     onClose();
@@ -299,14 +305,24 @@ export default function FollowsModal({ isOpen, onClose }) {
       return;
     }
 
+    // Cancel any pending search request
+    if (searchAbortControllerRef.current) {
+      searchAbortControllerRef.current.abort();
+    }
+    searchAbortControllerRef.current = new AbortController();
+
     setSearching(true);
     try {
-      const res = await fetchApi(`/shops/search?q=${encodeURIComponent(searchQuery.trim())}`);
+      const res = await fetchApi(`/shops/search?q=${encodeURIComponent(searchQuery.trim())}`, {
+        signal: searchAbortControllerRef.current.signal,
+      });
       setSearchResults(res.data || []);
       if (res.data.length === 0) {
         await alert('Магазины не найдены');
       }
     } catch (error) {
+      // Ignore abort errors
+      if (error.name === 'AbortError') return;
       await alert(error.message || 'Ошибка поиска');
     } finally {
       setSearching(false);
@@ -350,7 +366,7 @@ export default function FollowsModal({ isOpen, onClose }) {
             exit={{ x: '100%' }}
             transition={{ type: 'spring', damping: 30, stiffness: 300 }}
           >
-            <PageHeader title="Follows" onBack={handleClose} />
+            <PageHeader title="Follows" onBack={handleClose} variant="close" />
             <div
               className="flex-1 overflow-y-auto"
               style={{
@@ -397,7 +413,7 @@ export default function FollowsModal({ isOpen, onClose }) {
           exit={{ x: '100%' }}
           transition={{ type: 'spring', damping: 30, stiffness: 300 }}
         >
-          <PageHeader title="Follows" onBack={handleClose} />
+          <PageHeader title="Follows" onBack={handleClose} variant="close" />
           <div
             className="flex-1 overflow-y-auto"
             style={{

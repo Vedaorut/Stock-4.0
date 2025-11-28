@@ -38,7 +38,9 @@ const enterPrice = async (ctx) => {
   try {
     // Get product name from message
     if (!ctx.message || !ctx.message.text) {
-      await smartMessage.send(ctx, { text: sellerMessages.addProductNamePrompt });
+      await smartMessage.send(ctx, {
+        text: 'Пожалуйста, отправьте название товара текстом.\n\n' + sellerMessages.addProductNamePrompt,
+      });
       return;
     }
 
@@ -76,7 +78,9 @@ const complete = async (ctx) => {
   try {
     // Get price from message
     if (!ctx.message || !ctx.message.text) {
-      await smartMessage.send(ctx, { text: sellerMessages.addProductPricePrompt });
+      await smartMessage.send(ctx, {
+        text: 'Пожалуйста, отправьте цену текстом (только число).\n\n' + sellerMessages.addProductPricePrompt,
+      });
       return;
     }
 

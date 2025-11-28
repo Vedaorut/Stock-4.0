@@ -329,7 +329,9 @@ const upgradeShopScene = new Scenes.WizardScene(
 
     if (!ctx.message?.text) {
       if (ctx.wizard.state.awaitingTxHash) {
-        await smartMessage.send(ctx, { text: sellerMessages.upgrade.sendHashPrompt });
+        await smartMessage.send(ctx, {
+          text: 'Пожалуйста, отправьте TX Hash текстом.\n\n' + sellerMessages.upgrade.sendHashPrompt,
+        });
       }
       return;
     }
