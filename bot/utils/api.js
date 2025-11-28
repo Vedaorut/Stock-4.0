@@ -151,6 +151,18 @@ export async function getShopByName(shopName) {
   }
 }
 
+export async function getShopById(shopId) {
+  try {
+    const response = await apiClient.get(`/api/shops/${shopId}`);
+    return { success: true, data: response.data };
+  } catch (error) {
+    if (error.response?.status === 404) {
+      return { success: false, notFound: true };
+    }
+    return { success: false, error: error.response?.data?.message || 'Магазин не найден' };
+  }
+}
+
 export async function updateShop(shopId, updates) {
   try {
     const response = await apiClient.patch(`/api/shops/${shopId}`, updates);
@@ -259,33 +271,6 @@ export async function unsubscribeFromShop(telegramId, shopId) {
     return { success: true, data: response.data };
   } catch (error) {
     return { success: false, error: error.response?.data?.message || 'Ошибка отписки от магазина' };
-  }
-}
-
-// Payment API functions
-export async function generateBitcoinAddress(telegramId) {
-  try {
-    const response = await apiClient.post('/api/payments/generate-address', {
-      telegramId: telegramId.toString(),
-      amount: parseFloat(process.env.BITCOIN_SHOP_PRICE) || 25,
-    });
-    return { success: true, data: response.data };
-  } catch (error) {
-    return {
-      success: false,
-      error: error.response?.data?.message || 'Ошибка генерации Bitcoin адреса',
-    };
-  }
-}
-
-export async function verifyPayment(paymentHash) {
-  try {
-    const response = await apiClient.post('/api/payments/verify', {
-      transactionHash: paymentHash,
-    });
-    return { success: true, data: response.data };
-  } catch (error) {
-    return { success: false, error: error.response?.data?.message || 'Ошибка проверки платежа' };
   }
 }
 

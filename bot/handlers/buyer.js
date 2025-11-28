@@ -1,5 +1,6 @@
 import {
   getShopByName,
+  getShopById,
   subscribeToShop,
   unsubscribeFromShop,
   getSubscriptions,
@@ -117,15 +118,15 @@ export async function handleViewShop(ctx, shopId) {
       isSubscribed = subsResult.data.some((sub) => sub.shopId === shopId);
     }
 
-    // Mock shop data for now
-    // TODO: Implement getShopById in api.js
-    const shop = {
-      id: shopId,
-      name: 'Shop Name',
-      description: 'Shop description',
-      productsCount: 0,
-      subscribersCount: 0,
-    };
+    // Get real shop data from API
+    const shopResult = await getShopById(shopId);
+
+    if (!shopResult.success || !shopResult.data) {
+      await ctx.editMessageText('❌ Магазин не найден', backToBuyerMenuKeyboard());
+      return;
+    }
+
+    const shop = shopResult.data;
 
     await ctx.editMessageText(
       `🏪 ${shop.name}\n\n` +

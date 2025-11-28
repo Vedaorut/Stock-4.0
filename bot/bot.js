@@ -6,13 +6,7 @@ import { handleStart, handleBackToMain, handleHelp, handleCancel } from './handl
 
 import {
   handleSellerMenu,
-  handleCreateShopStart,
-  handlePaymentConfirm,
-  handlePaymentHashInput,
-  handleShopNameInput,
-  handleCancelShopCreation,
   handleMyShop,
-  handleVerifyPaymentButton,
 } from './handlers/seller.js';
 
 import {
@@ -144,10 +138,6 @@ bot.action('seller_menu', handleSellerMenu);
 bot.action('buyer_menu', handleBuyerMenu);
 
 // Seller actions
-bot.action('create_shop_start', handleCreateShopStart);
-bot.action('payment_confirm', handlePaymentConfirm);
-bot.action('verify_payment', handleVerifyPaymentButton);
-bot.action('cancel_shop_creation', handleCancelShopCreation);
 bot.action('my_shop', handleMyShop);
 bot.action('add_product', handleAddProduct);
 bot.action('my_orders', handleMyOrders);
@@ -257,14 +247,8 @@ bot.action('buyer_orders_cancelled', async (ctx) => {
 bot.on('text', async (ctx) => {
   const state = ctx.session?.state;
 
-  // Seller states
-  if (state === 'awaiting_payment_hash') {
-    await handlePaymentHashInput(ctx);
-  } else if (state === 'awaiting_shop_name') {
-    await handleShopNameInput(ctx);
-  }
   // Product creation states
-  else if (state === 'adding_product_name') {
+  if (state === 'adding_product_name') {
     await handleProductNameInput(ctx);
   } else if (state === 'adding_product_description') {
     await handleProductDescriptionInput(ctx);
