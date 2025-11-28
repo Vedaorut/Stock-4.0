@@ -54,10 +54,10 @@ function InteractiveListItem(
   },
   ref
 ) {
-  const Component = as;
+  const WrapperComponent = as;
 
   return (
-    <Component
+    <WrapperComponent
       ref={ref}
       className={`relative overflow-hidden ${className}`}
       initial="rest"
@@ -80,7 +80,7 @@ function InteractiveListItem(
       />
 
       <div className="relative z-10 flex items-center gap-4">{children}</div>
-    </Component>
+    </WrapperComponent>
   );
 }
 

@@ -15,7 +15,7 @@ import { getClient } from '../../src/config/database.js';
 describe('Authorization - IDOR Prevention Tests', () => {
   let user1, user2;
   let token1, token2;
-  let shop1, shop2;
+  let shop1, shop2, shop3;
   let follow1, follow2;
   let _product1, _product2;
 
@@ -65,6 +65,15 @@ describe('Authorization - IDOR Prevention Tests', () => {
       subscription_expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
     });
 
+    // Additional source shop to avoid circular follow constraint
+    shop3 = await shopQueries.create({
+      owner_id: user1.id,
+      name: 'testshop3',
+      description: 'Test Shop 3',
+      subscription_tier: 'pro',
+      subscription_expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+    });
+
     // Create products for both shops
     _product1 = await productQueries.create({
       shop_id: shop1.id,
@@ -96,12 +105,12 @@ describe('Authorization - IDOR Prevention Tests', () => {
       );
       follow1 = result1.rows[0];
 
-      // Shop2 follows Shop1
+      // Shop2 follows Shop3 (avoid circular constraint with shop1)
       const result2 = await client.query(
         `INSERT INTO shop_follows (follower_shop_id, source_shop_id, mode, status)
          VALUES ($1, $2, 'resell', 'active')
          RETURNING *`,
-        [shop2.id, shop1.id]
+        [shop2.id, shop3.id]
       );
       follow2 = result2.rows[0];
     } finally {
@@ -117,8 +126,16 @@ describe('Authorization - IDOR Prevention Tests', () => {
         shop1.id,
         shop2.id,
       ]);
-      await client.query('DELETE FROM products WHERE shop_id IN ($1, $2)', [shop1.id, shop2.id]);
-      await client.query('DELETE FROM shops WHERE id IN ($1, $2)', [shop1.id, shop2.id]);
+      await client.query('DELETE FROM products WHERE shop_id IN ($1, $2, $3)', [
+        shop1.id,
+        shop2.id,
+        shop3.id,
+      ]);
+      await client.query('DELETE FROM shops WHERE id IN ($1, $2, $3)', [
+        shop1.id,
+        shop2.id,
+        shop3.id,
+      ]);
       await client.query('DELETE FROM users WHERE id IN ($1, $2)', [user1.id, user2.id]);
     } finally {
       client.release();
@@ -173,7 +190,7 @@ describe('Authorization - IDOR Prevention Tests', () => {
           `INSERT INTO shop_follows (follower_shop_id, source_shop_id, mode, status)
            VALUES ($1, $2, 'resell', 'active')
            RETURNING *`,
-          [shop1.id, shop2.id]
+          [shop1.id, shop3.id]
         );
         tempFollow = result.rows[0];
       } finally {

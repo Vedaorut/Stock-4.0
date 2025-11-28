@@ -126,7 +126,6 @@ describe('Shop Follow Controller - Integration Tests', () => {
           .query({ shopId: proShop.id })
           .set('Authorization', `Bearer ${proToken}`)
           .expect(200);
-
         expect(response.body.data).toMatchObject({
           limit: null, // null = unlimited
           count: 0,

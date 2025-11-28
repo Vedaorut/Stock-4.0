@@ -69,7 +69,8 @@ const Toast = memo(function Toast({ type = 'info', message, onClose, duration = 
     }
   }, [duration, onClose]);
 
-  const handleManualClose = () => {
+  const _handleManualClose = () => {
+    // Reserved for close button implementation
     // Clear auto-dismiss timer before manual close
     if (timerRef.current) {
       clearTimeout(timerRef.current);

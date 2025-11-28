@@ -317,11 +317,11 @@ export const createFollow = asyncHandler(async (req, res) => {
     ]);
 
     if (!followerShop) {
-      throw new NotFoundError('Follower shop not found');
+      throw new NotFoundError('Follower shop');
     }
 
     if (!sourceShop) {
-      throw new NotFoundError('Source shop not found');
+      throw new NotFoundError('Source shop');
     }
 
     const access = await workerQueries.checkAccess(followerId, req.user.id);
@@ -360,7 +360,9 @@ export const createFollow = asyncHandler(async (req, res) => {
 
         if (activeRows.rowCount >= FREE_TIER_LIMIT) {
           await client.query('ROLLBACK');
-          throw new PaymentRequiredError('FREE tier limit reached');
+          const limitError = new PaymentRequiredError('FREE tier limit reached');
+          limitError.meta = { count: activeRows.rowCount };
+          throw limitError;
         }
       }
 
@@ -393,6 +395,21 @@ export const createFollow = asyncHandler(async (req, res) => {
         await client.query('ROLLBACK');
       } catch (rollbackError) {
         logger.error('Rollback error in createFollow', { error: rollbackError.message });
+      }
+
+      if (txError instanceof PaymentRequiredError) {
+        const count = txError.meta?.count ?? FREE_TIER_LIMIT;
+        return res.status(402).json({
+          success: false,
+          error: txError.message,
+          data: {
+            limit: FREE_TIER_LIMIT,
+            count,
+            remaining: Math.max(0, FREE_TIER_LIMIT - count),
+            reached: true,
+            canFollow: false,
+          },
+        });
       }
 
       if (txError.code === '23505') {
@@ -444,17 +461,17 @@ export const createFollow = asyncHandler(async (req, res) => {
 export const updateFollowMarkup = asyncHandler(async (req, res) => {
   try {
     const { id } = req.params;
-    const { markupPercentage } = req.body;
+    const markupValueRaw = req.body.markupPercentage ?? req.body.markup_percentage;
+    const markupPercentage = Number(markupValueRaw);
 
     const followId = Number.parseInt(id, 10);
-    const markupValue = Number(markupPercentage);
 
     if (!Number.isInteger(followId) || followId <= 0) {
       throw new ValidationError('Invalid follow ID');
     }
 
     // P1-SEC-007: Limit markup to 0.1-200%
-    if (!Number.isFinite(markupValue) || markupValue < 0.1 || markupValue > 200) {
+    if (!Number.isFinite(markupPercentage) || markupPercentage < 0.1 || markupPercentage > 200) {
       throw new ValidationError('Markup must be between 0.1% and 200%');
     }
 
@@ -472,10 +489,10 @@ export const updateFollowMarkup = asyncHandler(async (req, res) => {
       throw new ValidationError('Markup can only be updated in resell mode');
     }
 
-    await shopFollowQueries.updateMarkup(followId, markupValue);
+    await shopFollowQueries.updateMarkup(followId, markupPercentage);
 
     // Update all synced products with new markup
-    await updateMarkupForFollow(followId, markupValue);
+    await updateMarkupForFollow(followId, markupPercentage);
 
     const updatedFollow = await shopFollowQueries.findById(followId);
     res.json({ success: true, data: formatFollowResponse(updatedFollow) });
@@ -496,10 +513,11 @@ export const updateFollowMarkup = asyncHandler(async (req, res) => {
 export const switchFollowMode = asyncHandler(async (req, res) => {
   try {
     const { id } = req.params;
-    const { mode, markupPercentage } = req.body;
+    const { markupPercentage } = req.body;
+    const modeRaw = typeof req.body.mode === 'string' ? req.body.mode.trim().toLowerCase() : '';
 
     const followId = Number.parseInt(id, 10);
-    const normalizedMode = typeof mode === 'string' ? mode.trim().toLowerCase() : '';
+    const normalizedMode = modeRaw === 'showcase' ? 'monitor' : modeRaw;
     const markupValue = markupPercentage !== undefined ? Number(markupPercentage) : undefined;
 
     if (!Number.isInteger(followId) || followId <= 0) {

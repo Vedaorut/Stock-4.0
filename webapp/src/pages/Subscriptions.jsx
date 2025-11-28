@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { motion } from 'framer-motion';
+import { motion } from 'framer-motion'; // Used in JSX
 import Header from '../components/Layout/Header';
 import { useApi } from '../hooks/useApi';
 import { useStore } from '../store/useStore';
@@ -83,9 +83,8 @@ export default function Subscriptions() {
         }
       });
 
-    // ✅ Listen for WebSocket subscription payment confirmations
-    const handleSubscriptionConfirmed = (event) => {
-      console.log('[Subscriptions] 🎉 Payment confirmed via WebSocket:', event.detail);
+    // Listen for WebSocket subscription payment confirmations
+    const handleSubscriptionConfirmed = (_event) => {
       // Reload subscriptions to show updated status
       loadSubscriptions();
     };

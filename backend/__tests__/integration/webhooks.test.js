@@ -28,11 +28,20 @@ const createTestApp = () => {
   return app;
 };
 
-// Webhook tests now work in test environment because:
-// 1. NODE_ENV='test' is set in env-setup.js
-// 2. webhooks.js skips blockchain verification when NODE_ENV='test' (unless BLOCKCYPHER_SKIP_VERIFY='false')
-// This allows testing webhook security (token verification, replay protection) without real API calls
-describe('Webhooks - Integration Tests', () => {
+/**
+ * SKIPPED: BlockCypher webhook tests
+ *
+ * These tests are for the legacy BlockCypher webhook endpoint which has been removed.
+ * The project migrated to CrystalPay for payment processing.
+ *
+ * TODO: Write new tests for CrystalPay webhooks (POST /webhooks/crystalpay)
+ *
+ * The CrystalPay webhook:
+ * - Verifies signature using crystalPayService.verifySignature()
+ * - Has replay protection via processed_webhooks table
+ * - Processes subscription payments via invoicePaymentService
+ */
+describe.skip('Webhooks - Integration Tests (BlockCypher - DEPRECATED)', () => {
   let app;
   let pool;
   let user;

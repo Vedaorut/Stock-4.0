@@ -11,6 +11,12 @@ export const verifyToken = async (req, res, next) => {
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      if (process.env.NODE_ENV === 'test') {
+        logger.warn('[verifyToken] Missing or malformed Authorization header in test', {
+          header: authHeader || null,
+          path: req.path,
+        });
+      }
       return res.status(401).json({
         success: false,
         error: 'No token provided. Authorization header must be in format: Bearer <token>',
@@ -20,6 +26,9 @@ export const verifyToken = async (req, res, next) => {
     const token = authHeader.split(' ')[1];
 
     if (!token) {
+      if (process.env.NODE_ENV === 'test') {
+        logger.warn('[verifyToken] Empty token after split', { header: authHeader });
+      }
       return res.status(401).json({
         success: false,
         error: 'Invalid token format',
@@ -39,6 +48,9 @@ export const verifyToken = async (req, res, next) => {
     next();
   } catch (error) {
     if (error.name === 'JsonWebTokenError') {
+      if (process.env.NODE_ENV === 'test') {
+        logger.warn('[verifyToken] Invalid JWT', { error: error.message });
+      }
       return res.status(401).json({
         success: false,
         error: 'Invalid token',
@@ -46,6 +58,9 @@ export const verifyToken = async (req, res, next) => {
     }
 
     if (error.name === 'TokenExpiredError') {
+      if (process.env.NODE_ENV === 'test') {
+        logger.warn('[verifyToken] Expired JWT', { error: error.message });
+      }
       return res.status(401).json({
         success: false,
         error: 'Token expired',

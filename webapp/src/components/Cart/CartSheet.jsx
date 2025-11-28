@@ -14,10 +14,35 @@ import {
 import CartItem from './CartItem';
 import { useBackButton } from '../../hooks/useBackButton';
 
-// Lazy load domMax for drag gestures
+// Lazy load domMax
 const loadDomMax = () => import('framer-motion').then((mod) => mod.domMax);
 
+// --- Styles & Variants ---
+
+const getCheckoutShadows = (android) => ({
+  shadow: android
+    ? '0 4px 16px rgba(255, 107, 0, 0.26), 0 8px 20px rgba(255, 107, 0, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.12)'
+    : `0 4px 12px rgba(255, 107, 0, 0.3),
+       0 8px 24px rgba(255, 107, 0, 0.15),
+       inset 0 1px 0 rgba(255, 255, 255, 0.2)`,
+  hover: android
+    ? '0 4px 10px rgba(255, 107, 0, 0.3), 0 8px 20px rgba(255, 107, 0, 0.2)'
+    : '0 4px 8px rgba(255, 107, 0, 0.3), 0 8px 20px rgba(255, 107, 0, 0.25), 0 0 40px rgba(255, 107, 0, 0.2)',
+});
+
+const getEmptyEmojiVariants = (android) => ({
+  animate: android
+    ? { scale: 1, rotate: 0 }
+    : { scale: [1, 1.1, 1], rotate: [0, -10, 10, 0] },
+  transition: android
+    ? { duration: 1.2, ease: 'easeOut' }
+    : { duration: 2, repeat: Infinity, repeatDelay: 1 },
+});
+
+// --- Component ---
+
 export default function CartSheet() {
+  // State Selection
   const { cart, isCartOpen, setCartOpen, clearCart, startCheckout } = useStore(
     useShallow((state) => ({
       cart: state.cart,
@@ -27,72 +52,44 @@ export default function CartSheet() {
       startCheckout: state.startCheckout,
     }))
   );
+
   const { triggerHaptic } = useTelegram();
   const { t } = useTranslation();
   const platform = usePlatform();
   const android = isAndroid(platform);
-
-  const overlayStyle = useMemo(() => getSurfaceStyle('overlay', platform), [platform]);
-
-  const sheetStyle = useMemo(() => getSurfaceStyle('surfaceStrong', platform), [platform]);
-
-  const sheetSpring = useMemo(() => getSpringPreset('sheet', platform), [platform]);
-
-  const controlSpring = useMemo(() => getSpringPreset('press', platform), [platform]);
-
-  const quickSpring = useMemo(() => getSpringPreset('quick', platform), [platform]);
-
   const checkoutTimeoutRef = useRef(null);
 
-  // Cleanup timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (checkoutTimeoutRef.current) {
-        clearTimeout(checkoutTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  const checkoutShadow = useMemo(
-    () =>
-      android
-        ? '0 4px 16px rgba(255, 107, 0, 0.26), 0 8px 20px rgba(255, 107, 0, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.12)'
-        : `
-            0 4px 12px rgba(255, 107, 0, 0.3),
-            0 8px 24px rgba(255, 107, 0, 0.15),
-            inset 0 1px 0 rgba(255, 255, 255, 0.2)
-          `,
-    [android]
-  );
-
-  const checkoutHoverShadow = useMemo(
-    () =>
-      android
-        ? '0 4px 10px rgba(255, 107, 0, 0.3), 0 8px 20px rgba(255, 107, 0, 0.2)'
-        : '0 4px 8px rgba(255, 107, 0, 0.3), 0 8px 20px rgba(255, 107, 0, 0.25), 0 0 40px rgba(255, 107, 0, 0.2)',
-    [android]
-  );
-
+  // Derived Values
   const total = useMemo(
     () => cart.reduce((sum, item) => sum + item.price * item.quantity, 0),
     [cart]
   );
 
-  const emptyEmojiAnimate = android
-    ? { scale: 1, rotate: 0 }
-    : {
-        scale: [1, 1.1, 1],
-        rotate: [0, -10, 10, 0],
-      };
+  // Styles
+  const overlayStyle = useMemo(() => getSurfaceStyle('overlay', platform), [platform]);
+  const sheetStyle = useMemo(() => getSurfaceStyle('surfaceStrong', platform), [platform]);
+  const sheetSpring = useMemo(() => getSpringPreset('sheet', platform), [platform]);
+  const controlSpring = useMemo(() => getSpringPreset('press', platform), [platform]);
+  const quickSpring = useMemo(() => getSpringPreset('quick', platform), [platform]);
+  
+  const { shadow: checkoutShadow, hover: checkoutHoverShadow } = useMemo(
+    () => getCheckoutShadows(android),
+    [android]
+  );
 
-  const emptyEmojiTransition = android
-    ? { duration: 1.2, ease: 'easeOut' }
-    : {
-        duration: 2,
-        repeat: Infinity,
-        repeatDelay: 1,
-      };
+  const { animate: emptyAnimate, transition: emptyTransition } = useMemo(
+    () => getEmptyEmojiVariants(android),
+    [android]
+  );
 
+  // Lifecycle
+  useEffect(() => {
+    return () => {
+      if (checkoutTimeoutRef.current) clearTimeout(checkoutTimeoutRef.current);
+    };
+  }, []);
+
+  // Handlers
   const handleClose = () => {
     triggerHaptic('light');
     setCartOpen(false);
@@ -100,20 +97,12 @@ export default function CartSheet() {
 
   const handleCheckout = () => {
     triggerHaptic('success');
-
-    // Close cart first, then open payment modal after animation
     setCartOpen(false);
-
-    // Clear previous timeout before setting new one
-    if (checkoutTimeoutRef.current) {
-      clearTimeout(checkoutTimeoutRef.current);
-    }
-
-    // Set new timeout with proper cleanup
+    if (checkoutTimeoutRef.current) clearTimeout(checkoutTimeoutRef.current);
     checkoutTimeoutRef.current = setTimeout(() => startCheckout(), 200);
   };
 
-  const handleClearCart = async () => {
+  const handleClearCart = () => {
     triggerHaptic('warning');
     clearCart();
   };
@@ -144,9 +133,9 @@ export default function CartSheet() {
             exit={{ y: '100%' }}
             transition={sheetSpring}
           >
-            <div className="rounded-t-[32px] flex flex-col" style={sheetStyle}>
+            <div className="rounded-t-[32px] flex flex-col h-full" style={sheetStyle}>
               {/* Header */}
-              <div className="flex items-center justify-between p-5 border-b border-white/10">
+              <div className="flex items-center justify-between p-5 border-b border-white/10 flex-shrink-0">
                 <h2 className="text-xl font-bold text-white" style={{ letterSpacing: '-0.01em' }}>
                   {t('cart.title')}
                 </h2>
@@ -157,7 +146,6 @@ export default function CartSheet() {
                       className="text-sm font-semibold text-red-500 hover:text-red-400 px-3 py-1 rounded-lg"
                       style={{
                         background: android ? 'rgba(239, 68, 68, 0.16)' : 'rgba(239, 68, 68, 0.1)',
-                        transition: 'all 200ms ease-out',
                       }}
                       whileTap={{ scale: android ? 0.97 : 0.95 }}
                       transition={controlSpring}
@@ -169,65 +157,48 @@ export default function CartSheet() {
                     onClick={handleClose}
                     className="w-9 h-9 rounded-xl flex items-center justify-center text-gray-400"
                     style={{
-                      background: android
-                        ? 'rgba(255, 255, 255, 0.08)'
-                        : 'rgba(255, 255, 255, 0.05)',
+                      background: android ? 'rgba(255, 255, 255, 0.08)' : 'rgba(255, 255, 255, 0.05)',
                       border: '1px solid rgba(255, 255, 255, 0.08)',
                     }}
                     whileTap={{ scale: android ? 0.94 : 0.9 }}
                     transition={controlSpring}
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M6 18L18 6M6 6l12 12"
-                      />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                     </svg>
                   </motion.button>
                 </div>
               </div>
 
-              {/* Cart Items */}
+              {/* Cart Items Area */}
               <div
-                className="flex-1 overflow-y-auto p-4 space-y-3"
+                className="flex-1 overflow-y-auto p-4 space-y-3 min-h-0"
                 style={{ WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}
               >
                 {cart.length === 0 ? (
                   <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="flex flex-col items-center justify-center py-20"
+                    className="flex flex-col items-center justify-center h-full py-10"
                   >
-                    {/* Animated cart icon */}
                     <motion.div
-                      animate={emptyEmojiAnimate}
-                      transition={emptyEmojiTransition}
+                      animate={emptyAnimate}
+                      transition={emptyTransition}
                       className="text-6xl mb-4"
                     >
                       🛒
                     </motion.div>
-
                     <h3 className="text-xl font-semibold text-white mb-2">{t('cart.empty')}</h3>
-                    <p className="text-gray-400 text-sm mb-6 text-center px-8">
-                      {t('cart.emptyDesc')}
-                    </p>
-
-                    {/* CTA Button */}
+                    <p className="text-gray-400 text-sm mb-6 text-center px-8">{t('cart.emptyDesc')}</p>
                     <motion.button
-                      onClick={() => {
-                        setCartOpen(false);
-                      }}
+                      onClick={handleClose}
                       whileHover={{ scale: android ? 1.02 : 1.05 }}
                       whileTap={{ scale: android ? 0.97 : 0.95 }}
-                      className="px-6 py-3 rounded-xl font-semibold text-white"
+                      className="px-6 py-3 rounded-xl font-semibold text-white bg-gradient-to-br from-orange-primary to-orange-400"
                       style={{
-                        background: 'linear-gradient(135deg, #FF6B00 0%, #FF8C42 100%)',
                         boxShadow: android
                           ? '0 4px 12px rgba(255, 107, 0, 0.24)'
                           : '0 4px 12px rgba(255, 107, 0, 0.3)',
-                        letterSpacing: '-0.01em',
                       }}
                       transition={quickSpring}
                     >
@@ -246,33 +217,22 @@ export default function CartSheet() {
               {/* Footer */}
               {cart.length > 0 && (
                 <div
-                  className="p-5 border-t border-white/10 space-y-4"
+                  className="p-5 border-t border-white/10 space-y-4 flex-shrink-0"
                   style={{ paddingBottom: 'calc(var(--tabbar-total) + 20px)' }}
                 >
-                  {/* Total */}
                   <div className="flex items-center justify-between">
-                    <span
-                      className="text-gray-400 text-base font-medium"
-                      style={{ letterSpacing: '0.01em' }}
-                    >
-                      {t('cart.total')}
-                    </span>
-                    <span
-                      className="text-2xl font-bold text-orange-primary tabular-nums"
-                      style={{ letterSpacing: '-0.02em' }}
-                    >
+                    <span className="text-gray-400 text-base font-medium">{t('cart.total')}</span>
+                    <span className="text-2xl font-bold text-orange-primary tabular-nums">
                       ${total.toFixed(2)}
                     </span>
                   </div>
 
-                  {/* Checkout Button */}
                   <motion.button
                     onClick={handleCheckout}
-                    className="w-full touch-target text-white font-bold rounded-xl overflow-hidden"
+                    className="w-full h-12 text-white font-bold rounded-xl overflow-hidden"
                     style={{
                       background: 'linear-gradient(135deg, #FF6B00 0%, #FF8F3D 100%)',
                       boxShadow: checkoutShadow,
-                      letterSpacing: '-0.01em',
                     }}
                     whileHover={{
                       scale: android ? 1.01 : 1.02,
@@ -282,10 +242,7 @@ export default function CartSheet() {
                       scale: android ? 0.985 : 0.98,
                       boxShadow: 'inset 0 2px 8px rgba(0, 0, 0, 0.3)',
                     }}
-                    transition={{
-                      ...controlSpring,
-                      boxShadow: { duration: 0.18 },
-                    }}
+                    transition={{ ...controlSpring, boxShadow: { duration: 0.18 } }}
                   >
                     {t('cart.checkout')}
                   </motion.button>

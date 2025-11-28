@@ -100,7 +100,7 @@ export default function AnalyticsModal({ isOpen, onClose }) {
         return { status: 'error', error: err.message || 'Ошибка загрузки данных' };
       }
     },
-    [get, getDateRange, period, customRange]
+    [get, getDateRange] // period and customRange are read via getDateRange
   );
 
   // Fetch on mount and period change

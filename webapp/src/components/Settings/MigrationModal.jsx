@@ -104,8 +104,10 @@ export default function MigrationModal({ isOpen, onClose }) {
   // Step 2: Check eligibility when opening modal
   useEffect(() => {
     if (isOpen) {
+      // Defined below - function hoisted
       checkEligibility();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
   const checkEligibility = async () => {
@@ -565,8 +567,8 @@ export default function MigrationModal({ isOpen, onClose }) {
 
                           // Real-time validation
                           if (value) {
-                            const { isValid, error } = parseChannelInput(value);
-                            setChannelError(error);
+                            const { error: validationError } = parseChannelInput(value);
+                            setChannelError(validationError);
                           } else {
                             setChannelError(null);
                           }

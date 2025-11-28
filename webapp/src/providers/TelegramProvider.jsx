@@ -1,3 +1,5 @@
+/* eslint-disable react-refresh/only-export-components */
+// Provider and hook are intentionally co-located for maintainability
 import {
   createContext,
   useContext,
@@ -34,6 +36,7 @@ export function TelegramProvider({ children }) {
   const [isValidating, setIsValidating] = useState(true);
   const [error, setError] = useState(null);
   const initializationRef = useRef(false);
+  const apiLoggedRef = useRef(false);
 
   const waitForTelegramSDK = useCallback(async (maxRetries = 10, delay = 200) => {
     for (let i = 0; i < maxRetries; i++) {
@@ -54,6 +57,12 @@ export function TelegramProvider({ children }) {
   const validateTelegramAuth = useCallback(async (initData) => {
     try {
       const API_URL = getApiBaseUrl();
+
+      // Log once to help diagnose incorrect base URLs in production
+      if (!apiLoggedRef.current) {
+        console.log('[TelegramProvider] Using API base URL:', API_URL);
+        apiLoggedRef.current = true;
+      }
 
       const response = await axios.post(
         `${API_URL}/auth/telegram-validate`,

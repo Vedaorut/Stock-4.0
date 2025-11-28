@@ -59,7 +59,7 @@ export function t(key, params = {}, lang = currentLang) {
   }
 
   if (!value) {
-    console.warn(`[i18n] Translation missing: ${key}`);
+    // Translation missing - return key as fallback
     return key;
   }
 

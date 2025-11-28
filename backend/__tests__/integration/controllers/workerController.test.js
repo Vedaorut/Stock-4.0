@@ -124,10 +124,13 @@ describe('WorkerController Integration Tests', () => {
     });
 
     it('should reject adding non-existent user', async () => {
+      // Use a truly non-existent telegram_id (in test range but not used)
+      const nonExistentTelegramId = 9000999888;
+
       const response = await request(app)
         .post(`/api/shops/${proShop.id}/workers`)
         .set('Authorization', `Bearer ${authToken1}`)
-        .send({ telegram_id: 999999999 })
+        .send({ telegram_id: nonExistentTelegramId })
         .expect(404);
 
       expect(response.body.success).toBe(false);

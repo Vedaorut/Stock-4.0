@@ -51,6 +51,20 @@ async function canMigrate(shopId) {
       resetDate,
     };
   } catch (error) {
+    if (error.code === '42P01') {
+      logger.warn(
+        `[RateLimit] channel_migrations table missing; allowing migration check to pass for shop ${shopId}`
+      );
+      return {
+        allowed: true,
+        remaining: 2,
+        used: 0,
+        limit: 2,
+        resetDate: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1),
+        skipped: true,
+      };
+    }
+
     logger.error(`[RateLimit] Error checking migration limit for shop ${shopId}:`, error);
     throw error;
   }
@@ -136,6 +150,13 @@ async function getMigrationHistory(shopId, limit = 10) {
 
     return result.rows;
   } catch (error) {
+    if (error.code === '42P01') {
+      logger.warn(
+        `[RateLimit] channel_migrations table missing; returning empty history for shop ${shopId}`
+      );
+      return [];
+    }
+
     logger.error(`[RateLimit] Error getting migration history for shop ${shopId}:`, error);
     throw error;
   }

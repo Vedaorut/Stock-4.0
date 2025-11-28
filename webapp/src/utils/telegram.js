@@ -17,7 +17,9 @@ export function initTelegramApp() {
     if (tg.requestFullscreen && tg.platform !== 'web') {
       try {
         tg.requestFullscreen();
-      } catch (err) {}
+      } catch {
+        // Fullscreen not supported
+      }
     } else {
     }
 
@@ -48,7 +50,9 @@ export function initTelegramApp() {
       });
 
       // Обработчики fullscreen событий (Mini Apps 2.0)
-      tg.onEvent('fullscreenChanged', (data) => {});
+      tg.onEvent('fullscreenChanged', (_data) => {
+        // Handle fullscreen change if needed
+      });
 
       tg.onEvent('fullscreenFailed', (error) => {
         console.error('❌ Fullscreen failed:', error);

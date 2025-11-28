@@ -94,7 +94,7 @@ function ProductCard({ product, onEdit, onDelete }) {
 }
 
 // Product Form Component
-function ProductForm({ product, formData, setFormData, onSubmit, saving, editingProduct }) {
+function ProductForm({ product: _product, formData, setFormData, onSubmit, saving, editingProduct }) {
   return (
     <motion.div
       className="glass-card rounded-2xl p-4 space-y-3"

@@ -7,7 +7,16 @@ import logger from '../../utils/logger.js';
 export const productQueries = {
   // Create new product
   create: async (productData) => {
-    const { shopId, name, description, price, currency, stockQuantity, isPreorder } = productData;
+    const shopId = productData.shopId ?? productData.shop_id;
+    const stockQuantity =
+      productData.stockQuantity ?? productData.stock ?? productData.stock_quantity ?? 0;
+    const currency = productData.currency ?? 'USD';
+    const { name, description, price, isPreorder } = productData;
+
+    if (!shopId) {
+      throw new Error('shopId is required to create a product');
+    }
+
     const result = await query(
       `INSERT INTO products (shop_id, name, description, price, currency, stock_quantity, reserved_quantity, is_preorder)
        VALUES ($1, $2, $3, $4, $5, $6, 0, COALESCE($7, false))

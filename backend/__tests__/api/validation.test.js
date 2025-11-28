@@ -64,12 +64,13 @@ describe('Validation Tests', () => {
   });
 
   describe('P0-API-4: Wallet Address Validation', () => {
+    // Note: Controller uses snake_case field names (wallet_btc, wallet_eth, etc.)
     test('Should accept valid BTC address', async () => {
       const response = await request(app)
         .put(`/api/shops/${shop.id}/wallets`)
         .set('Authorization', `Bearer ${token}`)
         .send({
-          walletBtc: '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa',
+          wallet_btc: '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa',
         });
 
       expect(response.status).toBe(200);
@@ -80,18 +81,20 @@ describe('Validation Tests', () => {
         .put(`/api/shops/${shop.id}/wallets`)
         .set('Authorization', `Bearer ${token}`)
         .send({
-          walletEth: '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb',
+          // Valid ETH address: 0x + 40 hex characters
+          wallet_eth: '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb1',
         });
 
       expect(response.status).toBe(200);
     });
 
-    test('Should accept valid USDT (Tron) address', async () => {
+    test('Should accept valid USDT (ERC20) address', async () => {
+      // Note: System expects USDT as ERC20 format (Ethereum address), not TRON
       const response = await request(app)
         .put(`/api/shops/${shop.id}/wallets`)
         .set('Authorization', `Bearer ${token}`)
         .send({
-          walletUsdt: 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t',
+          wallet_usdt: '0xdAC17F958D2ee523a2206206994597C13D831ec7',
         });
 
       expect(response.status).toBe(200);
@@ -102,7 +105,7 @@ describe('Validation Tests', () => {
         .put(`/api/shops/${shop.id}/wallets`)
         .set('Authorization', `Bearer ${token}`)
         .send({
-          walletLtc: 'LdP8Qox1VAhCzLJNqrr74YovaWYyNBUWvL',
+          wallet_ltc: 'LdP8Qox1VAhCzLJNqrr74YovaWYyNBUWvL',
         });
 
       expect(response.status).toBe(200);
@@ -113,11 +116,11 @@ describe('Validation Tests', () => {
         .put(`/api/shops/${shop.id}/wallets`)
         .set('Authorization', `Bearer ${token}`)
         .send({
-          walletBtc: 'invalid_btc_address',
+          wallet_btc: 'invalid_btc_address',
         });
 
       expect(response.status).toBe(400);
-      expect(response.body.error).toMatch(/validation/i);
+      expect(response.body.error).toMatch(/invalid.*bitcoin/i);
     });
 
     test('Should reject invalid ETH address', async () => {
@@ -125,11 +128,11 @@ describe('Validation Tests', () => {
         .put(`/api/shops/${shop.id}/wallets`)
         .set('Authorization', `Bearer ${token}`)
         .send({
-          walletEth: '0xinvalid',
+          wallet_eth: '0xinvalid',
         });
 
       expect(response.status).toBe(400);
-      expect(response.body.error).toMatch(/validation/i);
+      expect(response.body.error).toMatch(/invalid.*ethereum/i);
     });
 
     test('Should reject ETH address without 0x prefix', async () => {
@@ -137,7 +140,7 @@ describe('Validation Tests', () => {
         .put(`/api/shops/${shop.id}/wallets`)
         .set('Authorization', `Bearer ${token}`)
         .send({
-          walletEth: '742d35Cc6634C0532925a3b844Bc9e7595f0bEb',
+          wallet_eth: '742d35Cc6634C0532925a3b844Bc9e7595f0bEb',
         });
 
       expect(response.status).toBe(400);

@@ -32,7 +32,7 @@ export default function PaymentDetailsModal() {
   } = useStore();
   const { triggerHaptic } = useTelegram();
   const { t } = useTranslation();
-  const toast = useToast();
+  const _toast = useToast(); // Reserved for future notifications
   const platform = usePlatform();
   const android = isAndroid(platform);
   const ios = isIOS(platform);
@@ -84,7 +84,7 @@ export default function PaymentDetailsModal() {
     try {
       await navigator.clipboard.writeText(text);
       return true;
-    } catch (err) {
+    } catch {
       // Fallback: Legacy execCommand (works in iframe)
       try {
         const textArea = document.createElement('textarea');
@@ -104,7 +104,7 @@ export default function PaymentDetailsModal() {
         }
 
         throw new Error('execCommand returned false');
-      } catch (fallbackErr) {
+      } catch {
         return false;
       }
     }

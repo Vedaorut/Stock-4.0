@@ -159,7 +159,7 @@ async function validateAndLockSubscription(client, subscriptionId, actorUserId) 
   return subscription;
 }
 
-async function finalizeOrderPayment(client, { order, invoice, verification, payment }) {
+async function _finalizeOrderPayment(client, { order, invoice, verification, payment }) {
   // Check invoice expiry just before confirmation
   const now = new Date();
   const expiresAt = new Date(invoice.expires_at);
@@ -577,7 +577,7 @@ async function notifySubscriptionActivated(subscriptionId) {
 /**
  * Process crypto payment for an order using invoice as single source of truth.
  */
-export async function processOrderPayment({ orderId, txHash, paymentLink, actorUserId, allowSeller = false }) {
+export async function processOrderPayment({ orderId, txHash, paymentLink: _paymentLink, actorUserId, allowSeller = false }) {
   const client = await getClient();
   try {
     await client.query('BEGIN ISOLATION LEVEL SERIALIZABLE');
@@ -666,7 +666,7 @@ export async function processOrderPayment({ orderId, txHash, paymentLink, actorU
 export async function processSubscriptionPayment({
   subscriptionId,
   txHash,
-  paymentLink,
+  paymentLink: _paymentLink,
   actorUserId,
   mode = null,
   invoiceId = null,
@@ -718,7 +718,7 @@ export async function processSubscriptionPayment({
 
   // 1.3. Skip verification for CrystalPay (external payment gateway handles verification)
   const isCrystalPay = invoice.chain === 'CRYSTALPAY';
-  let verifiedTxHash = txHash;
+  const verifiedTxHash = txHash;
   let verification;
 
   if (isCrystalPay) {

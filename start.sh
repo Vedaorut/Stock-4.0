@@ -143,6 +143,33 @@ else
   exit 1
 fi
 
+# Update webapp/.env.production (Vite uses this for production builds!)
+if [ -f "$PROJECT_ROOT/webapp/.env.production" ]; then
+  sed -i '' "s|VITE_API_URL=.*|VITE_API_URL=$NGROK_URL/api|g" "$PROJECT_ROOT/webapp/.env.production"
+  echo -e "  ${GREEN}✓${NC} Updated webapp/.env.production"
+fi
+
+# Validate that webapp API URL is correct before building
+WEBAPP_API_URL=$(grep '^VITE_API_URL=' "$PROJECT_ROOT/webapp/.env.production" | cut -d'=' -f2-)
+if [[ -z "$WEBAPP_API_URL" ]]; then
+  echo -e "  ${RED}✗${NC} VITE_API_URL is empty in webapp/.env.production"
+  exit 1
+fi
+
+if [[ "$WEBAPP_API_URL" != *"/api" ]]; then
+  WEBAPP_API_URL="${WEBAPP_API_URL%/}/api"
+  sed -i '' "s|VITE_API_URL=.*|VITE_API_URL=$WEBAPP_API_URL|g" "$PROJECT_ROOT/webapp/.env"
+  sed -i '' "s|VITE_API_URL=.*|VITE_API_URL=$WEBAPP_API_URL|g" "$PROJECT_ROOT/webapp/.env.production"
+  echo -e "  ${YELLOW}!${NC} Normalized webapp API URL to include /api: ${BLUE}$WEBAPP_API_URL${NC}"
+fi
+
+if [[ "$WEBAPP_API_URL" == http://localhost* && "$NGROK_URL" != http://localhost:3000* ]]; then
+  echo -e "  ${YELLOW}!${NC} Warning: webapp VITE_API_URL still points to localhost (${BLUE}$WEBAPP_API_URL${NC})"
+  echo -e "     Build will continue, but requests may fail if accessed via ngrok."
+fi
+
+echo -e "  └─ Webapp API URL: ${BLUE}$WEBAPP_API_URL${NC}"
+
 echo ""
 
 #############################################

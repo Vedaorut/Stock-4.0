@@ -79,7 +79,6 @@ export const useStore = create(
       cart: [],
       addToCart: (product) => {
         const { cart: currentCart, currentShop, productsShopId } = get();
-        const toast = useToastStore.getState().addToast;
         const existingItem = currentCart.find((item) => item.id === product.id);
 
         if (existingItem) {
@@ -132,7 +131,6 @@ export const useStore = create(
           return;
         }
 
-        const toast = useToastStore.getState().addToast;
         const { cart } = get();
         const item = cart.find((i) => i.id === productId);
 
@@ -218,7 +216,6 @@ export const useStore = create(
       // Payment Actions
       startCheckout: () => {
         const { cart } = get();
-        const toast = useToastStore.getState().addToast;
 
         if (cart.length === 0) {
           return;
@@ -284,7 +281,7 @@ export const useStore = create(
       },
 
       createOrder: async () => {
-        const { cart, user, isCreatingOrder } = get();
+        const { cart, isCreatingOrder } = get();
 
         // ✅ FIX: Atomic check-and-set to prevent race condition
         if (isCreatingOrder) {
@@ -296,9 +293,9 @@ export const useStore = create(
         // Set flag IMMEDIATELY before any async operations
         set({ isCreatingOrder: true });
 
-        // ✅ FIX: Defensive re-check after set (paranoid mode)
+        // Defensive re-check after set (paranoid mode)
         if (get().isCreatingOrder !== true) {
-          console.warn('[createOrder] Race condition detected, aborting');
+          console.error('[createOrder] Race condition detected, aborting');
           return null;
         }
 
@@ -355,15 +352,13 @@ export const useStore = create(
 
           return order;
         } catch (error) {
-          console.error('❌ [createOrder] Error:', error);
+          console.error('[createOrder] Error:', error);
 
-          // ✅ Enhanced error logging for debugging 400 errors
+          // Enhanced error logging for debugging 400 errors
           if (error.response) {
             console.error('Server Response Status:', error.response.status);
             console.error('Server Response Data:', error.response.data);
           }
-
-          const toast = useToastStore.getState().addToast;
 
           if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
           } else if (error.response?.status === 401) {
@@ -394,10 +389,10 @@ export const useStore = create(
         let invoiceInProgress = false; // Synchronous lock
 
         return async (crypto) => {
-          // ✅ Normalize to UPPERCASE before everything (fix ID case mismatch)
+          // Normalize to UPPERCASE before everything (fix ID case mismatch)
           const normalizedCrypto = crypto.toUpperCase();
 
-          const { currentOrder, user, isGeneratingInvoice } = get();
+          const { currentOrder, isGeneratingInvoice } = get();
           const toast = useToastStore.getState().addToast;
 
           // Check BOTH store state AND closure variable
@@ -427,13 +422,11 @@ export const useStore = create(
             if (!order) {
               order = await get().createOrder();
               if (!order) {
-                const errorMsg = 'Не удалось создать заказ';
-                console.error('🔴 [selectCrypto] ERROR: Failed to create order');
-
+                console.error('[selectCrypto] ERROR: Failed to create order');
                 throw new Error('Failed to create order');
               }
             } else {
-              // ✅ FIX: Validate order total matches cart total
+              // Validate order total matches cart total
               const orderTotal = parseFloat(order.total_price) || 0;
               const diff = Math.abs(orderTotal - cartTotal);
 
@@ -441,9 +434,7 @@ export const useStore = create(
                 // Re-create order with current cart data
                 order = await get().createOrder();
                 if (!order) {
-                  const errorMsg = 'Не удалось обновить заказ';
-                  console.error('🔴 [selectCrypto] ERROR: Failed to re-create order');
-
+                  console.error('[selectCrypto] ERROR: Failed to re-create order');
                   throw new Error('Failed to re-create order');
                 }
               }
@@ -470,9 +461,8 @@ export const useStore = create(
             const cryptoAmount = parseFloat(invoice.cryptoAmount);
 
             if (!isFinite(cryptoAmount) || cryptoAmount <= 0) {
-              const errorMsg = 'Некорректная сумма от сервера';
-              console.error('🔴 [selectCrypto] Invalid cryptoAmount:', { invoice, cryptoAmount });
-              toast({ type: 'error', message: errorMsg, duration: 3000 });
+              console.error('[selectCrypto] Invalid cryptoAmount:', { invoice, cryptoAmount });
+              toast({ type: 'error', message: 'Некорректная сумма от сервера', duration: 3000 });
               throw new Error('Invalid cryptoAmount from API');
             }
 
@@ -484,7 +474,7 @@ export const useStore = create(
               verifyError: null, // ✅ FIX: Clear previous errors on success
             });
           } catch (error) {
-            console.error('🔴 [selectCrypto] API ERROR:', {
+            console.error('[selectCrypto] API ERROR:', {
               message: error.message,
               status: error.response?.status,
               data: error.response?.data,
@@ -529,8 +519,7 @@ export const useStore = create(
       })(), // End of closure IIFE
 
       submitPaymentHash: async (hash) => {
-        const { currentOrder, selectedCrypto, user } = get();
-        const toast = useToastStore.getState().addToast;
+        const { currentOrder, selectedCrypto } = get();
 
         if (!currentOrder) {
           return;
@@ -618,7 +607,7 @@ export const useStore = create(
           clearCart = false, // Clear shopping cart?
           clearPendingOrders = false, // Clear order history?
           keepOrder = false, // Keep currentOrder for retry?
-          reason = 'manual', // 'manual', 'success', 'error', 'timeout'
+          // reason param available for debugging: 'manual', 'success', 'error', 'timeout'
         } = options;
 
         // Clear cart if requested
@@ -687,7 +676,7 @@ export const useStore = create(
           if (shouldUpdate) {
             set({ products: normalized, productsShopId: shopId });
           }
-        } catch (error) {
+        } catch {
           // Error handled silently
         }
       },

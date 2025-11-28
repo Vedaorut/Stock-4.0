@@ -1,10 +1,4 @@
-import {
-  orderQueries,
-  orderItemQueries,
-  productQueries,
-  invoiceQueries,
-} from '../database/queries/index.js';
-import { NotFoundError } from '../utils/errors.js';
+import { orderQueries, orderItemQueries, productQueries } from '../database/queries/index.js';
 import logger from '../utils/logger.js';
 
 /**

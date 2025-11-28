@@ -60,10 +60,10 @@ function validateConfig(config) {
  * @param {string} params.method - BITCOIN or LITECOIN
  * @param {string} params.description - Payment description
  * @param {string} params.extra - Custom data (our invoice_id)
- * @param {number} params.lifetime - Invoice lifetime in MINUTES (default 60 = 1 hour)
+ * @param {number} params.lifetime - Invoice lifetime in seconds (default 3600 = 1 hour)
  * @returns {Promise<{id: string, url: string, amount: string}>}
  */
-export async function createInvoice({ amount, method, description, extra, lifetime = 60 }) {
+export async function createInvoice({ amount, method, description, extra, lifetime = 3600 }) {
   const config = getConfig();
   validateConfig(config);
 
@@ -76,7 +76,7 @@ export async function createInvoice({ amount, method, description, extra, lifeti
       amount: String(amount),
       type: 'purchase',
       lifetime,
-      currency: 'USD',
+      currency: 'RUB',
       required_method: method,
       callback_url: config.callbackUrl,
       description,

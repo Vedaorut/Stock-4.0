@@ -4,6 +4,11 @@ import dotenv from 'dotenv';
 // Without this, stale system env vars (like placeholder TELEGRAM_BOT_TOKEN) would be used
 dotenv.config({ override: true });
 
+// In Jest, always force NODE_ENV to "test" even if .env sets a different value
+if (process.env.JEST_WORKER_ID !== undefined) {
+  process.env.NODE_ENV = 'test';
+}
+
 /**
  * Validate required environment variables
  */

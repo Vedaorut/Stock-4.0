@@ -1,4 +1,4 @@
-import { orderQueries, shopQueries, invoiceQueries } from '../database/queries/index.js';
+import { orderQueries, shopQueries } from '../database/queries/index.js';
 import { getClient } from '../config/database.js';
 import { asyncHandler, dbErrorHandler } from '../middleware/errorHandler.js';
 import telegramService from '../services/telegram.js';
@@ -485,7 +485,7 @@ export const orderController = {
    * Generate invoice for order
    * NOTE: HD wallet system removed - order crypto payments temporarily disabled
    */
-  generateInvoice: asyncHandler(async (req, res) => {
+  generateInvoice: asyncHandler(async (_req, _res) => {
     // HD wallet system was removed - order crypto payments not available
     throw new ValidationError('Криптовалютная оплата заказов временно недоступна. Используйте другой способ оплаты.');
   }),

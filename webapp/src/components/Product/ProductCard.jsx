@@ -7,23 +7,106 @@ import { usePlatform } from '../../hooks/usePlatform';
 import { getSpringPreset, getSurfaceStyle, isAndroid } from '../../utils/platform';
 import { gpuAccelStyle } from '../../utils/animationHelpers';
 import CountdownTimer from '../common/CountdownTimer';
-import DiscountBadge from '../common/DiscountBadge';
 
-// Move static calculations outside component
+// --- Constants & Helpers ---
+
 const getSurfaceStyles = (platform) => ({
   cardSurface: getSurfaceStyle('glassCard', platform),
   quickSpring: getSpringPreset('quick', platform),
   pressSpring: getSpringPreset('press', platform),
 });
 
-const ProductCard = memo(function ProductCard({ product, onPreorder, isWide = false }) {
+// Extract Price Logic
+const calculatePriceDetails = (product) => {
+  const hasDiscount =
+    product.original_price &&
+    parseFloat(product.original_price) > 0 &&
+    (product.discount_percentage || 0) > 0;
+  
+  const originalPrice = hasDiscount ? product.original_price : product.price;
+  const discountPercentage = hasDiscount ? product.discount_percentage || 0 : 0;
+  const isTimerDiscount = hasDiscount && product.discount_expires_at;
+  
+  const rawPrice = product.price ?? '';
+  const priceString = typeof rawPrice === 'number' ? String(rawPrice) : `${rawPrice}`;
+  const numericPriceLength = priceString.replace(/[^0-9]/g, '').length;
+
+  let priceSizeClass = 'text-2xl';
+  if (numericPriceLength >= 10) priceSizeClass = 'text-base';
+  else if (numericPriceLength >= 7) priceSizeClass = 'text-lg';
+  else if (numericPriceLength >= 4) priceSizeClass = 'text-xl';
+
+  return {
+    hasDiscount,
+    originalPrice,
+    discountPercentage,
+    isTimerDiscount,
+    priceSizeClass,
+  };
+};
+
+// --- Icon Components ---
+
+const PremiumIcon = () => (
+  <div className="px-3 py-1 rounded-full text-[10px] font-semibold uppercase tracking-[0.12em] text-orange-100 border border-white/20 bg-white/10 shadow-[0_6px_24px_rgba(0,0,0,0.35)]">
+    Premium
+  </div>
+);
+
+const PreorderIcon = () => (
+  <div className="w-9 h-9 rounded-full border border-orange-400/50 bg-orange-500/15 flex items-center justify-center shadow-[0_4px_12px_rgba(255,107,0,0.25)]">
+    <svg
+      className="w-5 h-5 text-orange-300"
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+      strokeWidth={2.2}
+    >
+      <circle cx="12" cy="12" r="9" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l2.5 2.5" />
+    </svg>
+  </div>
+);
+
+const StockBadge = ({ stock, lowStock }) => (
+  <div
+    className={`flex items-center gap-1 px-2 py-1 rounded-full border ${
+      lowStock ? 'border-orange-400/70 bg-orange-500/12' : 'border-white/12 bg-black/35'
+    } shadow-[0_8px_24px_rgba(12,12,12,0.35)] backdrop-blur`}
+  >
+    <span
+      className={`w-1 h-1 rounded-full ${lowStock ? 'bg-orange-400 animate-pulse' : 'bg-emerald-400'}`}
+    />
+    <span
+      className="text-[10px] font-semibold text-white"
+      style={{ letterSpacing: '0.08em' }}
+    >
+      {stock > 999 ? '999+' : stock} шт
+    </span>
+  </div>
+);
+
+const CartIcon = () => (
+  <svg
+    className="relative w-5 h-5"
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+    strokeWidth={2.5}
+  >
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+  </svg>
+);
+
+// --- Main Component ---
+
+const ProductCard = memo(function ProductCard({ product, onPreorder: _onPreorder, isWide = false }) {
   const { triggerHaptic } = useTelegram();
   const addToCart = useStore((state) => state.addToCart);
   const toast = useToast();
   const platform = usePlatform();
   const android = isAndroid(platform);
 
-  // Memoize only once with all styles together
   const { cardSurface, quickSpring, pressSpring } = useMemo(
     () => getSurfaceStyles(platform),
     [platform]
@@ -33,43 +116,27 @@ const ProductCard = memo(function ProductCard({ product, onPreorder, isWide = fa
   const [justAdded, setJustAdded] = useState(false);
   const addedTimeoutRef = useRef(null);
 
-  // Cleanup timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (addedTimeoutRef.current) {
-        clearTimeout(addedTimeoutRef.current);
-      }
-    };
+  // Cleanup timeout
+  useEffect(() => () => {
+    if (addedTimeoutRef.current) clearTimeout(addedTimeoutRef.current);
   }, []);
 
+  // Derived State
   const isAvailable = product.isAvailable ?? product.is_available ?? true;
   const stock = product.stock ?? product.stock_quantity ?? 0;
   const availability = product.availability || (isAvailable && stock <= 0 ? 'preorder' : 'stock');
   const isPreorder = availability === 'preorder';
   const isDisabled = !isAvailable || (!isPreorder && stock <= 0);
-  const stockLabel = stock > 999 ? '999+' : stock;
   const lowStock = stock > 0 && stock <= 3;
 
-  // Discount logic
-  // Discount is active only if original_price exists AND discount_percentage > 0
-  const hasDiscount =
-    product.original_price &&
-    parseFloat(product.original_price) > 0 &&
-    (product.discount_percentage || 0) > 0;
-  const isTimerDiscount = hasDiscount && product.discount_expires_at;
-  const originalPrice = hasDiscount ? product.original_price : product.price;
-  const discountPercentage = hasDiscount ? product.discount_percentage || 0 : 0;
-  const rawPrice = product.price ?? '';
-  const priceString = typeof rawPrice === 'number' ? String(rawPrice) : `${rawPrice}`;
-  const numericPriceLength = priceString.replace(/[^0-9]/g, '').length;
-  let priceSizeClass = 'text-2xl';
-  if (numericPriceLength >= 10) {
-    priceSizeClass = 'text-base';
-  } else if (numericPriceLength >= 7) {
-    priceSizeClass = 'text-lg';
-  } else if (numericPriceLength >= 4) {
-    priceSizeClass = 'text-xl';
-  }
+  // Price Logic
+  const {
+    hasDiscount,
+    originalPrice,
+    discountPercentage,
+    isTimerDiscount,
+    priceSizeClass,
+  } = useMemo(() => calculatePriceDetails(product), [product]);
 
   const handleAddToCart = useCallback(
     (event) => {
@@ -82,16 +149,32 @@ const ProductCard = memo(function ProductCard({ product, onPreorder, isWide = fa
       addToCart(product);
       setJustAdded(true);
 
-      // Clear previous timeout before setting new one
-      if (addedTimeoutRef.current) {
-        clearTimeout(addedTimeoutRef.current);
-      }
-
-      // Set new timeout with proper cleanup
+      if (addedTimeoutRef.current) clearTimeout(addedTimeoutRef.current);
       addedTimeoutRef.current = setTimeout(() => setJustAdded(false), 1500);
     },
     [isDisabled, toast, triggerHaptic, addToCart, product]
   );
+
+  // Styles
+  const backgroundStyle = useMemo(() => ({
+    ...gpuAccelStyle,
+    ...cardSurface,
+    isolation: 'isolate',
+    background: hasDiscount
+      ? 'linear-gradient(145deg, rgba(255, 71, 87, 0.08) 0%, rgba(255, 107, 53, 0.06) 50%, rgba(26, 26, 26, 0.9) 100%)'
+      : 'linear-gradient(145deg, rgba(26, 26, 26, 0.9) 0%, rgba(20, 20, 20, 0.95) 100%)',
+  }), [hasDiscount, cardSurface]);
+
+  const buttonStyle = useMemo(() => ({
+    background: isDisabled
+      ? 'rgba(74, 74, 74, 0.5)'
+      : 'linear-gradient(135deg, #FF6B00 0%, #FF8C42 100%)',
+    boxShadow: isDisabled
+      ? 'none'
+      : `0 2px 4px rgba(255, 107, 0, 0.25),
+         0 4px 12px rgba(255, 107, 0, 0.2),
+         inset 0 1px 0 rgba(255, 255, 255, 0.25)`,
+  }), [isDisabled]);
 
   return (
     <motion.div
@@ -105,14 +188,7 @@ const ProductCard = memo(function ProductCard({ product, onPreorder, isWide = fa
       className={`relative min-h-[200px] rounded-3xl overflow-hidden group ${
         hasDiscount ? 'ring-2 ring-red-500/50 shadow-[0_0_20px_rgba(255,71,87,0.25)]' : ''
       }`}
-      style={{
-        ...gpuAccelStyle,
-        ...cardSurface,
-        isolation: 'isolate',
-        background: hasDiscount
-          ? 'linear-gradient(145deg, rgba(255, 71, 87, 0.08) 0%, rgba(255, 107, 53, 0.06) 50%, rgba(26, 26, 26, 0.9) 100%)'
-          : 'linear-gradient(145deg, rgba(26, 26, 26, 0.9) 0%, rgba(20, 20, 20, 0.95) 100%)',
-      }}
+      style={backgroundStyle}
     >
       {!android && (
         <motion.div
@@ -127,49 +203,20 @@ const ProductCard = memo(function ProductCard({ product, onPreorder, isWide = fa
         />
       )}
 
+      {/* Badges */}
       <div className="absolute top-3 left-3 z-10 flex flex-col gap-2">
-        {product.isPremium && (
-          <div className="px-3 py-1 rounded-full text-[10px] font-semibold uppercase tracking-[0.12em] text-orange-100 border border-white/20 bg-white/10 shadow-[0_6px_24px_rgba(0,0,0,0.35)]">
-            Premium
-          </div>
-        )}
+        {product.isPremium && <PremiumIcon />}
       </div>
 
       <div className="absolute top-3 right-3 z-10 flex flex-col gap-2 items-end">
         {isPreorder ? (
-          <div className="w-9 h-9 rounded-full border border-orange-400/50 bg-orange-500/15 flex items-center justify-center shadow-[0_4px_12px_rgba(255,107,0,0.25)]">
-            <svg
-              className="w-5 h-5 text-orange-300"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              strokeWidth={2.2}
-            >
-              <circle cx="12" cy="12" r="9" />
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l2.5 2.5" />
-            </svg>
-          </div>
+          <PreorderIcon />
         ) : (
-          stock > 0 && (
-            <div
-              className={`flex items-center gap-1 px-2 py-1 rounded-full border ${
-                lowStock ? 'border-orange-400/70 bg-orange-500/12' : 'border-white/12 bg-black/35'
-              } shadow-[0_8px_24px_rgba(12,12,12,0.35)] backdrop-blur`}
-            >
-              <span
-                className={`w-1 h-1 rounded-full ${lowStock ? 'bg-orange-400 animate-pulse' : 'bg-emerald-400'}`}
-              />
-              <span
-                className="text-[10px] font-semibold text-white"
-                style={{ letterSpacing: '0.08em' }}
-              >
-                {stockLabel} шт
-              </span>
-            </div>
-          )
+          stock > 0 && <StockBadge stock={stock} lowStock={lowStock} />
         )}
       </div>
 
+      {/* Success Animation */}
       <AnimatePresence>
         {justAdded && (
           <motion.div
@@ -194,6 +241,7 @@ const ProductCard = memo(function ProductCard({ product, onPreorder, isWide = fa
         )}
       </AnimatePresence>
 
+      {/* Content */}
       <div
         className={`relative h-full ${isWide ? 'p-6' : 'p-5'} flex ${
           isWide ? 'flex-row items-center gap-5' : 'flex-col gap-3'
@@ -221,21 +269,16 @@ const ProductCard = memo(function ProductCard({ product, onPreorder, isWide = fa
           className={`flex items-end mt-auto ${isWide ? 'gap-6 ml-auto' : 'justify-between gap-5'}`}
         >
           <div className="flex flex-col min-w-fit max-w-[calc(100%-60px)]">
-            {/* Price with discount logic */}
             {hasDiscount ? (
               <div className="space-y-0.5">
-                {/* Старая цена + процент скидки */}
                 <div className="flex items-center gap-1.5">
                   <span className="text-xs text-gray-400 line-through font-medium">
                     ${Math.round(originalPrice)}
                   </span>
-                  {/* Процент скидки - компактный badge */}
                   <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-500 text-white">
                     -{Math.round(discountPercentage)}%
                   </span>
                 </div>
-
-                {/* Новая цена красная */}
                 <span
                   className={`text-red-500 font-bold leading-tight ${priceSizeClass}`}
                   style={{
@@ -260,7 +303,6 @@ const ProductCard = memo(function ProductCard({ product, onPreorder, isWide = fa
               </span>
             )}
 
-            {/* Currency or Timer */}
             {isTimerDiscount ? (
               <div className="mt-1">
                 <CountdownTimer expiresAt={product.discount_expires_at} />
@@ -298,18 +340,7 @@ const ProductCard = memo(function ProductCard({ product, onPreorder, isWide = fa
               boxShadow: { duration: 0.18 },
             }}
             className="relative w-[2.75rem] h-[2.75rem] min-w-[2.75rem] min-h-[2.75rem] flex-shrink-0 rounded-xl text-white overflow-hidden disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center"
-            style={{
-              background: isDisabled
-                ? 'rgba(74, 74, 74, 0.5)'
-                : 'linear-gradient(135deg, #FF6B00 0%, #FF8C42 100%)',
-              boxShadow: isDisabled
-                ? 'none'
-                : `
-                  0 2px 4px rgba(255, 107, 0, 0.25),
-                  0 4px 12px rgba(255, 107, 0, 0.2),
-                  inset 0 1px 0 rgba(255, 255, 255, 0.25)
-                `,
-            }}
+            style={buttonStyle}
           >
             {!isDisabled && !android && (
               <motion.div
@@ -322,15 +353,7 @@ const ProductCard = memo(function ProductCard({ product, onPreorder, isWide = fa
                 }}
               />
             )}
-            <svg
-              className="relative w-5 h-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              strokeWidth={2.5}
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-            </svg>
+            <CartIcon />
           </motion.button>
         </div>
       </div>

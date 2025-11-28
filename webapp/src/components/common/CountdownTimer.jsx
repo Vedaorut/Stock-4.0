@@ -80,7 +80,7 @@ const CountdownTimer = memo(function CountdownTimer({ expiresAt }) {
   // Цветовое кодирование и пульсация
   const isUrgent = timeLeft.totalHours < 1; // <1 час - красный + пульсация
   const isWarning = timeLeft.totalHours >= 1 && timeLeft.totalHours < 3; // 1-3 часа - красный
-  const isNormal = timeLeft.totalHours >= 3; // >3 часа - оранжевый
+  // Note: isNormal = timeLeft.totalHours >= 3 (>3 часа - оранжевый)
 
   let colorClass = 'text-orange-500';
   if (isWarning || isUrgent) {

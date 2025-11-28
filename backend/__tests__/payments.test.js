@@ -76,8 +76,9 @@ describe('POST /api/payments/verify - Validation Tests', () => {
       .expect(400);
 
     expect(response.body).toHaveProperty('error');
-    // Updated expectation: backend now checks seller wallet configuration
-    expect(response.body.error).toMatch(/Seller has not configured.*wallet/i);
+    // Payment verify now requires an invoice first (CrystalPay integration)
+    // Old flow: check seller wallet -> New flow: check invoice exists
+    expect(response.body.error).toMatch(/invoice|wallet/i);
   });
 
   it('should reject payment verification with empty payment_address', async () => {

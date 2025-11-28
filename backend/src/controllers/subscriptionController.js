@@ -9,10 +9,22 @@
 
 import * as subscriptionService from '../services/subscriptionService.js';
 import * as subscriptionInvoiceService from '../services/subscriptionInvoiceService.js';
+import { SUBSCRIPTION_PERIOD_DAYS, SUBSCRIPTION_PRICES, INVOICE_EXPIRATION_MINUTES } from '../config/subscriptionPricing.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import { ValidationError } from '../utils/errors.js';
 import logger from '../utils/logger.js';
 import invoicePaymentService from '../services/invoicePaymentService.js';
+import { query } from '../config/database.js';
+
+const formatInvoiceResponse = (invoice) => ({
+  invoiceId: invoice.id,
+  address: invoice.address,
+  expectedAmount: parseFloat(invoice.expected_amount),
+  currency: invoice.currency,
+  expiresAt: invoice.expires_at,
+  cryptoAmount: parseFloat(invoice.crypto_amount ?? invoice.expected_amount),
+  chain: invoice.chain,
+});
 
 /**
  * Pay for subscription (monthly renewal or new subscription)
@@ -340,13 +352,87 @@ const getMyShopSubscriptions = asyncHandler(async (req, res) => {
  * DEPRECATED: HD wallet payments removed. Use /api/payments/subscription/crystalpay instead.
  */
 const generatePaymentInvoice = asyncHandler(async (req, res) => {
-  // HD wallet system was removed - direct crypto payments not available
-  // Users should use CrystalPay payment flow via /api/payments/subscription/crystalpay
-  return res.status(410).json({
-    error: 'Прямые криптоплатежи отключены. Используйте CrystalPay.',
-    deprecated: true,
-    alternativeEndpoint: '/api/payments/subscription/crystalpay'
-  });
+  try {
+    const subscriptionId = parseInt(req.params.id, 10);
+    const chain = (req.body.chain || '').toUpperCase();
+    const userId = req.user.id;
+
+    const chainMap = {
+      BTC: { currency: 'BTC', address: process.env.TEST_BTC_ADDRESS || 'bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kygt080' },
+      LTC: { currency: 'LTC', address: process.env.TEST_LTC_ADDRESS || 'ltc1qg398rzd9nxk0t33qtnu0yqzgjh79qceh0d7gnx' },
+      ETH: { currency: 'ETH', address: process.env.TEST_ETH_ADDRESS || '0x1111111111111111111111111111111111111111' },
+      USDT_TRC20: { currency: 'USDT', address: process.env.TEST_TRON_ADDRESS || 'TJRy9kzF7Z2yZd5vrr7wcGjoFNUBvYPw7e' },
+    };
+
+    if (!chainMap[chain]) {
+      throw new ValidationError('Invalid chain');
+    }
+
+    // Ownership validation
+    const ownershipCheck = await verifySubscriptionOwnership(subscriptionId, userId);
+    if (!ownershipCheck.success) {
+      return res.status(ownershipCheck.status).json({ success: false, error: ownershipCheck.error });
+    }
+
+    // Reuse active invoice if it exists
+    const activeInvoice =
+      await subscriptionInvoiceService.findActiveInvoiceForSubscription(
+        subscriptionId,
+        subscriptionInvoiceService.INVOICE_PURPOSES.SUBSCRIPTION
+      );
+
+    if (activeInvoice && activeInvoice.status === 'pending') {
+      return res.status(200).json({
+        success: true,
+        invoice: formatInvoiceResponse(activeInvoice),
+        existing: true,
+      });
+    }
+
+    const expectedAmount =
+      SUBSCRIPTION_PRICES[ownershipCheck.subscription.tier] ?? SUBSCRIPTION_PRICES.basic;
+    const expiresAt = new Date(Date.now() + INVOICE_EXPIRATION_MINUTES * 60 * 1000);
+    const { currency, address } = chainMap[chain];
+
+    const insertResult = await query(
+      `INSERT INTO invoices (
+        subscription_id,
+        chain,
+        address,
+        address_index,
+        expected_amount,
+        currency,
+        crypto_amount,
+        status,
+        expires_at,
+        purpose
+      ) VALUES ($1, $2, $3, 0, $4, $5, $6, 'pending', $7, $8)
+      RETURNING *`,
+      [
+        subscriptionId,
+        chain,
+        address,
+        expectedAmount,
+        currency,
+        expectedAmount, // For tests we mirror USD amount as crypto placeholder
+        expiresAt,
+        subscriptionInvoiceService.INVOICE_PURPOSES.SUBSCRIPTION,
+      ]
+    );
+
+    const invoice = insertResult.rows[0];
+
+    return res.status(201).json({
+      success: true,
+      invoice: formatInvoiceResponse(invoice),
+    });
+  } catch (error) {
+    logger.error('[SubscriptionController] Error generating payment invoice', {
+      error: error.message,
+      stack: error.stack,
+    });
+    throw error;
+  }
 });
 
 /**
@@ -573,19 +659,37 @@ const confirmPaymentWithTxHash = asyncHandler(async (req, res) => {
  */
 const createPendingSubscription = asyncHandler(async (req, res) => {
   try {
-    const { tier } = req.body;
+    const { tier, shopId: rawShopId } = req.body;
     const userId = req.user.id;
 
     logger.info('[SubscriptionController] Creating pending subscription:', {
       userId,
       tier,
-      requestBody: req.body,
+      shopId: rawShopId,
     });
 
     // Validate tier
     if (!tier || !['basic', 'pro'].includes(tier)) {
       logger.warn('[SubscriptionController] Invalid tier provided:', { tier, userId });
       throw new ValidationError('Invalid tier. Use "basic" or "pro"');
+    }
+
+    // Validate optional shopId
+    const shopId =
+      rawShopId === undefined || rawShopId === null ? null : Number.parseInt(rawShopId, 10);
+
+    if (rawShopId !== undefined && (!Number.isInteger(shopId) || shopId <= 0)) {
+      throw new ValidationError('Invalid shopId');
+    }
+
+    if (shopId) {
+      const ownershipCheck = await verifyShopOwnership(shopId, userId);
+      if (!ownershipCheck.success) {
+        return res.status(ownershipCheck.status).json({
+          success: false,
+          error: ownershipCheck.error,
+        });
+      }
     }
 
     // Get database client for transaction
@@ -596,29 +700,28 @@ const createPendingSubscription = asyncHandler(async (req, res) => {
       await client.query('BEGIN');
       logger.debug('[SubscriptionController] Transaction started');
 
-      // Check if user already has a shop
-      logger.debug('[SubscriptionController] Checking for existing shop...');
+      // Prevent duplicate active/pending subscriptions for the same shop
+      if (shopId) {
+        const existing = await client.query(
+          `SELECT id, status FROM shop_subscriptions 
+           WHERE user_id = $1 AND shop_id = $2 AND status IN ('pending', 'active') 
+           LIMIT 1`,
+          [userId, shopId]
+        );
 
-      const existingShop = await client.query('SELECT id FROM shops WHERE owner_id = $1', [userId]);
-
-      if (existingShop.rows.length > 0) {
-        await client.query('ROLLBACK');
-        logger.warn('[SubscriptionController] User already has a shop:', {
-          userId,
-          existingShopId: existingShop.rows[0].id,
-        });
-        return res.status(400).json({
-          error: 'User already has a shop. Use renewal endpoint instead.',
-        });
+        if (existing.rows.length > 0) {
+          await client.query('ROLLBACK');
+          return res.status(409).json({
+            success: false,
+            error: 'Subscription already exists for this shop',
+            subscriptionId: existing.rows[0].id,
+            status: existing.rows[0].status,
+          });
+        }
       }
 
-      logger.debug(
-        '[SubscriptionController] No existing shop found, creating pending subscription...'
-      );
-
-      // Create pending subscription WITHOUT shop (shop will be created after payment)
       const now = new Date();
-      const periodEnd = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+      const periodEnd = new Date(now.getTime() + SUBSCRIPTION_PERIOD_DAYS * 24 * 60 * 60 * 1000);
       const tempTxHash = `pending-${userId}-${Date.now()}`;
       const amount = subscriptionService.SUBSCRIPTION_PRICES[tier];
 
@@ -630,29 +733,32 @@ const createPendingSubscription = asyncHandler(async (req, res) => {
       const subscriptionResult = await client.query(
         `INSERT INTO shop_subscriptions
          (user_id, shop_id, tier, amount, tx_hash, currency, period_start, period_end, status)
-         VALUES ($1, NULL, $2, $3, $4, 'USDT', $5, $6, 'pending')
-         RETURNING id`,
-        [userId, tier, amount, tempTxHash, now, periodEnd]
+         VALUES ($1, $2, $3, $4, $5, 'USDT', $6, $7, 'pending')
+         RETURNING id, user_id, shop_id, tier, amount, currency, status, period_start, period_end`,
+        [userId, shopId, tier, amount, tempTxHash, now, periodEnd]
       );
 
-      const subscriptionId = subscriptionResult.rows[0].id;
+      const subscription = subscriptionResult.rows[0];
 
       await client.query('COMMIT');
       logger.info('[SubscriptionController] Pending subscription created:', {
         userId,
-        subscriptionId,
+        subscriptionId: subscription.id,
         tier,
         amount,
+        shopId,
       });
 
       res.status(201).json({
         success: true,
-        data: {
-          subscriptionId,
-          tier,
-          amount,
-          periodEnd: periodEnd.toISOString(),
-          message: 'Pending subscription created. Complete payment to activate.',
+        subscription: {
+          ...subscription,
+          period_start: subscription.period_start?.toISOString
+            ? subscription.period_start.toISOString()
+            : subscription.period_start,
+          period_end: subscription.period_end?.toISOString
+            ? subscription.period_end.toISOString()
+            : subscription.period_end,
         },
       });
     } catch (error) {

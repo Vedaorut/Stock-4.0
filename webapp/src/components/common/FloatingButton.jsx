@@ -15,7 +15,7 @@ const FloatingButton = memo(function FloatingButton({
     </svg>
   );
 
-  const IconComponent = Icon || DefaultIcon;
+  const ButtonIcon = Icon || DefaultIcon;
 
   return (
     <motion.button
@@ -33,7 +33,7 @@ const FloatingButton = memo(function FloatingButton({
       animate={{ scale: 1, opacity: 1 }}
       transition={{ type: 'spring', stiffness: 260, damping: 20 }}
     >
-      <IconComponent className="w-6 h-6 text-white" />
+      <ButtonIcon className="w-6 h-6 text-white" />
     </motion.button>
   );
 });

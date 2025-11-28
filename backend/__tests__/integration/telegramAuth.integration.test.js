@@ -258,9 +258,17 @@ describe('POST /api/auth/telegram-validate - Integration', () => {
     });
 
     it('should handle Cyrillic names correctly', async () => {
+      const pool = getTestPool();
+
+      // Use unique telegram_id for this test to avoid conflicts
+      const telegramId = 9000777777 + Date.now() % 100000;
+
+      // Cleanup any existing user first
+      await pool.query('DELETE FROM users WHERE telegram_id = $1', [telegramId]);
+
       const user = {
-        id: 999999999,
-        username: 'ivan',
+        id: telegramId,
+        username: 'ivan_cyrillic',
         first_name: 'Иван',
         last_name: 'Петров',
       };
@@ -276,8 +284,7 @@ describe('POST /api/auth/telegram-validate - Integration', () => {
       expect(response.body.user.last_name).toBe('Петров');
 
       // Cleanup
-      const pool = getTestPool();
-      await pool.query('DELETE FROM users WHERE telegram_id = 999999999');
+      await pool.query('DELETE FROM users WHERE telegram_id = $1', [telegramId]);
     });
   });
 });

@@ -22,7 +22,14 @@ export const shopQueries = {
 
   // Create new shop
   create: async (shopData) => {
-    const { ownerId, name, description, logo, tier = 'basic' } = shopData;
+    const ownerId = shopData.ownerId ?? shopData.owner_id;
+    const tier = shopData.tier ?? shopData.subscription_tier ?? 'basic';
+    const { name, description = null, logo = null } = shopData;
+
+    if (!ownerId) {
+      throw new Error('ownerId is required to create a shop');
+    }
+
     const result = await query(
       `INSERT INTO shops (owner_id, name, description, logo, tier)
        VALUES ($1, $2, $3, $4, $5)

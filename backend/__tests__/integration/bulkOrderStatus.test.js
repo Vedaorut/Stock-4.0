@@ -17,31 +17,49 @@ describe('POST /api/orders/bulk-status', () => {
   let orderIds;
   let testUserToken;
   let otherUserToken;
+  let testTelegramId1;
+  let testTelegramId2;
 
   beforeAll(async () => {
     client = await getClient();
 
+    // Generate unique identifiers for this test run (test range: 9000000000+)
+    const uniqueSuffix = Date.now() % 1000000;
+    testTelegramId1 = 9000888001 + uniqueSuffix;
+    testTelegramId2 = 9000888002 + uniqueSuffix;
+    const shopName = `bulktest_shop_${uniqueSuffix}`;
+
+    // Clean up any existing test data (both old hardcoded and new dynamic)
+    // First delete dependent data, then parent data
+    await client.query(`DELETE FROM orders WHERE product_id IN (SELECT id FROM products WHERE shop_id IN (SELECT id FROM shops WHERE name LIKE 'bulktest_shop%'))`);
+    await client.query(`DELETE FROM products WHERE shop_id IN (SELECT id FROM shops WHERE name LIKE 'bulktest_shop%')`);
+    await client.query(`DELETE FROM shops WHERE name LIKE 'bulktest_shop%'`);
+    await client.query('DELETE FROM users WHERE telegram_id IN ($1, $2)', [testTelegramId1, testTelegramId2]);
+    await client.query(`DELETE FROM users WHERE username IN ('bulktest_seller', 'bulktest_buyer')`);
+
     // Create test users
     const user1 = await client.query(
       `INSERT INTO users (telegram_id, username, first_name, last_name)
-       VALUES (888001, 'bulktest_seller', 'Bulk', 'Seller')
-       RETURNING id`
+       VALUES ($1, 'bulktest_seller', 'Bulk', 'Seller')
+       RETURNING id`,
+      [testTelegramId1]
     );
     testUserId = user1.rows[0].id;
 
     const user2 = await client.query(
       `INSERT INTO users (telegram_id, username, first_name, last_name)
-       VALUES (888002, 'bulktest_buyer', 'Bulk', 'Buyer')
-       RETURNING id`
+       VALUES ($1, 'bulktest_buyer', 'Bulk', 'Buyer')
+       RETURNING id`,
+      [testTelegramId2]
     );
     otherUserId = user2.rows[0].id;
 
-    // Create test shop
+    // Create test shop with unique name
     const shop = await client.query(
       `INSERT INTO shops (owner_id, name, description, registration_paid)
-       VALUES ($1, 'bulktest_shop', 'Test shop for bulk operations', true)
+       VALUES ($1, $2, 'Test shop for bulk operations', true)
        RETURNING id`,
-      [testUserId]
+      [testUserId, shopName]
     );
     shopId = shop.rows[0].id;
 
@@ -80,13 +98,13 @@ describe('POST /api/orders/bulk-status', () => {
 
     // Generate real JWT tokens
     testUserToken = jwt.sign(
-      { id: testUserId, telegramId: 888001, username: 'bulktest_seller' },
+      { id: testUserId, telegramId: testTelegramId1, username: 'bulktest_seller' },
       config.jwt.secret,
       { expiresIn: config.jwt.expiresIn }
     );
 
     otherUserToken = jwt.sign(
-      { id: otherUserId, telegramId: 888002, username: 'bulktest_buyer' },
+      { id: otherUserId, telegramId: testTelegramId2, username: 'bulktest_buyer' },
       config.jwt.secret,
       { expiresIn: config.jwt.expiresIn }
     );
@@ -234,13 +252,20 @@ describe('POST /api/orders/bulk-status', () => {
   });
 
   describe('Successful bulk update', () => {
+    // Reset order statuses to 'pending' before each test in this section
+    // because previous tests may have changed them to terminal states
+    beforeEach(async () => {
+      await client.query(`UPDATE orders SET status = 'pending' WHERE id = ANY($1::int[])`, [orderIds]);
+    });
+
     test('should successfully update multiple orders status', async () => {
+      // State machine: pending -> confirmed (valid transition)
       const response = await request(app)
         .post('/api/orders/bulk-status')
         .set('Authorization', `Bearer ${testUserToken}`)
         .send({
           order_ids: orderIds,
-          status: 'shipped',
+          status: 'confirmed',
         });
 
       expect(response.status).toBe(200);
@@ -253,7 +278,7 @@ describe('POST /api/orders/bulk-status', () => {
       // Verify each order in response
       response.body.data.orders.forEach((order) => {
         expect(order).toHaveProperty('id');
-        expect(order).toHaveProperty('status', 'shipped');
+        expect(order).toHaveProperty('status', 'confirmed');
         expect(order).toHaveProperty('product_name', 'Test Product');
         expect(order).toHaveProperty('buyer_username', 'bulktest_buyer');
         expect(order).toHaveProperty('quantity');
@@ -263,13 +288,13 @@ describe('POST /api/orders/bulk-status', () => {
     });
 
     test('should update database records', async () => {
-      // Update to delivered
+      // State machine: pending -> confirmed (valid transition)
       await request(app)
         .post('/api/orders/bulk-status')
         .set('Authorization', `Bearer ${testUserToken}`)
         .send({
           order_ids: orderIds,
-          status: 'delivered',
+          status: 'confirmed',
         });
 
       // Verify in database
@@ -279,7 +304,7 @@ describe('POST /api/orders/bulk-status', () => {
 
       expect(result.rows).toHaveLength(orderIds.length);
       result.rows.forEach((row) => {
-        expect(row.status).toBe('delivered');
+        expect(row.status).toBe('confirmed');
       });
     });
 
@@ -301,12 +326,13 @@ describe('POST /api/orders/bulk-status', () => {
     });
 
     test('should handle single order', async () => {
+      // State machine: pending -> confirmed (valid transition)
       const response = await request(app)
         .post('/api/orders/bulk-status')
         .set('Authorization', `Bearer ${testUserToken}`)
         .send({
           order_ids: [orderIds[0]],
-          status: 'pending',
+          status: 'confirmed',
         });
 
       expect(response.status).toBe(200);

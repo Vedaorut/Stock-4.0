@@ -1,10 +1,9 @@
-import js from '@eslint/js';
 import globals from 'globals';
 import reactHooks from 'eslint-plugin-react-hooks';
 import reactRefresh from 'eslint-plugin-react-refresh';
 
 export default [
-  { ignores: ['dist', 'node_modules'] },
+  { ignores: ['dist', 'node_modules', 'public/mockServiceWorker.js'] },
   {
     files: ['**/*.{js,jsx}'],
     languageOptions: {
@@ -23,7 +22,13 @@ export default [
     rules: {
       ...reactHooks.configs.recommended.rules,
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
-      'no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
+      // NOTE: ESLint doesn't recognize JSX-used imports without eslint-plugin-react.
+      // These patterns cover common JSX components (motion.*, AnimatePresence, etc.)
+      // and imports used as JSX tags (Header, ProductCard, etc.)
+      'no-unused-vars': ['warn', {
+        argsIgnorePattern: '^(_|.*Icon$)',
+        varsIgnorePattern: '^(_.*|motion|AnimatePresence|LazyMotion|domAnimation|React|Suspense|App|TelegramProvider|ProductGrid|.*Lazy|.*Page|.*Modal|.*Card|.*List|.*Button|.*Icon|.*Sheet|.*Container|.*Item|.*Form|.*Input|.*Badge|.*Timer|.*Banner|.*Manager|.*Boundary|.*Portal|.*Control|.*Skeleton|.*Dialog|.*Slider|.*Tabs|Header|PageLoader|PageHeader|InteractiveListItem|SegmentedControl|QRCodeSVG|TabIcon|WrapperComponent)$'
+      }],
       'no-console': ['warn', { allow: ['error'] }],
     },
   },

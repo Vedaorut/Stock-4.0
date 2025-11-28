@@ -608,7 +608,7 @@ describe('E2E: Crypto Payment Flow', () => {
         .set('Authorization', `Bearer ${authToken}`);
 
       expect(statusResponse.status).toBe(404);
-      expect(statusResponse.body.error).toContain('No active invoice');
+      expect(statusResponse.body.error).toContain('No active payment invoice');
     });
 
     it('should find invoice immediately after creation (timezone fix verification)', async () => {

@@ -1,20 +1,19 @@
 import { useState, useMemo, lazy, Suspense } from 'react';
-import { motion } from 'framer-motion';
+import { motion } from 'framer-motion'; // Used in JSX
 import Header from '../components/Layout/Header';
 import { useTelegram } from '../hooks/useTelegram';
 import { useTranslation } from '../i18n/useTranslation';
-import { useStore } from '../store/useStore';
 import InteractiveListItem from '../components/common/InteractiveListItem';
 
 // Lazy load modals - only load when user opens them
-const WalletsModal = lazy(() => import('../components/Settings/WalletsModal'));
-const LanguageModal = lazy(() => import('../components/Settings/LanguageModal'));
-const ProductsModal = lazy(() => import('../components/Settings/ProductsModal'));
-const SubscriptionModal = lazy(() => import('../components/Settings/SubscriptionModal'));
-const WorkspaceModal = lazy(() => import('../components/Settings/WorkspaceModal'));
-const FollowsModal = lazy(() => import('../components/Settings/FollowsModal'));
-const AnalyticsModal = lazy(() => import('../components/Settings/AnalyticsModal'));
-const MigrationModal = lazy(() => import('../components/Settings/MigrationModal'));
+const WalletsModalLazy = lazy(() => import('../components/Settings/WalletsModal'));
+const LanguageModalLazy = lazy(() => import('../components/Settings/LanguageModal'));
+const ProductsModalLazy = lazy(() => import('../components/Settings/ProductsModal'));
+const SubscriptionModalLazy = lazy(() => import('../components/Settings/SubscriptionModal'));
+const WorkspaceModalLazy = lazy(() => import('../components/Settings/WorkspaceModal'));
+const FollowsModalLazy = lazy(() => import('../components/Settings/FollowsModal'));
+const AnalyticsModalLazy = lazy(() => import('../components/Settings/AnalyticsModal'));
+const MigrationModalLazy = lazy(() => import('../components/Settings/MigrationModal'));
 
 const getSettingsSections = (t, lang) => {
   const languageNames = { ru: 'Русский', en: 'English' };
@@ -159,7 +158,6 @@ const getSettingsSections = (t, lang) => {
 export default function Settings() {
   const { user, triggerHaptic } = useTelegram();
   const { t, lang } = useTranslation();
-  const setActiveTab = useStore((state) => state.setActiveTab);
   const [showWallets, setShowWallets] = useState(false);
   const [showLanguage, setShowLanguage] = useState(false);
   const [showProducts, setShowProducts] = useState(false);
@@ -308,24 +306,24 @@ export default function Settings() {
       {/* Modals - wrapped in Suspense for lazy loading */}
       <Suspense fallback={null}>
         {showAnalytics && (
-          <AnalyticsModal isOpen={showAnalytics} onClose={() => setShowAnalytics(false)} />
+          <AnalyticsModalLazy isOpen={showAnalytics} onClose={() => setShowAnalytics(false)} />
         )}
         {showProducts && (
-          <ProductsModal isOpen={showProducts} onClose={() => setShowProducts(false)} />
+          <ProductsModalLazy isOpen={showProducts} onClose={() => setShowProducts(false)} />
         )}
         {showSubscription && (
-          <SubscriptionModal isOpen={showSubscription} onClose={() => setShowSubscription(false)} />
+          <SubscriptionModalLazy isOpen={showSubscription} onClose={() => setShowSubscription(false)} />
         )}
         {showWorkspace && (
-          <WorkspaceModal isOpen={showWorkspace} onClose={() => setShowWorkspace(false)} />
+          <WorkspaceModalLazy isOpen={showWorkspace} onClose={() => setShowWorkspace(false)} />
         )}
-        {showFollows && <FollowsModal isOpen={showFollows} onClose={() => setShowFollows(false)} />}
-        {showWallets && <WalletsModal isOpen={showWallets} onClose={() => setShowWallets(false)} />}
+        {showFollows && <FollowsModalLazy isOpen={showFollows} onClose={() => setShowFollows(false)} />}
+        {showWallets && <WalletsModalLazy isOpen={showWallets} onClose={() => setShowWallets(false)} />}
         {showLanguage && (
-          <LanguageModal isOpen={showLanguage} onClose={() => setShowLanguage(false)} />
+          <LanguageModalLazy isOpen={showLanguage} onClose={() => setShowLanguage(false)} />
         )}
         {showMigration && (
-          <MigrationModal isOpen={showMigration} onClose={() => setShowMigration(false)} />
+          <MigrationModalLazy isOpen={showMigration} onClose={() => setShowMigration(false)} />
         )}
       </Suspense>
     </div>

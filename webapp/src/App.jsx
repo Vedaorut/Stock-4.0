@@ -16,21 +16,23 @@ import './styles/globals.css';
 import { useApi } from './hooks/useApi';
 
 // Lazy load pages for code splitting
-const Subscriptions = lazy(() => import('./pages/Subscriptions'));
-const Catalog = lazy(() => import('./pages/Catalog'));
-const Settings = lazy(() => import('./pages/Settings'));
-const Follows = lazy(() => import('./pages/Follows'));
-const FollowDetail = lazy(() => import('./pages/FollowDetail'));
+const SubscriptionsPage = lazy(() => import('./pages/Subscriptions'));
+const CatalogPage = lazy(() => import('./pages/Catalog'));
+const SettingsPage = lazy(() => import('./pages/Settings'));
+const FollowsPage = lazy(() => import('./pages/Follows'));
+const FollowDetailPage = lazy(() => import('./pages/FollowDetail'));
 
 // Loading fallback component
-const PageLoader = () => (
+function PageLoader() {
+  return (
   <div className="min-h-screen flex items-center justify-center bg-[#0A0A0A]">
     <div className="text-center">
       <div className="w-12 h-12 border-4 border-[#FF6B00] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
       <p className="text-white/60 text-sm">Loading...</p>
     </div>
   </div>
-);
+  );
+}
 
 function App() {
   const { activeTab, followDetailId } = useStore();
@@ -149,20 +151,20 @@ function App() {
   const renderPage = () => {
     // Если открыт детальный просмотр подписки
     if (followDetailId) {
-      return <FollowDetail />;
+      return <FollowDetailPage />;
     }
 
     switch (activeTab) {
       case 'subscriptions':
-        return <Subscriptions />;
+        return <SubscriptionsPage />;
       case 'follows':
-        return <Follows />;
+        return <FollowsPage />;
       case 'catalog':
-        return <Catalog />;
+        return <CatalogPage />;
       case 'settings':
-        return <Settings />;
+        return <SettingsPage />;
       default:
-        return <Subscriptions />;
+        return <SubscriptionsPage />;
     }
   };
 

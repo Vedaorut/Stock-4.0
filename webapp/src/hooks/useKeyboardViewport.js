@@ -39,7 +39,7 @@ export function useKeyboardViewport() {
           try {
             const input = typeof candidate === 'function' ? candidate() : candidate;
             return toNumber(input);
-          } catch (err) {
+          } catch {
             return null;
           }
         })

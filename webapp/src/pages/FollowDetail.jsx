@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useState, useEffect, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion'; // Used in JSX
 import { ChevronLeftIcon, EyeIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
 import { useStore } from '../store/useStore';
 import { useFollowsApi } from '../hooks/useApi';
@@ -275,7 +275,7 @@ const FollowDetail = () => {
   }
 
   const modeLabel = currentFollow.mode === 'monitor' ? 'Мониторинг' : 'Перепродажа';
-  const ModeIcon = currentFollow.mode === 'monitor' ? EyeIcon : ArrowPathIcon;
+  const CurrentModeIcon = currentFollow.mode === 'monitor' ? EyeIcon : ArrowPathIcon;
   const productsCount =
     currentFollow.mode === 'resell'
       ? currentFollow.synced_products_count || 0
@@ -320,7 +320,7 @@ const FollowDetail = () => {
         {/* Stats Row */}
         <div className="px-4 pb-3 flex items-center gap-4 text-sm">
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5">
-            <ModeIcon className="w-4 h-4 text-gray-400" />
+            <CurrentModeIcon className="w-4 h-4 text-gray-400" />
             <span className="text-white font-medium">{modeLabel}</span>
           </div>
 

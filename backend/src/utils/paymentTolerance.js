@@ -18,7 +18,7 @@ import logger from './logger.js';
 export const TOLERANCE_BOUNDS = {
   MIN_TOLERANCE: 0.0001, // 0.01% minimum
   MAX_TOLERANCE: 1.0, // 1.0% maximum  
-  DEFAULT_TOLERANCE: 0.01, // 1% to accommodate network fees (previously 0.5%)
+  DEFAULT_TOLERANCE: 0.005, // 0.5% (symmetric for over/under payments)
 };
 
 /**
@@ -138,28 +138,23 @@ export function amountsMatchWithTolerance(
   // Clamp tolerance to valid bounds
   const clampedTolerance = clampTolerance(tolerance, context);
 
-  // CRITICAL: Always accept overpayment in crypto (actual >= expected)
-  if (actual >= expected) {
-    return true;
-  }
-
-  // For underpayment: check if within tolerance
-  const toleranceAmount = expected * clampedTolerance;
-  const shortfall = expected - actual; // How much less than expected
+  // Symmetric tolerance check (reject significant over/under payments)
+  const toleranceAmount = Math.abs(expected) * clampedTolerance;
+  const diff = Math.abs(actual - expected);
 
   // Use epsilon for floating point comparison to avoid precision issues
   const epsilon = 1e-10;
-  const matches = shortfall <= toleranceAmount + epsilon;
+  const matches = diff <= toleranceAmount + epsilon;
 
   if (!matches) {
     logger.warn(`[PaymentTolerance] Amount mismatch in ${context}`, {
       expected,
       actual,
-      shortfall: shortfall.toFixed(8),
+      diff: diff.toFixed(8),
       tolerance: clampedTolerance,
       toleranceAmount: toleranceAmount.toFixed(8),
       percentage: `${(clampedTolerance * 100).toFixed(4)}%`,
-      exceedsToleranceBy: (shortfall - toleranceAmount).toFixed(8),
+      exceedsToleranceBy: (diff - toleranceAmount).toFixed(8),
     });
   }
 
@@ -183,15 +178,16 @@ export function toleranceToPercentage(tolerance) {
  * @returns {object} - Info object for logging
  */
 export function getToleranceInfo(tolerance) {
-  const clamped = clampTolerance(tolerance);
+  const provided = tolerance ?? TOLERANCE_BOUNDS.DEFAULT_TOLERANCE;
+  const clamped = clampTolerance(provided);
   const { MIN_TOLERANCE, MAX_TOLERANCE } = TOLERANCE_BOUNDS;
 
   return {
-    provided: tolerance,
+    provided,
     clamped,
     percentage: toleranceToPercentage(clamped),
-    isDefault: tolerance === TOLERANCE_BOUNDS.DEFAULT_TOLERANCE,
-    isClamped: clamped !== tolerance,
+    isDefault: provided === TOLERANCE_BOUNDS.DEFAULT_TOLERANCE,
+    isClamped: clamped !== provided,
     bounds: {
       min: toleranceToPercentage(MIN_TOLERANCE),
       max: toleranceToPercentage(MAX_TOLERANCE),

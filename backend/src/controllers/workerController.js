@@ -188,7 +188,7 @@ export const workerController = {
       // Verify worker exists and belongs to this shop
       const worker = await workerQueries.findById(workerId);
       if (!worker || worker.shop_id !== parseInt(shopId)) {
-        throw new NotFoundError('Worker not found in this shop');
+        throw new NotFoundError('Worker in this shop');
       }
 
       // Remove worker

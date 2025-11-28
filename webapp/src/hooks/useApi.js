@@ -61,7 +61,7 @@ export function useApi() {
           const response = await makeRequest(currentToken);
           return { data: response.data, error: null };
         } catch (err) {
-          console.error(`API ${method} ${endpoint} error:`, err);
+          if (import.meta.env.DEV) console.error(`API ${method} ${endpoint} error:`, err);
 
           // Handle axios native timeout
           if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
@@ -75,11 +75,10 @@ export function useApi() {
 
           // Handle 401 Unauthorized - attempt token refresh and retry ONCE
           if (err.response?.status === 401 && !isRetry && isTokenRefreshInitialized()) {
-            console.log('[useApi] 401 received, attempting token refresh...');
+            // Token refresh flow (debug via browser devtools)
 
             try {
               await refreshAuthToken();
-              console.log('[useApi] Token refreshed successfully, retrying request...');
 
               // Get fresh token after refresh
               const newToken = tokenGetter();

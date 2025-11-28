@@ -31,7 +31,6 @@ export default defineConfig({
           'react-vendor': ['react', 'react-dom'],
           animation: ['framer-motion'],
           state: ['zustand'],
-          telegram: ['@telegram-apps/sdk'],
           // QR code now lazy-loaded, remove from vendor chunk
         },
       },

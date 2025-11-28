@@ -222,7 +222,7 @@ export const createTestOrder = async (buyerId, productId, shopId, orderData = {}
     `INSERT INTO orders (buyer_id, product_id, quantity, total_price, currency, status)
      VALUES ($1, $2, $3, $4, $5, $6)
      RETURNING id, buyer_id, product_id, quantity, total_price, currency,
-               delivery_address, payment_hash, payment_address, status,
+               delivery_address, status,
                created_at, updated_at, paid_at, completed_at`,
     [
       order.buyer_id,

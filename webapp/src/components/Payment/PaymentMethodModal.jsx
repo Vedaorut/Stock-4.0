@@ -1,7 +1,6 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useEffect, useMemo } from 'react';
 import { useStore } from '../../store/useStore';
-import { useToastStore } from '../../hooks/useToast';
 import { useTelegram } from '../../hooks/useTelegram';
 import { useTranslation } from '../../i18n/useTranslation';
 import { useApi } from '../../hooks/useApi';
@@ -22,7 +21,7 @@ export default function PaymentMethodModal() {
     selectCrypto,
     setPaymentStep,
     currentShop,
-    selectedCrypto,
+    selectedCrypto: _selectedCrypto, // Reserved for multi-currency display
     isGeneratingInvoice,
   } = useStore();
   const { triggerHaptic } = useTelegram();

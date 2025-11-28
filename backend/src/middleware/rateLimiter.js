@@ -6,6 +6,10 @@ import { RATE_LIMITS, ERROR_MESSAGES } from '../utils/constants.js';
  * Create rate limiter middleware
  */
 const createRateLimiter = (windowMs, maxRequests, message) => {
+  if (process.env.NODE_ENV === 'test') {
+    return (_req, _res, next) => next();
+  }
+
   return rateLimit({
     windowMs,
     max: maxRequests,

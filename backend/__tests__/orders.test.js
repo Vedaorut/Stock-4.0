@@ -71,11 +71,12 @@ describe('POST /api/orders', () => {
     expect(response.body.data.quantity).toBe(3);
     expect(response.body.data.status).toBe('pending');
 
-    // Verify stock was reserved (not decreased)
-    // After migration 009: stock_quantity stays same, reserved_quantity increases
+    // Verify stock was NOT reserved at order creation
+    // After business logic change: stock reservation happens on payment confirmation, not order creation
+    // This is first-come-first-served on payment (see orderService.js comment)
     const updatedProduct = await getProductById(product.id);
     expect(updatedProduct.stock_quantity).toBe(10); // Stock unchanged
-    expect(updatedProduct.reserved_quantity).toBe(3); // Reserved quantity = order quantity
+    expect(updatedProduct.reserved_quantity).toBe(0); // No reservation at order creation
   });
 
   it('should reject order with insufficient stock', async () => {
@@ -122,8 +123,10 @@ describe('POST /api/orders', () => {
     expect(unchangedProduct.stock_quantity).toBe(2); // Still 2
   });
 
-  it('should prevent race condition (overselling)', async () => {
-    // This test verifies P0-2 fix: Race Condition in Orders
+  it('should allow concurrent orders (stock check at payment)', async () => {
+    // After business logic change: stock reservation happens on payment confirmation
+    // Orders can be created even if total quantity exceeds stock
+    // This is first-come-first-served on PAYMENT, not order creation
 
     // Setup: Create seller, shop, product with limited stock
     const seller = await createTestUser({
@@ -162,7 +165,9 @@ describe('POST /api/orders', () => {
       { expiresIn: '7d' }
     );
 
-    // Simulate concurrent orders (both want to buy 3 items, total 6 > 5 available)
+    // Simulate concurrent orders (both want to buy 3 items)
+    // With current business logic, both should succeed at order creation
+    // Stock is only reserved/decremented at payment confirmation
     const order1Promise = request(app)
       .post('/api/orders')
       .set('Authorization', `Bearer ${token1}`)
@@ -187,17 +192,17 @@ describe('POST /api/orders', () => {
 
     // Count successful orders
     const successfulOrders = responses.filter((r) => r && r.status === 201);
-    const failedOrders = responses.filter((r) => r && r.status === 400);
 
-    // Verify: Only ONE order should succeed (race condition prevented)
-    // The transaction + FOR UPDATE lock ensures atomicity
-    expect(successfulOrders.length).toBe(1);
-    expect(failedOrders.length).toBe(1);
+    // Both orders should succeed - stock check happens at order creation
+    // but stock is NOT reserved. First-come-first-served is at payment time.
+    // Note: If stock < quantity, order still fails (checked in validateProductsForOrder)
+    // But both can succeed if each order individually has enough stock
+    expect(successfulOrders.length).toBe(2);
 
-    // Verify final stock (after migration 009: check reserved_quantity instead)
+    // Verify final stock - no reservation at order creation
     const finalProduct = await getProductById(product.id);
     expect(finalProduct.stock_quantity).toBe(5); // Stock unchanged
-    expect(finalProduct.reserved_quantity).toBe(3); // Only one order succeeded, reserved 3
+    expect(finalProduct.reserved_quantity).toBe(0); // No reservation at order creation
   });
 
   it('should reject order for zero quantity', async () => {
@@ -272,9 +277,10 @@ describe('POST /api/orders', () => {
         productId: 999999, // Non-existent
         quantity: 1,
       })
-      .expect(404);
+      .expect(400); // ValidationError returns 400 (not 404)
 
     expect(response.body).toHaveProperty('error');
+    expect(response.body.error).toMatch(/not found|locked/i);
   });
 
   it('should reject order without authentication', async () => {
@@ -391,21 +397,35 @@ describe('PUT /api/orders/:id/status', () => {
     const orderId = orderResponse.body.data.id;
 
     // Update order status (as seller)
+    // Note: Sellers can only update to: confirmed, shipped, cancelled
+    // State machine: pending -> confirmed -> shipped
     const sellerToken = jwt.sign(
       { id: seller.id, telegram_id: seller.telegram_id },
       process.env.JWT_SECRET,
       { expiresIn: '7d' }
     );
 
+    // First update: pending -> confirmed
     const updateResponse = await request(app)
       .put(`/api/orders/${orderId}/status`)
       .set('Authorization', `Bearer ${sellerToken}`)
       .send({
-        status: 'delivered',
+        status: 'confirmed',
       })
       .expect(200);
 
-    expect(updateResponse.body.data.status).toBe('delivered');
+    expect(updateResponse.body.data.status).toBe('confirmed');
+
+    // Second update: confirmed -> shipped
+    const shipResponse = await request(app)
+      .put(`/api/orders/${orderId}/status`)
+      .set('Authorization', `Bearer ${sellerToken}`)
+      .send({
+        status: 'shipped',
+      })
+      .expect(200);
+
+    expect(shipResponse.body.data.status).toBe('shipped');
   });
 
   it('should reject invalid status', async () => {
@@ -490,17 +510,29 @@ describe('GET /api/orders/analytics', () => {
       .send({ productId: product1.id, quantity: 1 })
       .expect(201);
 
-    // Mark two orders as completed
+    // Mark two orders as completed (via proper state transitions)
+    // Order 1: pending -> confirmed -> shipped (counts as "completed" in analytics)
     await request(app)
       .put(`/api/orders/${order1Response.body.data.id}/status`)
       .set('Authorization', `Bearer ${sellerToken}`)
       .send({ status: 'confirmed' })
       .expect(200);
+    await request(app)
+      .put(`/api/orders/${order1Response.body.data.id}/status`)
+      .set('Authorization', `Bearer ${sellerToken}`)
+      .send({ status: 'shipped' })
+      .expect(200);
 
+    // Order 2: pending -> confirmed -> shipped
     await request(app)
       .put(`/api/orders/${order2Response.body.data.id}/status`)
       .set('Authorization', `Bearer ${sellerToken}`)
-      .send({ status: 'delivered' })
+      .send({ status: 'confirmed' })
+      .expect(200);
+    await request(app)
+      .put(`/api/orders/${order2Response.body.data.id}/status`)
+      .set('Authorization', `Bearer ${sellerToken}`)
+      .send({ status: 'shipped' })
       .expect(200);
 
     // Leave order3 as pending

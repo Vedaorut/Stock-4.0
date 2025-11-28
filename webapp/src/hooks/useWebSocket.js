@@ -73,7 +73,7 @@ export const useWebSocket = () => {
           console.error('❌ WebSocket error:', error);
         };
 
-        ws.onclose = (event) => {
+        ws.onclose = (_event) => {
           setIsConnected(false);
           wsRef.current = null;
 
