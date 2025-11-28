@@ -3001,6 +3001,17 @@ async function handleBulkUpdatePrices(args, shopId, token, products) {
 
 export { saveToConversationHistory };
 
+// Export internal functions for testing
+export {
+  cleanDeepSeekTokens,
+  detectJSONInMessage,
+  parseDurationToMs,
+  formatDuration,
+  detectStockUpdateIntent,
+  detectSingleProductDiscountIntent,
+  getConversationHistory,
+};
+
 export default {
   processProductCommand,
   noteProductContext,
