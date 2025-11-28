@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ClockIcon } from '@heroicons/react/24/outline';
 import PageHeader from '../common/PageHeader';
@@ -19,6 +19,9 @@ export default function MigrationModal({ isOpen, onClose }) {
   const [migrationError, setMigrationError] = useState(null);
   const [countdown, setCountdown] = useState(null);
   const [channelError, setChannelError] = useState(null);
+
+  // AbortController ref for migrate operation
+  const migrateAbortControllerRef = useRef(null);
 
   /**
    * Parse and validate Telegram channel input
@@ -191,6 +194,21 @@ export default function MigrationModal({ isOpen, onClose }) {
     return () => controller.abort();
   }, [isOpen, checkEligibility]);
 
+  // Cleanup migrate request when modal closes or unmounts
+  useEffect(() => {
+    if (!isOpen && migrateAbortControllerRef.current) {
+      migrateAbortControllerRef.current.abort();
+      migrateAbortControllerRef.current = null;
+    }
+
+    return () => {
+      if (migrateAbortControllerRef.current) {
+        migrateAbortControllerRef.current.abort();
+        migrateAbortControllerRef.current = null;
+      }
+    };
+  }, [isOpen]);
+
   const handleNext = () => {
     triggerHaptic('light');
     setStep(step + 1);
@@ -214,16 +232,26 @@ export default function MigrationModal({ isOpen, onClose }) {
 
     if (!confirmed) return;
 
+    // Cancel previous migrate request if exists
+    if (migrateAbortControllerRef.current) {
+      migrateAbortControllerRef.current.abort();
+    }
+    migrateAbortControllerRef.current = new AbortController();
+
     setLoading(true);
 
     try {
-      const { data, error } = await post(`/shops/${shop.id}/migration`, {
+      const { data, error: postError } = await post(`/shops/${shop.id}/migration`, {
         newChannelUrl: cleaned, // Use cleaned value
         oldChannelUrl: shop.channel_url,
+        signal: migrateAbortControllerRef.current.signal,
       });
 
-      if (error) {
-        setMigrationError(error || 'Ошибка миграции');
+      // Check if aborted before updating state
+      if (migrateAbortControllerRef.current?.signal.aborted) return;
+
+      if (postError) {
+        setMigrationError(postError || 'Ошибка миграции');
         setLoading(false);
         return;
       }
@@ -250,6 +278,9 @@ export default function MigrationModal({ isOpen, onClose }) {
         });
       }, 1000);
     } catch (err) {
+      // Ignore AbortError - request was cancelled intentionally
+      if (err.name === 'AbortError') return;
+
       console.error('Migration failed:', err);
       setMigrationError('Ошибка миграции. Попробуйте позже.');
     } finally {

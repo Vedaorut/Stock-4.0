@@ -210,7 +210,7 @@ export default function AnalyticsModal({ isOpen, onClose }) {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           >
-            <PageHeader title="Статистика" onBack={handleClose} />
+            <PageHeader title="Статистика" onBack={handleClose} variant="close" />
             <div
               style={{ paddingTop: 'calc(env(safe-area-inset-top) + 56px)' }}
               className="px-4 py-8 text-center"
@@ -242,7 +242,7 @@ export default function AnalyticsModal({ isOpen, onClose }) {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           >
-            <PageHeader title="Статистика" onBack={handleClose} />
+            <PageHeader title="Статистика" onBack={handleClose} variant="close" />
 
             <div
               style={{

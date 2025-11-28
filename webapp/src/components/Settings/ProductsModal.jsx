@@ -203,6 +203,7 @@ export default function ProductsModal({ isOpen, onClose }) {
   const [aiError, setAiError] = useState(null);
   const [lastAIPrompt, setLastAIPrompt] = useState('');
   const aiAbortControllerRef = useRef(null);
+  const productAbortControllerRef = useRef(null);
 
   const handleOpenAIChat = () => {
     triggerHaptic('medium');
@@ -258,6 +259,11 @@ export default function ProductsModal({ isOpen, onClose }) {
   }, []);
 
   const handleClose = useCallback(() => {
+    // Cancel any pending product requests on close
+    if (productAbortControllerRef.current) {
+      productAbortControllerRef.current.abort();
+      productAbortControllerRef.current = null;
+    }
     setShowForm(false);
     setEditingProduct(null);
     setShowAIChat(false);
@@ -433,6 +439,11 @@ export default function ProductsModal({ isOpen, onClose }) {
   // Reset state when modal closes
   useEffect(() => {
     if (!isOpen) {
+      // Cancel any pending product requests
+      if (productAbortControllerRef.current) {
+        productAbortControllerRef.current.abort();
+        productAbortControllerRef.current = null;
+      }
       setMyShop(null);
       setProducts([]);
       setError(null);
@@ -454,6 +465,13 @@ export default function ProductsModal({ isOpen, onClose }) {
 
   const handleSubmitProduct = async () => {
     if (saving) return;
+
+    // Cancel any pending product request
+    if (productAbortControllerRef.current) {
+      productAbortControllerRef.current.abort();
+    }
+    productAbortControllerRef.current = new AbortController();
+
     setSaving(true);
 
     try {
@@ -480,6 +498,7 @@ export default function ProductsModal({ isOpen, onClose }) {
         await fetchApi(`/products/${editingProduct.id}`, {
           method: 'PUT',
           body: JSON.stringify(payload),
+          signal: productAbortControllerRef.current.signal,
         });
       } else {
         // Create mode
@@ -490,6 +509,7 @@ export default function ProductsModal({ isOpen, onClose }) {
         await fetchApi('/products', {
           method: 'POST',
           body: JSON.stringify({ ...payload, shopId: myShop.id }),
+          signal: productAbortControllerRef.current.signal,
         });
       }
 
@@ -499,6 +519,7 @@ export default function ProductsModal({ isOpen, onClose }) {
       setEditingProduct(null);
       setFormData({ name: '', description: '', price: '', stock: '', is_available: true });
     } catch (error) {
+      if (error.name === 'AbortError') return;
       await alert(error.message || 'Ошибка сохранения товара');
     } finally {
       setSaving(false);
@@ -506,14 +527,22 @@ export default function ProductsModal({ isOpen, onClose }) {
   };
 
   const handleDeleteProduct = async (productId) => {
+    // Cancel any pending product request
+    if (productAbortControllerRef.current) {
+      productAbortControllerRef.current.abort();
+    }
+    productAbortControllerRef.current = new AbortController();
+
     try {
       await fetchApi(`/products/${productId}`, {
         method: 'DELETE',
+        signal: productAbortControllerRef.current.signal,
       });
 
       triggerHaptic('success');
       await loadData();
     } catch (error) {
+      if (error.name === 'AbortError') return;
       await alert(error.message || 'Ошибка удаления товара');
     }
   };
