@@ -1,5 +1,6 @@
 import {
   getProducts,
+  getProductById,
   createProduct,
   updateProduct,
   deleteProduct,
@@ -281,23 +282,20 @@ export async function handleViewProductDetail(ctx, productId) {
   try {
     await ctx.answerCbQuery();
 
-    // Get product from session or fetch from API
-    // For now, using mock data
-    const product = {
-      id: productId,
-      name: 'Product Name',
-      description: 'Product description',
-      price: 100,
-      stock: 10,
-      imageUrl: null,
-    };
+    const result = await getProductById(productId);
 
-    let message = `📦 ${product.name}\n\n`;
-    message += `📝 ${product.description}\n\n`;
-    message += `💰 Цена: $${product.price}\n`;
-    message += `📊 В наличии: ${product.stock}\n`;
+    if (result.success && result.data) {
+      const product = result.data;
 
-    await ctx.editMessageText(message, productDetailKeyboard(productId));
+      let message = `📦 ${product.name}\n\n`;
+      message += `📝 ${product.description || 'Описание отсутствует'}\n\n`;
+      message += `💰 Цена: $${product.price}\n`;
+      message += `📊 В наличии: ${product.stock}\n`;
+
+      await ctx.editMessageText(message, productDetailKeyboard(productId));
+    } else {
+      await ctx.reply('❌ Товар не найден или был удален.');
+    }
   } catch (error) {
     console.error('Error in handleViewProductDetail:', error);
     await ctx.reply('❌ Ошибка при загрузке товара.');

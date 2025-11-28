@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import PageHeader from '../common/PageHeader';
 import { useTelegram } from '../../hooks/useTelegram';
@@ -88,6 +88,16 @@ export default function WorkspaceModal({ isOpen, onClose }) {
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [telegramId, setTelegramId] = useState('');
+  const workerAbortController = useRef(null);
+
+  // Cleanup requests on unmount
+  useEffect(() => {
+    return () => {
+      if (workerAbortController.current) {
+        workerAbortController.current.abort();
+      }
+    };
+  }, []);
 
   const handleClose = useCallback(() => {
     setShowForm(false);
@@ -195,6 +205,12 @@ export default function WorkspaceModal({ isOpen, onClose }) {
     if (saving) return;
     setSaving(true);
 
+    // Cancel previous request if exists
+    if (workerAbortController.current) {
+      workerAbortController.current.abort();
+    }
+    workerAbortController.current = new AbortController();
+
     try {
       if (!myShop) {
         await alert('Сначала создайте магазин');
@@ -221,6 +237,7 @@ export default function WorkspaceModal({ isOpen, onClose }) {
       await fetchApi(`/shops/${myShop.id}/workers`, {
         method: 'POST',
         body: JSON.stringify(payload),
+        signal: workerAbortController.current.signal,
       });
 
       triggerHaptic('success');
@@ -228,21 +245,32 @@ export default function WorkspaceModal({ isOpen, onClose }) {
       setShowForm(false);
       await loadData();
     } catch (error) {
+      if (error.name === 'AbortError') return;
       await alert(error.message || 'Ошибка добавления сотрудника');
     } finally {
-      setSaving(false);
+      if (!workerAbortController.current?.signal.aborted) {
+        setSaving(false);
+      }
     }
   };
 
   const handleRemoveWorker = async (workerId) => {
+    // Cancel previous request if exists
+    if (workerAbortController.current) {
+      workerAbortController.current.abort();
+    }
+    workerAbortController.current = new AbortController();
+
     try {
       await fetchApi(`/shops/${myShop.id}/workers/${workerId}`, {
         method: 'DELETE',
+        signal: workerAbortController.current.signal,
       });
 
       triggerHaptic('success');
       await loadData();
     } catch (error) {
+      if (error.name === 'AbortError') return;
       await alert(error.message || 'Ошибка удаления сотрудника');
     }
   };

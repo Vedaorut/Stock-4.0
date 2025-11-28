@@ -194,6 +194,15 @@ export async function getProducts(shopId) {
   }
 }
 
+export async function getProductById(productId) {
+  try {
+    const response = await apiClient.get(`/api/products/${productId}`);
+    return { success: true, data: response.data };
+  } catch (error) {
+    return { success: false, error: error.response?.data?.message || 'Ошибка получения товара' };
+  }
+}
+
 export async function updateProduct(productId, updates) {
   try {
     const response = await apiClient.patch(`/api/products/${productId}`, updates);
