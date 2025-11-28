@@ -99,17 +99,18 @@ export const shopQueries = {
 
   // Update shop
   update: async (id, shopData) => {
-    const { name, description, logo, isActive } = shopData;
+    const { name, description, logo, isActive, channelUrl } = shopData;
     const result = await query(
       `UPDATE shops
        SET name = COALESCE($2, name),
            description = COALESCE($3, description),
            logo = COALESCE($4, logo),
            is_active = COALESCE($5, is_active),
+           channel_url = COALESCE($6, channel_url),
            updated_at = NOW()
        WHERE id = $1
-       RETURNING id, owner_id, name, description, logo, tier, is_active, subscription_status, next_payment_due, grace_period_until, registration_paid, wallet_btc, wallet_eth, wallet_usdt, wallet_ltc, created_at, updated_at`,
-      [id, name, description, logo, isActive]
+       RETURNING id, owner_id, name, description, logo, channel_url, tier, is_active, subscription_status, next_payment_due, grace_period_until, registration_paid, wallet_btc, wallet_eth, wallet_usdt, wallet_ltc, created_at, updated_at`,
+      [id, name, description, logo, isActive, channelUrl]
     );
     return result.rows[0];
   },
@@ -154,7 +155,7 @@ export const shopQueries = {
     if (setClauses.length === 0) {
       // Nothing to update, return current record for consistency
       const existing = await query(
-        `SELECT id, owner_id, name, description, logo, tier, is_active, wallet_btc, wallet_eth, wallet_usdt, wallet_ltc, created_at, updated_at
+        `SELECT id, owner_id, name, description, logo, channel_url, tier, is_active, subscription_status, next_payment_due, grace_period_until, registration_paid, wallet_btc, wallet_eth, wallet_usdt, wallet_ltc, created_at, updated_at
          FROM shops
          WHERE id = $1`,
         [id]
@@ -168,7 +169,7 @@ export const shopQueries = {
       `UPDATE shops
        SET ${setClauses.join(', ')}
        WHERE id = $1
-       RETURNING id, owner_id, name, description, logo, tier, is_active, wallet_btc, wallet_eth, wallet_usdt, wallet_ltc, created_at, updated_at`,
+       RETURNING id, owner_id, name, description, logo, channel_url, tier, is_active, subscription_status, next_payment_due, grace_period_until, registration_paid, wallet_btc, wallet_eth, wallet_usdt, wallet_ltc, created_at, updated_at`,
       params
     );
     return result.rows[0];

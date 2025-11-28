@@ -358,14 +358,19 @@ const generatePaymentInvoice = asyncHandler(async (req, res) => {
     const userId = req.user.id;
 
     const chainMap = {
-      BTC: { currency: 'BTC', address: process.env.TEST_BTC_ADDRESS || 'bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kygt080' },
-      LTC: { currency: 'LTC', address: process.env.TEST_LTC_ADDRESS || 'ltc1qg398rzd9nxk0t33qtnu0yqzgjh79qceh0d7gnx' },
-      ETH: { currency: 'ETH', address: process.env.TEST_ETH_ADDRESS || '0x1111111111111111111111111111111111111111' },
-      USDT_TRC20: { currency: 'USDT', address: process.env.TEST_TRON_ADDRESS || 'TJRy9kzF7Z2yZd5vrr7wcGjoFNUBvYPw7e' },
+      BTC: { currency: 'BTC', address: process.env.TEST_BTC_ADDRESS, envVar: 'TEST_BTC_ADDRESS' },
+      LTC: { currency: 'LTC', address: process.env.TEST_LTC_ADDRESS, envVar: 'TEST_LTC_ADDRESS' },
+      ETH: { currency: 'ETH', address: process.env.TEST_ETH_ADDRESS, envVar: 'TEST_ETH_ADDRESS' },
+      USDT_TRC20: { currency: 'USDT', address: process.env.TEST_TRON_ADDRESS, envVar: 'TEST_TRON_ADDRESS' },
     };
 
     if (!chainMap[chain]) {
       throw new ValidationError('Invalid chain');
+    }
+
+    if (!chainMap[chain].address) {
+      const envVar = chainMap[chain].envVar || `TEST_${chain}_ADDRESS`;
+      throw new ValidationError(`Payment address for ${chain} is not configured. Set ${envVar} env variable.`);
     }
 
     // Ownership validation

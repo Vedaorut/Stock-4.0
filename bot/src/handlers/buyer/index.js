@@ -87,7 +87,9 @@ const buildProductSectionMessage = (section, shopName, products) =>
  */
 export const handleBuyerRole = async (ctx) => {
   try {
-    await ctx.answerCbQuery();
+    if (ctx.callbackQuery) {
+      await ctx.answerCbQuery();
+    }
 
     ctx.session.role = 'buyer';
     logger.info(`User ${ctx.from.id} selected buyer role`);

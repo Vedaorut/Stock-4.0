@@ -53,10 +53,6 @@ describe('E2E: Crypto Payment Flow', () => {
     pool = getTestPool();
 
     // Set required environment variables for tests
-    process.env.BTC_XPUB = 'xpub_test_btc';
-    process.env.LTC_XPUB = 'xpub_test_ltc';
-    process.env.ETH_XPUB = 'xpub_test_eth';
-    process.env.TRX_XPUB = 'xpub_test_trx';
     process.env.WEBHOOK_BASE_URL = 'https://test.example.com';
 
     // Ensure shop_subscriptions table exists (match production schema)

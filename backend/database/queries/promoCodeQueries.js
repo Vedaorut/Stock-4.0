@@ -46,12 +46,12 @@ export async function findByCode(code) {
 /**
  * Validate promo code for usage
  * Checks: active status, expiry date, usage limits
+ * NOTE: Promo code DETERMINES the tier, not the other way around
  *
  * @param {string} code - Promo code to validate
- * @param {string} tier - Tier to apply promo to ('basic' or 'pro')
- * @returns {Promise<{valid: boolean, error?: string, promoCode?: Object}>}
+ * @returns {Promise<{valid: boolean, error?: string, promoCode?: Object, tier?: string}>}
  */
-export async function validatePromoCode(code, tier) {
+export async function validatePromoCode(code) {
   try {
     const promoCode = await findByCode(code);
 
@@ -84,14 +84,6 @@ export async function validatePromoCode(code, tier) {
       }
     }
 
-    // Check if promo code applies to requested tier
-    if (promoCode.tier !== tier) {
-      return {
-        valid: false,
-        error: `Promo code only applies to ${promoCode.tier} tier`,
-      };
-    }
-
     // Check usage limits
     if (promoCode.max_uses !== null && promoCode.used_count >= promoCode.max_uses) {
       return {
@@ -100,16 +92,16 @@ export async function validatePromoCode(code, tier) {
       };
     }
 
-    // All checks passed
+    // All checks passed - promo code determines the tier
     return {
       valid: true,
       promoCode,
+      tier: promoCode.tier, // Return the tier from promo code
     };
   } catch (error) {
     logger.error('[PromoCodeQueries] Error validating promo code:', {
       error: error.message,
       code,
-      tier,
     });
     throw error;
   }

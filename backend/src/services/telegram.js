@@ -281,7 +281,12 @@ ${emoji} Обновление статуса заказа
       parse_mode: 'HTML',
       reply_markup: {
         inline_keyboard: [
-          [{ text: '🏪 Создать магазин', callback_data: 'start_create_shop' }],
+          [
+            {
+              text: '🏪 Создать магазин',
+              callback_data: `start_create_shop:${(payload.tier || 'basic').toLowerCase()}`,
+            },
+          ],
           [{ text: '📋 В меню', callback_data: 'back_to_main' }],
         ],
       },

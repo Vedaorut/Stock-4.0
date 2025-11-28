@@ -94,9 +94,15 @@ export const subscriptionQueries = {
     return parseInt(result.rows[0].count, 10);
   },
 
-  // Find shop subscription (billing) by ID
+  // Find shop subscription (billing) by ID with owner info
   findShopSubscriptionById: async (id) => {
-    const result = await query('SELECT * FROM shop_subscriptions WHERE id = $1', [id]);
+    const result = await query(
+      `SELECT ss.*, s.owner_id
+       FROM shop_subscriptions ss
+       JOIN shops s ON ss.shop_id = s.id
+       WHERE ss.id = $1`,
+      [id]
+    );
     return result.rows[0] || null;
   },
 };

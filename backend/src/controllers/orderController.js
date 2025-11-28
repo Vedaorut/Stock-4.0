@@ -4,7 +4,7 @@ import { asyncHandler, dbErrorHandler } from '../middleware/errorHandler.js';
 import telegramService from '../services/telegram.js';
 import logger from '../utils/logger.js';
 import { validateStatusTransition } from '../utils/orderStateValidator.js';
-import { NotFoundError, UnauthorizedError, ValidationError } from '../utils/errors.js';
+import { NotFoundError, UnauthorizedError, ValidationError, ConflictError } from '../utils/errors.js';
 import {
   validateCartItems,
   validateProductsForOrder,
@@ -16,6 +16,27 @@ import {
   updateOrderStatusWithStockLogic,
   getOrderAnalytics,
 } from '../services/orderService.js';
+
+/**
+ * Generate payment URI for QR code
+ */
+function generatePaymentUri(currency, address, amount) {
+  switch (currency) {
+    case 'BTC':
+      return `bitcoin:${address}?amount=${amount}`;
+    case 'LTC':
+      return `litecoin:${address}?amount=${amount}`;
+    case 'ETH':
+      // Convert to wei for EIP-681
+      const weiAmount = BigInt(Math.floor(parseFloat(amount) * 1e18));
+      return `ethereum:${address}?value=${weiAmount}`;
+    case 'USDT_TRC20':
+      // Simple address for TRC20
+      return address;
+    default:
+      return address;
+  }
+}
 
 /**
  * Order Controller
@@ -482,15 +503,6 @@ export const orderController = {
   },
 
   /**
-   * Generate invoice for order
-   * NOTE: HD wallet system removed - order crypto payments temporarily disabled
-   */
-  generateInvoice: asyncHandler(async (_req, _res) => {
-    // HD wallet system was removed - order crypto payments not available
-    throw new ValidationError('Криптовалютная оплата заказов временно недоступна. Используйте другой способ оплаты.');
-  }),
-
-  /**
    * Get sales analytics for seller
    */
   getAnalytics: asyncHandler(async (req, res) => {
@@ -536,6 +548,242 @@ export const orderController = {
         period: { from, to },
         ...analytics,
       },
+    });
+  }),
+
+  /**
+   * GET /api/orders/:id/payment-info
+   * Returns seller's wallet address and crypto amount for payment
+   */
+  getPaymentInfo: asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const { currency } = req.query; // BTC, ETH, LTC, USDT_TRC20
+    const userId = req.user.id;
+
+    // Validate currency
+    const validCurrencies = ['BTC', 'ETH', 'LTC', 'USDT_TRC20'];
+    if (!currency || !validCurrencies.includes(currency.toUpperCase())) {
+      throw new ValidationError(`Invalid currency. Valid options: ${validCurrencies.join(', ')}`);
+    }
+
+    // Get order with shop data
+    const orderData = await orderQueries.getInvoiceData(id);
+    if (!orderData) {
+      throw new NotFoundError('Order');
+    }
+
+    // Check access (buyer only)
+    if (orderData.buyer_id !== userId) {
+      throw new UnauthorizedError('Only buyer can view payment info');
+    }
+
+    // Check order status
+    if (orderData.status !== 'pending') {
+      throw new ValidationError(`Cannot pay for ${orderData.status} order`);
+    }
+
+    // Get seller's wallet for selected currency
+    const currencyUpper = currency.toUpperCase();
+    const walletMap = {
+      BTC: orderData.wallet_btc,
+      ETH: orderData.wallet_eth,
+      LTC: orderData.wallet_ltc,
+      USDT_TRC20: orderData.wallet_usdt // USDT is stored in wallet_usdt column
+    };
+
+    const walletAddress = walletMap[currencyUpper];
+    if (!walletAddress) {
+      const available = Object.entries(walletMap)
+        .filter(([, v]) => v)
+        .map(([k]) => k)
+        .join(', ');
+      throw new ValidationError(`Seller does not accept ${currencyUpper}. Available: ${available || 'none'}`);
+    }
+
+    // Convert USD to crypto
+    const { cryptoPriceService } = await import('../services/cryptoPriceService.js');
+    const priceChain = currencyUpper === 'USDT_TRC20' ? 'USDT' : currencyUpper;
+    const { cryptoAmount, usdRate } = await cryptoPriceService.convertAndRound(
+      parseFloat(orderData.total_price),
+      priceChain
+    );
+
+    // Save crypto payment details
+    await orderQueries.setCryptoPayment(id, {
+      cryptoAmount,
+      cryptoCurrency: currencyUpper,
+      paymentAddress: walletAddress
+    });
+
+    // Generate QR code URI
+    const qrUri = generatePaymentUri(currencyUpper, walletAddress, cryptoAmount);
+
+    return res.json({
+      success: true,
+      data: {
+        orderId: parseInt(id),
+        currency: currencyUpper,
+        address: walletAddress,
+        amount: cryptoAmount,
+        amountUsd: parseFloat(orderData.total_price),
+        usdRate,
+        qrUri,
+        shopName: orderData.shop_name,
+        expiresIn: 3600, // 1 hour
+        minConfirmations: { BTC: 3, LTC: 6, ETH: 12, USDT_TRC20: 19 }[currencyUpper]
+      }
+    });
+  }),
+
+  /**
+   * POST /api/orders/:id/submit-payment
+   * Buyer submits tx_hash after payment
+   */
+  submitPayment: asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const { tx_hash, currency } = req.body;
+    const userId = req.user.id;
+
+    // Validate input
+    if (!tx_hash || typeof tx_hash !== 'string' || tx_hash.length < 10) {
+      throw new ValidationError('Valid transaction hash required');
+    }
+    
+    const validCurrencies = ['BTC', 'ETH', 'LTC', 'USDT_TRC20'];
+    if (!currency || !validCurrencies.includes(currency.toUpperCase())) {
+      throw new ValidationError(`Invalid currency. Valid options: ${validCurrencies.join(', ')}`);
+    }
+
+    // Get order
+    const order = await orderQueries.findById(id);
+    if (!order) {
+      throw new NotFoundError('Order');
+    }
+
+    // Check access
+    if (order.buyer_id !== userId) {
+      throw new UnauthorizedError('Only buyer can submit payment');
+    }
+
+    // Check status
+    if (order.status === 'confirmed') {
+      return res.json({
+        success: true,
+        data: { status: 'already_confirmed', orderId: parseInt(id) }
+      });
+    }
+    if (order.status !== 'pending') {
+      throw new ValidationError(`Cannot submit payment for ${order.status} order`);
+    }
+
+    // Check tx_hash not already used (double-spend protection)
+    const { paymentQueries } = await import('../database/queries/index.js');
+    const existingPayment = await paymentQueries.findByTxHash(tx_hash);
+    if (existingPayment && existingPayment.order_id !== parseInt(id)) {
+      throw new ConflictError('This transaction hash is already used for another payment');
+    }
+
+    // Get order data for wallet address
+    const orderData = await orderQueries.getInvoiceData(id);
+    const walletMap = {
+      BTC: orderData.wallet_btc,
+      ETH: orderData.wallet_eth,
+      LTC: orderData.wallet_ltc,
+      USDT_TRC20: orderData.wallet_usdt
+    };
+    const recipientAddress = walletMap[currency.toUpperCase()];
+
+    // Create payment record
+    let payment;
+    if (existingPayment) {
+      payment = existingPayment;
+    } else {
+      payment = await paymentQueries.createForDirectCrypto({
+        orderId: parseInt(id),
+        txHash: tx_hash,
+        amount: order.total_price,
+        currency: currency.toUpperCase(),
+        recipientAddress,
+        expectedCryptoAmount: order.crypto_amount
+      });
+    }
+
+    // Update order with tx_hash
+    await orderQueries.updatePaymentHash(id, tx_hash);
+
+    logger.info('[Payment] Crypto payment submitted', {
+      orderId: id,
+      paymentId: payment.id,
+      txHash: tx_hash,
+      currency: currency.toUpperCase()
+    });
+
+    return res.json({
+      success: true,
+      data: {
+        paymentId: payment.id,
+        status: 'pending',
+        message: 'Payment submitted. Verification in progress.'
+      }
+    });
+  }),
+
+  /**
+   * GET /api/orders/:id/payment-status
+   * Returns current verification status
+   */
+  getPaymentStatus: asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const userId = req.user.id;
+
+    const order = await orderQueries.findById(id);
+    if (!order) {
+      throw new NotFoundError('Order');
+    }
+
+    // Check access (buyer or seller)
+    const orderData = await orderQueries.getInvoiceData(id);
+    const shop = orderData ? await shopQueries.findById(orderData.shop_id) : null;
+    const isBuyer = order.buyer_id === userId;
+    const isSeller = shop?.owner_id === userId;
+
+    if (!isBuyer && !isSeller) {
+      throw new UnauthorizedError('Access denied');
+    }
+
+    // If order confirmed
+    if (order.status === 'confirmed') {
+      return res.json({
+        success: true,
+        data: { status: 'confirmed', orderId: parseInt(id) }
+      });
+    }
+
+    // If no payment_hash
+    if (!order.payment_hash) {
+      return res.json({
+        success: true,
+        data: { status: 'awaiting_payment', orderId: parseInt(id) }
+      });
+    }
+
+    // Get payment record
+    const { paymentQueries } = await import('../database/queries/index.js');
+    const payment = await paymentQueries.findByTxHash(order.payment_hash);
+
+    const minConfirmations = {
+      BTC: 3, LTC: 6, ETH: 12, USDT_TRC20: 19
+    };
+
+    return res.json({
+      success: true,
+      data: {
+        status: payment?.verification_status || 'pending',
+        confirmations: payment?.blockchain_confirmations || 0,
+        required: minConfirmations[payment?.currency] || 3,
+        orderId: parseInt(id),
+        error: payment?.verification_error || null
+      }
     });
   }),
 };

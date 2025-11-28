@@ -16,15 +16,25 @@
  * - subscriptionController.js - for price display in API responses
  */
 
+const DEFAULT_SUBSCRIPTION_PRICES = {
+  basic: 25.0,
+  pro: 35.0,
+};
+
+const parsePrice = (value, fallback) => {
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+};
+
 /**
  * Monthly subscription prices (USD)
  *
- * NOTE: Testing prices set to $1.00 for development/testing
- * Production prices should be: basic: 25.0, pro: 35.0
+ * Production defaults: basic $25, pro $35.
+ * Can be overridden via env (SUBSCRIPTION_PRICE_BASIC / SUBSCRIPTION_PRICE_PRO) for testing.
  */
 export const SUBSCRIPTION_PRICES = {
-  basic: 1.0,   // Testing: $1/month (prod: $25/month)
-  pro: 1.0,     // Testing: $1/month (prod: $35/month)
+  basic: parsePrice(process.env.SUBSCRIPTION_PRICE_BASIC, DEFAULT_SUBSCRIPTION_PRICES.basic),
+  pro: parsePrice(process.env.SUBSCRIPTION_PRICE_PRO, DEFAULT_SUBSCRIPTION_PRICES.pro),
 };
 
 /**

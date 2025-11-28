@@ -19,7 +19,7 @@ export const PAYMENT_STATUS = {
   FAILED: 'failed',
 };
 
-const LTC_CONFIRMATIONS = 3; // 3 confirmations keeps the UX snappy while staying secure.
+const LTC_CONFIRMATIONS = 6; // Align with standard 6 confirmations for LTC security
 
 // Supported cryptocurrencies
 export const SUPPORTED_CURRENCIES = {

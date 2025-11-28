@@ -53,6 +53,9 @@ import orderCleanupService from './services/orderCleanupService.js';
 // Import invoice cleanup service
 import { startInvoiceCleanup } from './services/invoiceCleanupService.js';
 
+// Import payment verification worker
+import { startPaymentVerificationWorker, stopPaymentVerificationWorker } from './workers/paymentVerificationWorker.js';
+
 /**
  * Database Sequences Validation
  * Validates that all required wallet address sequences exist in database
@@ -456,6 +459,10 @@ const startServer = async () => {
       // Start invoice cleanup service (cleanup expired invoices every hour)
       startInvoiceCleanup();
       logger.info('Invoice cleanup service started');
+
+      // Start payment verification worker (verify pending crypto payments every 30 seconds)
+      startPaymentVerificationWorker();
+      logger.info('Payment verification worker started');
     });
 
     // Setup WebSocket server for real-time updates
@@ -558,6 +565,9 @@ const startServer = async () => {
 
       // Stop subscription cron jobs
       stopSubscriptionJobs();
+
+      // Stop payment verification worker
+      stopPaymentVerificationWorker();
 
       // Stop Telegram bot
       if (global.botInstance) {

@@ -634,15 +634,14 @@ export async function processOrderPayment({ orderId, txHash, paymentLink: _payme
       return { ok: true, state: 'confirmed', idempotent: true };
     }
 
-    // HD wallet blockchain verification removed - only CrystalPay payments supported for orders
-    // Order payments should use CrystalPay gateway which handles verification externally
-    logger.error(`[InvoicePayment] Order ${orderId} - direct blockchain verification not available`);
+    // CrystalPay not supported for orders anymore - use direct blockchain payments
+    logger.error(`[InvoicePayment] Order ${orderId} - CrystalPay invoice processing removed`);
     await client.query('COMMIT');
     return {
       ok: false,
       state: 'failed',
       code: 'UNSUPPORTED_PAYMENT_METHOD',
-      message: 'Direct blockchain payments not supported. Use CrystalPay payment gateway.',
+      message: 'CrystalPay payment gateway not supported for orders. Use direct blockchain payments.',
     };
   } catch (error) {
     try {

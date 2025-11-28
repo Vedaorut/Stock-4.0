@@ -179,7 +179,10 @@ export const paymentController = {
           break;
         case 'ETH':
           // EIP-681: ethereum:address?value=X (value in wei)
-          paymentURI = `ethereum:${address}?value=${amount}`;
+          // Convert ETH to wei (string to avoid precision loss)
+          const ethFloat = parseFloat(amount);
+          const wei = Number.isFinite(ethFloat) ? BigInt(Math.round(ethFloat * 1e18)).toString() : amount;
+          paymentURI = `ethereum:${address}?value=${wei}`;
           break;
         case 'USDT':
           // TRC-20 Tron format

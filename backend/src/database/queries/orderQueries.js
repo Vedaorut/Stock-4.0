@@ -25,9 +25,9 @@ export const orderQueries = {
               s.name as shop_name, s.owner_id,
               u.username as buyer_username, u.telegram_id as buyer_telegram_id
        FROM orders o
-       JOIN products p ON o.product_id = p.id
-       JOIN shops s ON p.shop_id = s.id
-       JOIN users u ON o.buyer_id = u.id
+       LEFT JOIN products p ON o.product_id = p.id
+       LEFT JOIN shops s ON p.shop_id = s.id
+       LEFT JOIN users u ON o.buyer_id = u.id
        WHERE o.id = $1`,
       [id]
     );
@@ -169,6 +169,30 @@ export const orderQueries = {
        JOIN shops s ON p.shop_id = s.id
        WHERE o.id = $1`,
       [orderId]
+    );
+    return result.rows[0];
+  },
+
+  // Set crypto payment details when buyer requests payment info
+  setCryptoPayment: async (orderId, { cryptoAmount, cryptoCurrency, paymentAddress }) => {
+    const result = await query(
+      `UPDATE orders 
+       SET crypto_amount = $2,
+           crypto_currency = $3,
+           payment_address = $4,
+           updated_at = NOW()
+       WHERE id = $1
+       RETURNING *`,
+      [orderId, cryptoAmount, cryptoCurrency, paymentAddress]
+    );
+    return result.rows[0];
+  },
+
+  // Update order with payment hash
+  updatePaymentHash: async (orderId, paymentHash) => {
+    const result = await query(
+      `UPDATE orders SET payment_hash = $2, updated_at = NOW() WHERE id = $1 RETURNING *`,
+      [orderId, paymentHash]
     );
     return result.rows[0];
   },

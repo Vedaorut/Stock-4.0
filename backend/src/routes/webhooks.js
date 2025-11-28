@@ -71,20 +71,29 @@ router.post('/crystalpay', async (req, res) => {
 
     await client.query('COMMIT');
 
-    // 5. Process subscription payment
-    const result = await invoicePaymentService.processSubscriptionPayment({
-      subscriptionId: invoice.subscription_id,
-      txHash: `crystalpay_${payload.id}`,
-      invoiceId: invoice.id,
-      purpose: invoice.purpose
-    });
+    // 5. Process payment based on invoice type
+    if (invoice.subscription_id) {
+      // Handle subscription payment
+      const result = await invoicePaymentService.processSubscriptionPayment({
+        subscriptionId: invoice.subscription_id,
+        txHash: `crystalpay_${payload.id}`,
+        invoiceId: invoice.id,
+        purpose: invoice.purpose
+      });
 
-    logger.info('[Webhook] CrystalPay: Payment processed', {
-      invoiceId: invoice.id,
-      result: result.ok
-    });
+      logger.info('[Webhook] CrystalPay: Subscription payment processed', {
+        invoiceId: invoice.id,
+        result: result.ok
+      });
 
-    return res.json({ status: 'success', confirmed: result.ok });
+      return res.json({ status: 'success', confirmed: result.ok });
+
+    } else {
+      logger.warn('[Webhook] CrystalPay: Invoice has no subscription', {
+        invoiceId: invoice.id
+      });
+      return res.status(400).json({ error: 'Invalid invoice type' });
+    }
 
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {});

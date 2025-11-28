@@ -31,8 +31,8 @@ const chooseTierScene = new Scenes.WizardScene(
         ctx,
         message,
         Markup.inlineKeyboard([
-          [Markup.button.callback('BASIC $1', 'tier_select:basic')],
-          [Markup.button.callback('PRO $1', 'tier_select:pro')],
+          [Markup.button.callback('BASIC $25/month', 'tier_select:basic')],
+          [Markup.button.callback('PRO $35/month', 'tier_select:pro')],
           [Markup.button.callback(buttonText.promoCode, 'tier_promo')],
           [Markup.button.callback(buttonText.back, 'cancel_scene')],
         ])
@@ -72,7 +72,7 @@ const chooseTierScene = new Scenes.WizardScene(
           });
 
           // Show payment button
-          const tierPrice = tier === 'pro' ? '$1' : '$1';
+          const tierPrice = tier === 'pro' ? '$35' : '$25';
           const tierName = tier.toUpperCase();
           const message = `Вы выбрали ${tierName} (${tierPrice}/мес)\n\nДля создания магазина необходимо оплатить подписку.`;
 
@@ -84,7 +84,6 @@ const chooseTierScene = new Scenes.WizardScene(
             ]),
           });
 
-          await ctx.answerCbQuery();
           return;
         }
 

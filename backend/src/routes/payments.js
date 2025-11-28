@@ -6,6 +6,7 @@ import { optionalTelegramAuth } from '../middleware/telegramAuth.js';
 import { strictPaymentLimiter } from '../middleware/rateLimiter.js';
 import { createCrystalPayInvoice } from '../services/subscriptionInvoiceService.js';
 import { invoiceQueries, subscriptionQueries } from '../database/queries/index.js';
+import { getPrice } from '../config/subscriptionPricing.js';
 import logger from '../utils/logger.js';
 
 const router = express.Router();
@@ -62,6 +63,7 @@ router.post('/subscriptions/:id/invoice/crystalpay', verifyToken, async (req, re
   try {
     const subscriptionId = parseInt(req.params.id);
     const { method, purpose } = req.body;
+    const userId = req.user?.id;
 
     // Validate method
     if (!['BITCOIN', 'LITECOIN'].includes(method)) {
@@ -80,12 +82,27 @@ router.post('/subscriptions/:id/invoice/crystalpay', verifyToken, async (req, re
       return res.status(404).json({ error: 'Subscription not found' });
     }
 
-    // Determine amount based on tier (in USD)
-    const PRICES = {
-      basic: 1,
-      pro: 3,
-    };
-    const amountUsd = PRICES[subscription.tier] || 1;
+    // SECURITY: Check ownership - user must own the shop associated with this subscription
+    if (subscription.owner_id !== userId) {
+      logger.warn('[API] Subscription ownership check failed', {
+        subscriptionId,
+        requestUserId: userId,
+        ownerId: subscription.owner_id,
+      });
+      return res.status(403).json({ error: 'Access denied: not subscription owner' });
+    }
+
+    // Determine amount based on tier (in USD) using shared pricing config
+    let amountUsd;
+    try {
+      amountUsd = getPrice(subscription.tier);
+    } catch (priceError) {
+      logger.error('[API] Invalid subscription tier during invoice creation', {
+        tier: subscription.tier,
+        error: priceError.message,
+      });
+      return res.status(400).json({ error: 'Invalid subscription tier' });
+    }
 
     const result = await createCrystalPayInvoice({
       subscriptionId,

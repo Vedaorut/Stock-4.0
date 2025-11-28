@@ -166,12 +166,20 @@ CREATE TABLE orders (
   created_at TIMESTAMP NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
   paid_at TIMESTAMP,
-  completed_at TIMESTAMP
+  completed_at TIMESTAMP,
+  -- Direct crypto payment fields (migration 043)
+  crypto_amount DECIMAL(20, 8),
+  crypto_currency VARCHAR(10)
 );
 
 COMMENT ON TABLE orders IS 'Stores customer orders';
 COMMENT ON COLUMN orders.payment_hash IS 'Blockchain transaction hash';
 COMMENT ON COLUMN orders.status IS 'Order status: pending, confirmed, shipped, delivered, cancelled';
+COMMENT ON COLUMN orders.crypto_amount IS 'Amount in cryptocurrency';
+COMMENT ON COLUMN orders.crypto_currency IS 'Selected cryptocurrency (BTC, ETH, LTC, USDT_TRC20)';
+
+CREATE INDEX idx_orders_crypto_payment
+ON orders(id, crypto_currency) WHERE crypto_currency IS NOT NULL;
 
 -- ============================================
 -- Order items table
@@ -211,14 +219,21 @@ CREATE TABLE payments (
     id SERIAL PRIMARY KEY,
     order_id INTEGER REFERENCES orders(id) ON DELETE CASCADE,
     subscription_id INTEGER REFERENCES shop_subscriptions(id) ON DELETE CASCADE,
-    tx_hash VARCHAR(255) UNIQUE NOT NULL,
+    tx_hash VARCHAR(255),
     amount DECIMAL(18, 8) NOT NULL,
-    currency VARCHAR(10) NOT NULL CHECK (currency IN ('BTC', 'ETH', 'USDT', 'LTC')),
+    currency VARCHAR(10) NOT NULL CHECK (currency IN ('BTC', 'ETH', 'USDT', 'LTC', 'USDT_TRC20')),
     status VARCHAR(50) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'confirmed', 'failed')),
     confirmations INTEGER NOT NULL DEFAULT 0,
     verified_at TIMESTAMP,
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    -- Direct crypto verification fields (migration 043)
+    verification_status VARCHAR(20) DEFAULT 'pending' CHECK (verification_status IN ('pending', 'verifying', 'confirmed', 'failed', 'expired')),
+    last_checked_at TIMESTAMP,
+    blockchain_confirmations INTEGER DEFAULT 0,
+    verification_error VARCHAR(255),
+    recipient_address VARCHAR(255),
+    expected_crypto_amount DECIMAL(20, 8),
     CONSTRAINT check_payment_reference CHECK (
         (order_id IS NOT NULL AND subscription_id IS NULL) OR
         (order_id IS NULL AND subscription_id IS NOT NULL)
@@ -230,6 +245,59 @@ COMMENT ON COLUMN payments.order_id IS 'Reference to order payment (mutually exc
 COMMENT ON COLUMN payments.subscription_id IS 'Reference to subscription payment (mutually exclusive with order_id)';
 COMMENT ON COLUMN payments.tx_hash IS 'Blockchain transaction hash';
 COMMENT ON COLUMN payments.confirmations IS 'Number of blockchain confirmations';
+COMMENT ON COLUMN payments.verification_status IS 'Blockchain verification status';
+COMMENT ON COLUMN payments.blockchain_confirmations IS 'Number of blockchain confirmations';
+COMMENT ON COLUMN payments.recipient_address IS 'Payment address used for the invoice';
+COMMENT ON COLUMN payments.expected_crypto_amount IS 'Expected crypto amount for verification';
+
+CREATE INDEX idx_payments_pending_verification
+ON payments(status, created_at) WHERE status = 'pending' AND subscription_id IS NULL;
+
+CREATE UNIQUE INDEX idx_payments_tx_hash_unique 
+ON payments(tx_hash) WHERE tx_hash IS NOT NULL;
+
+-- ============================================
+-- Promo Codes table (migration 022)
+-- ============================================
+CREATE TABLE promo_codes (
+  id SERIAL PRIMARY KEY,
+  code VARCHAR(50) UNIQUE NOT NULL,
+  discount_percentage DECIMAL(5, 2) NOT NULL CHECK (discount_percentage >= 0 AND discount_percentage <= 100),
+  tier VARCHAR(10) NOT NULL CHECK (tier IN ('basic', 'pro')),
+  max_uses INT DEFAULT NULL,
+  used_count INT DEFAULT 0 CHECK (used_count >= 0),
+  expires_at TIMESTAMP DEFAULT NULL,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW(),
+  CONSTRAINT check_max_uses CHECK (max_uses IS NULL OR max_uses > 0),
+  CONSTRAINT check_used_count_limit CHECK (max_uses IS NULL OR used_count <= max_uses)
+);
+
+CREATE INDEX idx_promo_codes_code ON promo_codes(code) WHERE is_active = true;
+CREATE INDEX idx_promo_codes_active ON promo_codes(is_active, expires_at);
+
+COMMENT ON TABLE promo_codes IS 'Database-driven promo codes for subscription discounts';
+COMMENT ON COLUMN promo_codes.code IS 'Promo code string (case-insensitive)';
+COMMENT ON COLUMN promo_codes.discount_percentage IS 'Discount percentage (0-100)';
+COMMENT ON COLUMN promo_codes.tier IS 'Tier this promo applies to: basic or pro';
+COMMENT ON COLUMN promo_codes.max_uses IS 'Maximum number of uses. NULL = unlimited';
+COMMENT ON COLUMN promo_codes.used_count IS 'Current usage count';
+COMMENT ON COLUMN promo_codes.expires_at IS 'Expiration timestamp. NULL = never expires';
+COMMENT ON COLUMN promo_codes.is_active IS 'Whether promo code is active';
+
+CREATE OR REPLACE FUNCTION update_promo_codes_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trigger_update_promo_codes_updated_at
+BEFORE UPDATE ON promo_codes
+FOR EACH ROW
+EXECUTE FUNCTION update_promo_codes_updated_at();
 
 -- ============================================
 -- Promo Activations table
@@ -459,6 +527,11 @@ CREATE INDEX IF NOT EXISTS idx_payments_order_status ON payments(order_id, statu
 CREATE INDEX IF NOT EXISTS idx_payments_subscription_id ON payments(subscription_id);
 -- Payment verification optimization: tx_hash lookup (40-60ms faster)
 CREATE INDEX IF NOT EXISTS idx_payments_tx_hash ON payments(tx_hash);
+-- Direct crypto payment verification indexes (migration 043)
+CREATE INDEX IF NOT EXISTS idx_payments_pending_verification ON payments(status, created_at) WHERE status = 'pending' AND subscription_id IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_payments_tx_hash_unique ON payments(tx_hash) WHERE tx_hash IS NOT NULL;
+-- Order crypto payment lookup (migration 043)
+CREATE INDEX IF NOT EXISTS idx_orders_crypto_payment ON orders(id, crypto_currency) WHERE crypto_currency IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_channel_migrations_shop ON channel_migrations(shop_id);
 CREATE INDEX IF NOT EXISTS idx_channel_migrations_status ON channel_migrations(status);
 CREATE INDEX IF NOT EXISTS idx_channel_migrations_created ON channel_migrations(created_at);

@@ -26,7 +26,7 @@ export const setupCommonHandlers = (bot) => {
   bot.action('back_to_main', handleBackToMain);
 
   // Start create shop (from subscription pending notification)
-  bot.action('start_create_shop', handleStartCreateShop);
+  bot.action(/^start_create_shop(?::.+)?$/, handleStartCreateShop);
 
   // Cancel scene action
   bot.action('cancel_scene', handleCancelScene);
@@ -263,6 +263,11 @@ const handleStartCreateShop = async (ctx) => {
   try {
     await ctx.answerCbQuery();
 
+    // Extract tier from callback data (format: start_create_shop:{tier}) with safe fallback
+    const callbackData = ctx.callbackQuery?.data || '';
+    const [, tierFromCallback] = callbackData.split(':');
+    const tier = tierFromCallback || 'basic';
+
     // Set seller role
     ctx.session.role = 'seller';
 
@@ -279,9 +284,11 @@ const handleStartCreateShop = async (ctx) => {
       logger.error('Failed to save role:', error);
     }
 
-    // Enter create shop scene
-    logger.info(`User ${ctx.from.id} entering create shop scene from subscription notification`);
-    await ctx.scene.enter('createShop');
+    // Enter create shop scene directly with the paid tier
+    logger.info(`User ${ctx.from.id} entering create shop scene from subscription notification`, {
+      tier,
+    });
+    await ctx.scene.enter('createShop', { tier });
   } catch (error) {
     logger.error('Error in start create shop handler:', error);
     try {

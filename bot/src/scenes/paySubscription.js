@@ -281,7 +281,7 @@ const paySubscriptionScene = new Scenes.WizardScene(
       // Prepare message
       const message = [
         `📦 <b>Подписка:</b> ${tier === 'pro' ? 'Pro' : 'Basic'}`,
-        `💰 <b>Стоимость:</b> $${amount}`,
+        `💰 <b>Стоимость:</b> ${amount} ₽`,
         `💳 <b>Метод:</b> ${methodLabel}`,
         '',
         '💡 <i>Поле "Email" — вводите что угодно, нам не нужен</i>',

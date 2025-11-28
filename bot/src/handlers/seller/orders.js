@@ -293,6 +293,11 @@ export const handleMarkShipped = async (ctx) => {
     const orderId = ctx.match[1];
     const token = ctx.session.token;
 
+    if (!token) {
+      await ctx.answerCbQuery('Требуется авторизация');
+      return;
+    }
+
     await orderApi.updateOrderStatus(orderId, 'shipped', token);
 
     await ctx.answerCbQuery('✅ Заказ отмечен как отправленный');

@@ -129,15 +129,27 @@ export const shopController = {
         }
       }
 
-      // Handle promo code creation (existing flow)
-      if (wantsPro && normalizedPromo) {
-        // Validate promo code against database
-        const validation = await promoCodeQueries.validatePromoCode(normalizedPromo, 'pro');
+      // Handle promo code - promo code DETERMINES the tier
+      let promoValidation = null;
+      let effectiveTier = tier; // Default to requested tier
 
-        if (!validation.valid) {
-          throw new ValidationError(validation.error || 'Invalid promo code');
+      if (normalizedPromo) {
+        // Validate promo code against database (no tier check - promo determines tier)
+        promoValidation = await promoCodeQueries.validatePromoCode(normalizedPromo);
+
+        if (!promoValidation.valid) {
+          throw new ValidationError(promoValidation.error || 'Invalid promo code');
         }
-      } else if (wantsPro && !normalizedPromo) {
+
+        // Promo code determines the tier
+        effectiveTier = promoValidation.tier;
+        logger.info('[ShopController] Promo code validated, tier from promo:', {
+          promoCode: normalizedPromo,
+          promoTier: effectiveTier,
+          requestedTier: tier,
+        });
+      } else if (wantsPro) {
+        // PRO without promo code requires payment
         throw new PaymentRequiredError('PRO plan requires payment or valid promo code');
       }
 
@@ -146,48 +158,45 @@ export const shopController = {
         name,
         description,
         logo,
-        tier,
+        tier: effectiveTier, // Use tier from promo code or request
       });
 
-      if (wantsPro && normalizedPromo) {
-        // Re-validate promo code (additional safety check)
-        const validation = await promoCodeQueries.validatePromoCode(normalizedPromo, 'pro');
+      // Activate promo subscription if promo code was used
+      if (promoValidation && promoValidation.valid) {
+        try {
+          shop = await activatePromoSubscription(shop.id, req.user.id, normalizedPromo);
 
-        if (validation.valid) {
+          // Increment promo code usage count
+          await promoCodeQueries.incrementUsageCount(promoValidation.promoCode.id);
+
+          logger.info(`Promo code applied for shop ${shop.id} by user ${req.user.id}`, {
+            promoCode: normalizedPromo,
+            promoCodeId: promoValidation.promoCode.id,
+            tier: promoValidation.tier,
+          });
+        } catch (promoError) {
+          logger.error('Promo activation failed', {
+            error: promoError.message,
+            stack: promoError.stack,
+          });
+
+          // Check if it's idempotency error (promo already used)
+          if (promoError.message === 'Promo code already used by this user') {
+            throw new ConflictError('This promo code has already been used by your account');
+          }
+
           try {
-            shop = await activatePromoSubscription(shop.id, req.user.id, normalizedPromo);
-
-            // Increment promo code usage count
-            await promoCodeQueries.incrementUsageCount(validation.promoCode.id);
-
-            logger.info(`Promo code applied for shop ${shop.id} by user ${req.user.id}`, {
-              promoCode: normalizedPromo,
-              promoCodeId: validation.promoCode.id,
-            });
-          } catch (promoError) {
-            logger.error('Promo activation failed', {
-              error: promoError.message,
-              stack: promoError.stack,
-            });
-
-            // Check if it's idempotency error (promo already used)
-            if (promoError.message === 'Promo code already used by this user') {
-              throw new ConflictError('This promo code has already been used by your account');
-            }
-
-            try {
-              await shopQueries.delete(shop.id);
-            } catch (cleanupError) {
-              logger.error('Failed to rollback shop after promo failure', {
-                error: cleanupError.message,
-                stack: cleanupError.stack,
-              });
-            }
-            return res.status(500).json({
-              success: false,
-              error: 'Failed to apply promo code. Shop was not created.',
+            await shopQueries.delete(shop.id);
+          } catch (cleanupError) {
+            logger.error('Failed to rollback shop after promo failure', {
+              error: cleanupError.message,
+              stack: cleanupError.stack,
             });
           }
+          return res.status(500).json({
+            success: false,
+            error: 'Failed to apply promo code. Shop was not created.',
+          });
         }
       }
 

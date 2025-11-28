@@ -443,35 +443,40 @@ export const useStore = create(
             // ✅ FIX: Get token for authorization
             const { token } = get();
 
-            const response = await axios.post(
-              `${API_URL}/orders/${order.id}/invoice`,
-              { chain: normalizedCrypto },
+            // ✅ FIX: Use new payment-info endpoint (GET with query param)
+            const response = await axios.get(
+              `${API_URL}/orders/${order.id}/payment-info`,
               {
+                params: { currency: normalizedCrypto },
                 headers: {
-                  'Content-Type': 'application/json',
-                  ...(token && { Authorization: `Bearer ${token}` }), // ✅ FIX: Add auth token
+                  ...(token && { Authorization: `Bearer ${token}` }),
                 },
-                signal: controller.signal, // ✅ Add abort signal
+                signal: controller.signal,
               }
             );
 
-            const invoice = response.data.data;
+            const paymentInfo = response.data.data;
 
-            // Ensure cryptoAmount is NUMBER (backend might return string from PostgreSQL)
-            const cryptoAmount = parseFloat(invoice.cryptoAmount);
+            // Ensure amount is NUMBER (backend might return string from PostgreSQL)
+            const cryptoAmount = parseFloat(paymentInfo.amount);
 
             if (!isFinite(cryptoAmount) || cryptoAmount <= 0) {
-              console.error('[selectCrypto] Invalid cryptoAmount:', { invoice, cryptoAmount });
+              console.error('[selectCrypto] Invalid amount:', { paymentInfo, cryptoAmount });
               toast({ type: 'error', message: 'Некорректная сумма от сервера', duration: 3000 });
-              throw new Error('Invalid cryptoAmount from API');
+              throw new Error('Invalid amount from API');
             }
 
+            // Calculate expiration time from expiresIn (seconds)
+            const expiresAt = paymentInfo.expiresIn
+              ? new Date(Date.now() + paymentInfo.expiresIn * 1000).toISOString()
+              : null;
+
             set({
-              paymentWallet: invoice.address,
+              paymentWallet: paymentInfo.address,
               cryptoAmount,
-              invoiceExpiresAt: invoice.expiresAt,
+              invoiceExpiresAt: expiresAt,
               paymentStep: 'details',
-              verifyError: null, // ✅ FIX: Clear previous errors on success
+              verifyError: null,
             });
           } catch (error) {
             console.error('[selectCrypto] API ERROR:', {

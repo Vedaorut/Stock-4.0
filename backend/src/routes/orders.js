@@ -59,11 +59,25 @@ router.get('/', verifyToken, (req, res, next) => {
 });
 
 /**
- * @route   POST /api/orders/:id/invoice
- * @desc    Generate invoice for order payment
+ * @route   GET /api/orders/:id/payment-info
+ * @desc    Get payment info for direct crypto payment
  * @access  Private (WebApp)
  */
-router.post('/:id/invoice', verifyToken, orderController.generateInvoice);
+router.get('/:id/payment-info', verifyToken, orderController.getPaymentInfo);
+
+/**
+ * @route   POST /api/orders/:id/submit-payment
+ * @desc    Submit payment transaction hash
+ * @access  Private (WebApp)
+ */
+router.post('/:id/submit-payment', verifyToken, orderController.submitPayment);
+
+/**
+ * @route   GET /api/orders/:id/payment-status
+ * @desc    Get payment verification status
+ * @access  Private (WebApp)
+ */
+router.get('/:id/payment-status', verifyToken, orderController.getPaymentStatus);
 
 /**
  * @route   GET /api/orders/:id

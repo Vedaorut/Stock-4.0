@@ -62,6 +62,50 @@ export const paymentQueries = {
     );
     return result.rows[0];
   },
+
+  // Find pending payments for verification worker
+  findPendingForVerification: async (limit = 50) => {
+    const result = await query(
+      `SELECT p.*, o.payment_address, o.total_price, o.crypto_amount, o.crypto_currency
+       FROM payments p
+       JOIN orders o ON p.order_id = o.id
+       WHERE p.status = 'pending'
+         AND p.subscription_id IS NULL
+         AND o.status = 'pending'
+         AND p.created_at > NOW() - INTERVAL '24 hours'
+       ORDER BY p.created_at ASC
+       LIMIT $1`,
+      [limit]
+    );
+    return result.rows;
+  },
+
+  // Update verification status
+  updateVerificationStatus: async (id, { status, confirmations, error }) => {
+    const result = await query(
+      `UPDATE payments 
+       SET verification_status = $2,
+           blockchain_confirmations = COALESCE($3, blockchain_confirmations),
+           verification_error = $4,
+           last_checked_at = NOW(),
+           updated_at = NOW()
+       WHERE id = $1
+       RETURNING *`,
+      [id, status, confirmations, error]
+    );
+    return result.rows[0];
+  },
+
+  // Create payment for direct crypto
+  createForDirectCrypto: async ({ orderId, txHash, amount, currency, recipientAddress, expectedCryptoAmount }) => {
+    const result = await query(
+      `INSERT INTO payments (order_id, tx_hash, amount, currency, status, verification_status, recipient_address, expected_crypto_amount)
+       VALUES ($1, $2, $3, $4, 'pending', 'pending', $5, $6)
+       RETURNING *`,
+      [orderId, txHash, amount, currency, recipientAddress, expectedCryptoAmount]
+    );
+    return result.rows[0];
+  },
 };
 
 export default paymentQueries;

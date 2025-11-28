@@ -125,7 +125,7 @@ export const productQueries = {
            is_preorder = COALESCE($10::BOOLEAN, is_preorder),
            updated_at = NOW()
        WHERE id = $1
-       RETURNING id, shop_id, name, description, price, currency, stock_quantity, original_price, discount_percentage, discount_expires_at, is_active, is_preorder, created_at, updated_at`,
+       RETURNING id, shop_id, name, description, price, currency, stock_quantity, reserved_quantity, original_price, discount_percentage, discount_expires_at, is_active, is_preorder, created_at, updated_at`,
       params
     );
     return result.rows[0];
