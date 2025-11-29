@@ -17,10 +17,10 @@ const { general: generalMessages, follows: followMessages } = messages;
  * 4. Complete
  */
 
-// Step 1: Enter source shop ID
-const enterShopId = async (ctx) => {
+// Step 1: Enter source shop name
+const enterShopName = async (ctx) => {
   try {
-    logger.info('follow_create_step:shop_id', { userId: ctx.from.id });
+    logger.info('follow_create_step:shop_name', { userId: ctx.from.id });
 
     // Check token first
     if (!ctx.session.token) {
@@ -51,7 +51,7 @@ const enterShopId = async (ctx) => {
     }
 
     await smartMessage.send(ctx, {
-      text: followMessages.createEnterId,
+      text: followMessages.createEnterName,
       keyboard: cancelButton,
     });
 
@@ -62,13 +62,13 @@ const enterShopId = async (ctx) => {
   }
 };
 
-// Step 2: Validate shop ID and ask mode
-const selectMode = async (ctx) => {
+// Step 2: Show search results
+const showSearchResults = async (ctx) => {
   try {
-    // Get shop ID from message
+    // Get shop name from message
     if (!ctx.message || !ctx.message.text) {
       await smartMessage.send(ctx, {
-        text: 'Пожалуйста, отправьте ID магазина текстом (только число).\n\n' + followMessages.createEnterId,
+        text: 'Пожалуйста, отправьте название магазина текстом.\n\n' + followMessages.createEnterName,
       });
       return;
     }
@@ -85,39 +85,117 @@ const selectMode = async (ctx) => {
     }
     ctx.wizard.state.userMessageIds.push(ctx.message.message_id);
 
-    const sourceShopId = parseInt(ctx.message.text.trim(), 10);
+    const query = ctx.message.text.trim();
 
-    if (Number.isNaN(sourceShopId) || sourceShopId <= 0) {
+    // Validate query length
+    if (query.length < 2) {
       await smartMessage.send(ctx, {
-        text: followMessages.createIdInvalid,
+        text: followMessages.createQueryTooShort,
         keyboard: cancelButton,
       });
       return;
     }
 
+    // Show searching message
+    await smartMessage.send(ctx, { text: followMessages.createSearching });
+
+    // Search shops
+    let shops = [];
+    try {
+      // shopApi.searchShops already returns array (unwraps data.data)
+      shops = await shopApi.searchShops(query, ctx.session.token);
+    } catch (error) {
+      logger.error('Error searching shops:', error);
+      await smartMessage.send(ctx, {
+        text: followMessages.createSearchError,
+        keyboard: successButtons,
+      });
+      return ctx.scene.leave();
+    }
+
+    // Filter out own shop
+    const filteredShops = shops.filter((shop) => shop.id !== ctx.session.shopId);
+
+    if (filteredShops.length === 0) {
+      if (shops.length > 0) {
+        // Only own shop found
+        await smartMessage.send(ctx, {
+          text: followMessages.createOnlyOwnShop,
+          keyboard: successButtons,
+        });
+      } else {
+        // No shops found
+        await smartMessage.send(ctx, {
+          text: followMessages.createNoResults,
+          keyboard: cancelButton,
+        });
+      }
+      return ctx.scene.leave();
+    }
+
+    // Store search results
+    ctx.wizard.state.searchResults = filteredShops;
+
+    // Create buttons (max 10 shops)
+    const buttons = filteredShops.slice(0, 10).map((shop) => [
+      Markup.button.callback(shop.name, `select_shop:${shop.id}`),
+    ]);
+    buttons.push([Markup.button.callback('❌ Отмена', 'cancel_scene')]);
+
+    await smartMessage.send(ctx, {
+      text: followMessages.createSelectShop(filteredShops.length),
+      keyboard: Markup.inlineKeyboard(buttons),
+    });
+
+    return ctx.wizard.next();
+  } catch (error) {
+    logger.error('Error in showSearchResults step:', error);
+    throw error;
+  }
+};
+
+// Step 3: Validate shop ID and ask mode
+const selectMode = async (ctx) => {
+  try {
+    // Get shop ID from callback query
+    if (!ctx.callbackQuery || !ctx.callbackQuery.data) {
+      await smartMessage.send(ctx, {
+        text: 'Пожалуйста, выберите магазин с помощью кнопок выше.',
+      });
+      return;
+    }
+
+    await ctx.answerCbQuery();
+
+    // Check token first
+    if (!ctx.session.token) {
+      await ctx.reply(generalMessages.authorizationRequired, successButtons);
+      return ctx.scene.leave();
+    }
+
+    // Extract shop ID from callback data
+    const sourceShopId = parseInt(ctx.callbackQuery.data.replace('select_shop:', ''), 10);
+
+    if (Number.isNaN(sourceShopId) || sourceShopId <= 0) {
+      await ctx.editMessageText(followMessages.createIdInvalid, successButtons);
+      return ctx.scene.leave();
+    }
+
+    // Verify shop still exists
     try {
       await shopApi.getShop(sourceShopId);
     } catch (error) {
       if (error.response?.status === 404) {
-        await smartMessage.send(ctx, {
-          text: followMessages.createShopNotFound,
-          keyboard: cancelButton,
-        });
+        await ctx.editMessageText(followMessages.createShopNotFound, successButtons);
       } else {
         logger.error('Error checking shop existence:', error);
-        await smartMessage.send(ctx, {
-          text: followMessages.createCheckError,
-          keyboard: cancelButton,
-        });
+        await ctx.editMessageText(followMessages.createCheckError, successButtons);
       }
-      return;
+      return ctx.scene.leave();
     }
 
     if (sourceShopId === ctx.session.shopId) {
-      await smartMessage.send(ctx, {
-        text: followMessages.createSelfFollow,
-        keyboard: successButtons,
-      });
+      await ctx.editMessageText(followMessages.createSelfFollow, successButtons);
       return ctx.scene.leave();
     }
 
@@ -134,10 +212,7 @@ const selectMode = async (ctx) => {
           followerShopId: ctx.session.shopId,
           sourceShopId,
         });
-        await smartMessage.send(ctx, {
-          text: followMessages.createCircularDetailed,
-          keyboard: successButtons,
-        });
+        await ctx.editMessageText(followMessages.createCircularDetailed, successButtons);
         return ctx.scene.leave();
       }
     } catch (error) {
@@ -145,7 +220,7 @@ const selectMode = async (ctx) => {
       logger.error('Error validating circular dependency:', error);
     }
 
-    // NOTE: Follow limit is now checked early in enterShopId step (P1-BOT-018)
+    // NOTE: Follow limit is now checked early in enterShopName step (P1-BOT-018)
     // No need to check again here
 
     ctx.wizard.state.sourceShopId = sourceShopId;
@@ -165,8 +240,7 @@ const selectMode = async (ctx) => {
     }
 
     const message = followMessages.createModePromptDetailed(sourceShopName);
-    await cleanReply(
-      ctx,
+    await ctx.editMessageText(
       message,
       Markup.inlineKeyboard([
         [Markup.button.callback('🔍 Мониторинг', 'mode:monitor')],
@@ -182,7 +256,7 @@ const selectMode = async (ctx) => {
   }
 };
 
-// Step 3: Handle mode selection
+// Step 4: Handle mode selection
 const handleModeSelection = async (ctx) => {
   try {
     if (!ctx.callbackQuery) {
@@ -256,7 +330,7 @@ const handleModeSelection = async (ctx) => {
   }
 };
 
-// Step 4: Handle markup input (only for resell mode)
+// Step 5: Handle markup input (only for resell mode)
 const handleMarkup = async (ctx) => {
   try {
     if (!ctx.message || !ctx.message.text) {
@@ -382,11 +456,27 @@ const handleMarkup = async (ctx) => {
 // Create wizard scene
 const createFollowScene = new Scenes.WizardScene(
   'createFollow',
-  enterShopId,
+  enterShopName,
+  showSearchResults,
   selectMode,
   handleModeSelection,
   handleMarkup
 );
+
+// Add action handler for shop selection
+createFollowScene.action(/^select_shop:(\d+)$/, async (ctx) => {
+  await ctx.wizard.steps[ctx.wizard.cursor](ctx);
+});
+
+// Add action handler for mode selection (monitor/resell)
+createFollowScene.action(/^mode:(monitor|resell)$/, async (ctx) => {
+  if (!ctx.wizard || !ctx.wizard.steps) {
+    await ctx.answerCbQuery();
+    await ctx.reply('Произошла ошибка. Попробуйте снова.');
+    return ctx.scene.leave();
+  }
+  await ctx.wizard.steps[ctx.wizard.cursor](ctx);
+});
 
 // Handle scene leave
 createFollowScene.leave(async (ctx) => {
@@ -439,14 +529,14 @@ createFollowScene.action('cancel_scene', async (ctx) => {
     await ctx.answerCbQuery(); // Silent
     logger.info('follow_create_cancelled', { userId: ctx.from.id });
     await ctx.scene.leave();
-    
+
     const { showSellerToolsMenu } = await import('../utils/sellerNavigation.js');
     await showSellerToolsMenu(ctx);
   } catch (error) {
     logger.error('Error in cancel_scene handler:', error);
     // Local error handling
     try {
-       await ctx.reply(generalMessages.actionFailed);
+      await ctx.reply(generalMessages.actionFailed);
     } catch (replyError) {
       logger.error('Failed to send error message:', replyError);
     }

@@ -3,7 +3,8 @@ import { getWebAppUrl } from '../utils/webappUrl.js';
 import { buttons as buttonText } from '../texts/messages.js';
 
 // Seller menu (with active shop) - redesigned hierarchical structure
-export const sellerMenu = (activeOrdersCount = 0) => {
+export const sellerMenu = (activeOrdersCount = 0, options = {}) => {
+  const { hasFollows = false } = options;
   const buttons = [
     [Markup.button.webApp(buttonText.openCatalog, getWebAppUrl())],
     [
@@ -14,9 +15,10 @@ export const sellerMenu = (activeOrdersCount = 0) => {
     ],
   ];
 
-  // P2-7 FIX: Always show "Manage Follows" button regardless of hasFollows
-  // This ensures sellers can always add their FIRST follow
-  buttons.push([Markup.button.callback(buttonText.manageFollows, 'seller:follows')]);
+  // Show "Manage Follows" button only if hasFollows is true
+  if (hasFollows) {
+    buttons.push([Markup.button.callback(buttonText.manageFollows, 'seller:follows')]);
+  }
 
   buttons.push([Markup.button.callback(buttonText.orderHistory, 'seller:order_history')]);
   buttons.push([Markup.button.callback(buttonText.tools, 'seller:tools')]);

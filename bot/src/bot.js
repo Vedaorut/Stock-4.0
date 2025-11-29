@@ -115,11 +115,11 @@ bot.use(analyticsMiddleware); // P1-BOT-012: Track usage
 bot.use(userRateLimitMiddleware); // P1-BOT-014: Rate limiting
 bot.use(debounceMiddleware); // Prevent rapid clicks
 
-// CRITICAL: SessionRecovery MUST run BEFORE authMiddleware
-// sessionRecoveryMiddleware restores shopId from backend API
-// authMiddleware then sees complete session and may skip re-authentication
-bot.use(sessionRecoveryMiddleware); // FIRST: Recover session after restart
-bot.use(authMiddleware); // THEN: Authenticate user (or skip if already authed)
+// CRITICAL: Auth MUST run BEFORE sessionRecovery
+// authMiddleware creates token if missing
+// sessionRecoveryMiddleware then uses token to restore shopId
+bot.use(authMiddleware); // FIRST: Authenticate user (creates token if needed)
+bot.use(sessionRecoveryMiddleware); // THEN: Recover shopId using valid token
 
 // Error handling
 

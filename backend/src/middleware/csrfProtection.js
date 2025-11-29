@@ -34,6 +34,9 @@ import { config } from '../config/env.js';
  * @param {function} next - Express next middleware
  */
 export const validateOrigin = (req, res, next) => {
+  const path = req.path || '';
+  const originalUrl = req.originalUrl || '';
+
   // Skip for safe HTTP methods (read-only)
   if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
     return next();
@@ -54,6 +57,23 @@ export const validateOrigin = (req, res, next) => {
   // Using startsWith to handle all auth routes regardless of prefix
   if (req.path.startsWith('/api/auth/') || req.path.startsWith('/auth/') || req.path.includes('/auth/register')) {
     logger.debug('CSRF bypassed for auth endpoint', { path: req.path, method: req.method });
+    return next();
+  }
+
+  // Skip for internal API endpoints (protected by x-internal-secret header)
+  // These are bot-to-backend trusted calls that don't send Origin headers
+  if (req.path.startsWith('/api/internal/') || req.path.startsWith('/internal/')) {
+    logger.debug('CSRF bypassed for internal API endpoint', { path: req.path, method: req.method });
+    return next();
+  }
+
+  // Also bypass when originalUrl still contains the /api/internal prefix (defensive)
+  if (originalUrl.startsWith('/api/internal/') || originalUrl.startsWith('/internal/')) {
+    logger.debug('CSRF bypassed for internal API endpoint (originalUrl)', {
+      path: req.path,
+      originalUrl,
+      method: req.method,
+    });
     return next();
   }
 

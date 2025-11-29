@@ -67,13 +67,25 @@ describe('Follow Shop - Create/View/Delete Flow (P0)', () => {
     await new Promise((resolve) => setImmediate(resolve));
 
     const text2 = testBot.getLastReplyText();
-    // FIX BUG #4: Updated prompt text
-    expect(text2).toContain('ID магазина для подписки');
+    // FIX BUG #4: Updated prompt text - now asks for shop NAME
+    expect(text2).toContain('название магазина для поиска');
 
     testBot.captor.reset();
 
-    // Step 3: Enter shop ID
-    const sourceShopId = 999;
+    // Step 3: Enter shop NAME (not ID)
+    mock.onGet(/\/shops\/search/).reply(200, {
+      data: [{ id: 999, name: 'SourceShop', sellerId: 2 }],
+    });
+
+    await testBot.handleUpdate(textUpdate('SourceShop'));
+    await new Promise((resolve) => setImmediate(resolve));
+
+    // Verify search results shown
+    const searchResultsText = testBot.getLastReplyText();
+    expect(searchResultsText).toContain('Найдено магазинов');
+    testBot.captor.reset();
+
+    // Step 4: Select shop via callback
     mock.onGet('/shops/999').reply(200, {
       data: { id: 999, name: 'SourceShop', sellerId: 2 },
     });
@@ -81,7 +93,7 @@ describe('Follow Shop - Create/View/Delete Flow (P0)', () => {
       data: { reached: false, count: 0, limit: 2 },
     });
 
-    await testBot.handleUpdate(textUpdate(String(sourceShopId)));
+    await testBot.handleUpdate(callbackUpdate('select_shop:999'));
     await new Promise((resolve) => setImmediate(resolve));
 
     const text3 = testBot.getLastReplyText();
@@ -89,7 +101,7 @@ describe('Follow Shop - Create/View/Delete Flow (P0)', () => {
 
     testBot.captor.reset();
 
-    // Step 4: Select Monitor mode
+    // Step 5: Select Monitor mode
     mock.onPost('/follows').reply(201, {
       data: {
         id: 1,
@@ -117,7 +129,7 @@ describe('Follow Shop - Create/View/Delete Flow (P0)', () => {
 
     testBot.captor.reset();
 
-    // Step 5: View follows list again (should show 1 follow)
+    // Step 6: View follows list again (should show 1 follow)
     mock.onGet(/\/follows\/my/).reply(200, {
       data: [
         {
@@ -140,7 +152,7 @@ describe('Follow Shop - Create/View/Delete Flow (P0)', () => {
 
     testBot.captor.reset();
 
-    // Step 6: View follow detail
+    // Step 7: View follow detail
     // Mock GET /follows/1 for detail view
     mock.onGet('/follows/1').reply(200, {
       data: {
@@ -169,7 +181,7 @@ describe('Follow Shop - Create/View/Delete Flow (P0)', () => {
 
     testBot.captor.reset();
 
-    // Step 7: Delete follow
+    // Step 8: Delete follow
     mock.onDelete('/follows/1').reply(200, { success: true });
     mock.onGet(/\/follows\/my/).reply(200, { data: [] }); // Empty list after delete
 
@@ -192,7 +204,16 @@ describe('Follow Shop - Create/View/Delete Flow (P0)', () => {
     await new Promise((resolve) => setImmediate(resolve));
     testBot.captor.reset();
 
-    // Enter shop ID
+    // Enter shop NAME
+    mock.onGet(/\/shops\/search/).reply(200, {
+      data: [{ id: 888, name: 'ResellSource', sellerId: 3 }],
+    });
+
+    await testBot.handleUpdate(textUpdate('ResellSource'));
+    await new Promise((resolve) => setImmediate(resolve));
+    testBot.captor.reset();
+
+    // Select shop via callback
     mock.onGet('/shops/888').reply(200, {
       data: { id: 888, name: 'ResellSource', sellerId: 3 },
     });
@@ -200,7 +221,7 @@ describe('Follow Shop - Create/View/Delete Flow (P0)', () => {
       data: { reached: false, count: 0, limit: 2 },
     });
 
-    await testBot.handleUpdate(textUpdate('888'));
+    await testBot.handleUpdate(callbackUpdate('select_shop:888'));
     await new Promise((resolve) => setImmediate(resolve));
     testBot.captor.reset();
 
@@ -269,20 +290,20 @@ describe('Follow Shop - Create/View/Delete Flow (P0)', () => {
     await new Promise((resolve) => setImmediate(resolve));
     testBot.captor.reset();
 
-    // Try to follow own shop (shopId: 1 in session)
-    mock.onGet('/shops/1').reply(200, {
-      data: { id: 1, name: 'MyShop', sellerId: 1 },
+    // Search for own shop
+    mock.onGet(/\/shops\/search/).reply(200, {
+      data: [{ id: 1, name: 'MyShop', sellerId: 1 }], // Only own shop
     });
 
-    await testBot.handleUpdate(textUpdate('1'));
+    await testBot.handleUpdate(textUpdate('MyShop'));
     await new Promise((resolve) => setImmediate(resolve));
 
     const text = testBot.getLastReplyText();
-    expect(text).toContain('Нельзя подписаться на собственный магазин');
+    expect(text).toContain('Найден только ваш магазин');
 
     // Verify limit check was called once (from global mock in beforeEach)
     // Note: global mock is set up in beforeEach, so it will be called
-    // Self-follow is detected before limit check in the scene flow
+    // Self-follow is detected during search results processing
   });
 
   it('circular follow: A→B создана, попытка B→A → ошибка 400', async () => {
@@ -309,7 +330,16 @@ describe('Follow Shop - Create/View/Delete Flow (P0)', () => {
     await new Promise((resolve) => setImmediate(resolve));
     circularTestBot.captor.reset();
 
-    // Try to follow shop 1 (which already follows shop 666)
+    // Search for shop 1
+    circularMock.onGet(/\/shops\/search/).reply(200, {
+      data: [{ id: 1, name: 'ShopA', sellerId: 1 }],
+    });
+
+    await circularTestBot.handleUpdate(textUpdate('ShopA'));
+    await new Promise((resolve) => setImmediate(resolve));
+    circularTestBot.captor.reset();
+
+    // Select shop via callback
     circularMock.onGet('/shops/1').reply(200, {
       data: { id: 1, name: 'ShopA', sellerId: 1 },
     });
@@ -319,7 +349,7 @@ describe('Follow Shop - Create/View/Delete Flow (P0)', () => {
       data: { valid: false },
     });
 
-    await circularTestBot.handleUpdate(textUpdate('1'));
+    await circularTestBot.handleUpdate(callbackUpdate('select_shop:1'));
     await new Promise((resolve) => setImmediate(resolve));
 
     // Circular is detected BEFORE mode selection, so scene exits immediately
@@ -336,16 +366,14 @@ describe('Follow Shop - Create/View/Delete Flow (P0)', () => {
     await new Promise((resolve) => setImmediate(resolve));
     testBot.captor.reset();
 
-    // Try to follow non-existent shop
-    mock.onGet('/shops/99999').reply(404, {
-      error: 'Shop not found',
-    });
+    // Search returns empty (no shops found)
+    mock.onGet(/\/shops\/search/).reply(200, { data: [] });
 
-    await testBot.handleUpdate(textUpdate('99999'));
+    await testBot.handleUpdate(textUpdate('NonExistent'));
     await new Promise((resolve) => setImmediate(resolve));
 
     const text = testBot.getLastReplyText();
-    expect(text).toContain('Магазин не найден');
+    expect(text).toContain('Магазины не найдены');
   });
 
   // Test removed: /cancel command is not implemented and should not exist

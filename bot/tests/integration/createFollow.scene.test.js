@@ -46,53 +46,74 @@ describe('Create Follow Scene - Wizard Validation (P0)', () => {
     mock.reset();
   });
 
-  it('невалидный shopId (не число) → ошибка', async () => {
+  it('пустой результат поиска → сообщение об ошибке', async () => {
     await testBot.handleUpdate(callbackUpdate('follows:create'));
     await new Promise((resolve) => setImmediate(resolve));
     testBot.captor.reset();
 
-    // Enter non-numeric shop ID
-    await testBot.handleUpdate(textUpdate('abc'));
+    // Mock empty search result
+    mock.onGet(/\/shops\/search/).reply(200, { data: [] });
+
+    // Enter shop name that doesn't exist
+    await testBot.handleUpdate(textUpdate('NonExistentShop'));
     await new Promise((resolve) => setImmediate(resolve));
 
     const text = testBot.getLastReplyText();
-    // FIX BUG #4: Updated error message
-    expect(text).toContain('Нужен числовой ID');
+    expect(text).toContain('Магазины не найдены');
 
-    // Verify API was NOT called (except shop validation and follow limit check)
-    // mock.history.get includes:
-    // - 1 call to GET /shops/1 from validateShopBeforeScene
-    // - 1 call to GET /follows/check-limit from createFollow scene entry
-    const nonExpectedGets = mock.history.get.filter(
-      (r) => !r.url.startsWith('/shops/') && !r.url.includes('/follows/check-limit')
-    );
-    expect(nonExpectedGets.length).toBe(0);
+    // Verify search API was called
+    const searchCalls = mock.history.get.filter((r) => r.url.includes('/shops/search'));
+    expect(searchCalls.length).toBe(1);
   });
 
-  it('невалидный shopId (отрицательное число) → ошибка', async () => {
+  it('поиск находит несколько магазинов → показать кнопки выбора', async () => {
     await testBot.handleUpdate(callbackUpdate('follows:create'));
     await new Promise((resolve) => setImmediate(resolve));
     testBot.captor.reset();
 
-    await testBot.handleUpdate(textUpdate('-5'));
+    // Mock search result with multiple shops
+    mock.onGet(/\/shops\/search/).reply(200, {
+      data: [
+        { id: 101, name: 'Shop One', sellerId: 10 },
+        { id: 102, name: 'Shop Two', sellerId: 11 },
+      ],
+    });
+
+    await testBot.handleUpdate(textUpdate('Shop'));
     await new Promise((resolve) => setImmediate(resolve));
 
     const text = testBot.getLastReplyText();
-    // FIX BUG #4: Updated error message
-    expect(text).toContain('Нужен числовой ID');
+    expect(text).toContain('Найдено магазинов:');
+    // Shop names are shown in buttons, not in text message
+    expect(text).toContain('2'); // Shows count of found shops
+
+    // Verify search API was called
+    const searchCalls = mock.history.get.filter((r) => r.url.includes('/shops/search'));
+    expect(searchCalls.length).toBe(1);
   });
 
   it('markup < 1% → ошибка валидации', async () => {
-    // Enter scene and shop ID
+    // Enter scene and search for shop
     await testBot.handleUpdate(callbackUpdate('follows:create'));
     await new Promise((resolve) => setImmediate(resolve));
     testBot.captor.reset();
 
+    // Mock search result
+    mock.onGet(/\/shops\/search/).reply(200, {
+      data: [{ id: 555, name: 'TestShop', sellerId: 2 }],
+    });
+
+    await testBot.handleUpdate(textUpdate('TestShop'));
+    await new Promise((resolve) => setImmediate(resolve));
+    testBot.captor.reset();
+
+    // Mock shop details for selection
     mock.onGet('/shops/555').reply(200, {
       data: { id: 555, name: 'TestShop', sellerId: 2 },
     });
 
-    await testBot.handleUpdate(textUpdate('555'));
+    // Select shop from search results
+    await testBot.handleUpdate(callbackUpdate('select_shop:555'));
     await new Promise((resolve) => setImmediate(resolve));
     testBot.captor.reset();
 
@@ -119,11 +140,22 @@ describe('Create Follow Scene - Wizard Validation (P0)', () => {
     await new Promise((resolve) => setImmediate(resolve));
     testBot.captor.reset();
 
+    // Mock search result
+    mock.onGet(/\/shops\/search/).reply(200, {
+      data: [{ id: 444, name: 'Shop444', sellerId: 3 }],
+    });
+
+    await testBot.handleUpdate(textUpdate('Shop444'));
+    await new Promise((resolve) => setImmediate(resolve));
+    testBot.captor.reset();
+
+    // Mock shop details for selection
     mock.onGet('/shops/444').reply(200, {
       data: { id: 444, name: 'Shop444', sellerId: 3 },
     });
 
-    await testBot.handleUpdate(textUpdate('444'));
+    // Select shop from search results
+    await testBot.handleUpdate(callbackUpdate('select_shop:444'));
     await new Promise((resolve) => setImmediate(resolve));
     testBot.captor.reset();
 
@@ -149,11 +181,22 @@ describe('Create Follow Scene - Wizard Validation (P0)', () => {
     await new Promise((resolve) => setImmediate(resolve));
     testBot.captor.reset();
 
+    // Mock search result
+    mock.onGet(/\/shops\/search/).reply(200, {
+      data: [{ id: 333, name: 'Shop333', sellerId: 4 }],
+    });
+
+    await testBot.handleUpdate(textUpdate('Shop333'));
+    await new Promise((resolve) => setImmediate(resolve));
+    testBot.captor.reset();
+
+    // Mock shop details for selection
     mock.onGet('/shops/333').reply(200, {
       data: { id: 333, name: 'Shop333', sellerId: 4 },
     });
 
-    await testBot.handleUpdate(textUpdate('333'));
+    // Select shop from search results
+    await testBot.handleUpdate(callbackUpdate('select_shop:333'));
     await new Promise((resolve) => setImmediate(resolve));
     testBot.captor.reset();
 
@@ -174,11 +217,22 @@ describe('Create Follow Scene - Wizard Validation (P0)', () => {
     await new Promise((resolve) => setImmediate(resolve));
     testBot.captor.reset();
 
+    // Mock search result
+    mock.onGet(/\/shops\/search/).reply(200, {
+      data: [{ id: 222, name: 'Shop222', sellerId: 5 }],
+    });
+
+    await testBot.handleUpdate(textUpdate('Shop222'));
+    await new Promise((resolve) => setImmediate(resolve));
+    testBot.captor.reset();
+
+    // Mock shop details for selection
     mock.onGet('/shops/222').reply(200, {
       data: { id: 222, name: 'Shop222', sellerId: 5 },
     });
 
-    await testBot.handleUpdate(textUpdate('222'));
+    // Select shop from search results
+    await testBot.handleUpdate(callbackUpdate('select_shop:222'));
     await new Promise((resolve) => setImmediate(resolve));
     testBot.captor.reset();
 
@@ -208,11 +262,22 @@ describe('Create Follow Scene - Wizard Validation (P0)', () => {
     await new Promise((resolve) => setImmediate(resolve));
     testBot.captor.reset();
 
+    // Mock search result
+    mock.onGet(/\/shops\/search/).reply(200, {
+      data: [{ id: 111, name: 'Shop111', sellerId: 6 }],
+    });
+
+    await testBot.handleUpdate(textUpdate('Shop111'));
+    await new Promise((resolve) => setImmediate(resolve));
+    testBot.captor.reset();
+
+    // Mock shop details for selection
     mock.onGet('/shops/111').reply(200, {
       data: { id: 111, name: 'Shop111', sellerId: 6 },
     });
 
-    await testBot.handleUpdate(textUpdate('111'));
+    // Select shop from search results
+    await testBot.handleUpdate(callbackUpdate('select_shop:111'));
     await new Promise((resolve) => setImmediate(resolve));
     testBot.captor.reset();
 
@@ -248,8 +313,7 @@ describe('Create Follow Scene - Wizard Validation (P0)', () => {
     await new Promise((resolve) => setImmediate(resolve));
 
     const text1 = testBot.getLastReplyText();
-    // FIX BUG #4: Updated prompt text
-    expect(text1).toContain('ID магазина');
+    expect(text1).toContain('название магазина');
 
     testBot.captor.reset();
 
@@ -320,11 +384,22 @@ describe('Create Follow Scene - Wizard Validation (P0)', () => {
     await new Promise((resolve) => setImmediate(resolve));
     testBot.captor.reset();
 
+    // Mock search result
+    mock.onGet(/\/shops\/search/).reply(200, {
+      data: [{ id: 777, name: 'Shop777', sellerId: 8 }],
+    });
+
+    await testBot.handleUpdate(textUpdate('Shop777'));
+    await new Promise((resolve) => setImmediate(resolve));
+    testBot.captor.reset();
+
+    // Mock shop details for selection
     mock.onGet('/shops/777').reply(200, {
       data: { id: 777, name: 'Shop777', sellerId: 8 },
     });
 
-    await testBot.handleUpdate(textUpdate('777'));
+    // Select shop from search results
+    await testBot.handleUpdate(callbackUpdate('select_shop:777'));
     await new Promise((resolve) => setImmediate(resolve));
     testBot.captor.reset();
 

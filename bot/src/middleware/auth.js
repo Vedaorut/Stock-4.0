@@ -12,15 +12,33 @@ const authMiddleware = async (ctx, next) => {
       return next();
     }
 
+    ctx.session = ctx.session || {};
+
     // Check if user already authenticated in session
     // IMPORTANT: Both token AND user must be truthy (not null/undefined)
-    if (ctx.session?.token && ctx.session?.user) {
-      return next();
+    // Also check that token is not too old (refresh if older than 6 days)
+    if (ctx.session.token && ctx.session.user) {
+      // Old sessions may be missing tokenCreatedAt — backfill without forcing re-auth
+      if (!ctx.session.tokenCreatedAt) {
+        ctx.session.tokenCreatedAt = new Date().toISOString();
+        logger.info(`Backfilled tokenCreatedAt for user ${ctx.from.id}`);
+        return next();
+      }
+
+      const tokenAge = Date.now() - new Date(ctx.session.tokenCreatedAt).getTime();
+      const sixDays = 6 * 24 * 60 * 60 * 1000;
+      if (tokenAge < sixDays) {
+        return next(); // Token is valid and fresh
+      }
+      logger.info(
+        `Token age ${Math.floor(tokenAge / (24 * 60 * 60 * 1000))} days, refreshing for user ${ctx.from.id}`
+      );
     }
 
     // Force re-auth if token is null but user exists (corrupted session state)
-    if (ctx.session?.user && !ctx.session?.token) {
-      logger.info(`Forcing re-auth for user ${ctx.from.id} (token was null)`);
+    // Or if tokenCreatedAt is missing (old session format)
+    if (ctx.session?.user && (!ctx.session?.token || !ctx.session?.tokenCreatedAt)) {
+      logger.info(`Forcing re-auth for user ${ctx.from.id} (token was null or no creation time)`);
     }
 
     // Extract user data from Telegram
@@ -40,13 +58,13 @@ const authMiddleware = async (ctx, next) => {
     }
 
     // Store in session (preserve existing shopId/role if they exist)
-    ctx.session = ctx.session || {};
     const existingShopId = ctx.session.shopId;
     const existingShopName = ctx.session.shopName;
     const existingRole = ctx.session.role;
 
     ctx.session.token = authData.token;
     ctx.session.user = authData.user;
+    ctx.session.tokenCreatedAt = new Date().toISOString(); // Track token creation time
     ctx.session.role = existingRole || null;
     ctx.session.shopId = existingShopId || null; // Preserve if exists
     ctx.session.shopName = existingShopName || null;
@@ -56,27 +74,13 @@ const authMiddleware = async (ctx, next) => {
     return next();
   } catch (error) {
     logger.error('Auth middleware error:', error);
+    ctx.session.authError = error.message;
 
-    // Create basic session even if auth failed (preserve existing data)
-    ctx.session = ctx.session || {};
-    const existingShopId = ctx.session.shopId;
-    const existingShopName = ctx.session.shopName;
-    const existingRole = ctx.session.role;
-
-    ctx.session.user = {
-      telegramId: ctx.from.id,
-      username: ctx.from.username,
-      firstName: ctx.from.first_name,
-    };
-    ctx.session.token = null; // No token, will retry on next request
-    ctx.session.shopId = existingShopId || null; // Preserve if exists
-    ctx.session.shopName = existingShopName || null;
-    ctx.session.role = existingRole || null;
-
-    logger.warn(`Auth failed for user ${ctx.from.id}, created basic session`);
-
-    // Continue without auth (will fail on protected routes)
-    return next();
+    // Surface a clear message without mutating token/user to null
+    if (ctx.reply) {
+      await ctx.reply('⚠️ Не удалось авторизоваться. Попробуйте снова через /start.');
+    }
+    return;
   }
 };
 

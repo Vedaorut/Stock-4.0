@@ -186,7 +186,7 @@ api.interceptors.response.use(
 
 // API methods
 export const authApi = {
-  // Register or login user
+  // Register or login user via internal API (bot-to-backend trusted auth)
   async authenticate(telegramId, userData) {
     const requestBody = {
       telegramId: parseInt(telegramId, 10), // Send as integer, not string
@@ -195,12 +195,19 @@ export const authApi = {
       lastName: userData.lastName || userData.last_name || '',
     };
 
-    const { data } = await api.post('/auth/register', requestBody, {
+    if (!config.internalSecret) {
+      throw new Error('Missing INTERNAL_SECRET for bot internal auth');
+    }
+
+    // Use internal API endpoint with x-internal-secret header
+    // This bypasses Telegram initData verification for bot auth
+    const { data } = await api.post('/internal/auth/bot-register', requestBody, {
       headers: {
         'Content-Type': 'application/json',
+        'x-internal-secret': config.internalSecret,
       },
     });
-    // Unwrap response: return data.data instead of data
+    // Unwrap response: return { token, user }
     return data.data || data;
   },
 

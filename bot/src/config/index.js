@@ -1,7 +1,21 @@
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 
-// Override system env vars with local .env values
-dotenv.config({ override: true });
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Load environment variables deterministically:
+// 1) repo root .env (if present) for shared defaults
+// 2) bot/.env overriding everything else, regardless of CWD
+const repoRootEnv = path.resolve(__dirname, '../../../.env');
+if (fs.existsSync(repoRootEnv)) {
+  dotenv.config({ path: repoRootEnv, override: false });
+}
+
+const botEnvPath = path.resolve(__dirname, '../../.env');
+dotenv.config({ path: botEnvPath, override: true });
 
 const config = {
   // Bot configuration
@@ -41,6 +55,9 @@ const config = {
 
   // Redis configuration
   redisUrl: process.env.REDIS_URL || 'redis://localhost:6379',
+
+  // Internal API security (for bot-to-backend auth)
+  internalSecret: process.env.INTERNAL_SECRET,
 };
 
 export default config;

@@ -192,6 +192,12 @@ export const handleFollowDetail = async (ctx) => {
     await ctx.editMessageText(message, followCatalogMenu(followId));
     logger.info(`User ${ctx.from.id} viewed follow catalog ${followId}`);
   } catch (error) {
+    // Telegram error when message content unchanged - silently ignore
+    if (error.message?.includes('message is not modified')) {
+      await ctx.answerCbQuery('Данные актуальны').catch(() => {});
+      return;
+    }
+
     logger.error('Error viewing follow detail:', error);
     const status = error.response?.status;
     if (status === 404) {

@@ -162,14 +162,29 @@ export const verifyTelegramInitData = (req, res, next) => {
 };
 
 /**
- * Optional Telegram validation for development
+ * Optional Telegram validation
  *
- * In development: Skip validation if no initData header (allows testing without Telegram)
- * In production: Always require valid initData
+ * Skip validation if:
+ * 1. JWT token already verified (req.user exists from verifyToken middleware)
+ * 2. In development/test mode without initData header
  *
- * Usage: Apply to routes that are accessed from both WebApp and other clients
+ * This allows bot-to-backend communication using JWT tokens
+ * while still validating WebApp requests with initData
+ *
+ * Usage: Apply to routes that are accessed from both WebApp and Bot
  */
 export const optionalTelegramAuth = (req, res, next) => {
+  // If JWT token already verified (req.user set by verifyToken), skip initData validation
+  // This allows bot requests with valid JWT to work in all environments
+  if (req.user && req.user.id) {
+    logger.debug('Skipping Telegram validation - JWT already verified', {
+      path: req.path,
+      method: req.method,
+      userId: req.user.id,
+    });
+    return next();
+  }
+
   // In development/test, skip validation if no initData header
   const env = process.env.NODE_ENV || 'development';
   if ((env === 'development' || env === 'test') && !req.headers['x-telegram-init-data']) {

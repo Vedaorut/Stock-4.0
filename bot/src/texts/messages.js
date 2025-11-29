@@ -584,7 +584,7 @@ ${safe(channel)}
       return `${safe(index)}. ${safe(name)}\n   Поставщик: ${safe(sourcePrice)}\n   Ваш магазин: ${safe(syncedPrice)}${diffText}`;
     },
     notFound: 'Подписка не найдена.',
-    loadError: 'Не удалось загрузить подписку. Попробуйте ещё раз.',
+    loadError: 'Не удалось загрузить данные. Попробуйте ещё раз.',
     accessDenied: 'Нет доступа к этой подписке.',
     deleteSuccess: 'Подписка удалена.',
     deleteError: 'Не удалось удалить подписку. Попробуйте ещё раз.',
@@ -617,6 +617,13 @@ ${safe(channel)}
     createCircularDetailed:
       'Циклическая подписка\n\nЭтот магазин уже подписан на ваш магазин. Взаимные подписки не разрешены',
     cancelOperationError: 'Произошла ошибка при отмене\n\nПопробуйте позже',
+    createEnterName: 'Введите название магазина для поиска (минимум 2 символа):',
+    createQueryTooShort: 'Название слишком короткое. Введите минимум 2 символа.',
+    createSearching: '🔍 Ищу магазины...',
+    createNoResults: 'Магазины не найдены. Попробуйте другой запрос.',
+    createOnlyOwnShop: 'Найден только ваш магазин. Вы не можете подписаться на себя.',
+    createSelectShop: (count) => `Найдено магазинов: ${count}\n\nВыберите магазин для подписки:`,
+    createSearchError: 'Ошибка при поиске магазинов. Попробуйте позже.',
   },
   subscription: {
     chooseTierIntro: 'Выберите тариф.',

@@ -1,6 +1,9 @@
 import express from 'express';
+import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import logger from '../utils/logger.js';
 import { config } from '../config/env.js';
+import { userQueries } from '../database/queries/index.js';
 
 const router = express.Router();
 
@@ -97,6 +100,84 @@ router.get('/health', verifyInternalSecret, (req, res) => {
       timestamp: new Date().toISOString(),
     },
   });
+});
+
+/**
+ * POST /api/internal/auth/bot-register
+ * Authenticate user from Telegram Bot (not WebApp)
+ * Uses INTERNAL_SECRET for security instead of initData
+ *
+ * Headers: { x-internal-secret: string }
+ * Body: { telegramId: number, username?: string, firstName?: string, lastName?: string }
+ *
+ * Returns: { token: string, user: object }
+ */
+router.post('/auth/bot-register', verifyInternalSecret, async (req, res) => {
+  try {
+    const { telegramId, username, firstName, lastName } = req.body;
+
+    if (!telegramId) {
+      return res.status(400).json({
+        success: false,
+        error: 'telegramId is required',
+      });
+    }
+
+    // Check if user exists
+    let user = await userQueries.findByTelegramId(telegramId);
+    let isNewUser = false;
+
+    if (!user) {
+      // Create new user
+      user = await userQueries.create({
+        telegramId,
+        username: username || null,
+        firstName: firstName || null,
+        lastName: lastName || null,
+      });
+      isNewUser = true;
+      logger.info(`[Internal] New user registered via bot: ${telegramId} (@${username})`);
+    } else {
+      logger.info(`[Internal] Existing user authenticated via bot: ${telegramId} (@${username})`);
+    }
+
+    // Generate JWT token
+    const token = jwt.sign(
+      {
+        id: user.id,
+        telegram_id: Number(user.telegram_id),
+        username: user.username,
+        jti: crypto.randomBytes(16).toString('hex'),
+      },
+      config.jwt.secret,
+      { expiresIn: config.jwt.expiresIn }
+    );
+
+    res.status(isNewUser ? 201 : 200).json({
+      success: true,
+      token,
+      user: {
+        id: user.id,
+        telegram_id: Number(user.telegram_id),
+        username: user.username,
+        first_name: user.first_name,
+        last_name: user.last_name,
+        selected_role: user.selected_role,
+        created_at: user.created_at,
+      },
+    });
+  } catch (error) {
+    logger.error('[Internal] Bot auth error:', {
+      error: error.message,
+      telegramId: req.body.telegramId,
+    });
+
+    res.status(500).json({
+      success: false,
+      error: 'Authentication failed',
+      details: error.message,
+    });
+  }
 });
 
 /**
