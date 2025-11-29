@@ -2,14 +2,17 @@
  * Debug Routes
  * 
  * Development endpoints for debugging invoice and subscription issues.
- * Protected by authentication middleware - only logged-in users can access.
+ * Protected by authentication middleware AND ownership verification.
  * 
  * Endpoints:
- * - GET /api/debug/invoice/:id - Detailed invoice inspection
- * - GET /api/debug/subscription/:id/invoices - All invoices for a subscription
- * - GET /api/debug/shop/:id/subscription - Shop subscription status
+ * - GET /api/debug/invoice/:id - Detailed invoice inspection (owner only)
+ * - GET /api/debug/subscription/:id/invoices - All invoices for a subscription (owner only)
+ * - GET /api/debug/shop/:id/subscription - Shop subscription status (owner only)
  * 
- * IMPORTANT: These endpoints should be disabled in production or restricted to admin users
+ * SECURITY:
+ * - Disabled in production environment
+ * - Requires authentication (JWT token)
+ * - Requires ownership verification (user must own the shop)
  */
 
 import express from 'express';
@@ -17,8 +20,74 @@ import { query } from '../config/database.js';
 import auth from '../middleware/auth.js';
 const { verifyToken: authenticateToken } = auth;
 import logger from '../utils/logger.js';
+import { subscriptionQueries } from '../database/queries/subscriptionQueries.js';
+import { shopQueries } from '../database/queries/shopQueries.js';
+// Note: invoiceQueries not imported - we use direct query() for invoice ownership check
+// to avoid extra JOIN in the main query
 
 const router = express.Router();
+
+// ============================================
+// PRODUCTION PROTECTION - Disable all debug endpoints
+// ============================================
+if (process.env.NODE_ENV === 'production') {
+  router.all('*', (req, res) => {
+    logger.warn('[Debug] Attempt to access debug endpoints in production', {
+      path: req.path,
+      method: req.method,
+      ip: req.ip,
+      userAgent: req.get('User-Agent'),
+    });
+    return res.status(404).json({ 
+      success: false,
+      error: 'Not found' 
+    });
+  });
+}
+
+// ============================================
+// Helper: Get owner_id from invoice via subscription -> shop chain
+// ============================================
+async function getInvoiceOwnerId(invoiceId) {
+  const result = await query(
+    `SELECT s.owner_id
+     FROM invoices i
+     JOIN shop_subscriptions ss ON i.subscription_id = ss.id
+     JOIN shops s ON ss.shop_id = s.id
+     WHERE i.id = $1`,
+    [invoiceId]
+  );
+  return result.rows[0]?.owner_id || null;
+}
+
+// ============================================
+// Helper: Get owner_id from shop_subscription via shop
+// ============================================
+async function getSubscriptionOwnerId(subscriptionId) {
+  const subscription = await subscriptionQueries.findShopSubscriptionById(subscriptionId);
+  return subscription?.owner_id || null;
+}
+
+// ============================================
+// Helper: Get owner_id from shop
+// ============================================
+async function getShopOwnerId(shopId) {
+  const shop = await shopQueries.findById(shopId);
+  return shop?.owner_id || null;
+}
+
+// ============================================
+// Helper: Log unauthorized access attempt
+// ============================================
+function logUnauthorizedAccess(endpoint, resourceId, userId, ownerId) {
+  logger.warn('[Debug] Unauthorized access attempt (IDOR blocked)', {
+    endpoint,
+    resourceId,
+    attemptedByUserId: userId,
+    actualOwnerId: ownerId,
+    timestamp: new Date().toISOString(),
+  });
+}
 
 /**
  * GET /api/debug/invoice/:id
@@ -42,6 +111,25 @@ router.get('/invoice/:id', authenticateToken, async (req, res) => {
         success: false,
         error: 'Invalid invoice ID - must be a number',
         invoiceId: req.params.id
+      });
+    }
+
+    // SECURITY: Verify ownership before returning data
+    const ownerId = await getInvoiceOwnerId(invoiceId);
+    
+    if (!ownerId) {
+      return res.status(404).json({ 
+        success: false,
+        error: 'Invoice not found', 
+        invoiceId 
+      });
+    }
+
+    if (ownerId !== req.user.id) {
+      logUnauthorizedAccess('/invoice/:id', invoiceId, req.user.id, ownerId);
+      return res.status(403).json({ 
+        success: false,
+        error: 'Access denied. You can only debug your own invoices.',
       });
     }
 
@@ -174,6 +262,25 @@ router.get('/subscription/:id/invoices', authenticateToken, async (req, res) => 
       });
     }
 
+    // SECURITY: Verify ownership before returning data
+    const ownerId = await getSubscriptionOwnerId(subscriptionId);
+    
+    if (!ownerId) {
+      return res.status(404).json({ 
+        success: false,
+        error: 'Subscription not found', 
+        subscriptionId 
+      });
+    }
+
+    if (ownerId !== req.user.id) {
+      logUnauthorizedAccess('/subscription/:id/invoices', subscriptionId, req.user.id, ownerId);
+      return res.status(403).json({ 
+        success: false,
+        error: 'Access denied. You can only debug your own subscriptions.',
+      });
+    }
+
     // Get all invoices for this subscription
     const result = await query(
       `SELECT 
@@ -268,6 +375,25 @@ router.get('/shop/:id/subscription', authenticateToken, async (req, res) => {
         success: false,
         error: 'Invalid shop ID - must be a number',
         shopId: req.params.id
+      });
+    }
+
+    // SECURITY: Verify ownership before returning data
+    const ownerId = await getShopOwnerId(shopId);
+    
+    if (!ownerId) {
+      return res.status(404).json({ 
+        success: false,
+        error: 'Shop not found', 
+        shopId 
+      });
+    }
+
+    if (ownerId !== req.user.id) {
+      logUnauthorizedAccess('/shop/:id/subscription', shopId, req.user.id, ownerId);
+      return res.status(403).json({ 
+        success: false,
+        error: 'Access denied. You can only debug your own shops.',
       });
     }
 

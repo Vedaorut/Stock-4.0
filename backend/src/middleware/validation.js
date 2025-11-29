@@ -42,16 +42,10 @@ export const authValidation = {
     validate,
   ],
 
+  // SECURITY: register endpoint now extracts user data from verified x-telegram-init-data header
+  // Body validation removed - all user data comes from cryptographically verified initData
   register: [
-    body('telegramId').isInt({ min: 1 }).withMessage('Valid Telegram ID is required'),
-    body('username')
-      .optional()
-      .isLength({ min: 3, max: 32 })
-      .withMessage('Username must be 3-32 characters'),
-    body('firstName')
-      .notEmpty()
-      .isLength({ max: 64 })
-      .withMessage('First name is required (max 64 characters)'),
+    // No body validation needed - controller uses initData from header
     validate,
   ],
 

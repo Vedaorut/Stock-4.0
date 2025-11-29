@@ -554,6 +554,21 @@ export const paymentApi = {
 };
 
 export const subscriptionApi = {
+  // Get subscription pricing (tier prices from backend)
+  async getPricing() {
+    try {
+      const { data } = await api.get('/subscriptions/pricing');
+      return data;
+    } catch (error) {
+      logger.error('Failed to fetch subscription pricing:', error);
+      // Fallback prices if API fails
+      return {
+        basic: { price: 25, currency: 'USD', period: '30 days' },
+        pro: { price: 35, currency: 'USD', period: '30 days' },
+      };
+    }
+  },
+
   // Check if user is subscribed to shop
   async checkSubscription(shopId, token) {
     const { data } = await api.get(`/subscriptions/check/${shopId}`, {

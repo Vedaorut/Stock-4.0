@@ -122,14 +122,40 @@ router.post('/subscriptions/:id/invoice/crystalpay', verifyToken, async (req, re
  * @route   GET /api/payments/invoices/:id/status
  * @desc    Get invoice status
  * @access  Private (Bot)
+ * @security P1-SEC-005: IDOR protection - ownership verification required
  */
 router.get('/invoices/:id/status', verifyToken, async (req, res) => {
   try {
     const invoiceId = parseInt(req.params.id);
+    const userId = req.user?.id;
 
-    const invoice = await invoiceQueries.findById(invoiceId);
+    // Use findByIdWithOwnership to get invoice with ownership info in single query
+    const invoice = await invoiceQueries.findByIdWithOwnership(invoiceId);
     if (!invoice) {
       return res.status(404).json({ error: 'Invoice not found' });
+    }
+
+    // P1-SEC-005: IDOR protection - verify ownership
+    // User must be either:
+    // 1. Buyer of the order (for order invoices)
+    // 2. Shop owner of the order (for order invoices - seller can also check)
+    // 3. Shop owner of the subscription (for subscription invoices)
+    const isBuyer = invoice.buyer_id === userId;
+    const isOrderShopOwner = invoice.order_shop_owner_id === userId;
+    const isSubscriptionOwner = invoice.subscription_owner_id === userId;
+
+    const hasAccess = isBuyer || isOrderShopOwner || isSubscriptionOwner;
+
+    if (!hasAccess) {
+      logger.warn('[SEC] IDOR attempt on invoice status', {
+        invoiceId: invoice.id,
+        attemptedBy: userId,
+        invoiceType: invoice.order_id ? 'order' : 'subscription',
+        actualBuyerId: invoice.buyer_id,
+        actualOrderShopOwnerId: invoice.order_shop_owner_id,
+        actualSubscriptionOwnerId: invoice.subscription_owner_id,
+      });
+      return res.status(403).json({ error: 'Access denied' });
     }
 
     // Map invoice status to frontend-friendly status

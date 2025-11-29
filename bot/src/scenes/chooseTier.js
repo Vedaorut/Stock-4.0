@@ -14,6 +14,7 @@ import { Scenes, Markup } from 'telegraf';
 import logger from '../utils/logger.js';
 import { reply as cleanReply, replyHTML as cleanReplyHTML } from '../utils/cleanReply.js';
 import { messages, buttons as buttonText } from '../texts/messages.js';
+import { subscriptionApi } from '../utils/api.js';
 
 const { subscription: subMessages } = messages;
 
@@ -25,14 +26,22 @@ const chooseTierScene = new Scenes.WizardScene(
     try {
       logger.info('choose_tier_step:entry', { userId: ctx.from.id });
 
+      // Fetch current prices from backend API
+      const pricing = await subscriptionApi.getPricing();
+      const basicPrice = pricing.basic?.price || 25;
+      const proPrice = pricing.pro?.price || 35;
+
+      // Store prices in wizard state for later use
+      ctx.wizard.state.pricing = { basic: basicPrice, pro: proPrice };
+
       const message = `${subMessages.chooseTierIntro}\n\n${subMessages.tierDescriptionBasic}\n\n${subMessages.tierDescriptionPro}`;
 
       await cleanReplyHTML(
         ctx,
         message,
         Markup.inlineKeyboard([
-          [Markup.button.callback('BASIC $25/month', 'tier_select:basic')],
-          [Markup.button.callback('PRO $35/month', 'tier_select:pro')],
+          [Markup.button.callback(`BASIC $${basicPrice}/month`, 'tier_select:basic')],
+          [Markup.button.callback(`PRO $${proPrice}/month`, 'tier_select:pro')],
           [Markup.button.callback(buttonText.promoCode, 'tier_promo')],
           [Markup.button.callback(buttonText.back, 'cancel_scene')],
         ])
@@ -71,8 +80,9 @@ const chooseTierScene = new Scenes.WizardScene(
             tier,
           });
 
-          // Show payment button
-          const tierPrice = tier === 'pro' ? '$35' : '$25';
+          // Get price from wizard state (fetched in step 1)
+          const pricing = ctx.wizard.state.pricing || { basic: 25, pro: 35 };
+          const tierPrice = `$${pricing[tier] || (tier === 'pro' ? 35 : 25)}`;
           const tierName = tier.toUpperCase();
           const message = `Вы выбрали ${tierName} (${tierPrice}/мес)\n\nДля создания магазина необходимо оплатить подписку.`;
 
@@ -238,7 +248,7 @@ chooseTierScene.leave(async (ctx) => {
     }
   }
 
-  // ✅ P1-2 FIX: Clear wizard state to prevent memory leak
+  // P1-2 FIX: Clear wizard state to prevent memory leak
   if (ctx.wizard) {
     delete ctx.wizard.state;
   }

@@ -69,9 +69,70 @@ router.post('/crystalpay', async (req, res) => {
       return res.json({ status: 'skipped', state: payload.state });
     }
 
+    // 5. SECURITY: Verify payment amount matches expected amount
+    const paidAmount = parseFloat(payload.amount);
+    const expectedAmount = parseFloat(invoice.expected_amount);
+
+    if (isNaN(paidAmount) || paidAmount <= 0) {
+      logger.warn('[Webhook] CrystalPay: Invalid paid amount in payload', {
+        invoiceId: invoice.id,
+        crystalPayId: payload.id,
+        rawAmount: payload.amount
+      });
+      await client.query('COMMIT');
+      return res.status(400).json({ 
+        error: 'Invalid amount',
+        message: 'Paid amount is invalid or missing'
+      });
+    }
+
+    // Check for underpayment (reject)
+    if (paidAmount < expectedAmount) {
+      logger.warn('[Webhook] CrystalPay: UNDERPAYMENT DETECTED', {
+        invoiceId: invoice.id,
+        crystalPayId: payload.id,
+        expected: expectedAmount,
+        received: paidAmount,
+        difference: expectedAmount - paidAmount,
+        currency: invoice.currency
+      });
+      await client.query('COMMIT');
+      return res.status(400).json({ 
+        error: 'Amount mismatch',
+        message: 'Paid amount is less than expected',
+        expected: expectedAmount,
+        received: paidAmount
+      });
+    }
+
+    // Log overpayment (allow but record)
+    if (paidAmount > expectedAmount) {
+      logger.info('[Webhook] CrystalPay: Overpayment detected (allowed)', {
+        invoiceId: invoice.id,
+        crystalPayId: payload.id,
+        expected: expectedAmount,
+        received: paidAmount,
+        overpayment: paidAmount - expectedAmount,
+        currency: invoice.currency
+      });
+    }
+
+    // 6. Verify currency matches (if stored)
+    if (invoice.currency && payload.currency && 
+        payload.currency.toUpperCase() !== invoice.currency.toUpperCase()) {
+      logger.warn('[Webhook] CrystalPay: Currency mismatch', {
+        invoiceId: invoice.id,
+        crystalPayId: payload.id,
+        expected: invoice.currency,
+        received: payload.currency
+      });
+      // Note: We log but don't reject currency mismatch as CrystalPay 
+      // may convert currencies internally. The amount check is primary.
+    }
+
     await client.query('COMMIT');
 
-    // 5. Process payment based on invoice type
+    // 7. Process payment based on invoice type
     if (invoice.subscription_id) {
       // Handle subscription payment
       const result = await invoicePaymentService.processSubscriptionPayment({

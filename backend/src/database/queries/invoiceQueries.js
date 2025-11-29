@@ -96,6 +96,37 @@ export const invoiceQueries = {
     );
     return result.rows;
   },
+
+  /**
+   * Find invoice by ID with ownership information
+   * Returns invoice with buyer_id (for order invoices) and owner_id (for subscription invoices)
+   * @param {number} id - Invoice ID
+   * @returns {Promise<Object|null>} Invoice with ownership info
+   */
+  findByIdWithOwnership: async (id) => {
+    const result = await query(
+      `SELECT 
+         i.*,
+         -- Order invoice ownership
+         o.buyer_id,
+         u_buyer.telegram_id as buyer_telegram_id,
+         s_order.owner_id as order_shop_owner_id,
+         -- Subscription invoice ownership  
+         s_sub.owner_id as subscription_owner_id
+       FROM invoices i
+       -- Join for order invoices
+       LEFT JOIN orders o ON i.order_id = o.id
+       LEFT JOIN users u_buyer ON o.buyer_id = u_buyer.id
+       LEFT JOIN products p ON o.product_id = p.id
+       LEFT JOIN shops s_order ON p.shop_id = s_order.id
+       -- Join for subscription invoices
+       LEFT JOIN shop_subscriptions ss ON i.subscription_id = ss.id
+       LEFT JOIN shops s_sub ON ss.shop_id = s_sub.id
+       WHERE i.id = $1`,
+      [id]
+    );
+    return result.rows[0] || null;
+  },
 };
 
 export default invoiceQueries;

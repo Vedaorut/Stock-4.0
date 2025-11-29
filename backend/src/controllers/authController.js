@@ -28,8 +28,22 @@ export const authController = {
       // Parse user data from init data
       const userData = telegramService.parseInitData(initData);
 
+      // SECURITY FIX: Verify that body telegramId matches verified initData user.id
+      // This prevents telegramId spoofing attacks
+      if (telegramId && String(telegramId) !== String(userData.id)) {
+        logger.warn('Security: Telegram ID mismatch attempt', {
+          bodyTelegramId: telegramId,
+          verifiedTelegramId: userData.id,
+          ip: req.ip,
+        });
+        throw new UnauthenticatedError('Telegram ID mismatch');
+      }
+
+      // Use ONLY the verified telegramId from initData
+      const verifiedTelegramId = userData.id;
+
       // Check if user exists
-      let user = await userQueries.findByTelegramId(telegramId);
+      let user = await userQueries.findByTelegramId(verifiedTelegramId);
 
       if (!user) {
         // Create new user
@@ -79,10 +93,38 @@ export const authController = {
    * Register or login user (for Telegram Bot)
    * If user exists, returns token (login)
    * If user doesn't exist, creates and returns token (register)
+   * 
+   * SECURITY: Requires x-telegram-init-data header for verification
+   * User data is extracted from verified initData, NOT from request body
    */
   register: asyncHandler(async (req, res) => {
     try {
-      const { telegramId, username, firstName, lastName } = req.body;
+      // SECURITY FIX: Require and verify Telegram initData
+      const initData = req.headers['x-telegram-init-data'];
+      
+      if (!initData) {
+        logger.warn('Security: Register attempt without initData', {
+          ip: req.ip,
+          bodyTelegramId: req.body.telegramId,
+        });
+        throw new UnauthenticatedError('Telegram authentication required');
+      }
+
+      // Verify the initData signature
+      const isValid = telegramService.verifyInitData(initData);
+      if (!isValid) {
+        logger.warn('Security: Register attempt with invalid initData', {
+          ip: req.ip,
+        });
+        throw new UnauthenticatedError('Invalid Telegram authentication data');
+      }
+
+      // Parse and use ONLY verified user data from initData
+      const userData = telegramService.parseInitData(initData);
+      const telegramId = userData.id;
+      const username = userData.username;
+      const firstName = userData.firstName;
+      const lastName = userData.lastName;
 
       // Check if user already exists
       let user = await userQueries.findByTelegramId(telegramId);

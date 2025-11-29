@@ -5,6 +5,7 @@
 
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import { createTestApp } from './helpers/testApp.js';
 import {
   closeTestDb,
@@ -12,6 +13,34 @@ import {
   createTestUser,
   getUserByTelegramId,
 } from './helpers/testDb.js';
+
+/**
+ * Helper to create valid Telegram initData with HMAC-SHA256 signature
+ * Required for register endpoint security
+ */
+function createValidInitData(user, authDate = Math.floor(Date.now() / 1000)) {
+  const botToken = process.env.BOT_TOKEN || 'test-bot-token-12345:ABCDEFGHIJKLMNOP';
+  const params = new URLSearchParams();
+  params.set('user', JSON.stringify({
+    id: user.id || user.telegram_id || user.telegramId,
+    username: user.username,
+    first_name: user.first_name || user.firstName,
+    last_name: user.last_name || user.lastName,
+  }));
+  params.set('auth_date', authDate.toString());
+  params.set('query_id', 'AAHdF6IQAAAAAN0XohDhrOrc');
+
+  const dataCheckString = Array.from(params.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([key, value]) => `${key}=${value}`)
+    .join('\n');
+
+  const secretKey = crypto.createHmac('sha256', 'WebAppData').update(botToken).digest();
+  const hash = crypto.createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
+
+  params.set('hash', hash);
+  return params.toString();
+}
 
 const app = createTestApp();
 
@@ -32,7 +61,14 @@ describe('POST /api/auth/register', () => {
       lastName: 'User',
     };
 
-    const response = await request(app).post('/api/auth/register').send(userData).expect(201);
+    // Create valid initData for the user
+    const initData = createValidInitData(userData);
+
+    const response = await request(app)
+      .post('/api/auth/register')
+      .set('x-telegram-init-data', initData)
+      .send(userData) // Body is now ignored, data comes from initData
+      .expect(201);
 
     // Check response structure
     expect(response.body).toHaveProperty('token');
@@ -58,14 +94,18 @@ describe('POST /api/auth/register', () => {
       username: 'existing',
     });
 
+    // Create initData for the same telegram_id
+    const initData = createValidInitData({
+      telegramId: 9000111222,
+      username: 'different_username', // Different username in initData
+      firstName: 'Test',
+    });
+
     // Try to register again
     const response = await request(app)
       .post('/api/auth/register')
-      .send({
-        telegramId: 9000111222,
-        username: 'different_username', // Different username
-        firstName: 'Test',
-      })
+      .set('x-telegram-init-data', initData)
+      .send({})
       .expect(200); // 200, not 201 for existing user
 
     // Should return existing user (not create new one)
@@ -73,14 +113,36 @@ describe('POST /api/auth/register', () => {
     expect(response.body.user.username).toBe('existing'); // Original username
   });
 
-  it('should reject registration without telegram_id', async () => {
+  it('should reject registration without x-telegram-init-data header', async () => {
     const response = await request(app)
       .post('/api/auth/register')
       .send({
+        telegramId: 9000123456,
         username: 'testuser',
         firstName: 'Test',
       })
-      .expect(400);
+      .expect(401);
+
+    expect(response.body).toHaveProperty('error');
+    expect(response.body.error).toContain('Telegram authentication required');
+  });
+
+  it('should reject registration with invalid initData signature', async () => {
+    const userData = {
+      telegramId: 9000123456,
+      username: 'testuser',
+      firstName: 'Test',
+    };
+
+    // Create valid initData and tamper with the hash
+    const initData = createValidInitData(userData);
+    const tamperedInitData = initData.replace(/hash=([a-f0-9]+)/, 'hash=deadbeef1234567890');
+
+    const response = await request(app)
+      .post('/api/auth/register')
+      .set('x-telegram-init-data', tamperedInitData)
+      .send(userData)
+      .expect(401);
 
     expect(response.body).toHaveProperty('error');
   });
