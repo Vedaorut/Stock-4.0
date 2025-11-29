@@ -113,7 +113,7 @@ export default function Follows() {
 
   return (
     <div
-      className="h-screen overflow-y-auto"
+      className="h-screen overflow-y-auto bg-[#181818]"
       style={{
         paddingTop: 'calc(env(safe-area-inset-top) + 56px)',
         paddingBottom: 'calc(var(--tabbar-total) + 20px)',
@@ -121,69 +121,78 @@ export default function Follows() {
     >
       <Header title={t('tabs.follows')} />
 
-      {/* Add button - fixed in header area */}
+      {/* Add button - fixed in header area with enhanced visuals */}
       <div
         className="fixed top-0 right-0 z-50 pr-4"
         style={{ paddingTop: 'calc(env(safe-area-inset-top) + 12px)' }}
       >
         <motion.button
           onClick={handleAddShop}
-          className="w-10 h-10 flex items-center justify-center rounded-xl bg-orange-primary/10 text-orange-primary"
-          whileTap={{ scale: 0.95 }}
+          className="w-10 h-10 flex items-center justify-center rounded-xl bg-gradient-to-br from-[#FF6B00]/20 to-[#FF6B00]/10 text-[#FF6B00] border border-[#FF6B00]/20 shadow-[0_0_15px_rgba(255,107,0,0.15)] backdrop-blur-sm"
+          whileTap={{ scale: 0.92 }}
+          whileHover={{ scale: 1.05 }}
         >
-          <PlusIcon className="w-5 h-5" />
+          <PlusIcon className="w-5 h-5 stroke-[2.5]" />
         </motion.button>
       </div>
 
-      <div className="px-4 py-6">
+      <div className="px-4 py-6 min-h-[calc(100vh-100px)]">
         {isLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="w-8 h-8 border-4 border-orange-primary border-t-transparent rounded-full animate-spin" />
+          <div className="flex items-center justify-center py-20">
+            <div className="relative w-10 h-10">
+                <div className="absolute inset-0 border-4 border-white/10 rounded-full"></div>
+                <div className="absolute inset-0 border-4 border-[#FF6B00] border-t-transparent rounded-full animate-spin"></div>
+            </div>
           </div>
         ) : error ? (
           <div className="flex flex-col items-center justify-center py-12 text-center">
-            <svg
-              className="w-16 h-16 text-red-500 mb-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-            <h3 className="text-lg font-semibold text-gray-400 mb-2">{error}</h3>
+            <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center mb-4">
+                <svg
+                  className="w-8 h-8 text-red-500"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+            </div>
+            <h3 className="text-lg font-semibold text-white mb-2">{error}</h3>
             <motion.button
               onClick={() => loadFollows()}
-              className="touch-target bg-orange-primary hover:bg-orange-light text-white font-semibold px-6 rounded-xl transition-colors duration-300 mt-4"
+              className="mt-4 px-6 py-3 bg-[#FF6B00] text-white font-semibold rounded-xl shadow-lg shadow-[#FF6B00]/20"
               whileTap={{ scale: 0.95 }}
             >
               Попробовать снова
             </motion.button>
           </div>
         ) : follows.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12 text-center">
-            <div className="w-20 h-20 rounded-2xl bg-white/5 flex items-center justify-center mb-4">
-              <svg
-                className="w-10 h-10 text-gray-500"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={1.5}
-                  d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
-                />
-              </svg>
+          <div className="flex flex-col items-center justify-center py-20 text-center">
+            <div className="relative w-24 h-24 mb-6">
+                <div className="absolute inset-0 bg-[#FF6B00]/10 blur-xl rounded-full"></div>
+                <div className="relative w-full h-full rounded-3xl bg-white/5 border border-white/10 flex items-center justify-center backdrop-blur-sm">
+                  <svg
+                    className="w-10 h-10 text-white/40"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1.5}
+                      d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
+                    />
+                  </svg>
+                </div>
             </div>
-            <h3 className="text-lg font-semibold text-white mb-2">Нет подписок</h3>
-            <p className="text-gray-400 text-sm mb-6">
-              Добавьте магазины через бота командой /follow
+            <h3 className="text-xl font-bold text-white mb-2">Нет подписок</h3>
+            <p className="text-white/50 text-sm max-w-[240px] leading-relaxed">
+              Добавьте магазины через бота командой <span className="text-[#FF6B00] font-mono bg-[#FF6B00]/10 px-1 rounded">/follow</span>
             </p>
           </div>
         ) : (
@@ -193,7 +202,7 @@ export default function Follows() {
                 key={follow.id}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.05 }}
+                transition={{ delay: index * 0.05, type: "spring", stiffness: 300, damping: 25 }}
               >
                 <FollowCard
                   follow={follow}

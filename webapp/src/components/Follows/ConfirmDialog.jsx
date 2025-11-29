@@ -13,10 +13,8 @@ const ConfirmDialog = ({
   cancelText = 'Отмена',
   danger = false,
 }) => {
-  // Spring animation preset
-  const controlSpring = { type: 'spring', stiffness: 400, damping: 32 };
-
-  // Telegram BackButton integration
+  const controlSpring = { type: 'spring', stiffness: 350, damping: 30 };
+  
   useBackButton(isOpen ? onClose : null);
 
   if (!isOpen) return null;
@@ -24,14 +22,14 @@ const ConfirmDialog = ({
   return (
     <AnimatePresence>
       <motion.div
-        className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+        className="fixed inset-0 bg-[#000]/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         onClick={onClose}
       >
         <motion.div
-          className="glass-elevated rounded-2xl p-6 w-full max-w-sm border border-white/10"
+          className="relative bg-[#1c1c1c] rounded-[28px] p-6 w-full max-w-[340px] border border-white/10 shadow-2xl"
           initial={{ scale: 0.9, opacity: 0, y: 20 }}
           animate={{ scale: 1, opacity: 1, y: 0 }}
           exit={{ scale: 0.9, opacity: 0, y: 20 }}
@@ -39,98 +37,68 @@ const ConfirmDialog = ({
           onClick={(e) => e.stopPropagation()}
         >
           {/* Icon */}
-          <motion.div
-            className={`w-12 h-12 rounded-full flex items-center justify-center mb-4 ${
-              danger ? 'bg-red-600/20' : 'bg-orange-primary/20'
-            }`}
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ delay: 0.1, ...controlSpring }}
-          >
-            {danger ? (
-              <ExclamationTriangleIcon className="w-6 h-6 text-red-400" />
-            ) : (
-              <InformationCircleIcon className="w-6 h-6 text-orange-primary" />
-            )}
-          </motion.div>
+          <div className="flex justify-center mb-5">
+            <motion.div
+              className={`w-16 h-16 rounded-2xl flex items-center justify-center ${
+                danger ? 'bg-red-500/10 text-red-500' : 'bg-[#FF6B00]/10 text-[#FF6B00]'
+              }`}
+              initial={{ rotate: -45, scale: 0 }}
+              animate={{ rotate: 0, scale: 1 }}
+              transition={{ delay: 0.1, type: 'spring' }}
+            >
+              {danger ? (
+                <ExclamationTriangleIcon className="w-8 h-8" />
+              ) : (
+                <InformationCircleIcon className="w-8 h-8" />
+              )}
+            </motion.div>
+          </div>
 
-          {/* Title */}
-          <motion.h3
-            className="text-white text-2xl font-bold tracking-tight mb-2"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.15, ...controlSpring }}
-          >
-            {title}
-          </motion.h3>
+          {/* Text */}
+          <div className="text-center mb-8">
+            <motion.h3
+              className="text-white text-xl font-bold mb-2"
+              initial={{ opacity: 0, y: 5 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+            >
+              {title}
+            </motion.h3>
+            <motion.p
+              className="text-white/50 text-[15px] leading-relaxed"
+              initial={{ opacity: 0, y: 5 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+            >
+              {message}
+            </motion.p>
+          </div>
 
-          {/* Message */}
-          <motion.p
-            className="text-gray-400 text-sm leading-relaxed mb-6"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2, ...controlSpring }}
-          >
-            {message}
-          </motion.p>
-
-          {/* Action Buttons */}
-          <motion.div
-            className="flex gap-3"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.25, ...controlSpring }}
-          >
+          {/* Buttons */}
+          <div className="flex gap-3">
             <motion.button
               onClick={onClose}
-              className="flex-1 bg-white/5 hover:bg-white/10 text-white py-3.5 rounded-xl font-semibold border border-white/10 transition-colors"
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              transition={controlSpring}
+              className="flex-1 bg-white/5 hover:bg-white/10 text-white font-semibold py-3.5 rounded-xl transition-colors border border-white/5"
+              whileTap={{ scale: 0.96 }}
             >
               {cancelText}
             </motion.button>
 
-            {danger ? (
-              <motion.button
-                onClick={() => {
-                  onConfirm();
-                  onClose();
-                }}
-                className="flex-1 bg-gradient-to-r from-red-600 to-red-500 text-white py-3.5 rounded-xl font-semibold shadow-lg"
-                whileHover={{
-                  scale: 1.02,
-                  boxShadow: '0 8px 24px rgba(220, 38, 38, 0.3)',
-                }}
-                whileTap={{
-                  scale: 0.98,
-                  boxShadow: 'inset 0 2px 8px rgba(0, 0, 0, 0.3)',
-                }}
-                transition={controlSpring}
-              >
-                {confirmText}
-              </motion.button>
-            ) : (
-              <motion.button
-                onClick={() => {
-                  onConfirm();
-                  onClose();
-                }}
-                className="flex-1 bg-gradient-to-r from-orange-primary to-orange-light text-white py-3.5 rounded-xl font-semibold shadow-lg"
-                whileHover={{
-                  scale: 1.02,
-                  boxShadow: '0 8px 24px rgba(255, 107, 0, 0.3)',
-                }}
-                whileTap={{
-                  scale: 0.98,
-                  boxShadow: 'inset 0 2px 8px rgba(0, 0, 0, 0.3)',
-                }}
-                transition={controlSpring}
-              >
-                {confirmText}
-              </motion.button>
-            )}
-          </motion.div>
+            <motion.button
+              onClick={() => {
+                onConfirm();
+                onClose();
+              }}
+              className={`flex-1 text-white font-semibold py-3.5 rounded-xl shadow-lg ${
+                  danger 
+                  ? 'bg-red-500 hover:bg-red-600 shadow-red-500/20' 
+                  : 'bg-[#FF6B00] hover:bg-[#FF8F00] shadow-[#FF6B00]/20'
+              }`}
+              whileTap={{ scale: 0.96 }}
+            >
+              {confirmText}
+            </motion.button>
+          </div>
         </motion.div>
       </motion.div>
     </AnimatePresence>

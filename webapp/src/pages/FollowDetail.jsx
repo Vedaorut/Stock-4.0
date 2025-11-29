@@ -89,15 +89,12 @@ export default function FollowDetail() {
 
       try {
         await updateMarkup(followDetailId, markupData);
-
-        // Update local state
         setFollow((prev) => ({
           ...prev,
           markup_type: markupData.markupType,
           markup_percentage: markupData.markupPercentage,
           markup_fixed: markupData.markupFixed,
         }));
-
         triggerHaptic('success');
       } catch (err) {
         console.error('[FollowDetail] Error updating markup:', err);
@@ -110,20 +107,12 @@ export default function FollowDetail() {
   // Handle mode switch
   const handleSwitchMode = useCallback(async () => {
     if (!followDetailId || !follow) return;
-
     const newMode = follow.mode === 'monitor' ? 'resell' : 'monitor';
-
     triggerHaptic('medium');
 
     try {
       await switchMode(followDetailId, newMode);
-
-      // Update local state
-      setFollow((prev) => ({
-        ...prev,
-        mode: newMode,
-      }));
-
+      setFollow((prev) => ({ ...prev, mode: newMode }));
       triggerHaptic('success');
     } catch (err) {
       console.error('[FollowDetail] Error switching mode:', err);
@@ -134,14 +123,10 @@ export default function FollowDetail() {
   // Handle delete
   const handleDelete = useCallback(async () => {
     if (!followDetailId) return;
-
     triggerHaptic('medium');
-
     try {
       await deleteFollow(followDetailId);
       triggerHaptic('success');
-
-      // Navigate back to follows list
       useStore.getState().setFollowDetailId(null);
     } catch (err) {
       console.error('[FollowDetail] Error deleting follow:', err);
@@ -155,13 +140,11 @@ export default function FollowDetail() {
   const markupType = follow?.markup_type || 'percentage';
   const markupPercentage = follow?.markup_percentage ?? 25;
   const markupFixed = follow?.markup_fixed ?? 0;
-
-  // Compute display markup for ActionsList
   const displayMarkup = markupType === 'percentage' ? markupPercentage : markupFixed;
 
   return (
     <div
-      className="h-screen overflow-y-auto"
+      className="h-screen overflow-y-auto bg-[#181818]"
       style={{
         paddingTop: 'calc(env(safe-area-inset-top) + 56px)',
         paddingBottom: 'calc(var(--tabbar-total) + 20px)',
@@ -172,27 +155,14 @@ export default function FollowDetail() {
       <div className="px-4 py-6 space-y-6">
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
-            <div className="w-8 h-8 border-4 border-orange-primary border-t-transparent rounded-full animate-spin" />
+            <div className="w-8 h-8 border-4 border-[#FF6B00] border-t-transparent rounded-full animate-spin" />
           </div>
         ) : error ? (
           <div className="flex flex-col items-center justify-center py-12 text-center">
-            <svg
-              className="w-16 h-16 text-red-500 mb-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-            <h3 className="text-lg font-semibold text-gray-400 mb-2">{error}</h3>
+            <h3 className="text-lg font-semibold text-white/50 mb-4">{error}</h3>
             <motion.button
               onClick={() => loadFollow()}
-              className="touch-target bg-orange-primary hover:bg-orange-light text-white font-semibold px-6 rounded-xl transition-colors duration-300 mt-4"
+              className="bg-[#FF6B00] text-white font-semibold px-6 py-2 rounded-xl"
               whileTap={{ scale: 0.95 }}
             >
               Try again
@@ -202,52 +172,53 @@ export default function FollowDetail() {
           <>
             {/* Shop Info Card */}
             <motion.div
-              className="glass-card rounded-2xl p-4 border border-white/10"
+              className="relative overflow-hidden rounded-3xl border border-white/10 p-6"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.05 }}
             >
-              <div className="flex items-center gap-4">
+              {/* Background Gradient */}
+              <div className="absolute inset-0 bg-gradient-to-br from-white/[0.08] to-transparent" />
+              
+              <div className="relative flex flex-col items-center gap-4 text-center">
                 {/* Shop Avatar */}
-                <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-orange-primary/20 to-orange-light/10 flex items-center justify-center flex-shrink-0">
-                  <span className="text-2xl font-bold text-orange-primary">
+                <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-[#FF6B00] to-[#FF8F00] shadow-lg shadow-[#FF6B00]/20 flex items-center justify-center text-white font-bold text-3xl">
                     {shopName.charAt(0).toUpperCase()}
-                  </span>
                 </div>
 
                 {/* Shop Info */}
-                <div className="flex-1 min-w-0">
-                  <h2 className="text-white font-semibold text-lg truncate">{shopName}</h2>
-                  <div className="flex items-center gap-2 mt-1">
+                <div className="w-full">
+                  <h2 className="text-white font-bold text-2xl mb-2">{shopName}</h2>
+                  <div className="flex items-center justify-center gap-2">
                     <span
-                      className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                      className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider border ${
                         mode === 'resell'
-                          ? 'bg-orange-primary/20 text-orange-primary'
-                          : 'bg-blue-500/20 text-blue-400'
+                          ? 'bg-[#FF6B00]/10 text-[#FF6B00] border-[#FF6B00]/20'
+                          : 'bg-blue-500/10 text-blue-400 border-blue-500/20'
                       }`}
                     >
                       {mode === 'resell' ? 'Resale' : 'Monitoring'}
                     </span>
                     {mode === 'resell' && (
-                      <span className="text-gray-400 text-xs">
+                      <span className="text-[#2ECC71] text-xs font-bold px-3 py-1 rounded-full bg-[#2ECC71]/10 border border-[#2ECC71]/20">
                         +{markupType === 'percentage' ? `${markupPercentage}%` : `$${markupFixed}`}
                       </span>
                     )}
                   </div>
                 </div>
-              </div>
 
-              {/* Stats Row */}
-              <div className="grid grid-cols-2 gap-3 mt-4 pt-4 border-t border-white/5">
-                <div className="text-center">
-                  <div className="text-white font-semibold">{follow.products_count || 0}</div>
-                  <div className="text-gray-400 text-xs">Products</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-white font-semibold">
-                    {new Date(follow.created_at).toLocaleDateString()}
+                {/* Stats Row */}
+                <div className="grid grid-cols-2 gap-px bg-white/10 w-full rounded-2xl overflow-hidden mt-2 border border-white/5">
+                  <div className="bg-white/[0.02] p-3 text-center hover:bg-white/[0.05] transition-colors">
+                    <div className="text-white font-bold text-lg">{follow.products_count || 0}</div>
+                    <div className="text-white/40 text-xs uppercase tracking-wide">Products</div>
                   </div>
-                  <div className="text-gray-400 text-xs">Since</div>
+                  <div className="bg-white/[0.02] p-3 text-center hover:bg-white/[0.05] transition-colors">
+                    <div className="text-white font-bold text-lg">
+                        {new Date(follow.created_at).toLocaleDateString(undefined, {day: 'numeric', month: 'short'})}
+                    </div>
+                    <div className="text-white/40 text-xs uppercase tracking-wide">Since</div>
+                  </div>
                 </div>
               </div>
             </motion.div>
@@ -279,7 +250,7 @@ export default function FollowDetail() {
         ) : null}
       </div>
 
-      {/* Markup Modal */}
+      {/* Modals */}
       <MarkupSliderModal
         isOpen={isMarkupModalOpen}
         onClose={() => setIsMarkupModalOpen(false)}
@@ -289,7 +260,6 @@ export default function FollowDetail() {
         currentMarkupFixed={markupFixed}
       />
 
-      {/* Switch Mode Confirm Dialog */}
       <ConfirmDialog
         isOpen={isSwitchModeDialogOpen}
         onClose={() => setIsSwitchModeDialogOpen(false)}
@@ -297,20 +267,19 @@ export default function FollowDetail() {
         title="Switch Mode"
         message={
           mode === 'monitor'
-            ? 'Switch to Resale mode? Products from this shop will be added to your catalog with your markup.'
-            : 'Switch to Monitoring mode? Products will only be tracked but not added to your catalog.'
+            ? 'Switch to Resale mode? Products will be added to your catalog with your markup.'
+            : 'Switch to Monitoring mode? Products will only be tracked.'
         }
         confirmText="Switch"
         cancelText="Cancel"
       />
 
-      {/* Delete Confirm Dialog */}
       <ConfirmDialog
         isOpen={isDeleteDialogOpen}
         onClose={() => setIsDeleteDialogOpen(false)}
         onConfirm={handleDelete}
         title="Delete Subscription"
-        message="Are you sure you want to delete this subscription? All synced products will be removed from your catalog. This action cannot be undone."
+        message="Are you sure? All synced products will be removed. This cannot be undone."
         confirmText="Delete"
         cancelText="Cancel"
         danger
