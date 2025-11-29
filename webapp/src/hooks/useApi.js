@@ -258,9 +258,17 @@ export function useFollowsApi() {
       },
 
       // Изменить наценку
-      updateMarkup: async (followId, markupPercentage) => {
+      updateMarkup: async (followId, markupData) => {
         try {
-          const response = await api.put(`/follows/${followId}/markup`, { markupPercentage });
+          // Support both old (number) and new (object) format for backward compatibility
+          const payload = typeof markupData === 'number' 
+            ? { markupPercentage: markupData, markupType: 'percentage' }
+            : {
+                markupType: markupData.markupType || 'percentage',
+                markupPercentage: markupData.markupPercentage || 0,
+                markupFixed: markupData.markupFixed || 0,
+              };
+          const response = await api.put(`/follows/${followId}/markup`, payload);
           return response.data;
         } catch (error) {
           console.error('Error updating markup:', error);
@@ -269,10 +277,24 @@ export function useFollowsApi() {
       },
 
       // Сменить режим
-      switchMode: async (followId, mode, markupPercentage = null) => {
+      switchMode: async (followId, mode, markupData = null) => {
         try {
           const body = { mode };
-          if (markupPercentage !== null) body.markupPercentage = markupPercentage;
+          
+          // Support both old (number) and new (object) format for backward compatibility
+          if (markupData !== null) {
+            if (typeof markupData === 'number') {
+              // Old format: just markupPercentage
+              body.markupPercentage = markupData;
+              body.markupType = 'percentage';
+            } else {
+              // New format: { markupType, markupPercentage, markupFixed }
+              body.markupType = markupData.markupType || 'percentage';
+              body.markupPercentage = markupData.markupPercentage || 0;
+              body.markupFixed = markupData.markupFixed || 0;
+            }
+          }
+          
           const response = await api.put(`/follows/${followId}/mode`, body);
           return response.data;
         } catch (error) {

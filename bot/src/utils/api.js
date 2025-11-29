@@ -823,11 +823,20 @@ export const followApi = {
     return data.data || data;
   },
 
-  // Update markup
-  async updateMarkup(followId, markupPercentage, token) {
+  // Update markup - supports both number (legacy) and object (new)
+  async updateMarkup(followId, markupData, token) {
+    // Backward compatible: if markupData is a number, treat as percentage
+    const payload = typeof markupData === 'number'
+      ? { markupPercentage: markupData, markupType: 'percentage' }
+      : {
+          markupType: markupData.markupType || 'percentage',
+          markupPercentage: markupData.markupPercentage || 0,
+          markupFixed: markupData.markupFixed || 0,
+        };
+
     const { data } = await api.put(
       `/follows/${followId}/markup`,
-      { markupPercentage: Number(markupPercentage) },
+      payload,
       {
         headers: { Authorization: `Bearer ${token}` },
       }
@@ -836,10 +845,21 @@ export const followApi = {
   },
 
   // Switch mode (monitor ↔ resell)
-  async switchMode(followId, mode, token, markupPercentage = null) {
+  // Supports both old format (markupData as number) and new format (markupData as object)
+  async switchMode(followId, mode, token, markupData = null) {
     const requestBody = { mode };
-    if (markupPercentage !== null) {
-      requestBody.markupPercentage = Number(markupPercentage);
+
+    if (markupData !== null) {
+      if (typeof markupData === 'number') {
+        // Old format: just a number (treated as percentage)
+        requestBody.markupPercentage = Number(markupData);
+        requestBody.markupType = 'percentage';
+      } else {
+        // New format: { markupType, markupPercentage, markupFixed }
+        requestBody.markupType = markupData.markupType || 'percentage';
+        requestBody.markupPercentage = markupData.markupPercentage || 0;
+        requestBody.markupFixed = markupData.markupFixed || 0;
+      }
     }
 
     const { data } = await api.put(`/follows/${followId}/mode`, requestBody, {

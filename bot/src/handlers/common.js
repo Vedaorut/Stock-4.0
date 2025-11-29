@@ -1,7 +1,8 @@
+import { Markup } from 'telegraf';
 import { mainMenu } from '../keyboards/main.js';
 import { sellerMenu } from '../keyboards/seller.js';
 import { buyerMenu } from '../keyboards/buyer.js';
-import { authApi } from '../utils/api.js';
+import { authApi, shopApi } from '../utils/api.js';
 import { handleSellerRole } from './seller/index.js';
 import { handleBuyerRole } from './buyer/index.js';
 import logger from '../utils/logger.js';
@@ -34,8 +35,16 @@ export const setupCommonHandlers = (bot) => {
   // Generic back action
   bot.action('back', handleBack);
 
-  // Role toggle action
+  // Role toggle action - show role selection menu
   bot.action('role:toggle', handleRoleToggle);
+
+  // Role selection actions
+  bot.action('role:buyer', handleRoleBuyer);
+  bot.action('role:seller', handleRoleSeller);
+  bot.action('role:worker', handleRoleWorker);
+
+  // Workspace shop selection
+  bot.action(/^workspace:(\d+)$/, handleSelectWorkspace);
 };
 
 /**
@@ -151,56 +160,254 @@ const handleBack = async (ctx) => {
 };
 
 /**
- * Handle role toggle action
+ * Handle role toggle action - show role selection menu
  */
 const handleRoleToggle = async (ctx) => {
   try {
     await ctx.answerCbQuery();
 
-    // Determine current role
-    const currentRole = ctx.session.role || ctx.session.user?.selectedRole;
-
-    if (!currentRole) {
-      logger.warn(`User ${ctx.from.id} tried to toggle role without current role`);
-      await smartMessage.send(ctx, {
-        text: startMessages.welcome,
-        keyboard: mainMenu(),
-      });
-      return;
+    // Check if user has workspace shops to show Worker option
+    let hasWorkspaceShops = false;
+    if (ctx.session.token) {
+      try {
+        const workspaceShops = await shopApi.getWorkerShops(ctx.session.token);
+        hasWorkspaceShops = Array.isArray(workspaceShops) && workspaceShops.length > 0;
+      } catch (error) {
+        logger.warn('Failed to check workspace shops:', error.message);
+      }
     }
 
-    // Toggle role
-    const newRole = currentRole === 'seller' ? 'buyer' : 'seller';
-    logger.info(`User ${ctx.from.id} toggling role from ${currentRole} to ${newRole}`);
+    // Build role selection keyboard
+    const buttons = [
+      [Markup.button.callback('\u{1F464} Покупатель', 'role:buyer')],
+      [Markup.button.callback('\u{1F3EA} Продавец', 'role:seller')],
+    ];
+
+    // Only show Worker option if user has workspace shops
+    if (hasWorkspaceShops) {
+      buttons.push([Markup.button.callback('\u{1F477} Работник', 'role:worker')]);
+    }
+
+    await smartMessage.send(ctx, {
+      text: 'Выберите роль:',
+      keyboard: Markup.inlineKeyboard(buttons),
+    });
+  } catch (error) {
+    logger.error('Error in role toggle handler:', error);
+    try {
+      await smartMessage.send(ctx, {
+        text: generalMessages.actionFailed,
+        keyboard: mainMenu(),
+      });
+    } catch (replyError) {
+      logger.error('Failed to send error message:', replyError);
+    }
+  }
+};
+
+/**
+ * Handle role:buyer action - switch to buyer role
+ */
+const handleRoleBuyer = async (ctx) => {
+  try {
+    await ctx.answerCbQuery();
+
+    logger.info(`User ${ctx.from.id} switching to buyer role`);
 
     // Save role to database
     try {
       if (ctx.session.token) {
-        await authApi.updateRole(newRole, ctx.session.token);
-        ctx.session.role = newRole;
+        await authApi.updateRole('buyer', ctx.session.token);
+        ctx.session.role = 'buyer';
+        ctx.session.workspaceShopId = null; // Clear workspace
         if (ctx.session.user) {
-          ctx.session.user.selectedRole = newRole;
+          ctx.session.user.selectedRole = 'buyer';
         }
-        logger.info(`Saved ${newRole} role for user ${ctx.from.id}`);
+        logger.info(`Saved buyer role for user ${ctx.from.id}`);
       } else {
         logger.warn(`User ${ctx.from.id} has no token, cannot save role`);
-        ctx.session.role = newRole;
+        ctx.session.role = 'buyer';
       }
     } catch (error) {
-      logger.error('Failed to save toggled role:', error);
-      // Continue anyway with local role change
-      ctx.session.role = newRole;
+      logger.error('Failed to save buyer role:', error);
+      ctx.session.role = 'buyer';
     }
 
-    // Redirect to appropriate handler
-    if (newRole === 'seller') {
-      await handleSellerRole(ctx);
-    } else {
-      await handleBuyerRole(ctx);
-    }
+    await handleBuyerRole(ctx);
   } catch (error) {
-    logger.error('Error in role toggle handler:', error);
-    // Local error handling - don't throw to avoid infinite spinner
+    logger.error('Error in role:buyer handler:', error);
+    try {
+      await smartMessage.send(ctx, {
+        text: generalMessages.actionFailed,
+        keyboard: mainMenu(),
+      });
+    } catch (replyError) {
+      logger.error('Failed to send error message:', replyError);
+    }
+  }
+};
+
+/**
+ * Handle role:seller action - switch to seller role
+ */
+const handleRoleSeller = async (ctx) => {
+  try {
+    await ctx.answerCbQuery();
+
+    logger.info(`User ${ctx.from.id} switching to seller role`);
+
+    // Save role to database
+    try {
+      if (ctx.session.token) {
+        await authApi.updateRole('seller', ctx.session.token);
+        ctx.session.role = 'seller';
+        ctx.session.workspaceShopId = null; // Clear workspace
+        if (ctx.session.user) {
+          ctx.session.user.selectedRole = 'seller';
+        }
+        logger.info(`Saved seller role for user ${ctx.from.id}`);
+      } else {
+        logger.warn(`User ${ctx.from.id} has no token, cannot save role`);
+        ctx.session.role = 'seller';
+      }
+    } catch (error) {
+      logger.error('Failed to save seller role:', error);
+      ctx.session.role = 'seller';
+    }
+
+    await handleSellerRole(ctx);
+  } catch (error) {
+    logger.error('Error in role:seller handler:', error);
+    try {
+      await smartMessage.send(ctx, {
+        text: generalMessages.actionFailed,
+        keyboard: mainMenu(),
+      });
+    } catch (replyError) {
+      logger.error('Failed to send error message:', replyError);
+    }
+  }
+};
+
+/**
+ * Handle role:worker action - enter workspace mode
+ */
+const handleRoleWorker = async (ctx) => {
+  try {
+    // Check for workspace shops
+    if (!ctx.session.token) {
+      await ctx.answerCbQuery('\u274C Требуется авторизация', { show_alert: true });
+      return;
+    }
+
+    let workspaceShops;
+    try {
+      workspaceShops = await shopApi.getWorkerShops(ctx.session.token);
+    } catch (error) {
+      logger.error('Failed to get workspace shops:', error);
+      await ctx.answerCbQuery('\u274C Ошибка загрузки магазинов', { show_alert: true });
+      return;
+    }
+
+    // No workspace shops
+    if (!Array.isArray(workspaceShops) || workspaceShops.length === 0) {
+      await ctx.answerCbQuery('\u274C Вы не являетесь работником ни одного магазина', {
+        show_alert: true,
+      });
+      return;
+    }
+
+    await ctx.answerCbQuery();
+
+    // If only 1 shop - directly enter workspace
+    if (workspaceShops.length === 1) {
+      const shop = workspaceShops[0];
+      logger.info(`User ${ctx.from.id} entering workspace for shop ${shop.id} (${shop.name})`);
+
+      ctx.session.role = 'worker';
+      ctx.session.workspaceShopId = shop.id;
+      ctx.session.selectedShop = shop;
+
+      // Workers have seller-like access - redirect to seller menu
+      await handleSellerRole(ctx);
+      return;
+    }
+
+    // Multiple shops - show selection
+    const buttons = workspaceShops.map((shop) => [
+      Markup.button.callback(`\u{1F3EA} ${shop.name}`, `workspace:${shop.id}`),
+    ]);
+
+    // Add back button
+    buttons.push([Markup.button.callback('\u2B05 Назад', 'role:toggle')]);
+
+    await smartMessage.send(ctx, {
+      text: 'Выберите магазин для работы:',
+      keyboard: Markup.inlineKeyboard(buttons),
+    });
+  } catch (error) {
+    logger.error('Error in role:worker handler:', error);
+    try {
+      await ctx.answerCbQuery('\u274C Произошла ошибка', { show_alert: true });
+    } catch (cbError) {
+      logger.error('Failed to answer callback:', cbError);
+    }
+    try {
+      await smartMessage.send(ctx, {
+        text: generalMessages.actionFailed,
+        keyboard: mainMenu(),
+      });
+    } catch (replyError) {
+      logger.error('Failed to send error message:', replyError);
+    }
+  }
+};
+
+/**
+ * Handle workspace shop selection
+ */
+const handleSelectWorkspace = async (ctx) => {
+  try {
+    const shopId = parseInt(ctx.match[1], 10);
+
+    if (!ctx.session.token) {
+      await ctx.answerCbQuery('\u274C Требуется авторизация', { show_alert: true });
+      return;
+    }
+
+    // Verify user has access to this shop
+    let workspaceShops;
+    try {
+      workspaceShops = await shopApi.getWorkerShops(ctx.session.token);
+    } catch (error) {
+      logger.error('Failed to verify workspace access:', error);
+      await ctx.answerCbQuery('\u274C Ошибка проверки доступа', { show_alert: true });
+      return;
+    }
+
+    const shop = workspaceShops?.find((s) => s.id === shopId);
+    if (!shop) {
+      await ctx.answerCbQuery('\u274C У вас нет доступа к этому магазину', { show_alert: true });
+      return;
+    }
+
+    await ctx.answerCbQuery();
+
+    logger.info(`User ${ctx.from.id} entering workspace for shop ${shop.id} (${shop.name})`);
+
+    ctx.session.role = 'worker';
+    ctx.session.workspaceShopId = shop.id;
+    ctx.session.selectedShop = shop;
+
+    // Workers have seller-like access - redirect to seller menu
+    await handleSellerRole(ctx);
+  } catch (error) {
+    logger.error('Error in workspace selection handler:', error);
+    try {
+      await ctx.answerCbQuery('\u274C Произошла ошибка', { show_alert: true });
+    } catch (cbError) {
+      logger.error('Failed to answer callback:', cbError);
+    }
     try {
       await smartMessage.send(ctx, {
         text: generalMessages.actionFailed,

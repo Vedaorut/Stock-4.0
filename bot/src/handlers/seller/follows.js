@@ -25,9 +25,21 @@ const formatMoney = (value) => {
 const buildFollowLabel = (follow) => {
   const name = follow.source_shop_name || follow.sourceShopName || follow.name || 'Магазин';
   const isResell = follow.mode === 'resell';
-  const markupRaw = isResell ? Number(follow.markup_percentage ?? follow.markup ?? 0) : null;
-  const markupSuffix =
-    isResell && Number.isFinite(markupRaw) ? ` (+${Math.round(markupRaw)}%)` : '';
+  const markupType = follow.markup_type || 'percentage';
+  let markupSuffix = '';
+  if (isResell) {
+    if (markupType === 'fixed') {
+      const fixedValue = Number(follow.markup_fixed ?? 0);
+      if (Number.isFinite(fixedValue) && fixedValue > 0) {
+        markupSuffix = ` (+$${fixedValue})`;
+      }
+    } else {
+      const percentValue = Number(follow.markup_percentage ?? follow.markup ?? 0);
+      if (Number.isFinite(percentValue) && percentValue > 0) {
+        markupSuffix = ` (+${Math.round(percentValue)}%)`;
+      }
+    }
+  }
   const modeLabel = isResell ? 'Перепродажа' : 'Мониторинг';
   return `🏪 ${name} (${modeLabel}${markupSuffix})`;
 };
@@ -43,15 +55,43 @@ const sendOrEdit = async (ctx, text, keyboard) => {
 const formatProductLine = (index, name, price, stock) =>
   `${index + 1}. ${name} • $${formatMoney(price)} • ${Number.isFinite(stock) ? stock : 0} шт`;
 
+const formatPriceWithMarkup = (sourcePrice, markupType, markupValue) => {
+  const price = Number(sourcePrice) || 0;
+  let finalPrice;
+  let markupSuffix;
+
+  if (markupType === 'fixed') {
+    const fixed = Number(markupValue) || 0;
+    finalPrice = price + fixed;
+    markupSuffix = fixed > 0 ? `(+$${fixed})` : '';
+  } else {
+    const percent = Number(markupValue) || 0;
+    finalPrice = price * (1 + percent / 100);
+    markupSuffix = percent > 0 ? `(+${Math.round(percent)}%)` : '';
+  }
+
+  return `$${formatMoney(price)} → $${formatMoney(finalPrice)} ${markupSuffix}`.trim();
+};
+
 const buildCatalogMessage = (followInfo, products, mode) => {
   const lines = [];
   const shopName = followInfo.source_shop_name || followInfo.sourceShopName || 'Магазин';
   const isResell = mode === 'resell';
-  const markupRaw = isResell
-    ? Number(followInfo.markup_percentage ?? followInfo.markup ?? 0)
-    : null;
-  const markupSuffix =
-    isResell && Number.isFinite(markupRaw) ? ` (+${Math.round(markupRaw)}%)` : '';
+  const markupType = followInfo.markup_type || 'percentage';
+  let markupSuffix = '';
+  if (isResell) {
+    if (markupType === 'fixed') {
+      const fixedValue = Number(followInfo.markup_fixed ?? 0);
+      if (Number.isFinite(fixedValue) && fixedValue > 0) {
+        markupSuffix = ` (+$${fixedValue})`;
+      }
+    } else {
+      const percentValue = Number(followInfo.markup_percentage ?? followInfo.markup ?? 0);
+      if (Number.isFinite(percentValue) && percentValue > 0) {
+        markupSuffix = ` (+${Math.round(percentValue)}%)`;
+      }
+    }
+  }
   const modeLabel = isResell ? `Перепродажа${markupSuffix}` : 'Мониторинг';
 
   lines.push(`🏪 ${shopName}`);
@@ -63,15 +103,20 @@ const buildCatalogMessage = (followInfo, products, mode) => {
     return lines.join('\n');
   }
 
+  const markupValue = markupType === 'fixed'
+    ? (followInfo.markup_fixed ?? 0)
+    : (followInfo.markup_percentage ?? followInfo.markup ?? 0);
+
   products.slice(0, 10).forEach((product, index) => {
     if (isResell) {
       const synced = product.synced_product || product.syncedProduct || {};
       const name =
         synced.name || product.source_product?.name || product.name || `Товар #${product.id}`;
-      const price =
-        synced.price ?? product.pricing?.expected_price ?? product.source_product?.price ?? 0;
+      const sourcePrice = product.source_product?.price ?? 0;
       const stock = synced.stock_quantity ?? product.source_product?.stock_quantity ?? 0;
-      lines.push(formatProductLine(index, name, price, stock));
+      const priceStr = formatPriceWithMarkup(sourcePrice, markupType, markupValue);
+      lines.push(`${index + 1}. ${name}`);
+      lines.push(`   💰 ${priceStr} • ${Number.isFinite(stock) ? stock : 0} шт`);
     } else {
       const name = product.name || `Товар #${product.id}`;
       const price = product.price ?? 0;

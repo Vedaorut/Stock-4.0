@@ -32,7 +32,11 @@ const formatFollowResponse = (follow) => {
     return null;
   }
 
-  const markup = follow.mode === 'resell' ? toNumber(follow.markup_percentage, 0) : 0;
+  const markupType = follow.markup_type || 'percentage';
+  const markupPercentage = follow.mode === 'resell' && markupType === 'percentage'
+    ? toNumber(follow.markup_percentage, 0) : 0;
+  const markupFixed = follow.mode === 'resell' && markupType === 'fixed'
+    ? toNumber(follow.markup_fixed, 0) : 0;
 
   return {
     id: follow.id,
@@ -45,7 +49,9 @@ const formatFollowResponse = (follow) => {
     source_owner_id: follow.source_owner_id || null,
     source_username: follow.source_username || null,
     mode: follow.mode,
-    markup_percentage: markup,
+    markup_type: markupType,
+    markup_percentage: markupPercentage,
+    markup_fixed: markupFixed,
     status: follow.status,
     synced_products_count: toNumber(follow.synced_products_count, 0),
     source_products_count: toNumber(follow.source_products_count, 0),
@@ -275,12 +281,14 @@ export const createFollow = asyncHandler(async (req, res) => {
     const followerShopIdRaw = req.body.followerShopId ?? req.body.follower_shop_id;
     const sourceShopIdRaw =
       req.body.sourceShopId ?? req.body.source_shop_id ?? req.body.target_shop_id;
-    const { mode, markupPercentage } = req.body;
+    const { mode, markupPercentage, markupType: rawMarkupType, markupFixed } = req.body;
 
     const followerId = Number.parseInt(followerShopIdRaw, 10);
     const sourceId = Number.parseInt(sourceShopIdRaw, 10);
     const normalizedMode = typeof mode === 'string' ? mode.trim().toLowerCase() : '';
-    const markupValue = markupPercentage !== undefined ? Number(markupPercentage) : undefined;
+    const markupTypeValue = rawMarkupType === 'fixed' ? 'fixed' : 'percentage';
+    const markupPercentageValue = markupPercentage !== undefined ? Number(markupPercentage) : undefined;
+    const markupFixedValue = markupFixed !== undefined ? Number(markupFixed) : 0;
 
     // Validation
     if (!Number.isInteger(followerId) || followerId <= 0) {
@@ -300,13 +308,22 @@ export const createFollow = asyncHandler(async (req, res) => {
     }
 
     if (normalizedMode === 'resell') {
-      if (!Number.isFinite(markupValue)) {
-        throw new ValidationError('Markup percentage is required for resell mode');
-      }
-
-      // P1-SEC-007: Limit markup to 0.1-200% to prevent extreme pricing
-      if (markupValue < 0.1 || markupValue > 200) {
-        throw new ValidationError('Markup must be between 0.1% and 200%');
+      if (markupTypeValue === 'percentage') {
+        if (!Number.isFinite(markupPercentageValue)) {
+          throw new ValidationError('Markup percentage is required for resell mode with percentage type');
+        }
+        // P1-SEC-007: Limit markup to 0.1-200% to prevent extreme pricing
+        if (markupPercentageValue < 0.1 || markupPercentageValue > 200) {
+          throw new ValidationError('Markup must be between 0.1% and 200%');
+        }
+      } else if (markupTypeValue === 'fixed') {
+        if (!Number.isFinite(markupFixedValue) || markupFixedValue < 0) {
+          throw new ValidationError('Fixed markup must be a non-negative number');
+        }
+        // Limit fixed markup to reasonable amount (e.g., $1000)
+        if (markupFixedValue > 1000) {
+          throw new ValidationError('Fixed markup cannot exceed $1000');
+        }
       }
     }
 
@@ -367,10 +384,17 @@ export const createFollow = asyncHandler(async (req, res) => {
       }
 
       const insertResult = await client.query(
-        `INSERT INTO shop_follows (follower_shop_id, source_shop_id, mode, markup_percentage, status)
-         VALUES ($1, $2, $3, $4, 'active')
+        `INSERT INTO shop_follows (follower_shop_id, source_shop_id, mode, markup_type, markup_percentage, markup_fixed, status)
+         VALUES ($1, $2, $3, $4, $5, $6, 'active')
          RETURNING *`,
-        [followerId, sourceId, normalizedMode, normalizedMode === 'resell' ? markupValue : 0]
+        [
+          followerId,
+          sourceId,
+          normalizedMode,
+          normalizedMode === 'resell' ? markupTypeValue : 'percentage',
+          normalizedMode === 'resell' && markupTypeValue === 'percentage' ? markupPercentageValue : 0,
+          normalizedMode === 'resell' && markupTypeValue === 'fixed' ? markupFixedValue : 0,
+        ]
       );
 
       follow = insertResult.rows[0];
@@ -461,18 +485,32 @@ export const createFollow = asyncHandler(async (req, res) => {
 export const updateFollowMarkup = asyncHandler(async (req, res) => {
   try {
     const { id } = req.params;
-    const markupValueRaw = req.body.markupPercentage ?? req.body.markup_percentage;
-    const markupPercentage = Number(markupValueRaw);
+    const markupPercentageRaw = req.body.markupPercentage ?? req.body.markup_percentage;
+    const markupFixedRaw = req.body.markupFixed ?? req.body.markup_fixed;
+    const markupTypeRaw = req.body.markupType ?? req.body.markup_type;
 
     const followId = Number.parseInt(id, 10);
+    const markupType = markupTypeRaw === 'fixed' ? 'fixed' : 'percentage';
+    const markupPercentage = Number(markupPercentageRaw);
+    const markupFixed = Number(markupFixedRaw) || 0;
 
     if (!Number.isInteger(followId) || followId <= 0) {
       throw new ValidationError('Invalid follow ID');
     }
 
-    // P1-SEC-007: Limit markup to 0.1-200%
-    if (!Number.isFinite(markupPercentage) || markupPercentage < 0.1 || markupPercentage > 200) {
-      throw new ValidationError('Markup must be between 0.1% and 200%');
+    // Validate based on markup type
+    if (markupType === 'percentage') {
+      // P1-SEC-007: Limit markup to 0.1-200%
+      if (!Number.isFinite(markupPercentage) || markupPercentage < 0.1 || markupPercentage > 200) {
+        throw new ValidationError('Markup must be between 0.1% and 200%');
+      }
+    } else if (markupType === 'fixed') {
+      if (!Number.isFinite(markupFixed) || markupFixed < 0) {
+        throw new ValidationError('Fixed markup must be a non-negative number');
+      }
+      if (markupFixed > 1000) {
+        throw new ValidationError('Fixed markup cannot exceed $1000');
+      }
     }
 
     const existingFollow = await shopFollowQueries.findById(followId);
@@ -489,10 +527,11 @@ export const updateFollowMarkup = asyncHandler(async (req, res) => {
       throw new ValidationError('Markup can only be updated in resell mode');
     }
 
-    await shopFollowQueries.updateMarkup(followId, markupPercentage);
+    await shopFollowQueries.updateMarkup(followId, markupPercentage, markupType, markupFixed);
 
     // Update all synced products with new markup
-    await updateMarkupForFollow(followId, markupPercentage);
+    const markupValue = markupType === 'fixed' ? markupFixed : markupPercentage;
+    await updateMarkupForFollow(followId, markupType, markupValue);
 
     const updatedFollow = await shopFollowQueries.findById(followId);
     res.json({ success: true, data: formatFollowResponse(updatedFollow) });

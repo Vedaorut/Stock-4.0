@@ -717,6 +717,12 @@ export const useStore = create(
       // Follow Products
       followProducts: [],
       setFollowProducts: (products) => set({ followProducts: products }),
+
+      // Worker Mode
+      workspaceShopId: null,
+      setWorkspaceShopId: (id) => set({ workspaceShopId: id }),
+      isWorkerMode: false,
+      setIsWorkerMode: (val) => set({ isWorkerMode: val }),
     }),
     {
       name: 'status-stock-storage',

@@ -77,12 +77,13 @@ const confirmAndAdd = async (ctx) => {
           resolvedId: telegramId,
         });
       } catch (lookupError) {
-        logger.warn('Failed to resolve username for worker', {
-          lookup: input,
-          error: lookupError.message,
+        // FALLBACK: getChat не сработал - отправим username на backend для поиска в БД
+        logger.info('manage_workers_username_fallback', {
+          requester: ctx.from.id,
+          username: usernameInput,
+          reason: lookupError.message,
         });
-        await smartMessage.send(ctx, { text: sellerMessages.workerAddNotFound });
-        return;
+        telegramId = null; // Backend будет искать только по username
       }
     } else if (/^\d+$/.test(input)) {
       telegramId = Number.parseInt(input, 10);
@@ -96,6 +97,12 @@ const confirmAndAdd = async (ctx) => {
     }
 
     ctx.wizard.state.telegramId = telegramId;
+
+    // Если нет ни telegramId, ни username - это ошибка
+    if (!telegramId && !usernameInput) {
+      await smartMessage.send(ctx, { text: sellerMessages.workerAddNotFound });
+      return;
+    }
 
     logger.info('manage_workers_step:confirm', {
       userId: ctx.from.id,
@@ -154,10 +161,17 @@ const confirmAndAdd = async (ctx) => {
     await smartMessage.send(ctx, { text: sellerMessages.workerAdding });
 
     try {
+      logger.info('worker_add_request', {
+        shopId: ctx.session.shopId,
+        telegramId,
+        username: usernameInput,
+        requestedBy: ctx.from.id,
+      });
+
       const worker = await workerApi.addWorker(
         ctx.session.shopId,
         {
-          telegram_id: telegramId,
+          telegram_id: telegramId || undefined,
           username: usernameInput ? `@${usernameInput}` : undefined,
         },
         ctx.session.token
@@ -196,6 +210,8 @@ const confirmAndAdd = async (ctx) => {
           errorMessage = sellerMessages.workerAddAlready;
         } else if (apiError.includes('owner cannot be added')) {
           errorMessage = sellerMessages.workerAddOwner;
+        } else if (apiError.includes('PRO subscription') || apiError.includes('Workspace feature')) {
+          errorMessage = 'Функция Workspace доступна только для PRO магазинов. Обновите подписку.';
         }
       }
 

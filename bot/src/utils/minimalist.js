@@ -341,13 +341,16 @@ export function formatFollowsList(follows) {
   }
   const header = messages.follows.listHeader(follows.length);
   const lines = follows.map((follow, index) => {
-    const markupRaw = follow.markup_percentage ?? follow.markup ?? null;
-    const markupValue = Number.isFinite(Number(markupRaw)) ? Number(markupRaw) : null;
+    const markupType = follow.markup_type || 'percentage';
+    const markupPercentage = follow.markup_percentage ?? follow.markup ?? 0;
+    const markupFixed = follow.markup_fixed ?? 0;
     return messages.follows.listItem({
       index: index + 1,
       name: follow.source_shop_name || follow.sourceShopName || follow.name || 'Магазин',
       mode: follow.mode,
-      markup: markupValue,
+      markupType,
+      markupPercentage: Number.isFinite(Number(markupPercentage)) ? Number(markupPercentage) : 0,
+      markupFixed: Number.isFinite(Number(markupFixed)) ? Number(markupFixed) : 0,
     });
   });
   return `${header}\n\n${lines.join('\n')}\n\n${messages.follows.listManageHint}`;
@@ -360,8 +363,9 @@ export function formatFollowsList(follows) {
  * @returns {string} Formatted message
  */
 export function formatFollowDetail(follow) {
-  const markupRaw = follow.markup_percentage ?? follow.markup ?? 0;
-  const markupValue = Number.isFinite(Number(markupRaw)) ? Number(markupRaw) : null;
+  const markupType = follow.markup_type || 'percentage';
+  const markupPercentage = follow.markup_percentage ?? follow.markup ?? 0;
+  const markupFixed = follow.markup_fixed ?? 0;
   const sourceProducts =
     follow.source_products_count ?? follow.products_count ?? follow.productsCount ?? 0;
   const syncedProducts =
@@ -370,7 +374,9 @@ export function formatFollowDetail(follow) {
   return messages.follows.detail({
     name: follow.source_shop_name || follow.name || 'Магазин',
     mode: follow.mode,
-    markup: markupValue,
+    markupType,
+    markupPercentage: Number.isFinite(Number(markupPercentage)) ? Number(markupPercentage) : 0,
+    markupFixed: Number.isFinite(Number(markupFixed)) ? Number(markupFixed) : 0,
     sourceProducts,
     syncedProducts,
   });

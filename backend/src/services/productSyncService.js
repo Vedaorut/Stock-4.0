@@ -12,11 +12,17 @@ import { getClient } from '../config/database.js';
 /**
  * Calculate price with markup
  * @param {number} sourcePrice - Original price
- * @param {number} markupPercentage - Markup percentage (e.g., 20 for 20%)
+ * @param {string} markupType - Markup type ('percentage' or 'fixed')
+ * @param {number} markupValue - Markup value (percentage or fixed dollar amount)
  * @returns {number} Price with markup (rounded to 2 decimals)
  */
-export function calculatePriceWithMarkup(sourcePrice, markupPercentage) {
-  return Math.round(parseFloat(sourcePrice) * (1 + markupPercentage / 100) * 100) / 100;
+export function calculatePriceWithMarkup(sourcePrice, markupType, markupValue) {
+  const price = parseFloat(sourcePrice);
+  if (markupType === 'fixed') {
+    return Math.round((price + parseFloat(markupValue)) * 100) / 100;
+  }
+  // percentage (default)
+  return Math.round(price * (1 + markupValue / 100) * 100) / 100;
 }
 
 /**
@@ -79,7 +85,9 @@ export async function copyProductWithMarkup(sourceProductId, followId) {
     }
 
     // Calculate price with markup
-    const newPrice = calculatePriceWithMarkup(sourceProduct.price, follow.markup_percentage);
+    const markupType = follow.markup_type || 'percentage';
+    const markupValue = markupType === 'fixed' ? follow.markup_fixed : follow.markup_percentage;
+    const newPrice = calculatePriceWithMarkup(sourceProduct.price, markupType, markupValue);
 
     // Generate unique name
     const uniqueName = await generateUniqueName(sourceProduct.name, follow.follower_shop_id);
@@ -147,7 +155,9 @@ export async function updateSyncedProduct(syncedProductId) {
 
     // Get follow for markup
     const follow = await shopFollowQueries.findById(syncRecord.follow_id);
-    const newPrice = calculatePriceWithMarkup(sourceProduct.price, follow.markup_percentage);
+    const markupType = follow.markup_type || 'percentage';
+    const markupValue = markupType === 'fixed' ? follow.markup_fixed : follow.markup_percentage;
+    const newPrice = calculatePriceWithMarkup(sourceProduct.price, markupType, markupValue);
 
     // Update synced product
     await productQueries.update(syncRecord.synced_product_id, {
@@ -266,12 +276,13 @@ export async function syncAllProductsForFollow(followId) {
 
 /**
  * Update markup for all synced products in a follow
- * Called when user changes markup percentage
+ * Called when user changes markup settings
  * @param {number} followId - Follow relationship ID
- * @param {number} newMarkupPercentage - New markup percentage
+ * @param {string} markupType - Markup type ('percentage' or 'fixed')
+ * @param {number} markupValue - Markup value (percentage or fixed dollar amount)
  * @returns {Promise<number>} Number of products updated
  */
-export async function updateMarkupForFollow(followId, newMarkupPercentage) {
+export async function updateMarkupForFollow(followId, markupType, markupValue) {
   const client = await getClient();
 
   try {
@@ -322,7 +333,7 @@ export async function updateMarkupForFollow(followId, newMarkupPercentage) {
       ]);
 
       // Update product price
-      const newPrice = calculatePriceWithMarkup(sync.source_product_price, newMarkupPercentage);
+      const newPrice = calculatePriceWithMarkup(sync.source_product_price, markupType, markupValue);
       await client.query('UPDATE products SET price = $1, updated_at = NOW() WHERE id = $2', [
         newPrice,
         sync.synced_product_id,
@@ -393,7 +404,9 @@ export async function runPeriodicSync() {
         // Check if source differs from synced
         const sourcePrice = parseFloat(sync.source_price);
         const syncedPrice = parseFloat(sync.synced_price);
-        const expectedPrice = calculatePriceWithMarkup(sourcePrice, sync.markup_percentage);
+        const markupType = sync.markup_type || 'percentage';
+        const markupValue = markupType === 'fixed' ? sync.markup_fixed : sync.markup_percentage;
+        const expectedPrice = calculatePriceWithMarkup(sourcePrice, markupType, markupValue);
 
         const priceChanged = Math.abs(syncedPrice - expectedPrice) > 0.01;
         const stockChanged = sync.source_stock !== sync.synced_stock;

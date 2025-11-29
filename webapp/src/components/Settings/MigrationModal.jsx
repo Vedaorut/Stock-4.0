@@ -9,7 +9,7 @@ import { useApi } from '../../hooks/useApi';
 export default function MigrationModal({ isOpen, onClose }) {
   const { triggerHaptic, confirm, alert } = useTelegram();
   const { get, post } = useApi();
-  const [step, setStep] = useState(1); // 1: info, 2: eligibility, 3: input, 4: result
+  const [step, setStep] = useState(1); // 1: info, 2: input, 3: result
   const [newChannel, setNewChannel] = useState('');
   const [loading, setLoading] = useState(false);
   const [eligibility, setEligibility] = useState(null);
@@ -96,7 +96,7 @@ export default function MigrationModal({ isOpen, onClose }) {
 
   // Back button support
   useBackButton(isOpen, () => {
-    if (step > 1) {
+    if (step > 1 && step < 3) {
       setStep(step - 1);
       setMigrationError(null); // Очистить migration error при возврате
     } else {
@@ -158,8 +158,8 @@ export default function MigrationModal({ isOpen, onClose }) {
         return { status: 'error' };
       }
 
-      // Success - переход к step 3 (input)
-      setStep(3);
+      // Success - переход к step 2 (input)
+      setStep(2);
       return { status: 'success' };
     } catch (err) {
       if (signal?.aborted) return { status: 'aborted' };
@@ -257,7 +257,7 @@ export default function MigrationModal({ isOpen, onClose }) {
       }
 
       setMigrationResult(data);
-      setStep(4);
+      setStep(3);
       triggerHaptic('success');
 
       // Haptic feedback для успеха
@@ -302,12 +302,10 @@ export default function MigrationModal({ isOpen, onClose }) {
               step === 1
                 ? 'Миграция канала'
                 : step === 2
-                  ? 'Проверка прав'
-                  : step === 3
-                    ? 'Новый канал'
-                    : 'Готово'
+                  ? 'Новый канал'
+                  : 'Готово'
             }
-            onBack={step === 1 ? onClose : () => setStep(step - 1)}
+            onBack={step === 1 || step === 3 ? onClose : () => setStep(step - 1)}
             variant="close"
           />
 
@@ -315,18 +313,18 @@ export default function MigrationModal({ isOpen, onClose }) {
             className="px-4 py-6 pb-20"
             style={{ paddingTop: 'calc(env(safe-area-inset-top) + 72px)' }}
           >
-            {loading && step === 2 ? (
-              // Loading state
-              <motion.div
-                className="flex flex-col items-center justify-center py-12"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-              >
-                <div className="w-16 h-16 border-4 border-orange-primary border-t-transparent rounded-full animate-spin mb-4"></div>
-                <p className="text-gray-400">Проверяем права на миграцию...</p>
-              </motion.div>
-            ) : step === 1 ? (
-              // Info screen
+            {step === 1 ? (
+              // Info screen with loading state
+              loading ? (
+                <motion.div
+                  className="flex flex-col items-center justify-center py-12"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                >
+                  <div className="w-16 h-16 border-4 border-orange-primary border-t-transparent rounded-full animate-spin mb-4"></div>
+                  <p className="text-gray-400">Проверяем права на миграцию...</p>
+                </motion.div>
+              ) : (
               <motion.div
                 className="space-y-6"
                 initial={{ opacity: 0, y: 20 }}
@@ -362,7 +360,7 @@ export default function MigrationModal({ isOpen, onClose }) {
                             setErrorMessage(null);
                             triggerHaptic('light');
                             setLoading(true);
-                            setStep(2); // Перейти в loading state
+                            // Retry eligibility check in loading state
                             const controller = new AbortController();
                             checkEligibility(controller.signal).finally(() => {
                               setLoading(false);
@@ -527,7 +525,10 @@ export default function MigrationModal({ isOpen, onClose }) {
                 </div>
 
                 <motion.button
-                  onClick={handleNext}
+                  onClick={() => {
+                    triggerHaptic('light');
+                    setStep(2);
+                  }}
                   disabled={eligibility?.limits?.daysUntilNext > 0}
                   className="w-full h-12 rounded-xl font-semibold text-white disabled:opacity-50 disabled:cursor-not-allowed"
                   style={{
@@ -543,7 +544,8 @@ export default function MigrationModal({ isOpen, onClose }) {
                     : 'Продолжить'}
                 </motion.button>
               </motion.div>
-            ) : step === 3 ? (
+              )
+            ) : step === 2 ? (
               // Input screen
               <motion.div
                 className="space-y-6"
@@ -704,7 +706,7 @@ export default function MigrationModal({ isOpen, onClose }) {
                   {loading ? 'Отправка уведомлений...' : 'Запустить миграцию'}
                 </motion.button>
               </motion.div>
-            ) : step === 4 ? (
+            ) : step === 3 ? (
               // Success screen
               <motion.div
                 className="space-y-6"

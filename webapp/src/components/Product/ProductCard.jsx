@@ -68,6 +68,15 @@ const PreorderIcon = () => (
   </div>
 );
 
+const SyncedBadge = () => (
+  <span className="px-2 py-0.5 rounded-md text-xs font-semibold bg-blue-500/20 text-blue-400 flex items-center gap-1">
+    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+    </svg>
+    Synced
+  </span>
+);
+
 const StockBadge = ({ stock, lowStock }) => (
   <div
     className={`flex items-center gap-1 px-2 py-1 rounded-full border ${
@@ -206,6 +215,7 @@ const ProductCard = memo(function ProductCard({ product, onPreorder: _onPreorder
       {/* Badges */}
       <div className="absolute top-3 left-3 z-10 flex flex-col gap-2">
         {product.isPremium && <PremiumIcon />}
+        {product.is_synced && <SyncedBadge />}
       </div>
 
       <div className="absolute top-3 right-3 z-10 flex flex-col gap-2 items-end">

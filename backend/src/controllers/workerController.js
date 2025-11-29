@@ -57,6 +57,11 @@ export const workerController = {
         workerUser = await userQueries.findByTelegramId(normalizedTelegramId);
       }
 
+      logger.info('Worker add: searching user', {
+        normalizedTelegramId,
+        hasUsername,
+      });
+
       if (!workerUser && hasUsername) {
         const cleanUsername = username.trim().startsWith('@')
           ? username.trim().slice(1)
@@ -64,7 +69,19 @@ export const workerController = {
         workerUser = await userQueries.findByUsername(cleanUsername);
       }
 
+      if (workerUser) {
+        logger.info('Worker add: user found', {
+          userId: workerUser.id,
+          telegramId: workerUser.telegram_id,
+          username: workerUser.username,
+        });
+      }
+
       if (!workerUser) {
+        logger.warn('Worker add: user not found in DB', {
+          searchedTelegramId: normalizedTelegramId,
+          searchedUsername: hasUsername ? username.trim().replace(/^@/, '') : null,
+        });
         throw new NotFoundError('User not found. Make sure they have used the bot at least once.');
       }
 

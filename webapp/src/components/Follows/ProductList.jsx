@@ -2,7 +2,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { CubeIcon } from '@heroicons/react/24/outline';
 
-const ProductList = ({ products, mode, onLoadMore, hasMore, loadingMore }) => {
+const ProductList = ({ products, mode, onLoadMore, hasMore, loadingMore, markupType = 'percentage' }) => {
   // Spring animation preset
   const controlSpring = { type: 'spring', stiffness: 400, damping: 32 };
 
@@ -113,9 +113,13 @@ const ProductList = ({ products, mode, onLoadMore, hasMore, loadingMore }) => {
             const followerPrice = Number(syncedProduct.price);
             const hasMarkup =
               Number.isFinite(sourcePrice) && sourcePrice > 0 && Number.isFinite(followerPrice);
+            
+            // Calculate markup display based on type
+            const priceDiff = followerPrice - sourcePrice;
             const markupPercent = hasMarkup
               ? Math.round(((followerPrice - sourcePrice) / sourcePrice) * 100)
               : null;
+            const markupFixed = hasMarkup ? priceDiff.toFixed(2) : null;
 
             return (
               <motion.div
@@ -160,19 +164,29 @@ const ProductList = ({ products, mode, onLoadMore, hasMore, loadingMore }) => {
 
                 {/* Price + Stock - одна чистая строка */}
                 <div className="relative flex items-center justify-between">
-                  {/* Ваша цена - крупно, акцент */}
-                  <div className="flex items-center gap-2">
-                    <div
-                      className="text-orange-primary text-xl font-bold tabular-nums"
-                      style={{ letterSpacing: '-0.02em' }}
-                    >
-                      ${syncedProduct.price}
+                  {/* Цены - исходная и ваша */}
+                  <div className="flex flex-col gap-0.5">
+                    {/* Цена магазина - серая, мелкая */}
+                    <div className="text-xs text-gray-400">
+                      Цена магазина: <span className="font-medium">${sourceProduct.price}</span>
                     </div>
-                    {markupPercent !== null && (
-                      <span className="text-xs font-semibold text-green-400 bg-green-500/10 px-2 py-0.5 rounded-full">
-                        +{markupPercent}%
-                      </span>
-                    )}
+                    {/* Ваша цена - крупно, оранжевая */}
+                    <div className="flex items-center gap-2">
+                      <div
+                        className="text-orange-primary text-xl font-bold tabular-nums"
+                        style={{ letterSpacing: '-0.02em' }}
+                      >
+                        ${syncedProduct.price}
+                      </div>
+                      {hasMarkup && (
+                        <span className="text-xs font-semibold text-green-400 bg-green-500/10 px-2 py-0.5 rounded-full">
+                          {markupType === 'fixed'
+                            ? `+$${markupFixed}`
+                            : `+${markupPercent}%`
+                          }
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   {/* Количество - компактно справа */}

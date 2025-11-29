@@ -7,6 +7,15 @@ import { messages } from '../texts/messages.js';
 
 const { general: generalMessages, follows: followMessages } = messages;
 
+// Markup type selection keyboard
+const markupTypeKeyboard = Markup.inlineKeyboard([
+  [
+    Markup.button.callback('% Процент', 'markup_type:percentage'),
+    Markup.button.callback('$ Фиксированная', 'markup_type:fixed'),
+  ],
+  [Markup.button.callback('❌ Отмена', 'cancel_scene')],
+]);
+
 /**
  * Edit Follow Markup Scene
  *
@@ -21,8 +30,8 @@ const { general: generalMessages, follows: followMessages } = messages;
  * 5. Leave scene
  */
 
-// Step 1: Show markup prompt
-const showMarkupPrompt = async (ctx) => {
+// Step 1: Show markup type selection
+const showMarkupTypeSelection = async (ctx) => {
   try {
     // P1-BOT-003 FIX: Validate and set lock (moved from enter() hook)
     const followId = ctx.scene.state.followId;
@@ -51,31 +60,44 @@ const showMarkupPrompt = async (ctx) => {
 
     const pendingModeSwitch = ctx.scene.state.pendingModeSwitch;
 
-    logger.info('edit_markup_step:prompt', {
+    logger.info('edit_markup_step:type_selection', {
       userId: ctx.from.id,
       followId,
       pendingModeSwitch,
     });
 
-    const message = pendingModeSwitch ? followMessages.markupPrompt : followMessages.markupPrompt;
-
-    await ctx.reply(
-      message,
-      Markup.inlineKeyboard([[Markup.button.callback('❌ Отмена', 'cancel_scene')]])
-    );
+    await ctx.reply(followMessages.markupTypePrompt, markupTypeKeyboard);
 
     return ctx.wizard.next();
   } catch (error) {
-    logger.error('Error in showMarkupPrompt step:', error);
+    logger.error('Error in showMarkupTypeSelection step:', error);
     throw error;
   }
 };
 
-// Step 2: Handle markup input
+// Step 2: Handle markup type selection (via action) or wait
+const waitForMarkupType = async (ctx) => {
+  // This step is handled by action handlers, just wait
+  if (ctx.message?.text) {
+    await ctx.reply(followMessages.markupTypeRequired, markupTypeKeyboard);
+  }
+  return;
+};
+
+// Step 3: Handle markup value input
 const handleMarkupInput = async (ctx) => {
   try {
+    const markupType = ctx.scene.state.markupType;
+    if (!markupType) {
+      await ctx.reply(followMessages.markupTypeRequired, markupTypeKeyboard);
+      return;
+    }
+
     if (!ctx.message || !ctx.message.text) {
-      await ctx.reply('Пожалуйста, отправьте наценку текстом (только число).\n\n' + followMessages.markupPrompt);
+      const prompt = markupType === 'fixed'
+        ? followMessages.markupFixedPrompt
+        : followMessages.markupPercentagePrompt;
+      await ctx.reply('Пожалуйста, отправьте наценку текстом (только число).\n\n' + prompt);
       return;
     }
 
@@ -84,8 +106,21 @@ const handleMarkupInput = async (ctx) => {
     const markupText = ctx.message.text.trim().replace(',', '.');
     const markup = parseFloat(markupText);
 
-    if (isNaN(markup) || markup < 1 || markup > 500) {
-      await ctx.reply(followMessages.markupInvalid);
+    // Validate based on type
+    let isValid = false;
+    let invalidMessage = '';
+    if (markupType === 'fixed') {
+      // Fixed: $0-$1000
+      isValid = !isNaN(markup) && markup >= 0 && markup <= 1000;
+      invalidMessage = followMessages.markupFixedInvalid;
+    } else {
+      // Percentage: 1-500%
+      isValid = !isNaN(markup) && markup >= 1 && markup <= 500;
+      invalidMessage = followMessages.markupInvalid;
+    }
+
+    if (!isValid) {
+      await ctx.reply(invalidMessage);
       // Delete invalid input message (M20 FIX: improved error logging)
       await ctx.deleteMessage(userMsgId).catch((err) => {
         // Log WARN for unexpected errors (not 400 Bad Request or 429 rate limit)
@@ -127,19 +162,27 @@ const handleMarkupInput = async (ctx) => {
     logger.info('edit_markup_step:save', {
       userId: ctx.from.id,
       followId,
+      markupType,
       markup,
       pendingModeSwitch,
     });
 
     await ctx.reply(followMessages.createSaving);
 
+    // Build markup data object
+    const markupData = {
+      markupType,
+      markupPercentage: markupType === 'percentage' ? markup : 0,
+      markupFixed: markupType === 'fixed' ? markup : 0,
+    };
+
     try {
       if (pendingModeSwitch) {
-        // Mode switch: use switchMode API
-        await followApi.switchMode(followId, pendingModeSwitch, token, markup);
+        // Mode switch: use switchMode API with markup data object
+        await followApi.switchMode(followId, pendingModeSwitch, token, markupData);
       } else {
-        // Simple markup update: use updateMarkup API
-        await followApi.updateMarkup(followId, markup, token);
+        // Simple markup update: use updateMarkup API with object
+        await followApi.updateMarkup(followId, markupData, token);
       }
 
       // Fetch updated follow detail
@@ -148,9 +191,14 @@ const handleMarkupInput = async (ctx) => {
 
       await ctx.reply(message, followDetailMenu(followId, follow.mode));
 
+      const successMsg = markupType === 'fixed'
+        ? followMessages.markupFixedUpdated(markup)
+        : followMessages.markupUpdated(markup);
+
       logger.info('markup_updated', {
         userId: ctx.from.id,
         followId,
+        markupType,
         markup,
         mode: follow.mode,
       });
@@ -183,7 +231,8 @@ const handleMarkupInput = async (ctx) => {
 // Create wizard scene
 const editFollowMarkupScene = new Scenes.WizardScene(
   'editFollowMarkup',
-  showMarkupPrompt,
+  showMarkupTypeSelection,
+  waitForMarkupType,
   handleMarkupInput
 );
 
@@ -204,6 +253,38 @@ editFollowMarkupScene.leave(async (ctx) => {
   ctx.scene.state = {};
 
   logger.info(`User ${ctx.from?.id} left editFollowMarkup scene`);
+});
+
+// Handle markup type selection
+editFollowMarkupScene.action(/^markup_type:(percentage|fixed)$/, async (ctx) => {
+  try {
+    await ctx.answerCbQuery();
+    const markupType = ctx.match[1];
+    ctx.scene.state.markupType = markupType;
+
+    logger.info('edit_markup_type_selected', {
+      userId: ctx.from.id,
+      followId: ctx.scene.state.followId,
+      markupType,
+    });
+
+    // Show appropriate prompt based on type
+    const prompt = markupType === 'fixed'
+      ? followMessages.markupFixedPrompt
+      : followMessages.markupPercentagePrompt;
+
+    await ctx.editMessageText(
+      prompt,
+      Markup.inlineKeyboard([[Markup.button.callback('❌ Отмена', 'cancel_scene')]])
+    );
+
+    // Move to value input step
+    return ctx.wizard.next();
+  } catch (error) {
+    logger.error('Error in markup_type handler:', error);
+    await ctx.reply(followMessages.switchError, followsMenu(Boolean(ctx.session?.hasFollows)));
+    return ctx.scene.leave();
+  }
 });
 
 // Handle cancel action within scene

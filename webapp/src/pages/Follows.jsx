@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { motion } from 'framer-motion'; // Used in JSX
-import Header from '../components/Layout/Header';
+import { PlusIcon } from '@heroicons/react/24/outline';
 import { useApi } from '../hooks/useApi';
 import { useStore } from '../store/useStore';
 import { useTelegram } from '../hooks/useTelegram';
@@ -107,9 +107,31 @@ export default function Follows() {
     [triggerHaptic]
   );
 
+  const handleAddShop = () => {
+    triggerHaptic('light');
+    if (window.Telegram?.WebApp?.showAlert) {
+      window.Telegram.WebApp.showAlert('Добавление магазинов доступно через бота. Используйте команду /follow');
+    }
+  };
+
   return (
     <div className="pb-24" style={{ paddingTop: 'calc(env(safe-area-inset-top) + 56px)' }}>
-      <Header title={t('tabs.follows')} />
+      {/* Custom Header with Add Button */}
+      <div 
+        className="fixed top-0 left-0 right-0 z-40 bg-dark-bg/95 backdrop-blur-lg border-b border-white/5" 
+        style={{ paddingTop: 'env(safe-area-inset-top)' }}
+      >
+        <div className="px-4 py-4 flex items-center justify-between">
+          <h1 className="text-xl font-bold text-white">{t('tabs.follows')}</h1>
+          <motion.button
+            onClick={handleAddShop}
+            className="w-10 h-10 flex items-center justify-center rounded-xl bg-orange-primary/10 text-orange-primary"
+            whileTap={{ scale: 0.95 }}
+          >
+            <PlusIcon className="w-5 h-5" />
+          </motion.button>
+        </div>
+      </div>
 
       <div className="px-4 py-6 space-y-6">
         {isLoading ? (

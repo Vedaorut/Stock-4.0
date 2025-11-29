@@ -522,18 +522,31 @@ ${safe(channel)}
     listTitle: (count) => `👀 Ваши подписки (${count})`,
     listEmpty:
       'У вас пока нет активных подписок.\n\nДобавьте магазин для отслеживания — выберите режим мониторинга или перепродажи.',
-    listItem: ({ index, name, mode, markup }) => {
+    listItem: ({ index, name, mode, markupType, markupPercentage, markupFixed }) => {
       const icon = mode === 'resell' ? '💰' : '🔍';
-      const suffix =
-        mode === 'resell' && Number.isFinite(markup) ? `, +${Number(markup).toFixed(0)}%` : '';
+      let suffix = '';
+      if (mode === 'resell') {
+        if (markupType === 'fixed' && Number.isFinite(markupFixed) && markupFixed > 0) {
+          suffix = `, +$${Number(markupFixed).toFixed(0)}`;
+        } else if (Number.isFinite(markupPercentage) && markupPercentage > 0) {
+          suffix = `, +${Number(markupPercentage).toFixed(0)}%`;
+        }
+      }
       const modeText = mode === 'resell' ? 'Перепродажа' : 'Мониторинг';
       return `${index}. 🏪 ${safe(name)} (${icon} ${modeText}${suffix})`;
     },
     listManageHint: 'Нажмите на подписку для управления.',
     listTitle2: '👀 Ваши подписки',
-    detail: ({ name, mode, markup, sourceProducts = 0, syncedProducts = 0 }) => {
+    detail: ({ name, mode, markupType, markupPercentage, markupFixed, sourceProducts = 0, syncedProducts = 0 }) => {
       const isResell = mode === 'resell';
-      const markupValue = isResell ? `${Number(markup ?? 0).toFixed(0)}%` : '—';
+      let markupValue = '—';
+      if (isResell) {
+        if (markupType === 'fixed') {
+          markupValue = `+$${Number(markupFixed ?? 0).toFixed(0)}`;
+        } else {
+          markupValue = `${Number(markupPercentage ?? 0).toFixed(0)}%`;
+        }
+      }
       const modeLabel = isResell ? '💰 Перепродажа' : '🔍 Мониторинг';
 
       const lines = [
@@ -593,6 +606,12 @@ ${safe(channel)}
     markupPrompt: 'Введите наценку от 1 до 500%.',
     markupInvalid: 'Наценка должна быть в диапазоне от 1 до 500%.',
     markupUpdated: (value) => `Наценка обновлена до ${safe(value)}%.`,
+    markupTypePrompt: 'Выберите тип наценки:\n\n% Процент — наценка в процентах от цены\n$ Фиксированная — фиксированная сумма в долларах',
+    markupTypeRequired: 'Сначала выберите тип наценки.',
+    markupPercentagePrompt: 'Введите наценку в процентах (1-500%):\n\nПример: 25 = +25% к цене',
+    markupFixedPrompt: 'Введите фиксированную наценку в долларах ($0-$1000):\n\nПример: 10 = +$10 к цене',
+    markupFixedInvalid: 'Фиксированная наценка должна быть от $0 до $1000.',
+    markupFixedUpdated: (value) => `Фиксированная наценка обновлена до ${safe(value)}.`,
     modeChanged: 'Режим обновлён.',
     switchError: 'Не удалось изменить режим. Попробуйте ещё раз.',
     createEnterId: 'Введите ID магазина для подписки.',

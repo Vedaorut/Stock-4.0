@@ -2,10 +2,23 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useBackButton } from '../../hooks/useBackButton';
 
-const MarkupSliderModal = ({ isOpen, onClose, onConfirm, currentMarkup = 25 }) => {
+const MarkupSliderModal = ({
+  isOpen,
+  onClose,
+  onConfirm,
+  currentMarkup = 25,
+  currentMarkupType = 'percentage',
+  currentMarkupFixed = 0,
+}) => {
   const [markup, setMarkup] = useState(currentMarkup);
-  const examplePrice = 100; // Пример цены для предпросмотра
-  const calculatedPrice = (examplePrice * (1 + markup / 100)).toFixed(2);
+  const [markupType, setMarkupType] = useState(currentMarkupType);
+  const [markupFixed, setMarkupFixed] = useState(currentMarkupFixed);
+  const examplePrice = 100; // Example price for preview
+
+  const calculatedPrice =
+    markupType === 'percentage'
+      ? (examplePrice * (1 + markup / 100)).toFixed(2)
+      : (examplePrice + markupFixed).toFixed(2);
 
   // BackButton integration
   useBackButton(isOpen ? onClose : null);
@@ -13,18 +26,41 @@ const MarkupSliderModal = ({ isOpen, onClose, onConfirm, currentMarkup = 25 }) =
   useEffect(() => {
     if (isOpen) {
       setMarkup(currentMarkup);
+      setMarkupType(currentMarkupType || 'percentage');
+      setMarkupFixed(currentMarkupFixed || 0);
     }
-  }, [isOpen, currentMarkup]);
+  }, [isOpen, currentMarkup, currentMarkupType, currentMarkupFixed]);
 
   const handleConfirm = () => {
-    onConfirm(markup);
+    onConfirm({
+      markupType,
+      markupPercentage: markupType === 'percentage' ? markup : 0,
+      markupFixed: markupType === 'fixed' ? markupFixed : 0,
+    });
     onClose();
+  };
+
+  const handleFixedInputChange = (e) => {
+    const value = e.target.value;
+    // Allow empty string for typing, or valid numbers 0-1000
+    if (value === '') {
+      setMarkupFixed(0);
+    } else {
+      const numValue = parseFloat(value);
+      if (!isNaN(numValue) && numValue >= 0 && numValue <= 1000) {
+        setMarkupFixed(numValue);
+      }
+    }
   };
 
   if (!isOpen) return null;
 
   // Spring animation preset
   const controlSpring = { type: 'spring', stiffness: 400, damping: 32 };
+
+  // Quick select values based on type
+  const percentageQuickValues = [10, 25, 50, 100];
+  const fixedQuickValues = [5, 10, 25, 50];
 
   return (
     <AnimatePresence>
@@ -47,72 +83,161 @@ const MarkupSliderModal = ({ isOpen, onClose, onConfirm, currentMarkup = 25 }) =
           <div className="mb-6">
             <h3 className="text-white text-2xl font-bold tracking-tight mb-2">Настройка наценки</h3>
             <p className="text-gray-400 text-sm">
-              Установите процент наценки для перепродажи товаров
+              {markupType === 'percentage'
+                ? 'Установите процент наценки для перепродажи товаров'
+                : 'Установите фиксированную сумму наценки в долларах'}
             </p>
+          </div>
+
+          {/* Type Toggle */}
+          <div className="flex justify-center mb-6">
+            <div className="inline-flex bg-white/5 rounded-xl p-1">
+              <button
+                onClick={() => setMarkupType('percentage')}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  markupType === 'percentage'
+                    ? 'bg-orange-primary text-white'
+                    : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                %
+              </button>
+              <button
+                onClick={() => setMarkupType('fixed')}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  markupType === 'fixed'
+                    ? 'bg-orange-primary text-white'
+                    : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                $
+              </button>
+            </div>
           </div>
 
           {/* Markup Value Display */}
           <div className="text-center mb-6">
-            <div className="text-6xl font-bold text-orange-primary mb-1">{markup}%</div>
-            <div className="text-gray-400 text-sm">Наценка</div>
-          </div>
-
-          {/* Slider */}
-          <div className="mb-6">
-            <div className="relative">
-              {/* Track Background */}
-              <div className="h-2 bg-white/5 rounded-full overflow-hidden">
-                {/* Active Track */}
-                <motion.div
-                  className="h-full bg-gradient-to-r from-orange-primary to-orange-light"
-                  style={{ width: `${((markup - 1) / 499) * 100}%` }}
-                  initial={false}
-                  animate={{ width: `${((markup - 1) / 499) * 100}%` }}
-                  transition={{ duration: 0.15, ease: 'easeOut' }}
-                />
-              </div>
-
-              {/* Range Input */}
-              <input
-                type="range"
-                min="1"
-                max="500"
-                step="1"
-                value={markup}
-                onChange={(e) => setMarkup(Number(e.target.value))}
-                className="absolute inset-0 w-full h-12 opacity-0 cursor-pointer"
-                style={{
-                  WebkitAppearance: 'none',
-                  appearance: 'none',
-                  zIndex: 10,
-                }}
-              />
-
-              {/* Custom Thumb */}
+            <AnimatePresence mode="wait">
               <motion.div
-                className="absolute w-10 h-10 bg-white rounded-full shadow-lg cursor-grab active:cursor-grabbing"
-                style={{
-                  left: `${((markup - 1) / 499) * 100}%`,
-                  top: '50%',
-                  transform: 'translateY(-50%) translateX(-50%)',
-                  boxShadow: '0 0 0 4px rgba(255, 107, 0, 0.2), 0 4px 12px rgba(0, 0, 0, 0.3)',
-                }}
-                initial={false}
-                animate={{
-                  left: `${((markup - 1) / 499) * 100}%`,
-                  scale: 1,
-                }}
-                whileHover={{ scale: 1.1 }}
-                transition={{ duration: 0.15, ease: 'easeOut' }}
-              />
-            </div>
-
-            {/* Min/Max Labels */}
-            <div className="flex justify-between mt-2 text-xs text-gray-500">
-              <span>1%</span>
-              <span>500%</span>
-            </div>
+                key={markupType}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+              >
+                {markupType === 'percentage' ? (
+                  <>
+                    <div className="text-6xl font-bold text-orange-primary mb-1">{markup}%</div>
+                    <div className="text-gray-400 text-sm">Наценка</div>
+                  </>
+                ) : (
+                  <>
+                    <div className="text-6xl font-bold text-orange-primary mb-1">${markupFixed}</div>
+                    <div className="text-gray-400 text-sm">Наценка</div>
+                  </>
+                )}
+              </motion.div>
+            </AnimatePresence>
           </div>
+
+          {/* Slider or Input based on type */}
+          <AnimatePresence mode="wait">
+            {markupType === 'percentage' ? (
+              <motion.div
+                key="percentage-slider"
+                className="mb-6"
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 20 }}
+                transition={{ duration: 0.2 }}
+              >
+                <div className="relative">
+                  {/* Track Background */}
+                  <div className="h-2 bg-white/5 rounded-full overflow-hidden">
+                    {/* Active Track */}
+                    <motion.div
+                      className="h-full bg-gradient-to-r from-orange-primary to-orange-light"
+                      style={{ width: `${((markup - 1) / 499) * 100}%` }}
+                      initial={false}
+                      animate={{ width: `${((markup - 1) / 499) * 100}%` }}
+                      transition={{ duration: 0.15, ease: 'easeOut' }}
+                    />
+                  </div>
+
+                  {/* Range Input */}
+                  <input
+                    type="range"
+                    min="1"
+                    max="500"
+                    step="1"
+                    value={markup}
+                    onChange={(e) => setMarkup(Number(e.target.value))}
+                    className="absolute inset-0 w-full h-12 opacity-0 cursor-pointer"
+                    style={{
+                      WebkitAppearance: 'none',
+                      appearance: 'none',
+                      zIndex: 10,
+                    }}
+                  />
+
+                  {/* Custom Thumb */}
+                  <motion.div
+                    className="absolute w-10 h-10 bg-white rounded-full shadow-lg cursor-grab active:cursor-grabbing"
+                    style={{
+                      left: `${((markup - 1) / 499) * 100}%`,
+                      top: '50%',
+                      transform: 'translateY(-50%) translateX(-50%)',
+                      boxShadow: '0 0 0 4px rgba(255, 107, 0, 0.2), 0 4px 12px rgba(0, 0, 0, 0.3)',
+                    }}
+                    initial={false}
+                    animate={{
+                      left: `${((markup - 1) / 499) * 100}%`,
+                      scale: 1,
+                    }}
+                    whileHover={{ scale: 1.1 }}
+                    transition={{ duration: 0.15, ease: 'easeOut' }}
+                  />
+                </div>
+
+                {/* Min/Max Labels */}
+                <div className="flex justify-between mt-2 text-xs text-gray-500">
+                  <span>1%</span>
+                  <span>500%</span>
+                </div>
+              </motion.div>
+            ) : (
+              <motion.div
+                key="fixed-input"
+                className="mb-6"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.2 }}
+              >
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <span className="text-orange-primary text-xl font-bold">$</span>
+                  </div>
+                  <input
+                    type="number"
+                    min="0"
+                    max="1000"
+                    step="0.01"
+                    value={markupFixed || ''}
+                    onChange={handleFixedInputChange}
+                    placeholder="0"
+                    className="w-full bg-white/5 border border-white/10 rounded-xl py-4 pl-10 pr-4 text-white text-2xl font-semibold text-center focus:outline-none focus:border-orange-primary focus:ring-1 focus:ring-orange-primary transition-all"
+                  />
+                </div>
+
+                {/* Min/Max Labels */}
+                <div className="flex justify-between mt-2 text-xs text-gray-500">
+                  <span>$0</span>
+                  <span>$1000</span>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* Price Preview */}
           <div className="glass-card rounded-xl p-4 mb-6 border border-white/5">
@@ -157,22 +282,39 @@ const MarkupSliderModal = ({ isOpen, onClose, onConfirm, currentMarkup = 25 }) =
 
           {/* Quick Select Buttons */}
           <div className="grid grid-cols-4 gap-2 mb-6">
-            {[10, 25, 50, 100].map((value) => (
-              <motion.button
-                key={value}
-                onClick={() => setMarkup(value)}
-                className={`py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
-                  markup === value
-                    ? 'bg-orange-primary text-white'
-                    : 'bg-white/5 text-gray-400 hover:bg-white/10'
-                }`}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                transition={controlSpring}
-              >
-                {value}%
-              </motion.button>
-            ))}
+            {markupType === 'percentage'
+              ? percentageQuickValues.map((value) => (
+                  <motion.button
+                    key={value}
+                    onClick={() => setMarkup(value)}
+                    className={`py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
+                      markup === value
+                        ? 'bg-orange-primary text-white'
+                        : 'bg-white/5 text-gray-400 hover:bg-white/10'
+                    }`}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    transition={controlSpring}
+                  >
+                    {value}%
+                  </motion.button>
+                ))
+              : fixedQuickValues.map((value) => (
+                  <motion.button
+                    key={value}
+                    onClick={() => setMarkupFixed(value)}
+                    className={`py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
+                      markupFixed === value
+                        ? 'bg-orange-primary text-white'
+                        : 'bg-white/5 text-gray-400 hover:bg-white/10'
+                    }`}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    transition={controlSpring}
+                  >
+                    ${value}
+                  </motion.button>
+                ))}
           </div>
 
           {/* Action Buttons */}

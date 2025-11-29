@@ -4,7 +4,6 @@ import { ChevronLeftIcon, EyeIcon, ArrowPathIcon } from '@heroicons/react/24/out
 import { useStore } from '../store/useStore';
 import { useFollowsApi } from '../hooks/useApi';
 import ProductList from '../components/Follows/ProductList';
-import EditMarkupModal from '../components/Follows/EditMarkupModal';
 import MarkupSliderModal from '../components/Follows/MarkupSliderModal';
 import ConfirmDialog from '../components/Follows/ConfirmDialog';
 import Tabs from '../components/Follows/Tabs';
@@ -122,9 +121,10 @@ const FollowDetail = () => {
     }
   };
 
-  const handleSaveMarkup = async (markup) => {
+  const handleSaveMarkup = async (markupData) => {
     try {
-      await followsApi.updateMarkup(followDetailId, markup);
+      // markupData can be a number (old format) or object { markupType, markupPercentage, markupFixed }
+      await followsApi.updateMarkup(followDetailId, markupData);
       await loadData();
       triggerHaptic('success');
     } catch (error) {
@@ -155,9 +155,10 @@ const FollowDetail = () => {
     }
   };
 
-  const confirmSwitchToResell = async (markup) => {
+  const confirmSwitchToResell = async (markupData) => {
     try {
-      await followsApi.switchMode(followDetailId, 'resell', markup);
+      // markupData = { markupType, markupPercentage, markupFixed } from MarkupSliderModal
+      await followsApi.switchMode(followDetailId, 'resell', markupData);
       await loadData();
       triggerHaptic('success');
     } catch (error) {
@@ -324,10 +325,13 @@ const FollowDetail = () => {
             <span className="text-white font-medium">{modeLabel}</span>
           </div>
 
-          {currentFollow.mode === 'resell' && currentFollow.markup_percentage && (
+          {currentFollow.mode === 'resell' && (currentFollow.markup_percentage || currentFollow.markup_fixed) && (
             <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-orange-primary/10 border border-orange-primary/20">
               <span className="text-orange-primary font-bold text-sm">
-                Наценка: +{currentFollow.markup_percentage}%
+                Наценка: {currentFollow.markup_type === 'fixed'
+                  ? `+$${currentFollow.markup_fixed || 0}`
+                  : `+${currentFollow.markup_percentage || 0}%`
+                }
               </span>
             </div>
           )}
@@ -362,6 +366,7 @@ const FollowDetail = () => {
               <ProductList
                 products={followProducts}
                 mode={currentFollow.mode}
+                markupType={currentFollow.markup_type || 'percentage'}
                 onLoadMore={loadMore}
                 hasMore={hasMore}
                 loadingMore={loadingMore}
@@ -394,14 +399,16 @@ const FollowDetail = () => {
       </div>
 
       {/* Modals */}
-      <EditMarkupModal
+      <MarkupSliderModal
         isOpen={showEditMarkup}
         onClose={() => {
           triggerHaptic('light');
           setShowEditMarkup(false);
         }}
-        currentMarkup={currentFollow.markup_percentage}
-        onSave={handleSaveMarkup}
+        currentMarkup={currentFollow.markup_percentage || 25}
+        currentMarkupType={currentFollow.markup_type || 'percentage'}
+        currentMarkupFixed={currentFollow.markup_fixed || 0}
+        onConfirm={handleSaveMarkup}
       />
 
       <MarkupSliderModal
@@ -411,6 +418,8 @@ const FollowDetail = () => {
           setShowMarkupSlider(false);
         }}
         currentMarkup={currentFollow.markup_percentage || 25}
+        currentMarkupType={currentFollow.markup_type || 'percentage'}
+        currentMarkupFixed={currentFollow.markup_fixed || 0}
         onConfirm={confirmSwitchToResell}
       />
 

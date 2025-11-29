@@ -29,9 +29,13 @@ export const productQueries = {
   // Find product by ID
   findById: async (id) => {
     const result = await query(
-      `SELECT p.*, s.name as shop_name, s.owner_id
+      `SELECT p.*,
+              s.name as shop_name,
+              s.owner_id,
+              CASE WHEN sp.id IS NOT NULL THEN true ELSE false END AS is_synced
        FROM products p
        JOIN shops s ON p.shop_id = s.id
+       LEFT JOIN synced_products sp ON sp.synced_product_id = p.id
        WHERE p.id = $1`,
       [id]
     );
@@ -43,9 +47,12 @@ export const productQueries = {
     const { shopId, isActive, limit = 50, offset = 0 } = filters;
 
     let queryText = `
-      SELECT p.*, s.name as shop_name
+      SELECT p.*,
+             s.name as shop_name,
+             CASE WHEN sp.id IS NOT NULL THEN true ELSE false END AS is_synced
       FROM products p
       JOIN shops s ON p.shop_id = s.id
+      LEFT JOIN synced_products sp ON sp.synced_product_id = p.id
       WHERE 1=1
     `;
     const params = [];

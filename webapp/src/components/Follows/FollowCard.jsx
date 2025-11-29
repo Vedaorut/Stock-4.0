@@ -45,10 +45,13 @@ const FollowCard = ({ follow, onClick }) => {
                 <span>{modeLabel}</span>
               </div>
 
-              {follow.mode === 'resell' && follow.markup_percentage && (
+              {follow.mode === 'resell' && (follow.markup_percentage || follow.markup_fixed) && (
                 <div className="flex items-center gap-1 rounded-md bg-orange-primary/10 px-2 py-0.5">
                   <span className="text-xs font-semibold text-orange-primary">
-                    +{follow.markup_percentage}%
+                    {follow.markup_type === 'fixed'
+                      ? `+$${follow.markup_fixed || 0}`
+                      : `+${follow.markup_percentage || 0}%`
+                    }
                   </span>
                 </div>
               )}
