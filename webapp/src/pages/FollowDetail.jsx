@@ -1,541 +1,320 @@
-import { useState, useEffect, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion'; // Used in JSX
-import { ChevronLeftIcon, EyeIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
-import { useStore } from '../store/useStore';
-import { useFollowsApi } from '../hooks/useApi';
-import ProductList from '../components/Follows/ProductList';
-import MarkupSliderModal from '../components/Follows/MarkupSliderModal';
-import ProductMarkupModal from '../components/Follows/ProductMarkupModal';
-import ConfirmDialog from '../components/Follows/ConfirmDialog';
-import Tabs from '../components/Follows/Tabs';
+import { useCallback, useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
+import Header from '../components/Layout/Header';
 import ActionsList from '../components/Follows/ActionsList';
+import ConfirmDialog from '../components/Follows/ConfirmDialog';
+import MarkupSliderModal from '../components/Follows/MarkupSliderModal';
+import { useFollowsApi } from '../hooks/useApi';
+import { useStore } from '../store/useStore';
 import { useTelegram } from '../hooks/useTelegram';
 import { useBackButton } from '../hooks/useBackButton';
 
-const FollowDetail = () => {
-  const followsApi = useFollowsApi();
-  const { triggerHaptic } = useTelegram();
+export default function FollowDetail() {
   const followDetailId = useStore((state) => state.followDetailId);
-  const currentFollow = useStore((state) => state.currentFollow);
-  const followProducts = useStore((state) => state.followProducts);
+  const { getDetail, updateMarkup, switchMode, deleteFollow } = useFollowsApi();
+  const { triggerHaptic } = useTelegram();
 
-  const [loading, setLoading] = useState(true);
-  const [networkError, setNetworkError] = useState(false);
-  const [hasMore, setHasMore] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [activeTab, setActiveTab] = useState('products'); // 'products' | 'manage'
-  const [showEditMarkup, setShowEditMarkup] = useState(false);
-  const [showMarkupSlider, setShowMarkupSlider] = useState(false);
-  const [showSwitchMode, setShowSwitchMode] = useState(false);
-  const [showDelete, setShowDelete] = useState(false);
-  const [showProductMarkup, setShowProductMarkup] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [follow, setFollow] = useState(null);
 
-  // Spring animation preset
-  const controlSpring = { type: 'spring', stiffness: 400, damping: 32 };
+  // Modal states
+  const [isMarkupModalOpen, setIsMarkupModalOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isSwitchModeDialogOpen, setIsSwitchModeDialogOpen] = useState(false);
 
-  const loadData = useCallback(
+  // Back button handler
+  const handleBack = useCallback(() => {
+    triggerHaptic('light');
+    useStore.getState().setFollowDetailId(null);
+  }, [triggerHaptic]);
+
+  // Telegram BackButton integration
+  useBackButton(handleBack);
+
+  // Load follow data
+  const loadFollow = useCallback(
     async (signal) => {
-      console.log('[FollowDetail] loadData called, followDetailId:', followDetailId);
-      if (!followDetailId) return { status: 'skipped' };
-      setNetworkError(false); // Clear previous errors
+      if (!followDetailId) return { status: 'error', error: 'No follow ID' };
 
-      try {
-        console.log('[FollowDetail] Fetching data...');
-        const [followData, productsData] = await Promise.all([
-          followsApi.getDetail(followDetailId, { signal }),
-          followsApi.getProducts(followDetailId, { limit: 100, signal }),
-        ]);
+      const response = await getDetail(followDetailId, { signal });
 
-        console.log('[FollowDetail] Raw API responses:', { followData, productsData });
+      if (signal?.aborted) return { status: 'aborted' };
 
-        if (signal?.aborted) return { status: 'aborted' };
-
-        if (followData.error || productsData.error) {
-          console.error('[FollowDetail] API errors:', { followError: followData.error, productsError: productsData.error });
-          setNetworkError(true);
-          return { status: 'error', error: followData.error || productsData.error };
-        }
-
-        // API returns { data: { success, data } } - need to extract nested data
-        const followResponse = followData?.data;
-        const productsResponse = productsData?.data;
-
-        console.log('[FollowDetail] Extracted responses:', { followResponse, productsResponse });
-
-        // Extract actual follow object from response
-        const follow = followResponse?.data || followResponse;
-        // Extract products payload (contains products array and pagination)
-        const productsPayload = productsResponse?.data || productsResponse;
-        const productsList = productsPayload?.products || [];
-
-        console.log('[FollowDetail] Parsed data:', { follow, productsPayload, productsList });
-
-        // ✅ FIX: Use getState() for stable references
-        const { setCurrentFollow, setFollowProducts } = useStore.getState();
-        setCurrentFollow(follow);
-        setFollowProducts(productsList);
-
-        const total = productsPayload.pagination?.total || productsList.length;
-        setHasMore(productsList.length < total);
-
-        console.log('[FollowDetail] Success! Products count:', productsList.length);
-        return { status: 'success' };
-      } catch (err) {
-        if (signal?.aborted) return { status: 'aborted' };
-        console.error("[FollowDetail] Load data error:", err);
-        setNetworkError(true);
-        return { status: 'error', error: err.message };
+      if (response.error) {
+        console.error('[FollowDetail] Error loading follow:', response.error);
+        return { status: 'error', error: 'Failed to load subscription' };
       }
+
+      const followData = response.data?.data || response.data;
+      setFollow(followData);
+      return { status: 'success' };
     },
-    [followDetailId, followsApi]
-  ); // ✅ FIX: Removed store setters from deps
+    [followDetailId, getDetail]
+  );
 
   useEffect(() => {
-    if (!followDetailId) return;
+    if (!followDetailId) {
+      setIsLoading(false);
+      return;
+    }
 
-    setLoading(true);
+    setIsLoading(true);
+    setError(null);
 
     const controller = new AbortController();
 
-    loadData(controller.signal)
+    loadFollow(controller.signal)
       .then((result) => {
         if (!controller.signal.aborted && result?.status === 'error') {
-          triggerHaptic('error');
+          setError(result.error);
+          setFollow(null);
         }
       })
       .finally(() => {
         if (!controller.signal.aborted) {
-          setLoading(false);
+          setIsLoading(false);
         }
       });
 
     return () => controller.abort();
-  }, [followDetailId, loadData]); // ✅ FIX: Removed triggerHaptic to prevent re-renders
+  }, [followDetailId, loadFollow]);
 
-  const loadMore = async () => {
-    if (loadingMore || !hasMore) return;
+  // Handle markup update
+  const handleUpdateMarkup = useCallback(
+    async (markupData) => {
+      if (!followDetailId || !follow) return;
 
-    setLoadingMore(true);
-    try {
-      const currentLength = followProducts.length;
-      const moreData = await followsApi.getProducts(followDetailId, {
-        limit: 100,
-        offset: currentLength,
-      });
+      triggerHaptic('medium');
 
-      if (moreData.error) {
-        console.error('Error loading more products:', moreData.error);
+      try {
+        await updateMarkup(followDetailId, markupData);
+
+        // Update local state
+        setFollow((prev) => ({
+          ...prev,
+          markup_type: markupData.markupType,
+          markup_percentage: markupData.markupPercentage,
+          markup_fixed: markupData.markupFixed,
+        }));
+
+        triggerHaptic('success');
+      } catch (err) {
+        console.error('[FollowDetail] Error updating markup:', err);
         triggerHaptic('error');
-        return;
       }
+    },
+    [followDetailId, follow, updateMarkup, triggerHaptic]
+  );
 
-      // Extract nested data: { data: { success, data: { products, pagination } } }
-      const responseData = moreData?.data?.data || moreData?.data;
-      const newProducts = responseData?.products || [];
+  // Handle mode switch
+  const handleSwitchMode = useCallback(async () => {
+    if (!followDetailId || !follow) return;
 
-      // ✅ FIX: Use getState() for stable reference
-      useStore.getState().setFollowProducts([...followProducts, ...newProducts]);
+    const newMode = follow.mode === 'monitor' ? 'resell' : 'monitor';
 
-      const total = responseData?.pagination?.total || 0;
-      setHasMore(currentLength + newProducts.length < total);
-    } catch (error) {
-      console.error('Error loading more products:', error);
-      triggerHaptic('error');
-    } finally {
-      setLoadingMore(false);
-    }
-  };
+    triggerHaptic('medium');
 
-  const handleSaveMarkup = async (markupData) => {
     try {
-      // markupData can be a number (old format) or object { markupType, markupPercentage, markupFixed }
-      await followsApi.updateMarkup(followDetailId, markupData);
-      await loadData();
+      await switchMode(followDetailId, newMode);
+
+      // Update local state
+      setFollow((prev) => ({
+        ...prev,
+        mode: newMode,
+      }));
+
       triggerHaptic('success');
-    } catch (error) {
-      console.error('Error updating markup:', error);
+    } catch (err) {
+      console.error('[FollowDetail] Error switching mode:', err);
       triggerHaptic('error');
     }
-  };
+  }, [followDetailId, follow, switchMode, triggerHaptic]);
 
-  const handleSwitchMode = async () => {
-    triggerHaptic('light');
-    const targetMode = currentFollow.mode === 'monitor' ? 'resell' : 'monitor';
+  // Handle delete
+  const handleDelete = useCallback(async () => {
+    if (!followDetailId) return;
 
-    if (targetMode === 'resell') {
-      setShowMarkupSlider(true);
-    } else {
-      setShowSwitchMode(true);
-    }
-  };
+    triggerHaptic('medium');
 
-  const confirmSwitchToMonitor = async () => {
     try {
-      await followsApi.switchMode(followDetailId, 'monitor', null);
-      await loadData();
+      await deleteFollow(followDetailId);
       triggerHaptic('success');
-    } catch (error) {
-      console.error('Error switching mode:', error);
-      triggerHaptic('error');
-    }
-  };
 
-  const confirmSwitchToResell = async (markupData) => {
-    try {
-      // markupData = { markupType, markupPercentage, markupFixed } from MarkupSliderModal
-      await followsApi.switchMode(followDetailId, 'resell', markupData);
-      await loadData();
-      triggerHaptic('success');
-    } catch (error) {
-      console.error('Error switching mode:', error);
-      triggerHaptic('error');
-    }
-  };
-
-  const handleDelete = async () => {
-    try {
-      await followsApi.deleteFollow(followDetailId);
-      triggerHaptic('success');
-      // ✅ FIX: Use getState() for stable reference
+      // Navigate back to follows list
       useStore.getState().setFollowDetailId(null);
-    } catch (error) {
-      console.error('Error deleting follow:', error);
+    } catch (err) {
+      console.error('[FollowDetail] Error deleting follow:', err);
       triggerHaptic('error');
     }
-  };
+  }, [followDetailId, deleteFollow, triggerHaptic]);
 
-  // Per-product markup handlers
-  const handleEditProductMarkup = (product) => {
-    triggerHaptic('light');
-    setSelectedProduct(product);
-    setShowProductMarkup(true);
-  };
+  // Get display values
+  const shopName = follow?.source_shop_name || follow?.shop_name || 'Loading...';
+  const mode = follow?.mode || 'monitor';
+  const markupType = follow?.markup_type || 'percentage';
+  const markupPercentage = follow?.markup_percentage ?? 25;
+  const markupFixed = follow?.markup_fixed ?? 0;
 
-  const handleSaveProductMarkup = async (markupData) => {
-    if (!selectedProduct) return;
-
-    try {
-      // Get synced_product_id from product data
-      const productId = selectedProduct.synced_product?.id || selectedProduct.id;
-      await followsApi.updateProductMarkup(followDetailId, productId, markupData);
-      await loadData();
-      triggerHaptic('success');
-    } catch (error) {
-      console.error('Error updating product markup:', error);
-      triggerHaptic('error');
-      throw error;
-    }
-  };
-
-  const handleResetProductMarkup = async () => {
-    if (!selectedProduct) return;
-
-    try {
-      const productId = selectedProduct.synced_product?.id || selectedProduct.id;
-      await followsApi.resetProductMarkup(followDetailId, productId);
-      await loadData();
-      triggerHaptic('success');
-    } catch (error) {
-      console.error('Error resetting product markup:', error);
-      triggerHaptic('error');
-      throw error;
-    }
-  };
-
-  const handleBack = () => {
-    triggerHaptic('light');
-    // ✅ FIX: Use getState() for stable reference
-    useStore.getState().setFollowDetailId(null);
-  };
-
-  // Telegram BackButton support
-  useBackButton(handleBack);
-
-  const handleTabChange = (tabId) => {
-    triggerHaptic('light');
-    setActiveTab(tabId);
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-dark-bg flex items-center justify-center">
-        <motion.div
-          className="flex flex-col items-center gap-4"
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={controlSpring}
-        >
-          <motion.div
-            className="w-16 h-16 border-4 border-orange-primary border-t-transparent rounded-full"
-            animate={{ rotate: 360 }}
-            transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-          />
-          <motion.div
-            className="text-white text-sm"
-            animate={{ opacity: [0.5, 1, 0.5] }}
-            transition={{ repeat: Infinity, duration: 1.5 }}
-          >
-            Загрузка подписки...
-          </motion.div>
-        </motion.div>
-      </div>
-    );
-  }
-
-  if (networkError) {
-    return (
-      <div className="min-h-screen bg-dark-bg flex items-center justify-center px-6">
-        <div className="text-center">
-          <div className="text-6xl mb-4">📡</div>
-          <div className="text-white text-lg font-semibold mb-2">Ошибка подключения</div>
-          <div className="text-gray-400 text-sm mb-6">
-            Не удалось загрузить данные. Проверьте интернет.
-          </div>
-          <div className="flex flex-col gap-3 items-center">
-            <motion.button
-              onClick={() => {
-                setLoading(true);
-                const controller = new AbortController();
-                loadData(controller.signal).finally(() => setLoading(false));
-              }}
-              className="px-6 py-3 bg-orange-primary rounded-xl text-white font-semibold w-full max-w-xs"
-              whileTap={{ scale: 0.95 }}
-            >
-              Попробовать снова
-            </motion.button>
-            <motion.button
-              onClick={handleBack}
-              className="text-gray-400 text-sm py-2"
-            >
-              Вернуться назад
-            </motion.button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!currentFollow) {
-    return (
-      <div className="min-h-screen bg-dark-bg flex items-center justify-center px-6">
-        <div className="text-center">
-          <div className="text-6xl mb-4">😔</div>
-          <div className="text-white text-lg font-semibold mb-2">Подписка не найдена</div>
-          <div className="text-gray-400 text-sm mb-6">
-            Эта подписка была удалена или не существует
-          </div>
-          <motion.button
-            onClick={handleBack}
-            className="inline-flex items-center gap-2 text-orange-primary font-semibold"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            <ChevronLeftIcon className="w-5 h-5" />
-            Вернуться назад
-          </motion.button>
-        </div>
-      </div>
-    );
-  }
-
-  const modeLabel = currentFollow.mode === 'monitor' ? 'Мониторинг' : 'Перепродажа';
-  const CurrentModeIcon = currentFollow.mode === 'monitor' ? EyeIcon : ArrowPathIcon;
-  const productsCount =
-    currentFollow.mode === 'resell'
-      ? currentFollow.synced_products_count || 0
-      : currentFollow.source_products_count || 0;
-
-  const tabs = [
-    { id: 'products', label: 'Товары' },
-    { id: 'manage', label: 'Управление' },
-  ];
+  // Compute display markup for ActionsList
+  const displayMarkup = markupType === 'percentage' ? markupPercentage : markupFixed;
 
   return (
-    <div className="min-h-screen bg-dark-bg text-white pb-20">
-      {/* Header - Fixed */}
-      <motion.div
-        className="fixed top-0 left-0 right-0 z-40 bg-dark-bg/95 backdrop-blur-lg border-b border-white/5"
-        style={{ paddingTop: 'env(safe-area-inset-top)' }}
-        initial={{ y: -100, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ ...controlSpring, delay: 0.05 }}
-      >
-        {/* Back button + Shop name */}
-        <div className="px-4 py-4 flex items-center gap-3">
-          <motion.button
-            onClick={handleBack}
-            className="w-10 h-10 flex items-center justify-center rounded-xl text-white hover:bg-white/5 -ml-2"
-            whileTap={{ scale: 0.95 }}
-            transition={controlSpring}
-          >
-            <ChevronLeftIcon className="w-6 h-6" />
-          </motion.button>
+    <div
+      className="h-screen overflow-y-auto"
+      style={{
+        paddingTop: 'calc(env(safe-area-inset-top) + 56px)',
+        paddingBottom: 'calc(var(--tabbar-total) + 20px)',
+      }}
+    >
+      <Header title={shopName} />
 
-          <div className="flex-1 min-w-0">
-            <h1
-              className="text-white text-xl font-bold truncate"
-              style={{ letterSpacing: '-0.02em' }}
+      <div className="px-4 py-6 space-y-6">
+        {isLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="w-8 h-8 border-4 border-orange-primary border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : error ? (
+          <div className="flex flex-col items-center justify-center py-12 text-center">
+            <svg
+              className="w-16 h-16 text-red-500 mb-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
             >
-              {currentFollow.source_shop_name}
-            </h1>
-          </div>
-        </div>
-
-        {/* Stats Row */}
-        <div className="px-4 pb-3 flex items-center gap-4 text-sm">
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5">
-            <CurrentModeIcon className="w-4 h-4 text-gray-400" />
-            <span className="text-white font-medium">{modeLabel}</span>
-          </div>
-
-          {currentFollow.mode === 'resell' && (currentFollow.markup_percentage || currentFollow.markup_fixed) && (
-            <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-orange-primary/10 border border-orange-primary/20">
-              <span className="text-orange-primary font-bold text-sm">
-                Наценка: {currentFollow.markup_type === 'fixed'
-                  ? `+$${currentFollow.markup_fixed || 0}`
-                  : `+${currentFollow.markup_percentage || 0}%`
-                }
-              </span>
-            </div>
-          )}
-
-          <div className="text-gray-400">
-            <span className="font-medium text-white">{productsCount}</span> товаров
-          </div>
-        </div>
-      </motion.div>
-
-      {/* Content with padding for fixed header */}
-      <div className="px-4" style={{ paddingTop: 'calc(env(safe-area-inset-top) + 120px)' }}>
-        {/* Tabs Navigation */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-        >
-          <Tabs tabs={tabs} activeTab={activeTab} onChange={handleTabChange} />
-        </motion.div>
-
-        {/* Tab Content */}
-        <AnimatePresence mode="wait">
-          {activeTab === 'products' ? (
-            <motion.div
-              key="products"
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 20 }}
-              transition={controlSpring}
-            >
-              <ProductList
-                products={followProducts}
-                mode={currentFollow.mode}
-                markupType={currentFollow.markup_type || 'percentage'}
-                onLoadMore={loadMore}
-                hasMore={hasMore}
-                loadingMore={loadingMore}
-                onEditProductMarkup={currentFollow.mode === 'resell' ? handleEditProductMarkup : undefined}
-                globalMarkup={{
-                  percentage: currentFollow.markup_percentage || 0,
-                  fixed: currentFollow.markup_fixed || 0,
-                }}
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
               />
-            </motion.div>
-          ) : (
+            </svg>
+            <h3 className="text-lg font-semibold text-gray-400 mb-2">{error}</h3>
+            <motion.button
+              onClick={() => loadFollow()}
+              className="touch-target bg-orange-primary hover:bg-orange-light text-white font-semibold px-6 rounded-xl transition-colors duration-300 mt-4"
+              whileTap={{ scale: 0.95 }}
+            >
+              Try again
+            </motion.button>
+          </div>
+        ) : follow ? (
+          <>
+            {/* Shop Info Card */}
             <motion.div
-              key="manage"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              transition={controlSpring}
+              className="glass-card rounded-2xl p-4 border border-white/10"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.05 }}
+            >
+              <div className="flex items-center gap-4">
+                {/* Shop Avatar */}
+                <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-orange-primary/20 to-orange-light/10 flex items-center justify-center flex-shrink-0">
+                  <span className="text-2xl font-bold text-orange-primary">
+                    {shopName.charAt(0).toUpperCase()}
+                  </span>
+                </div>
+
+                {/* Shop Info */}
+                <div className="flex-1 min-w-0">
+                  <h2 className="text-white font-semibold text-lg truncate">{shopName}</h2>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                        mode === 'resell'
+                          ? 'bg-orange-primary/20 text-orange-primary'
+                          : 'bg-blue-500/20 text-blue-400'
+                      }`}
+                    >
+                      {mode === 'resell' ? 'Resale' : 'Monitoring'}
+                    </span>
+                    {mode === 'resell' && (
+                      <span className="text-gray-400 text-xs">
+                        +{markupType === 'percentage' ? `${markupPercentage}%` : `$${markupFixed}`}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Stats Row */}
+              <div className="grid grid-cols-2 gap-3 mt-4 pt-4 border-t border-white/5">
+                <div className="text-center">
+                  <div className="text-white font-semibold">{follow.products_count || 0}</div>
+                  <div className="text-gray-400 text-xs">Products</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-white font-semibold">
+                    {new Date(follow.created_at).toLocaleDateString()}
+                  </div>
+                  <div className="text-gray-400 text-xs">Since</div>
+                </div>
+              </div>
+            </motion.div>
+
+            {/* Actions List */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
             >
               <ActionsList
-                mode={currentFollow.mode}
-                markup={currentFollow.markup_percentage}
+                mode={mode}
+                markup={displayMarkup}
                 onEditMarkup={() => {
                   triggerHaptic('light');
-                  setShowEditMarkup(true);
+                  setIsMarkupModalOpen(true);
                 }}
-                onSwitchMode={handleSwitchMode}
+                onSwitchMode={() => {
+                  triggerHaptic('light');
+                  setIsSwitchModeDialogOpen(true);
+                }}
                 onDelete={() => {
                   triggerHaptic('light');
-                  setShowDelete(true);
+                  setIsDeleteDialogOpen(true);
                 }}
               />
             </motion.div>
-          )}
-        </AnimatePresence>
+          </>
+        ) : null}
       </div>
 
-      {/* Modals */}
+      {/* Markup Modal */}
       <MarkupSliderModal
-        isOpen={showEditMarkup}
-        onClose={() => {
-          triggerHaptic('light');
-          setShowEditMarkup(false);
-        }}
-        currentMarkup={currentFollow.markup_percentage || 25}
-        currentMarkupType={currentFollow.markup_type || 'percentage'}
-        currentMarkupFixed={currentFollow.markup_fixed || 0}
-        onConfirm={handleSaveMarkup}
+        isOpen={isMarkupModalOpen}
+        onClose={() => setIsMarkupModalOpen(false)}
+        onConfirm={handleUpdateMarkup}
+        currentMarkup={markupPercentage}
+        currentMarkupType={markupType}
+        currentMarkupFixed={markupFixed}
       />
 
-      <MarkupSliderModal
-        isOpen={showMarkupSlider}
-        onClose={() => {
-          triggerHaptic('light');
-          setShowMarkupSlider(false);
-        }}
-        currentMarkup={currentFollow.markup_percentage || 25}
-        currentMarkupType={currentFollow.markup_type || 'percentage'}
-        currentMarkupFixed={currentFollow.markup_fixed || 0}
-        onConfirm={confirmSwitchToResell}
-      />
-
+      {/* Switch Mode Confirm Dialog */}
       <ConfirmDialog
-        isOpen={showSwitchMode}
-        onClose={() => {
-          triggerHaptic('light');
-          setShowSwitchMode(false);
-        }}
-        onConfirm={confirmSwitchToMonitor}
-        title="Переключить на Мониторинг"
-        message="Вы уверены что хотите переключиться на режим Мониторинг? Скопированные товары останутся в вашем каталоге."
-        confirmText="Переключить"
+        isOpen={isSwitchModeDialogOpen}
+        onClose={() => setIsSwitchModeDialogOpen(false)}
+        onConfirm={handleSwitchMode}
+        title="Switch Mode"
+        message={
+          mode === 'monitor'
+            ? 'Switch to Resale mode? Products from this shop will be added to your catalog with your markup.'
+            : 'Switch to Monitoring mode? Products will only be tracked but not added to your catalog.'
+        }
+        confirmText="Switch"
+        cancelText="Cancel"
       />
 
+      {/* Delete Confirm Dialog */}
       <ConfirmDialog
-        isOpen={showDelete}
-        onClose={() => {
-          triggerHaptic('light');
-          setShowDelete(false);
-        }}
+        isOpen={isDeleteDialogOpen}
+        onClose={() => setIsDeleteDialogOpen(false)}
         onConfirm={handleDelete}
-        title="Удалить подписку"
-        message="Вы уверены что хотите удалить эту подписку? Это действие нельзя отменить."
-        confirmText="Удалить"
-        danger={true}
-      />
-
-      {/* Per-product markup modal */}
-      <ProductMarkupModal
-        isOpen={showProductMarkup}
-        onClose={() => {
-          triggerHaptic('light');
-          setShowProductMarkup(false);
-          setSelectedProduct(null);
-        }}
-        onConfirm={handleSaveProductMarkup}
-        onReset={handleResetProductMarkup}
-        product={selectedProduct}
-        globalMarkup={{
-          type: currentFollow?.markup_type || 'percentage',
-          percentage: currentFollow?.markup_percentage || 25,
-          fixed: currentFollow?.markup_fixed || 0,
-        }}
+        title="Delete Subscription"
+        message="Are you sure you want to delete this subscription? All synced products will be removed from your catalog. This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+        danger
       />
     </div>
   );
-};
-
-export default FollowDetail;
+}
