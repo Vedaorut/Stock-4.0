@@ -1,27 +1,31 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { CubeIcon } from '@heroicons/react/24/outline';
+import { CubeIcon, AdjustmentsHorizontalIcon } from '@heroicons/react/24/outline';
 
-const ProductList = ({ products, mode, onLoadMore, hasMore, loadingMore, markupType = 'percentage' }) => {
-  // Spring animation preset
-  const controlSpring = { type: 'spring', stiffness: 400, damping: 32 };
+const ProductList = ({
+  products,
+  mode,
+  onLoadMore,
+  hasMore,
+  loadingMore,
+  markupType = 'percentage',
+  onEditProductMarkup,
+  globalMarkup = { percentage: 0, fixed: 0 },
+}) => {
+  const sectionTitle = mode === 'monitor' ? 'Отслеживаемые товары' : 'Синхронизированные товары';
 
-  const sectionTitle = mode === 'monitor' ? 'ОТСЛЕЖИВАЕМЫЕ ТОВАРЫ' : 'СИНХРОНИЗИРОВАННЫЕ ТОВАРЫ';
-
+  // Empty state
   if (!products || products.length === 0) {
     return (
-      <div>
-        {/* Section Header */}
+      <div className="py-8">
         <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider px-2 mb-4">
           {sectionTitle}
         </h3>
 
-        {/* Empty State */}
         <motion.div
           className="glass-card rounded-2xl p-12 text-center border border-white/5"
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={controlSpring}
         >
           <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-white/5 flex items-center justify-center">
             <CubeIcon className="w-8 h-8 text-gray-500" />
@@ -29,7 +33,7 @@ const ProductList = ({ products, mode, onLoadMore, hasMore, loadingMore, markupT
           <div className="text-white font-medium mb-1">Нет товаров</div>
           <div className="text-gray-400 text-sm">
             {mode === 'monitor'
-              ? 'Товары появятся здесь когда магазин добавит их'
+              ? 'Товары появятся когда магазин их добавит'
               : 'Товары будут синхронизированы автоматически'}
           </div>
         </motion.div>
@@ -38,66 +42,58 @@ const ProductList = ({ products, mode, onLoadMore, hasMore, loadingMore, markupT
   }
 
   return (
-    <div>
+    <div className="py-4">
       {/* Section Header */}
-      <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider px-2 mb-4">
-        {sectionTitle}
-      </h3>
+      <div className="flex items-center justify-between mb-4 px-2">
+        <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+          {sectionTitle}
+        </h3>
+        <span className="text-xs text-gray-500">
+          {products.length} шт
+        </span>
+      </div>
 
       {/* Products List */}
       <div className="space-y-3 pb-24">
         {products.map((product, index) => {
           if (mode === 'monitor') {
-            // Monitor mode: показываем оригинальные товары
+            // Monitor mode - simple display
             return (
               <motion.div
                 key={product.id || index}
-                className="group relative overflow-hidden rounded-xl border border-white/5 p-4 transition-colors duration-200 glass-card hover:border-white/10 hover:bg-white/[0.04]"
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: index * 0.05, ...controlSpring }}
+                className="glass-card rounded-xl border border-white/5 p-4 transition-colors hover:border-white/10"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.03 }}
               >
-                <span
-                  className="pointer-events-none absolute inset-0 rounded-xl opacity-0 transition-opacity duration-200 group-hover:opacity-100"
-                  style={{ boxShadow: '0 18px 38px rgba(255, 107, 0, 0.12)' }}
-                  aria-hidden="true"
-                />
-
-                <div className="relative flex items-center justify-between gap-4">
+                <div className="flex items-center justify-between gap-4">
                   {/* Product Name */}
                   <div className="flex-1 min-w-0">
                     <h3
-                      className="text-white text-base font-semibold"
+                      className="text-white text-sm font-medium"
                       style={{
-                        letterSpacing: '-0.01em',
                         display: '-webkit-box',
                         WebkitLineClamp: 2,
                         WebkitBoxOrient: 'vertical',
                         overflow: 'hidden',
-                        wordBreak: 'break-word',
                       }}
                     >
                       {product.name}
                     </h3>
-                    {/* Preorder Badge */}
                     {(product.is_preorder || product.availability === 'preorder') && (
-                      <div className="mt-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-blue-400/50 bg-blue-500/15 text-[10px] font-semibold text-blue-200 uppercase tracking-wider">
-                        <span>🔖</span>
-                        <span>Предзаказ</span>
-                      </div>
+                      <span className="inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-semibold text-blue-400 bg-blue-500/10">
+                        Предзаказ
+                      </span>
                     )}
                   </div>
 
                   {/* Price & Stock */}
                   <div className="flex items-center gap-3 flex-shrink-0">
-                    <div
-                      className="text-white text-xl font-bold tabular-nums"
-                      style={{ letterSpacing: '-0.02em' }}
-                    >
+                    <span className="text-lg font-bold text-white">
                       ${product.price}
-                    </div>
-                    <div className="bg-white/5 px-2.5 py-1 rounded-lg">
-                      <span className="text-gray-400 text-xs font-medium">
+                    </span>
+                    <div className="bg-white/5 px-2 py-1 rounded-lg">
+                      <span className="text-gray-400 text-xs">
                         {product.stock_quantity} шт
                       </span>
                     </div>
@@ -106,94 +102,112 @@ const ProductList = ({ products, mode, onLoadMore, hasMore, loadingMore, markupT
               </motion.div>
             );
           } else {
-            // Resell mode: показываем source + synced
+            // Resell mode - show source + synced with markup
             const sourceProduct = product.source_product || {};
             const syncedProduct = product.synced_product || {};
             const sourcePrice = Number(sourceProduct.price);
             const followerPrice = Number(syncedProduct.price);
-            const hasMarkup =
-              Number.isFinite(sourcePrice) && sourcePrice > 0 && Number.isFinite(followerPrice);
-            
-            // Calculate markup display based on type
+            const hasMarkup = Number.isFinite(sourcePrice) && sourcePrice > 0 && Number.isFinite(followerPrice);
+
+            const customMarkup = product.custom_markup || {};
+            const hasCustomMarkup = customMarkup.type !== null && customMarkup.type !== undefined;
+
             const priceDiff = followerPrice - sourcePrice;
-            const markupPercent = hasMarkup
-              ? Math.round(((followerPrice - sourcePrice) / sourcePrice) * 100)
-              : null;
-            const markupFixed = hasMarkup ? priceDiff.toFixed(2) : null;
+            const markupPercent = hasMarkup ? Math.round(((followerPrice - sourcePrice) / sourcePrice) * 100) : null;
+            const markupFixedDisplay = hasMarkup ? priceDiff.toFixed(2) : null;
+            const effectiveMarkupType = hasCustomMarkup ? customMarkup.type : markupType;
 
             return (
               <motion.div
                 key={product.id || index}
-                className="group relative overflow-hidden rounded-xl border border-white/5 p-5 transition-colors duration-200 glass-card hover:border-orange-primary/20 hover:bg-white/[0.04]"
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: index * 0.05, ...controlSpring }}
+                className="glass-card rounded-xl border border-white/5 p-4 transition-colors hover:border-orange-primary/20"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.03 }}
               >
-                <span
-                  className="pointer-events-none absolute inset-0 rounded-xl opacity-0 transition-opacity duration-200 group-hover:opacity-100"
-                  style={{ boxShadow: '0 18px 38px rgba(255, 107, 0, 0.12)' }}
-                  aria-hidden="true"
-                />
+                {/* Custom markup indicator */}
+                {hasCustomMarkup && (
+                  <div className="mb-3 flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-purple-500" />
+                    <span className="text-[10px] font-semibold text-purple-400 uppercase tracking-wider">
+                      Своя наценка
+                    </span>
+                  </div>
+                )}
 
-                {/* Product Header - название */}
-                <div className="relative mb-3">
-                  <h3
-                    className="text-white text-base font-semibold"
-                    style={{
-                      letterSpacing: '-0.01em',
-                      display: '-webkit-box',
-                      WebkitLineClamp: 2,
-                      WebkitBoxOrient: 'vertical',
-                      overflow: 'hidden',
-                      wordBreak: 'break-word',
-                    }}
-                  >
-                    {sourceProduct.name || syncedProduct.name}
-                  </h3>
-                  {/* Preorder Badge */}
-                  {(sourceProduct.is_preorder ||
-                    sourceProduct.availability === 'preorder' ||
-                    syncedProduct.is_preorder ||
-                    syncedProduct.availability === 'preorder') && (
-                    <div className="mt-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-blue-400/50 bg-blue-500/15 text-[10px] font-semibold text-blue-200 uppercase tracking-wider">
-                      <span>🔖</span>
-                      <span>Предзаказ</span>
-                    </div>
-                  )}
-                </div>
+                {/* Product Name */}
+                <h3
+                  className="text-white text-sm font-medium mb-3"
+                  style={{
+                    display: '-webkit-box',
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden',
+                  }}
+                >
+                  {sourceProduct.name || syncedProduct.name}
+                </h3>
 
-                {/* Price + Stock - одна чистая строка */}
-                <div className="relative flex items-center justify-between">
-                  {/* Цены - исходная и ваша */}
-                  <div className="flex flex-col gap-0.5">
-                    {/* Цена магазина - серая, мелкая */}
-                    <div className="text-xs text-gray-400">
-                      Цена магазина: <span className="font-medium">${sourceProduct.price}</span>
-                    </div>
-                    {/* Ваша цена - крупно, оранжевая */}
+                {(sourceProduct.is_preorder || syncedProduct.is_preorder) && (
+                  <span className="inline-block mb-3 px-2 py-0.5 rounded text-[10px] font-semibold text-blue-400 bg-blue-500/10">
+                    Предзаказ
+                  </span>
+                )}
+
+                {/* Price Row */}
+                <div className="flex items-end justify-between">
+                  {/* Prices */}
+                  <div className="flex flex-col gap-1">
+                    {/* Source price */}
                     <div className="flex items-center gap-2">
-                      <div
-                        className="text-orange-primary text-xl font-bold tabular-nums"
-                        style={{ letterSpacing: '-0.02em' }}
-                      >
+                      <span className="text-xs text-gray-500">Магазин:</span>
+                      <span className="text-sm text-gray-400 line-through">
+                        ${sourceProduct.price}
+                      </span>
+                    </div>
+
+                    {/* Your price */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-gray-500">Ваша:</span>
+                      <span className="text-xl font-bold text-orange-primary">
                         ${syncedProduct.price}
-                      </div>
+                      </span>
                       {hasMarkup && (
-                        <span className="text-xs font-semibold text-green-400 bg-green-500/10 px-2 py-0.5 rounded-full">
-                          {markupType === 'fixed'
-                            ? `+$${markupFixed}`
-                            : `+${markupPercent}%`
-                          }
+                        <span
+                          className={`text-xs font-semibold px-2 py-0.5 rounded ${
+                            hasCustomMarkup
+                              ? 'text-purple-400 bg-purple-500/10'
+                              : 'text-green-400 bg-green-500/10'
+                          }`}
+                        >
+                          {effectiveMarkupType === 'fixed'
+                            ? `+$${markupFixedDisplay}`
+                            : `+${markupPercent}%`}
                         </span>
                       )}
                     </div>
                   </div>
 
-                  {/* Количество - компактно справа */}
-                  <div className="bg-white/5 px-2.5 py-1 rounded-lg">
-                    <span className="text-gray-400 text-xs font-medium">
-                      {syncedProduct.stock_quantity} шт
-                    </span>
+                  {/* Stock + Edit */}
+                  <div className="flex items-center gap-2">
+                    <div className="bg-white/5 px-2 py-1 rounded-lg">
+                      <span className="text-gray-400 text-xs">
+                        {syncedProduct.stock_quantity} шт
+                      </span>
+                    </div>
+
+                    {onEditProductMarkup && (
+                      <motion.button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onEditProductMarkup(product);
+                        }}
+                        className="w-9 h-9 flex items-center justify-center rounded-lg bg-white/5 text-gray-400 hover:bg-orange-primary/10 hover:text-orange-primary transition-all"
+                        whileTap={{ scale: 0.95 }}
+                      >
+                        <AdjustmentsHorizontalIcon className="w-4 h-4" />
+                      </motion.button>
+                    )}
                   </div>
                 </div>
               </motion.div>
@@ -202,16 +216,16 @@ const ProductList = ({ products, mode, onLoadMore, hasMore, loadingMore, markupT
         })}
       </div>
 
-      {/* Load More button */}
+      {/* Load More */}
       {hasMore && (
         <motion.button
           onClick={onLoadMore}
           disabled={loadingMore}
-          className="glass-card w-full py-3.5 rounded-xl text-orange-primary font-semibold disabled:opacity-50 disabled:cursor-not-allowed hover:bg-white/5 transition-colors"
+          className="w-full py-3 rounded-xl bg-white/5 text-orange-primary font-semibold disabled:opacity-50 hover:bg-white/10 transition-colors"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.3 }}
-          whileTap={{ scale: loadingMore ? 1 : 0.98 }}
+          whileTap={{ scale: 0.98 }}
         >
           {loadingMore ? (
             <div className="flex items-center justify-center gap-2">
@@ -219,7 +233,7 @@ const ProductList = ({ products, mode, onLoadMore, hasMore, loadingMore, markupT
               <span>Загрузка...</span>
             </div>
           ) : (
-            'Загрузить еще'
+            'Загрузить ещё'
           )}
         </motion.button>
       )}

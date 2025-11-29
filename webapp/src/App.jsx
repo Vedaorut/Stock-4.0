@@ -35,8 +35,10 @@ function PageLoader() {
 }
 
 function App() {
-  const { activeTab, followDetailId } = useStore();
-  const token = useStore((state) => state.token); // ✅ Fix: Get token for checkFollows dependency
+  // ✅ Fix: Use selectors for proper Zustand subscription (prevents missing re-renders)
+  const activeTab = useStore((state) => state.activeTab);
+  const followDetailId = useStore((state) => state.followDetailId);
+  const token = useStore((state) => state.token);
   const hasFollows = useStore((state) => state.hasFollows);
   const { user, isReady, isValidating, error } = useTelegram();
   const { isConnected } = useWebSocket();
@@ -236,7 +238,7 @@ function App() {
           <Suspense fallback={<PageLoader />}>
             <AnimatePresence mode="wait">
               <motion.div
-                key={activeTab}
+                key={followDetailId ? `follow-${followDetailId}` : activeTab}
                 initial="initial"
                 animate="enter"
                 exit="exit"

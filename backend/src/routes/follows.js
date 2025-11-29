@@ -34,6 +34,10 @@ router.get('/:id/products', followController.getFollowProducts);
 // P0-PERF-1: Get sync status for background product sync
 router.get('/:id/sync-status', followController.getFollowSyncStatus);
 
+// Per-product markup (custom markup for individual products)
+router.put('/:id/products/:productId/markup', requireFollowOwner, followController.updateProductMarkup);
+router.delete('/:id/products/:productId/markup', requireFollowOwner, followController.resetProductMarkup);
+
 // Update follow markup (requires ownership)
 router.put('/:id/markup', requireFollowOwner, followController.updateFollowMarkup);
 

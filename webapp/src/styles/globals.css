@@ -1,3 +1,6 @@
+/* Neo-Terminal Typography System */
+@import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
 @tailwind base;
@@ -392,4 +395,46 @@ html.platform-android .gradient-mesh {
 
 .period-btn:active {
   transform: scale(0.98);
+}
+
+/* Markup Slider - Native Range Input Styling */
+.markup-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  border-radius: 9999px;
+  outline: none;
+}
+
+.markup-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  background: #FFFFFF;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  border: 2px solid #FF6B00;
+  margin-top: -1px;
+}
+
+.markup-slider::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  background: #FFFFFF;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  border: 2px solid #FF6B00;
+}
+
+.markup-slider::-webkit-slider-runnable-track {
+  height: 8px;
+  border-radius: 9999px;
+}
+
+.markup-slider::-moz-range-track {
+  height: 8px;
+  border-radius: 9999px;
+  background: #1a1a1a;
 }

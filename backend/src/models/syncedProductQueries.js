@@ -103,19 +103,24 @@ export const syncedProductQueries = {
     return result.rows;
   },
 
-  // Find synced products with pagination support
+  // Find synced products with pagination support (includes custom markup)
   findByFollowIdPaginated: async (followId, limit = 50, offset = 0) => {
     const result = await query(
       `SELECT
         sp.*,
+        sp.custom_markup_type,
+        sp.custom_markup_percentage,
+        sp.custom_markup_fixed,
         p_synced.name as synced_product_name,
         p_synced.price as synced_product_price,
         p_synced.stock_quantity as synced_product_stock,
         p_synced.is_active as synced_product_active,
+        p_synced.is_preorder as synced_product_preorder,
         p_source.name as source_product_name,
         p_source.price as source_product_price,
         p_source.stock_quantity as source_product_stock,
         p_source.is_active as source_product_active,
+        p_source.is_preorder as source_product_preorder,
         COUNT(*) OVER() as total_count
        FROM synced_products sp
        JOIN products p_synced ON sp.synced_product_id = p_synced.id
@@ -297,6 +302,64 @@ export const syncedProductQueries = {
       [followId]
     );
     return parseInt(result.rows[0].count, 10);
+  },
+
+  /**
+   * Update custom markup for a specific synced product
+   * @param {number} id - Synced product record ID
+   * @param {string} markupType - 'percentage' or 'fixed'
+   * @param {number} markupPercentage - Percentage markup (0-500)
+   * @param {number} markupFixed - Fixed markup amount (0-10000)
+   * @returns {Promise<Object>} Updated record
+   */
+  updateCustomMarkup: async (id, markupType, markupPercentage, markupFixed) => {
+    const result = await query(
+      `UPDATE synced_products
+       SET custom_markup_type = $2,
+           custom_markup_percentage = $3,
+           custom_markup_fixed = $4
+       WHERE id = $1
+       RETURNING *`,
+      [id, markupType, markupPercentage, markupFixed]
+    );
+    return result.rows[0];
+  },
+
+  /**
+   * Reset custom markup to use global follow markup
+   * @param {number} id - Synced product record ID
+   * @returns {Promise<Object>} Updated record
+   */
+  resetCustomMarkup: async (id) => {
+    const result = await query(
+      `UPDATE synced_products
+       SET custom_markup_type = NULL,
+           custom_markup_percentage = NULL,
+           custom_markup_fixed = NULL
+       WHERE id = $1
+       RETURNING *`,
+      [id]
+    );
+    return result.rows[0];
+  },
+
+  /**
+   * Find synced product by follow ID and synced product ID
+   * @param {number} followId - Follow relationship ID
+   * @param {number} syncedProductId - Synced product ID
+   * @returns {Promise<Object|undefined>} Synced product record
+   */
+  findByFollowAndSyncedProduct: async (followId, syncedProductId) => {
+    const result = await query(
+      `SELECT sp.*,
+              p_synced.name as synced_product_name,
+              p_synced.price as synced_product_price
+       FROM synced_products sp
+       JOIN products p_synced ON sp.synced_product_id = p_synced.id
+       WHERE sp.follow_id = $1 AND sp.synced_product_id = $2`,
+      [followId, syncedProductId]
+    );
+    return result.rows[0];
   },
 
   /**

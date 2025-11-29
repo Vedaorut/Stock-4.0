@@ -5,6 +5,7 @@ import { useStore } from '../store/useStore';
 import { useFollowsApi } from '../hooks/useApi';
 import ProductList from '../components/Follows/ProductList';
 import MarkupSliderModal from '../components/Follows/MarkupSliderModal';
+import ProductMarkupModal from '../components/Follows/ProductMarkupModal';
 import ConfirmDialog from '../components/Follows/ConfirmDialog';
 import Tabs from '../components/Follows/Tabs';
 import ActionsList from '../components/Follows/ActionsList';
@@ -27,31 +28,48 @@ const FollowDetail = () => {
   const [showMarkupSlider, setShowMarkupSlider] = useState(false);
   const [showSwitchMode, setShowSwitchMode] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
+  const [showProductMarkup, setShowProductMarkup] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState(null);
 
   // Spring animation preset
   const controlSpring = { type: 'spring', stiffness: 400, damping: 32 };
 
   const loadData = useCallback(
     async (signal) => {
+      console.log('[FollowDetail] loadData called, followDetailId:', followDetailId);
       if (!followDetailId) return { status: 'skipped' };
       setNetworkError(false); // Clear previous errors
 
       try {
+        console.log('[FollowDetail] Fetching data...');
         const [followData, productsData] = await Promise.all([
           followsApi.getDetail(followDetailId, { signal }),
           followsApi.getProducts(followDetailId, { limit: 100, signal }),
         ]);
 
+        console.log('[FollowDetail] Raw API responses:', { followData, productsData });
+
         if (signal?.aborted) return { status: 'aborted' };
 
         if (followData.error || productsData.error) {
+          console.error('[FollowDetail] API errors:', { followError: followData.error, productsError: productsData.error });
           setNetworkError(true);
-          return { status: 'error', error: 'Failed to load data' };
+          return { status: 'error', error: followData.error || productsData.error };
         }
 
-        const follow = followData?.data || followData;
-        const productsPayload = productsData?.data || productsData;
-        const productsList = productsPayload.products || [];
+        // API returns { data: { success, data } } - need to extract nested data
+        const followResponse = followData?.data;
+        const productsResponse = productsData?.data;
+
+        console.log('[FollowDetail] Extracted responses:', { followResponse, productsResponse });
+
+        // Extract actual follow object from response
+        const follow = followResponse?.data || followResponse;
+        // Extract products payload (contains products array and pagination)
+        const productsPayload = productsResponse?.data || productsResponse;
+        const productsList = productsPayload?.products || [];
+
+        console.log('[FollowDetail] Parsed data:', { follow, productsPayload, productsList });
 
         // ✅ FIX: Use getState() for stable references
         const { setCurrentFollow, setFollowProducts } = useStore.getState();
@@ -61,10 +79,11 @@ const FollowDetail = () => {
         const total = productsPayload.pagination?.total || productsList.length;
         setHasMore(productsList.length < total);
 
+        console.log('[FollowDetail] Success! Products count:', productsList.length);
         return { status: 'success' };
       } catch (err) {
         if (signal?.aborted) return { status: 'aborted' };
-        console.error("Load data error:", err);
+        console.error("[FollowDetail] Load data error:", err);
         setNetworkError(true);
         return { status: 'error', error: err.message };
       }
@@ -92,7 +111,7 @@ const FollowDetail = () => {
       });
 
     return () => controller.abort();
-  }, [followDetailId, loadData, triggerHaptic]);
+  }, [followDetailId, loadData]); // ✅ FIX: Removed triggerHaptic to prevent re-renders
 
   const loadMore = async () => {
     if (loadingMore || !hasMore) return;
@@ -105,13 +124,20 @@ const FollowDetail = () => {
         offset: currentLength,
       });
 
-      const productsPayload = moreData?.data || moreData;
-      const newProducts = productsPayload.products || [];
+      if (moreData.error) {
+        console.error('Error loading more products:', moreData.error);
+        triggerHaptic('error');
+        return;
+      }
+
+      // Extract nested data: { data: { success, data: { products, pagination } } }
+      const responseData = moreData?.data?.data || moreData?.data;
+      const newProducts = responseData?.products || [];
 
       // ✅ FIX: Use getState() for stable reference
       useStore.getState().setFollowProducts([...followProducts, ...newProducts]);
 
-      const total = productsPayload.pagination?.total || 0;
+      const total = responseData?.pagination?.total || 0;
       setHasMore(currentLength + newProducts.length < total);
     } catch (error) {
       console.error('Error loading more products:', error);
@@ -176,6 +202,44 @@ const FollowDetail = () => {
     } catch (error) {
       console.error('Error deleting follow:', error);
       triggerHaptic('error');
+    }
+  };
+
+  // Per-product markup handlers
+  const handleEditProductMarkup = (product) => {
+    triggerHaptic('light');
+    setSelectedProduct(product);
+    setShowProductMarkup(true);
+  };
+
+  const handleSaveProductMarkup = async (markupData) => {
+    if (!selectedProduct) return;
+
+    try {
+      // Get synced_product_id from product data
+      const productId = selectedProduct.synced_product?.id || selectedProduct.id;
+      await followsApi.updateProductMarkup(followDetailId, productId, markupData);
+      await loadData();
+      triggerHaptic('success');
+    } catch (error) {
+      console.error('Error updating product markup:', error);
+      triggerHaptic('error');
+      throw error;
+    }
+  };
+
+  const handleResetProductMarkup = async () => {
+    if (!selectedProduct) return;
+
+    try {
+      const productId = selectedProduct.synced_product?.id || selectedProduct.id;
+      await followsApi.resetProductMarkup(followDetailId, productId);
+      await loadData();
+      triggerHaptic('success');
+    } catch (error) {
+      console.error('Error resetting product markup:', error);
+      triggerHaptic('error');
+      throw error;
     }
   };
 
@@ -370,6 +434,11 @@ const FollowDetail = () => {
                 onLoadMore={loadMore}
                 hasMore={hasMore}
                 loadingMore={loadingMore}
+                onEditProductMarkup={currentFollow.mode === 'resell' ? handleEditProductMarkup : undefined}
+                globalMarkup={{
+                  percentage: currentFollow.markup_percentage || 0,
+                  fixed: currentFollow.markup_fixed || 0,
+                }}
               />
             </motion.div>
           ) : (
@@ -446,6 +515,24 @@ const FollowDetail = () => {
         message="Вы уверены что хотите удалить эту подписку? Это действие нельзя отменить."
         confirmText="Удалить"
         danger={true}
+      />
+
+      {/* Per-product markup modal */}
+      <ProductMarkupModal
+        isOpen={showProductMarkup}
+        onClose={() => {
+          triggerHaptic('light');
+          setShowProductMarkup(false);
+          setSelectedProduct(null);
+        }}
+        onConfirm={handleSaveProductMarkup}
+        onReset={handleResetProductMarkup}
+        product={selectedProduct}
+        globalMarkup={{
+          type: currentFollow?.markup_type || 'percentage',
+          percentage: currentFollow?.markup_percentage || 25,
+          fixed: currentFollow?.markup_fixed || 0,
+        }}
       />
     </div>
   );

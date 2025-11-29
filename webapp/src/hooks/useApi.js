@@ -181,6 +181,7 @@ export function useShopApi() {
 
   // Используем useRef для stable methods reference
   const methodsRef = useRef(null);
+  const combinedRef = useRef(null); // ✅ FIX: stable combined reference
 
   if (!methodsRef.current) {
     methodsRef.current = {
@@ -221,7 +222,12 @@ export function useShopApi() {
     };
   }
 
-  return { ...api, ...methodsRef.current };
+  // ✅ FIX: Create combined object ONCE to prevent infinite re-renders
+  if (!combinedRef.current) {
+    combinedRef.current = { ...api, ...methodsRef.current };
+  }
+
+  return combinedRef.current;
 }
 
 /**
@@ -232,29 +238,33 @@ export function useFollowsApi() {
 
   // Используем useRef для stable methods reference
   const methodsRef = useRef(null);
+  const combinedRef = useRef(null); // ✅ FIX: stable combined reference
 
   if (!methodsRef.current) {
     methodsRef.current = {
       // Детали подписки
-      getDetail: async (followId) => {
-        try {
-          const response = await api.get(`/follows/${followId}`);
-          return response.data;
-        } catch (error) {
-          console.error('Error getting follow detail:', error);
-          throw error;
+      getDetail: async (followId, options = {}) => {
+        const response = await api.get(`/follows/${followId}`, { signal: options.signal });
+        // api.get returns { data, error } - check for errors
+        if (response.error) {
+          console.error('Error getting follow detail:', response.error);
+          return { error: response.error };
         }
+        return response;
       },
 
       // Товары подписки
-      getProducts: async (followId, params = {}) => {
-        try {
-          const response = await api.get(`/follows/${followId}/products`, { params });
-          return response.data;
-        } catch (error) {
-          console.error('Error getting follow products:', error);
-          throw error;
+      getProducts: async (followId, options = {}) => {
+        const { signal, ...params } = options;
+        const queryString = new URLSearchParams(params).toString();
+        const url = queryString ? `/follows/${followId}/products?${queryString}` : `/follows/${followId}/products`;
+        const response = await api.get(url, { signal });
+        // api.get returns { data, error } - check for errors
+        if (response.error) {
+          console.error('Error getting follow products:', response.error);
+          return { error: response.error };
         }
+        return response;
       },
 
       // Изменить наценку
@@ -313,8 +323,40 @@ export function useFollowsApi() {
           throw error;
         }
       },
+
+      // Per-product markup: установить индивидуальную наценку на товар
+      updateProductMarkup: async (followId, productId, markupData) => {
+        try {
+          const payload = {
+            markupType: markupData.markupType || 'percentage',
+            markupPercentage: markupData.markupPercentage || 0,
+            markupFixed: markupData.markupFixed || 0,
+          };
+          const response = await api.put(`/follows/${followId}/products/${productId}/markup`, payload);
+          return response.data;
+        } catch (error) {
+          console.error('Error updating product markup:', error);
+          throw error;
+        }
+      },
+
+      // Per-product markup: сбросить наценку товара к глобальной
+      resetProductMarkup: async (followId, productId) => {
+        try {
+          const response = await api.delete(`/follows/${followId}/products/${productId}/markup`);
+          return response.data;
+        } catch (error) {
+          console.error('Error resetting product markup:', error);
+          throw error;
+        }
+      },
     };
   }
 
-  return { ...api, ...methodsRef.current };
+  // ✅ FIX: Create combined object ONCE to prevent infinite re-renders
+  if (!combinedRef.current) {
+    combinedRef.current = { ...api, ...methodsRef.current };
+  }
+
+  return combinedRef.current;
 }

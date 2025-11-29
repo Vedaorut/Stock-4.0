@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-import { motion } from 'framer-motion'; // Used in JSX
+import { motion } from 'framer-motion';
 import { PlusIcon } from '@heroicons/react/24/outline';
+import Header from '../components/Layout/Header';
 import { useApi } from '../hooks/useApi';
 import { useStore } from '../store/useStore';
 import { useTelegram } from '../hooks/useTelegram';
@@ -21,7 +22,6 @@ export default function Follows() {
 
   const loadFollows = useCallback(
     async (signal) => {
-      // First, load user's shop if not already loaded
       let shop = myShop;
 
       if (!shop) {
@@ -31,7 +31,7 @@ export default function Follows() {
 
         if (shopsError) {
           console.error('[Follows] Error loading shops:', shopsError);
-          return { status: 'error', error: 'Не удалось загрузить магазин' };
+          return { status: 'error', error: 'Не удалось загрузить данные' };
         }
 
         const shops = Array.isArray(shopsResponse?.data) ? shopsResponse.data : [];
@@ -43,11 +43,9 @@ export default function Follows() {
         }
 
         shop = shops[0];
-        // Save myShop to store for future use
         setMyShop(shop);
       }
 
-      // Load follows using consistent endpoint
       const { data: followsResponse, error: followsError } = await get('/follows/my', {
         params: { shopId: shop.id },
         signal,
@@ -101,7 +99,6 @@ export default function Follows() {
   const handleFollowClick = useCallback(
     (followId) => {
       triggerHaptic('light');
-      // ✅ FIX: Use getState() for stable reference
       useStore.getState().setFollowDetailId(followId);
     },
     [triggerHaptic]
@@ -110,66 +107,99 @@ export default function Follows() {
   const handleAddShop = () => {
     triggerHaptic('light');
     if (window.Telegram?.WebApp?.showAlert) {
-      window.Telegram.WebApp.showAlert('Добавление магазинов доступно через бота. Используйте команду /follow');
+      window.Telegram.WebApp.showAlert('Используйте команду /follow в боте для добавления магазинов');
     }
   };
 
   return (
-    <div className="pb-24" style={{ paddingTop: 'calc(env(safe-area-inset-top) + 56px)' }}>
-      {/* Custom Header with Add Button */}
-      <div 
-        className="fixed top-0 left-0 right-0 z-40 bg-dark-bg/95 backdrop-blur-lg border-b border-white/5" 
-        style={{ paddingTop: 'env(safe-area-inset-top)' }}
+    <div
+      className="h-screen overflow-y-auto"
+      style={{
+        paddingTop: 'calc(env(safe-area-inset-top) + 56px)',
+        paddingBottom: 'calc(var(--tabbar-total) + 20px)',
+      }}
+    >
+      <Header title={t('tabs.follows')} />
+
+      {/* Add button - fixed in header area */}
+      <div
+        className="fixed top-0 right-0 z-50 pr-4"
+        style={{ paddingTop: 'calc(env(safe-area-inset-top) + 12px)' }}
       >
-        <div className="px-4 py-4 flex items-center justify-between">
-          <h1 className="text-xl font-bold text-white">{t('tabs.follows')}</h1>
-          <motion.button
-            onClick={handleAddShop}
-            className="w-10 h-10 flex items-center justify-center rounded-xl bg-orange-primary/10 text-orange-primary"
-            whileTap={{ scale: 0.95 }}
-          >
-            <PlusIcon className="w-5 h-5" />
-          </motion.button>
-        </div>
+        <motion.button
+          onClick={handleAddShop}
+          className="w-10 h-10 flex items-center justify-center rounded-xl bg-orange-primary/10 text-orange-primary"
+          whileTap={{ scale: 0.95 }}
+        >
+          <PlusIcon className="w-5 h-5" />
+        </motion.button>
       </div>
 
-      <div className="px-4 py-6 space-y-6">
+      <div className="px-4 py-6">
         {isLoading ? (
-          <motion.div
-            className="flex flex-col items-center justify-center py-16 gap-4"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.3 }}
-          >
-            <motion.div
-              className="w-12 h-12 border-4 border-orange-primary border-t-transparent rounded-full"
-              animate={{ rotate: 360 }}
-              transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-            />
-            <motion.div
-              className="text-gray-400 text-sm"
-              animate={{ opacity: [0.5, 1, 0.5] }}
-              transition={{ duration: 1.5, repeat: Infinity }}
-            >
-              Загрузка подписок...
-            </motion.div>
-          </motion.div>
+          <div className="flex items-center justify-center py-12">
+            <div className="w-8 h-8 border-4 border-orange-primary border-t-transparent rounded-full animate-spin" />
+          </div>
         ) : error ? (
-          <div className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">
-            {error}
+          <div className="flex flex-col items-center justify-center py-12 text-center">
+            <svg
+              className="w-16 h-16 text-red-500 mb-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
+            </svg>
+            <h3 className="text-lg font-semibold text-gray-400 mb-2">{error}</h3>
+            <motion.button
+              onClick={() => loadFollows()}
+              className="touch-target bg-orange-primary hover:bg-orange-light text-white font-semibold px-6 rounded-xl transition-colors duration-300 mt-4"
+              whileTap={{ scale: 0.95 }}
+            >
+              Попробовать снова
+            </motion.button>
           </div>
         ) : follows.length === 0 ? (
-          <div className="glass-card rounded-2xl p-4 text-gray-400 text-sm">
-            У вас пока нет подписок. Добавьте магазины через бота.
+          <div className="flex flex-col items-center justify-center py-12 text-center">
+            <div className="w-20 h-20 rounded-2xl bg-white/5 flex items-center justify-center mb-4">
+              <svg
+                className="w-10 h-10 text-gray-500"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.5}
+                  d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
+                />
+              </svg>
+            </div>
+            <h3 className="text-lg font-semibold text-white mb-2">Нет подписок</h3>
+            <p className="text-gray-400 text-sm mb-6">
+              Добавьте магазины через бота командой /follow
+            </p>
           </div>
         ) : (
           <div className="space-y-3">
-            {follows.map((follow) => (
-              <FollowCard
+            {follows.map((follow, index) => (
+              <motion.div
                 key={follow.id}
-                follow={follow}
-                onClick={() => handleFollowClick(follow.id)}
-              />
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.05 }}
+              >
+                <FollowCard
+                  follow={follow}
+                  onClick={() => handleFollowClick(follow.id)}
+                />
+              </motion.div>
             ))}
           </div>
         )}

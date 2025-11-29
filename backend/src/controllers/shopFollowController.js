@@ -160,10 +160,29 @@ const formatMonitorProduct = (product) => ({
   created_at: product.created_at,
 });
 
-const formatResellProduct = (row, markupPercentage) => {
-  const markupMultiplier = 1 + (Number(markupPercentage) || 0) / 100;
+const formatResellProduct = (row, globalMarkupPercentage, globalMarkupType = 'percentage', globalMarkupFixed = 0) => {
   const sourcePrice = Number(row.source_product_price) || 0;
   const syncedPrice = Number(row.synced_product_price) || 0;
+
+  // Determine effective markup (custom > global)
+  const hasCustomMarkup = row.custom_markup_type !== null;
+  const effectiveMarkupType = hasCustomMarkup ? row.custom_markup_type : globalMarkupType;
+  const effectiveMarkupPercentage = hasCustomMarkup
+    ? Number(row.custom_markup_percentage) || 0
+    : Number(globalMarkupPercentage) || 0;
+  const effectiveMarkupFixed = hasCustomMarkup
+    ? Number(row.custom_markup_fixed) || 0
+    : Number(globalMarkupFixed) || 0;
+
+  // Calculate expected price based on markup type
+  let expectedPrice;
+  if (effectiveMarkupType === 'fixed') {
+    expectedPrice = sourcePrice + effectiveMarkupFixed;
+  } else {
+    const markupMultiplier = 1 + effectiveMarkupPercentage / 100;
+    expectedPrice = sourcePrice * markupMultiplier;
+  }
+  expectedPrice = Number(expectedPrice.toFixed(2));
 
   return {
     id: row.id,
@@ -174,6 +193,7 @@ const formatResellProduct = (row, markupPercentage) => {
       price: sourcePrice,
       stock_quantity: Number(row.source_product_stock),
       is_active: row.source_product_active,
+      is_preorder: row.source_product_preorder || false,
     },
     synced_product: {
       id: row.synced_product_id,
@@ -181,14 +201,23 @@ const formatResellProduct = (row, markupPercentage) => {
       price: syncedPrice,
       stock_quantity: Number(row.synced_product_stock),
       is_active: row.synced_product_active,
+      is_preorder: row.synced_product_preorder || false,
     },
     pricing: {
-      markup_percentage: Number(markupPercentage) || 0,
-      expected_price: Number((sourcePrice * markupMultiplier).toFixed(2)),
+      markup_type: effectiveMarkupType,
+      markup_percentage: effectiveMarkupPercentage,
+      markup_fixed: effectiveMarkupFixed,
+      expected_price: expectedPrice,
       deviation: syncedPrice
-        ? Number((syncedPrice - sourcePrice * markupMultiplier).toFixed(2))
+        ? Number((syncedPrice - expectedPrice).toFixed(2))
         : null,
+      has_custom_markup: hasCustomMarkup,
     },
+    custom_markup: hasCustomMarkup ? {
+      type: row.custom_markup_type,
+      percentage: Number(row.custom_markup_percentage) || 0,
+      fixed: Number(row.custom_markup_fixed) || 0,
+    } : null,
     conflict_status: row.conflict_status,
     last_synced_at: row.last_synced_at,
     created_at: row.created_at,
@@ -249,13 +278,22 @@ export const getFollowProducts = asyncHandler(async (req, res) => {
       rows.length > 0 && rows[0].total_count
         ? Number(rows[0].total_count)
         : follow.synced_products_count || 0;
-    const markupValue = toNumber(follow.markup_percentage, 0);
+
+    // Global follow markup settings
+    const globalMarkupPercentage = toNumber(follow.markup_percentage, 0);
+    const globalMarkupType = follow.markup_type || 'percentage';
+    const globalMarkupFixed = toNumber(follow.markup_fixed, 0);
 
     return res.json({
       success: true,
       data: {
         mode: 'resell',
-        products: rows.map((row) => formatResellProduct(row, markupValue)),
+        global_markup: {
+          type: globalMarkupType,
+          percentage: globalMarkupPercentage,
+          fixed: globalMarkupFixed,
+        },
+        products: rows.map((row) => formatResellProduct(row, globalMarkupPercentage, globalMarkupType, globalMarkupFixed)),
         pagination: {
           limit,
           offset,
@@ -697,6 +735,167 @@ export const getFollowSyncStatus = asyncHandler(async (req, res) => {
       error: error.message,
       stack: error.stack,
       followId: req.params?.id,
+    });
+    throw error;
+  }
+});
+
+/**
+ * Update product-level markup
+ * PUT /follows/:id/products/:productId/markup
+ */
+export const updateProductMarkup = asyncHandler(async (req, res) => {
+  try {
+    const { id, productId } = req.params;
+    const markupTypeRaw = req.body.markupType ?? req.body.markup_type;
+    const markupPercentageRaw = req.body.markupPercentage ?? req.body.markup_percentage;
+    const markupFixedRaw = req.body.markupFixed ?? req.body.markup_fixed;
+
+    const followId = Number.parseInt(id, 10);
+    const syncedProductId = Number.parseInt(productId, 10);
+    const markupType = markupTypeRaw === 'fixed' ? 'fixed' : 'percentage';
+    const markupPercentage = Number(markupPercentageRaw) || 0;
+    const markupFixed = Number(markupFixedRaw) || 0;
+
+    if (!Number.isInteger(followId) || followId <= 0) {
+      throw new ValidationError('Invalid follow ID');
+    }
+
+    if (!Number.isInteger(syncedProductId) || syncedProductId <= 0) {
+      throw new ValidationError('Invalid product ID');
+    }
+
+    // Validate markup values
+    if (markupType === 'percentage') {
+      if (markupPercentage < 0 || markupPercentage > 500) {
+        throw new ValidationError('Markup percentage must be between 0% and 500%');
+      }
+    } else if (markupType === 'fixed') {
+      if (markupFixed < 0 || markupFixed > 10000) {
+        throw new ValidationError('Fixed markup must be between $0 and $10000');
+      }
+    }
+
+    // Verify follow exists and user has access
+    const follow = await shopFollowQueries.findById(followId);
+    if (!follow) {
+      throw new NotFoundError('Follow');
+    }
+
+    const access = await workerQueries.checkAccess(follow.follower_shop_id, req.user.id);
+    if (!access.hasAccess) {
+      throw new UnauthorizedError('You do not have access to this follow');
+    }
+
+    if (follow.mode !== 'resell') {
+      throw new ValidationError('Product markup can only be set in resell mode');
+    }
+
+    // Find synced product record
+    const syncedProduct = await syncedProductQueries.findByFollowAndSyncedProduct(followId, syncedProductId);
+    if (!syncedProduct) {
+      throw new NotFoundError('Synced product');
+    }
+
+    // Update custom markup
+    const updated = await syncedProductQueries.updateCustomMarkup(
+      syncedProduct.id,
+      markupType,
+      markupType === 'percentage' ? markupPercentage : null,
+      markupType === 'fixed' ? markupFixed : null
+    );
+
+    logger.info('Product markup updated', {
+      followId,
+      syncedProductId,
+      markupType,
+      markupPercentage,
+      markupFixed,
+      userId: req.user.id,
+    });
+
+    res.json({
+      success: true,
+      data: {
+        id: updated.id,
+        synced_product_id: updated.synced_product_id,
+        custom_markup: {
+          type: markupType,
+          percentage: markupPercentage,
+          fixed: markupFixed,
+        },
+      },
+    });
+  } catch (error) {
+    logger.error('Error updating product markup', {
+      error: error.message,
+      stack: error.stack,
+      params: req.params,
+      body: req.body,
+    });
+    throw error;
+  }
+});
+
+/**
+ * Reset product-level markup to use global follow markup
+ * DELETE /follows/:id/products/:productId/markup
+ */
+export const resetProductMarkup = asyncHandler(async (req, res) => {
+  try {
+    const { id, productId } = req.params;
+
+    const followId = Number.parseInt(id, 10);
+    const syncedProductId = Number.parseInt(productId, 10);
+
+    if (!Number.isInteger(followId) || followId <= 0) {
+      throw new ValidationError('Invalid follow ID');
+    }
+
+    if (!Number.isInteger(syncedProductId) || syncedProductId <= 0) {
+      throw new ValidationError('Invalid product ID');
+    }
+
+    // Verify follow exists and user has access
+    const follow = await shopFollowQueries.findById(followId);
+    if (!follow) {
+      throw new NotFoundError('Follow');
+    }
+
+    const access = await workerQueries.checkAccess(follow.follower_shop_id, req.user.id);
+    if (!access.hasAccess) {
+      throw new UnauthorizedError('You do not have access to this follow');
+    }
+
+    // Find synced product record
+    const syncedProduct = await syncedProductQueries.findByFollowAndSyncedProduct(followId, syncedProductId);
+    if (!syncedProduct) {
+      throw new NotFoundError('Synced product');
+    }
+
+    // Reset custom markup to NULL (use global)
+    const updated = await syncedProductQueries.resetCustomMarkup(syncedProduct.id);
+
+    logger.info('Product markup reset to global', {
+      followId,
+      syncedProductId,
+      userId: req.user.id,
+    });
+
+    res.json({
+      success: true,
+      data: {
+        id: updated.id,
+        synced_product_id: updated.synced_product_id,
+        custom_markup: null,
+        message: 'Product markup reset to global follow markup',
+      },
+    });
+  } catch (error) {
+    logger.error('Error resetting product markup', {
+      error: error.message,
+      stack: error.stack,
+      params: req.params,
     });
     throw error;
   }
