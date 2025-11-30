@@ -50,7 +50,9 @@ export const authValidation = {
   ],
 
   updateRole: [
-    body('role').isIn(['buyer', 'seller']).withMessage('Role must be either "buyer" or "seller"'),
+    body('role')
+      .isIn(['buyer', 'seller', 'worker'])
+      .withMessage('Role must be either "buyer", "seller", or "worker"'),
     validate,
   ],
 };

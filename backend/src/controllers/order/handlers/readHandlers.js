@@ -1,4 +1,4 @@
-import { orderQueries, shopQueries } from '../../../database/queries/index.js';
+import { orderQueries, shopQueries, workerQueries } from '../../../database/queries/index.js';
 import { asyncHandler } from '../../../middleware/errorHandler.js';
 import { NotFoundError } from '../../../utils/errors.js';
 import { validateOrderAccess } from '../../../validators/orderValidator.js';
@@ -16,7 +16,7 @@ export const getById = asyncHandler(async (req, res) => {
     throw new NotFoundError('Order');
   }
 
-  validateOrderAccess(order, req.user.id);
+  await validateOrderAccess(order, req.user.id);
 
   return res.json({
     success: true,
@@ -59,10 +59,13 @@ export const getMyOrders = asyncHandler(async (req, res) => {
       });
     }
 
-    if (shop.owner_id !== req.user.id) {
+    const isOwner = shop.owner_id === req.user.id;
+    const isWorker = await workerQueries.findByShopAndUser(shopId, req.user.id);
+
+    if (!isOwner && !isWorker) {
       return res.status(403).json({
         success: false,
-        error: 'You can only view your own shop orders',
+        error: 'You can only view orders for shops you own or work at',
       });
     }
 
@@ -73,19 +76,37 @@ export const getMyOrders = asyncHandler(async (req, res) => {
     });
   } else if (type === 'seller') {
     const shops = await shopQueries.findByOwnerId(req.user.id);
+    const workerShops = await workerQueries.getWorkerShops(req.user.id);
 
-    if (!shops || shops.length === 0) {
+    if ((!shops || shops.length === 0) && (!workerShops || workerShops.length === 0)) {
       return res.status(403).json({
         success: false,
-        error: 'You need to create a shop first to view seller orders',
+        error: 'You need shop access to view seller orders',
       });
     }
 
-    orders = await orderQueries.findByOwnerId(req.user.id, {
-      limit,
-      offset,
-      statuses: statusFilter,
-    });
+    if (shops && shops.length > 0) {
+      orders = await orderQueries.findByOwnerId(req.user.id, {
+        limit,
+        offset,
+        statuses: statusFilter,
+      });
+    } else {
+      // Worker fallback: aggregate orders across worker shops
+      const shopIds = workerShops.map((s) => s.id);
+      const combined = [];
+      for (const id of shopIds) {
+        const shopOrders = await orderQueries.findByShopId(id, {
+          limit,
+          offset,
+          statuses: statusFilter,
+        });
+        combined.push(...shopOrders);
+      }
+      orders = combined
+        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+        .slice(offset, offset + limit);
+    }
   } else {
     orders = await orderQueries.findByBuyerId(req.user.id, limit, offset);
   }

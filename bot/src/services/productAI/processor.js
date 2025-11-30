@@ -33,9 +33,11 @@ export async function processProductCommand(userCommand, context) {
     shopName,
     token,
     products = [],
+    orders = [],
     ctx,
     clarifiedProductId,
     clarifiedProductName,
+    isWorker = false,
   } = context;
   const startTime = Date.now();
 
@@ -129,6 +131,8 @@ export async function processProductCommand(userCommand, context) {
         try {
           const systemPrompt = generateProductAIPrompt(shopName, products, {
             sessionContext: ctx?.session?.aiContext,
+            orders,
+            isWorker,
           });
           const aiResponse = await deepseek.chat({ system: systemPrompt, messages, stream: false });
           const message =
@@ -224,6 +228,8 @@ export async function processProductCommand(userCommand, context) {
         try {
           const systemPrompt = generateProductAIPrompt(shopName, products, {
             sessionContext: ctx?.session?.aiContext,
+            orders,
+            isWorker,
           });
           const aiResponse = await deepseek.chat({ system: systemPrompt, messages, stream: false });
           const message =
@@ -256,10 +262,12 @@ export async function processProductCommand(userCommand, context) {
       return result;
     }
 
-    // Generate system prompt
-    const systemPrompt = generateProductAIPrompt(shopName, products, {
-      sessionContext: ctx?.session?.aiContext,
-    });
+  // Generate system prompt
+  const systemPrompt = generateProductAIPrompt(shopName, products, {
+    sessionContext: ctx?.session?.aiContext,
+    orders,
+    isWorker,
+  });
 
     // Get conversation history for context
     const conversationHistory = getConversationHistory(ctx);

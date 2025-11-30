@@ -1,7 +1,7 @@
 import { PencilIcon, ArrowPathIcon, TrashIcon } from '@heroicons/react/24/outline';
 import InteractiveListItem from '../common/InteractiveListItem';
 
-export default function ActionsList({ mode, markup, onEditMarkup, onSwitchMode, onDelete }) {
+export default function ActionsList({ mode, markup, markupType, onEditMarkup, onSwitchMode, onDelete }) {
   const modeLabel = mode === 'monitor' ? 'Мониторинг' : 'Перепродажа';
   const switchToMode = mode === 'monitor' ? 'resell' : 'monitor';
   const switchToLabel = switchToMode === 'monitor' ? 'Мониторинг' : 'Перепродажа';
@@ -30,7 +30,7 @@ export default function ActionsList({ mode, markup, onEditMarkup, onSwitchMode, 
                 </div>
                 <div className="flex-1 min-w-0 px-4 text-left">
                   <div className="text-white font-semibold text-[15px]">Изменить наценку</div>
-                  <div className="text-white/40 text-xs mt-0.5 font-medium">Текущая: <span className="text-white/60">+{markup}%</span></div>
+                  <div className="text-white/40 text-xs mt-0.5 font-medium">Текущая: <span className="text-white/60">+{markupType === 'fixed' ? `$${markup}` : `${markup}%`}</span></div>
                 </div>
                 <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-white/20">
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

@@ -4,6 +4,7 @@ import { useTelegram } from '../../hooks/useTelegram';
 import { useStore } from '../../store/useStore';
 import { useToast } from '../../hooks/useToast';
 import { usePlatform } from '../../hooks/usePlatform';
+import { useTranslation } from '../../i18n/useTranslation';
 import { getSpringPreset, getSurfaceStyle, isAndroid } from '../../utils/platform';
 import { gpuAccelStyle } from '../../utils/animationHelpers';
 import CountdownTimer from '../common/CountdownTimer';
@@ -68,12 +69,12 @@ const PreorderIcon = () => (
   </div>
 );
 
-const SyncedBadge = () => (
+const SyncedBadge = ({ sourceName, t }) => (
   <span className="px-2 py-0.5 rounded-md text-xs font-semibold bg-blue-500/20 text-blue-400 flex items-center gap-1">
     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
     </svg>
-    Synced
+    {sourceName ? t('product.syncedFrom', { shop: sourceName }) : t('product.synced')}
   </span>
 );
 
@@ -115,6 +116,7 @@ const ProductCard = memo(function ProductCard({ product, onPreorder: _onPreorder
   const toast = useToast();
   const platform = usePlatform();
   const android = isAndroid(platform);
+  const { t } = useTranslation();
 
   const { cardSurface, quickSpring, pressSpring } = useMemo(
     () => getSurfaceStyles(platform),
@@ -215,7 +217,6 @@ const ProductCard = memo(function ProductCard({ product, onPreorder: _onPreorder
       {/* Badges */}
       <div className="absolute top-3 left-3 z-10 flex flex-col gap-2">
         {product.isPremium && <PremiumIcon />}
-        {product.is_synced && <SyncedBadge />}
       </div>
 
       <div className="absolute top-3 right-3 z-10 flex flex-col gap-2 items-end">

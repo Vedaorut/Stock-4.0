@@ -411,9 +411,14 @@ export async function runPeriodicSync() {
         // Check if source differs from synced
         const sourcePrice = parseFloat(sync.source_price);
         const syncedPrice = parseFloat(sync.synced_price);
-        const markupType = sync.markup_type || 'percentage';
-        const markupValue = markupType === 'fixed' ? sync.markup_fixed : sync.markup_percentage;
-        const expectedPrice = calculatePriceWithMarkup(sourcePrice, markupType, markupValue);
+        
+        // BUG FIX: Determine effective markup (custom > global)
+        const effectiveMarkupType = sync.custom_markup_type || sync.markup_type || 'percentage';
+        const effectiveMarkupValue = sync.custom_markup_type
+          ? (effectiveMarkupType === 'fixed' ? sync.custom_markup_fixed : sync.custom_markup_percentage)
+          : (effectiveMarkupType === 'fixed' ? sync.markup_fixed : sync.markup_percentage);
+        
+        const expectedPrice = calculatePriceWithMarkup(sourcePrice, effectiveMarkupType, effectiveMarkupValue);
 
         const priceChanged = Math.abs(syncedPrice - expectedPrice) > 0.01;
         const stockChanged = sync.source_stock !== sync.synced_stock;

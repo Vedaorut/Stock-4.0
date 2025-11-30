@@ -18,10 +18,12 @@ export const orderQueries = {
   },
 
   // Find order by ID
-  findById: async (id) => {
-    const result = await query(
+  findById: async (id, client = null) => {
+    const queryFn = client ? client.query.bind(client) : query;
+    const result = await queryFn(
       `SELECT o.*,
               p.name as product_name,
+              s.id as shop_id,
               s.name as shop_name, s.owner_id,
               u.username as buyer_username, u.telegram_id as buyer_telegram_id
        FROM orders o

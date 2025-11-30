@@ -279,7 +279,50 @@ export const shopApi = {
 
   // Get worker shops only (not owner)
   async getWorkerShops(token) {
-    const { data } = await api.get('/shops/workspace', {
+    try {
+      const { data } = await api.get('/shops/worker', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      return data.data || data;
+    } catch (error) {
+      // Backward compatibility: some backends expose /shops/workspace
+      if (error.response?.status === 404) {
+        const { data } = await api.get('/shops/workspace', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        return data.data || data;
+      }
+      throw error;
+    }
+  },
+
+  // Worker/seller: get products for specific shop with auth
+  async getShopProductsSecure(shopId, token) {
+    const { data } = await api.get(`/shops/${shopId}/products`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return data.data || data;
+  },
+
+  // Worker/seller: create product within a shop
+  async createShopProduct(shopId, productData, token) {
+    const { data } = await api.post(`/shops/${shopId}/products`, productData, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return data.data || data;
+  },
+
+  // Worker/seller: update product within a shop
+  async updateShopProduct(shopId, productId, productData, token) {
+    const { data } = await api.put(`/shops/${shopId}/products/${productId}`, productData, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return data.data || data;
+  },
+
+  // Worker/seller: delete product within a shop
+  async deleteShopProduct(shopId, productId, token) {
+    const { data } = await api.delete(`/shops/${shopId}/products/${productId}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     return data.data || data;
@@ -445,10 +488,24 @@ export const orderApi = {
         hasToken: !!token,
       });
 
-      const { data } = await api.get('/orders', {
-        params,
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      // Prefer new worker-friendly endpoint, fallback to legacy
+      let data;
+      try {
+        const response = await api.get(`/shops/${shopId}/orders`, {
+          params,
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        data = response.data;
+      } catch (err) {
+        if (err.response?.status !== 404) {
+          throw err;
+        }
+        const response = await api.get('/orders', {
+          params,
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        data = response.data;
+      }
 
       logger.info('getShopOrders response:', {
         status: 200,

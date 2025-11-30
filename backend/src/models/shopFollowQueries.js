@@ -88,7 +88,7 @@ export const shopFollowQueries = {
         (SELECT COUNT(*) FROM products p WHERE p.shop_id = sf.source_shop_id AND p.is_active = true) as source_products_count
       FROM shop_follows sf
       JOIN shops ss ON sf.source_shop_id = ss.id
-      JOIN users u ON ss.owner_id = u.id
+      LEFT JOIN users u ON ss.owner_id = u.id
       WHERE sf.follower_shop_id = $1
     `;
 

@@ -1,11 +1,46 @@
 import express from 'express';
 import { shopController } from '../controllers/shopController.js';
+import { workerController } from '../controllers/workerController.js';
+import { productController } from '../controllers/productController.js';
+import { orderController } from '../controllers/orderController.js';
 import { shopValidation } from '../middleware/validation.js';
-import { verifyToken, optionalAuth, requireShopOwner } from '../middleware/auth.js';
+import { productValidation } from '../middleware/validation.js';
+import { verifyToken, optionalAuth, requireShopOwner, requireShopAccess } from '../middleware/auth.js';
 import { shopCreationLimiter } from '../middleware/rateLimiter.js';
 import * as migrationController from '../controllers/migrationController.js';
+import { productQueries } from '../database/queries/index.js';
 
 const router = express.Router();
+
+// Helpers to bind shopId from params to request payload/query
+const setShopIdInBody = (req, res, next) => {
+  req.body.shopId = parseInt(req.params.shopId, 10);
+  return next();
+};
+
+const setShopIdInQuery = (req, res, next) => {
+  req.query.shopId = parseInt(req.params.shopId, 10);
+  return next();
+};
+
+// Ensure product belongs to the shop in params
+const ensureProductBelongsToShop = async (req, res, next) => {
+  try {
+    const product = await productQueries.findById(req.params.id);
+    if (!product || product.shop_id !== parseInt(req.params.shopId, 10)) {
+      return res.status(404).json({
+        success: false,
+        error: 'Product not found in this shop',
+      });
+    }
+    return next();
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to validate product',
+    });
+  }
+};
 
 /**
  * @route   POST /api/shops
@@ -22,11 +57,89 @@ router.post('/', verifyToken, shopCreationLimiter, shopValidation.create, shopCo
 router.get('/my', verifyToken, shopController.getMyShops);
 
 /**
+ * @route   GET /api/shops/worker
+ * @desc    Get shops where user is a worker
+ * @access  Private
+ */
+router.get('/worker', verifyToken, workerController.getWorkerShops);
+
+/**
  * @route   GET /api/shops/active
  * @desc    List all active shops
  * @access  Public
  */
 router.get('/active', shopController.listActive);
+
+/**
+ * @route   GET /api/shops/:shopId/products
+ * @desc    List products for a shop (owner or worker)
+ * @access  Private
+ */
+router.get(
+  '/:shopId/products',
+  verifyToken,
+  requireShopAccess,
+  setShopIdInQuery,
+  productValidation.list,
+  productController.list
+);
+
+/**
+ * @route   POST /api/shops/:shopId/products
+ * @desc    Create product in a shop (owner or worker)
+ * @access  Private
+ */
+router.post(
+  '/:shopId/products',
+  verifyToken,
+  requireShopAccess,
+  setShopIdInBody,
+  productValidation.create,
+  productController.create
+);
+
+/**
+ * @route   PUT /api/shops/:shopId/products/:id
+ * @desc    Update product in a shop (owner or worker)
+ * @access  Private
+ */
+router.put(
+  '/:shopId/products/:id',
+  verifyToken,
+  requireShopAccess,
+  ensureProductBelongsToShop,
+  productValidation.update,
+  productController.update
+);
+
+/**
+ * @route   DELETE /api/shops/:shopId/products/:id
+ * @desc    Delete product in a shop (owner or worker)
+ * @access  Private
+ */
+router.delete(
+  '/:shopId/products/:id',
+  verifyToken,
+  requireShopAccess,
+  ensureProductBelongsToShop,
+  productValidation.getById,
+  productController.delete
+);
+
+/**
+ * @route   GET /api/shops/:shopId/orders
+ * @desc    List orders for a shop (owner or worker)
+ * @access  Private
+ */
+router.get(
+  '/:shopId/orders',
+  verifyToken,
+  requireShopAccess,
+  (req, res, next) => {
+    req.query.shop_id = req.params.shopId;
+    return orderController.getMyOrders(req, res, next);
+  }
+);
 
 /**
  * @route   GET /api/shops/search

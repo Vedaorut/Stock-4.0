@@ -4,7 +4,7 @@ import { syncedProductQueries } from '../models/syncedProductQueries.js';
 import { getClient } from '../config/database.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import { NotFoundError, UnauthorizedError, ValidationError, ConflictError, PaymentRequiredError } from '../utils/errors.js';
-import { syncAllProductsForFollow, updateMarkupForFollow } from '../services/productSyncService.js';
+import { syncAllProductsForFollow, updateMarkupForFollow, calculatePriceWithMarkup } from '../services/productSyncService.js';
 import { queueProductSync, getSyncStatus } from '../jobs/syncQueue.js';
 import logger from '../utils/logger.js';
 
@@ -350,9 +350,9 @@ export const createFollow = asyncHandler(async (req, res) => {
         if (!Number.isFinite(markupPercentageValue)) {
           throw new ValidationError('Markup percentage is required for resell mode with percentage type');
         }
-        // P1-SEC-007: Limit markup to 0.1-200% to prevent extreme pricing
-        if (markupPercentageValue < 0.1 || markupPercentageValue > 200) {
-          throw new ValidationError('Markup must be between 0.1% and 200%');
+        // P1-SEC-007: Limit markup to 0.1-500% to prevent extreme pricing
+        if (markupPercentageValue < 0.1 || markupPercentageValue > 500) {
+          throw new ValidationError('Markup must be between 0.1% and 500%');
         }
       } else if (markupTypeValue === 'fixed') {
         if (!Number.isFinite(markupFixedValue) || markupFixedValue < 0) {
@@ -538,9 +538,9 @@ export const updateFollowMarkup = asyncHandler(async (req, res) => {
 
     // Validate based on markup type
     if (markupType === 'percentage') {
-      // P1-SEC-007: Limit markup to 0.1-200%
-      if (!Number.isFinite(markupPercentage) || markupPercentage < 0.1 || markupPercentage > 200) {
-        throw new ValidationError('Markup must be between 0.1% and 200%');
+      // P1-SEC-007: Limit markup to 0.1-500%
+      if (!Number.isFinite(markupPercentage) || markupPercentage < 0.1 || markupPercentage > 500) {
+        throw new ValidationError('Markup must be between 0.1% and 500%');
       }
     } else if (markupType === 'fixed') {
       if (!Number.isFinite(markupFixed) || markupFixed < 0) {
@@ -617,8 +617,8 @@ export const switchFollowMode = asyncHandler(async (req, res) => {
 
     // If switching to resell, validate markup first (P1-SEC-007)
     if (normalizedMode === 'resell') {
-      if (!Number.isFinite(markupValue) || markupValue < 0.1 || markupValue > 200) {
-        throw new ValidationError('Markup must be between 0.1% and 200% for resell mode');
+      if (!Number.isFinite(markupValue) || markupValue < 0.1 || markupValue > 500) {
+        throw new ValidationError('Markup must be between 0.1% and 500% for resell mode');
       }
     }
 
@@ -805,12 +805,21 @@ export const updateProductMarkup = asyncHandler(async (req, res) => {
       markupType === 'fixed' ? markupFixed : null
     );
 
+    // BUG FIX: Update the actual product price with new custom markup
+    const sourceProduct = await productQueries.findById(syncedProduct.source_product_id);
+    const sourcePrice = Number(sourceProduct.price);
+    const markupValue = markupType === 'fixed' ? markupFixed : markupPercentage;
+    const newPrice = calculatePriceWithMarkup(sourcePrice, markupType, markupValue);
+    await productQueries.update(syncedProductId, { price: newPrice });
+
     logger.info('Product markup updated', {
       followId,
       syncedProductId,
       markupType,
       markupPercentage,
       markupFixed,
+      sourcePrice,
+      newPrice,
       userId: req.user.id,
     });
 

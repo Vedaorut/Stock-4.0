@@ -1,4 +1,5 @@
 import { ValidationError, UnauthorizedError } from '../utils/errors.js';
+import { workerQueries } from '../database/queries/index.js';
 
 /**
  * Order Validator
@@ -140,11 +141,17 @@ export const validateProductsForOrder = async (cartItems, client) => {
  * @param {number} userId - User ID to check
  * @throws {UnauthorizedError} - If user doesn't have access
  */
-export const validateOrderAccess = (order, userId) => {
+export const validateOrderAccess = async (order, userId) => {
   const isBuyer = order.buyer_id === userId;
   const isOwner = order.owner_id && order.owner_id === userId;
+  let isWorker = false;
 
-  if (!isBuyer && !isOwner) {
+  if (!isOwner && order.shop_id) {
+    const worker = await workerQueries.findByShopAndUser(order.shop_id, userId);
+    isWorker = !!worker;
+  }
+
+  if (!isBuyer && !isOwner && !isWorker) {
     throw new UnauthorizedError('You do not have access to this order');
   }
 };
@@ -175,6 +182,17 @@ export const validateStatusUpdate = async (order, newStatus, userId) => {
     const allowedStatuses = ['confirmed', 'shipped', 'cancelled'];
     if (!allowedStatuses.includes(newStatus)) {
       throw new UnauthorizedError(`Sellers can only update status to: ${allowedStatuses.join(', ')}`);
+    }
+  } else if (order.shop_id) {
+    // Workers of this shop can manage orders with same rules as owner
+    const worker = await workerQueries.findByShopAndUser(order.shop_id, userId);
+    if (!worker) {
+      throw new UnauthorizedError('You do not have permission to update this order');
+    }
+
+    const allowedStatuses = ['confirmed', 'shipped', 'cancelled'];
+    if (!allowedStatuses.includes(newStatus)) {
+      throw new UnauthorizedError(`Workers can only update status to: ${allowedStatuses.join(', ')}`);
     }
   } else {
     throw new UnauthorizedError('You do not have permission to update this order');

@@ -1,4 +1,4 @@
-import { orderQueries, shopQueries } from '../../../database/queries/index.js';
+import { orderQueries, shopQueries, workerQueries } from '../../../database/queries/index.js';
 import { getClient } from '../../../config/database.js';
 import { asyncHandler } from '../../../middleware/errorHandler.js';
 import telegramService from '../../../services/telegram.js';
@@ -80,7 +80,10 @@ export const getActiveCount = asyncHandler(async (req, res) => {
   if (!shop) {
     throw new NotFoundError('Shop');
   }
-  if (shop.owner_id !== req.user.id) {
+  const isOwner = shop.owner_id === req.user.id;
+  const isWorker = await workerQueries.findByShopAndUser(shopId, req.user.id);
+
+  if (!isOwner && !isWorker) {
     throw new UnauthorizedError('Access denied');
   }
 

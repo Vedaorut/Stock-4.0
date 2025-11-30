@@ -126,12 +126,14 @@ export default function FollowDetail() {
           markup_fixed: markupData.markupFixed,
         }));
         triggerHaptic('success');
+        // Reload products to update prices with new markup
+        loadProducts();
       } catch (err) {
         console.error('[FollowDetail] Error updating markup:', err);
         triggerHaptic('error');
       }
     },
-    [followDetailId, follow, updateMarkup, triggerHaptic]
+    [followDetailId, follow, updateMarkup, triggerHaptic, loadProducts]
   );
 
   // Handle mode switch
@@ -244,54 +246,42 @@ export default function FollowDetail() {
           </div>
         ) : follow ? (
           <>
-            {/* Shop Info Card */}
+            {/* Shop Info Card - Compact */}
             <motion.div
-              className="relative overflow-hidden rounded-3xl border border-white/10 p-6"
+              className="relative overflow-hidden rounded-2xl border border-white/10 p-4"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.05 }}
             >
-              {/* Background Gradient */}
-              <div className="absolute inset-0 bg-gradient-to-br from-white/[0.08] to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-br from-white/[0.06] to-transparent" />
               
-              <div className="relative flex flex-col items-center gap-4 text-center">
+              <div className="relative flex items-center gap-4">
                 {/* Shop Avatar */}
-                <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-[#FF6B00] to-[#FF8F00] shadow-lg shadow-[#FF6B00]/20 flex items-center justify-center text-white font-bold text-3xl">
-                    {shopName.charAt(0).toUpperCase()}
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#FF6B00] to-[#FF8F00] shadow-lg shadow-[#FF6B00]/20 flex items-center justify-center text-white font-bold text-xl flex-shrink-0">
+                  {shopName.charAt(0).toUpperCase()}
                 </div>
 
                 {/* Shop Info */}
-                <div className="w-full">
-                  <h2 className="text-white font-bold text-2xl mb-2">{shopName}</h2>
-                  <div className="flex items-center justify-center gap-2">
+                <div className="flex-1 min-w-0">
+                  <h2 className="text-white font-bold text-lg truncate">{shopName}</h2>
+                  <div className="flex items-center gap-2 mt-1 flex-wrap">
                     <span
-                      className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider border ${
+                      className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
                         mode === 'resell'
                           ? 'bg-[#FF6B00]/10 text-[#FF6B00] border-[#FF6B00]/20'
                           : 'bg-blue-500/10 text-blue-400 border-blue-500/20'
                       }`}
                     >
-                      {mode === 'resell' ? 'Resale' : 'Monitoring'}
+                      {mode === 'resell' ? 'Resale' : 'Monitor'}
                     </span>
                     {mode === 'resell' && (
-                      <span className="text-[#2ECC71] text-xs font-bold px-3 py-1 rounded-full bg-[#2ECC71]/10 border border-[#2ECC71]/20">
+                      <span className="text-[#2ECC71] text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#2ECC71]/10 border border-[#2ECC71]/20">
                         +{markupType === 'percentage' ? `${markupPercentage}%` : `$${markupFixed}`}
                       </span>
                     )}
-                  </div>
-                </div>
-
-                {/* Stats Row */}
-                <div className="grid grid-cols-2 gap-px bg-white/10 w-full rounded-2xl overflow-hidden mt-2 border border-white/5">
-                  <div className="bg-white/[0.02] p-3 text-center hover:bg-white/[0.05] transition-colors">
-                    <div className="text-white font-bold text-lg">{follow.products_count || 0}</div>
-                    <div className="text-white/40 text-xs uppercase tracking-wide">Products</div>
-                  </div>
-                  <div className="bg-white/[0.02] p-3 text-center hover:bg-white/[0.05] transition-colors">
-                    <div className="text-white font-bold text-lg">
-                        {new Date(follow.created_at).toLocaleDateString(undefined, {day: 'numeric', month: 'short'})}
-                    </div>
-                    <div className="text-white/40 text-xs uppercase tracking-wide">Since</div>
+                    <span className="text-white/40 text-xs">
+                      {products.length} товаров • с {new Date(follow.created_at).toLocaleDateString('ru', {day: 'numeric', month: 'short'})}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -306,6 +296,7 @@ export default function FollowDetail() {
               <ActionsList
                 mode={mode}
                 markup={displayMarkup}
+                markupType={markupType}
                 onEditMarkup={() => {
                   triggerHaptic('light');
                   setIsMarkupModalOpen(true);
@@ -358,8 +349,11 @@ export default function FollowDetail() {
                                 {product.synced_product?.name || product.source_product?.name || product.name}
                               </h4>
                               {product.pricing?.has_custom_markup && (
-                                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-[#FF6B00]/20 text-[#FF6B00] flex-shrink-0">
-                                  Custom
+                                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-purple-500/20 text-purple-400 border border-purple-500/30 flex items-center gap-1 flex-shrink-0">
+                                  <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                  </svg>
+                                  Своя
                                 </span>
                               )}
                             </div>

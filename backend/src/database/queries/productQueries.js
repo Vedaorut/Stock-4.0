@@ -32,10 +32,13 @@ export const productQueries = {
       `SELECT p.*,
               s.name as shop_name,
               s.owner_id,
-              CASE WHEN sp.id IS NOT NULL THEN true ELSE false END AS is_synced
+              CASE WHEN sp.id IS NOT NULL THEN true ELSE false END AS is_synced,
+              source_shop.name as source_shop_name
        FROM products p
        JOIN shops s ON p.shop_id = s.id
        LEFT JOIN synced_products sp ON sp.synced_product_id = p.id
+       LEFT JOIN shop_follows sf ON sf.id = sp.follow_id
+       LEFT JOIN shops source_shop ON source_shop.id = sf.source_shop_id
        WHERE p.id = $1`,
       [id]
     );
@@ -49,10 +52,13 @@ export const productQueries = {
     let queryText = `
       SELECT p.*,
              s.name as shop_name,
-             CASE WHEN sp.id IS NOT NULL THEN true ELSE false END AS is_synced
+             CASE WHEN sp.id IS NOT NULL THEN true ELSE false END AS is_synced,
+             source_shop.name as source_shop_name
       FROM products p
       JOIN shops s ON p.shop_id = s.id
       LEFT JOIN synced_products sp ON sp.synced_product_id = p.id
+      LEFT JOIN shop_follows sf ON sf.id = sp.follow_id
+      LEFT JOIN shops source_shop ON source_shop.id = sf.source_shop_id
       WHERE 1=1
     `;
     const params = [];

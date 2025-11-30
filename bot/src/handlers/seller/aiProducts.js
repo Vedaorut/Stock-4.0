@@ -4,7 +4,7 @@ import {
   saveToConversationHistory,
   noteProductContext,
 } from '../../services/productAI.js';
-import { productApi } from '../../utils/api.js';
+import { productApi, shopApi, orderApi } from '../../utils/api.js';
 import { sellerMenu } from '../../keyboards/seller.js';
 import { isNoiseCommand } from '../../utils/fuzzyMatch.js';
 import logger from '../../utils/logger.js';
@@ -39,8 +39,12 @@ export async function handleAIProductCommand(ctx) {
       return; // In a scene, let scene handle it
     }
 
-    // Only process if user is seller with a shop
-    if (ctx.session.role !== 'seller' || !ctx.session.shopId) {
+    const isWorker = ctx.session.role === 'worker';
+    const shopId = ctx.session.shopId || ctx.session.workspaceShopId;
+    const shopName = ctx.session.shopName || ctx.session.workspaceShop?.name || 'Магазин';
+
+    // Only process if user is seller/worker with a shop
+    if ((!isWorker && ctx.session.role !== 'seller') || !shopId) {
       return; // Ignore, not for AI
     }
 
@@ -126,7 +130,10 @@ export async function handleAIProductCommand(ctx) {
     await ctx.sendChatAction('typing');
 
     // Fetch current products
-    const products = await productApi.getShopProducts(ctx.session.shopId);
+    const products =
+      (await shopApi
+        .getShopProductsSecure(shopId, ctx.session.token)
+        .catch(() => productApi.getShopProducts(shopId))) || [];
 
     // Handle random product selection requests without calling AI
     if (shouldSelectRandomProduct(userMessage)) {
@@ -134,13 +141,20 @@ export async function handleAIProductCommand(ctx) {
       return;
     }
 
+    const ordersForContext =
+      (await orderApi
+        .getShopOrders(shopId, ctx.session.token, { limit: 20 })
+        .catch(() => [])) || [];
+
     // Process AI command
     const result = await processProductCommand(userMessage, {
-      shopId: ctx.session.shopId,
-      shopName: ctx.session.shopName,
+      shopId,
+      shopName,
       token: ctx.session.token,
       products,
+      orders: ordersForContext,
       ctx, // Pass ctx for progress updates and confirmation prompts
+      isWorker, // Pass worker flag for AI prompt customization
     });
 
     // Handle result
@@ -186,7 +200,7 @@ export async function handleAIProductCommand(ctx) {
     // Log analytics
     logger.info('ai_command_result', {
       userId: ctx.from.id,
-      shopId: ctx.session.shopId,
+      shopId,
       success: result.success,
       operation: result.operation || 'text_response',
       hadToolCalls: !!result.operation,
@@ -200,7 +214,7 @@ export async function handleAIProductCommand(ctx) {
       error: error.message,
       stack: error.stack,
       userId: ctx.from?.id,
-      shopId: ctx.session?.shopId,
+      shopId,
       command: userMessage?.substring(0, 100),
       timestamp: new Date().toISOString(),
     });
@@ -295,6 +309,8 @@ export async function handleAISelection(ctx) {
     await ctx.answerCbQuery();
 
     const productId = parseInt(ctx.match[1]);
+    const shopId = ctx.session.shopId || ctx.session.workspaceShopId;
+    const shopName = ctx.session.shopName || ctx.session.workspaceShop?.name || 'Магазин';
 
     // Check if pending operation exists
     if (!ctx.session.pendingAI) {
@@ -325,12 +341,15 @@ export async function handleAISelection(ctx) {
     await ctx.editMessageText('⏳ Обрабатываю...');
 
     // Fetch current products for context
-    const products = await productApi.getShopProducts(ctx.session.shopId);
+    const products =
+      (await shopApi
+        .getShopProductsSecure(shopId, ctx.session.token)
+        .catch(() => productApi.getShopProducts(shopId))) || [];
 
     // Re-process original command with clarified product ID
     const result = await processProductCommand(originalCommand || 'выполнить операцию', {
-      shopId: ctx.session.shopId,
-      shopName: ctx.session.shopName,
+      shopId,
+      shopName,
       token: ctx.session.token,
       products,
       ctx,
@@ -365,10 +384,10 @@ export async function handleAISelection(ctx) {
       await cleanReply(ctx, result.message);
     }
 
-    logger.info('ai_clarification_resolved', {
-      userId: ctx.from.id,
-      shopId: ctx.session.shopId,
-      operation,
+  logger.info('ai_clarification_resolved', {
+    userId: ctx.from.id,
+    shopId,
+    operation,
       productId,
       productName: selectedProduct.name,
       success: result.success,
@@ -519,6 +538,8 @@ function formatUsdPrice(value) {
 }
 
 async function handleRandomProductSelection(ctx, userMessage, products) {
+  const shopId = ctx.session.shopId || ctx.session.workspaceShopId;
+
   if (!products || products.length === 0) {
     const replyText = 'Сейчас в магазине пусто — добавить что-нибудь?';
     await cleanReply(ctx, replyText);
@@ -529,7 +550,7 @@ async function handleRandomProductSelection(ctx, userMessage, products) {
 
     logger.info('ai_random_product_selection_empty', {
       userId: ctx.from.id,
-      shopId: ctx.session.shopId,
+      shopId,
     });
     return;
   }
@@ -566,7 +587,7 @@ async function handleRandomProductSelection(ctx, userMessage, products) {
 
   logger.info('ai_random_product_selected', {
     userId: ctx.from.id,
-    shopId: ctx.session.shopId,
+    shopId,
     productId: product.id,
     productName: product.name,
   });
@@ -592,7 +613,7 @@ export async function handleBulkDeleteAllConfirm(ctx) {
     });
 
     // Execute deletion via API
-    const shopId = ctx.session?.shopId;
+    const shopId = ctx.session?.shopId || ctx.session?.workspaceShopId;
     const token = ctx.session?.token;
 
     if (!shopId || !token) {
@@ -607,11 +628,11 @@ export async function handleBulkDeleteAllConfirm(ctx) {
       keyboard: sellerMenu(0, { hasFollows: ctx.session?.hasFollows }),
     });
 
-    logger.info('bulk_delete_all_confirmed', {
-      userId: ctx.from.id,
-      shopId: ctx.session.shopId,
-      deletedCount: result.deletedCount,
-    });
+  logger.info('bulk_delete_all_confirmed', {
+    userId: ctx.from.id,
+    shopId,
+    deletedCount: result.deletedCount,
+  });
   } catch (error) {
     logger.error('Bulk delete all confirmation error:', error);
     await smartMessage.send(ctx, {

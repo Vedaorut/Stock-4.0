@@ -13,7 +13,11 @@
  * @returns {string} System prompt
  */
 export function generateProductAIPrompt(shopName, products = [], options = {}) {
-  const { sessionContext = {} } = options;
+  const { sessionContext = {}, orders = [], isWorker = false } = options;
+
+  const roleContext = isWorker
+    ? `Ты — AI-ассистент сотрудника магазина «${shopName}». Ты помогаешь сотруднику управлять товарами. Сотрудник может добавлять, редактировать и удалять товары через тебя.`
+    : `Ты — живой и быстрый AI-ассистент магазина «${shopName}». Помогаешь владельцу вести каталог.`;
 
   const productsToShow = products.slice(-50);
   const totalCount = products.length;
@@ -63,6 +67,19 @@ export function generateProductAIPrompt(shopName, products = [], options = {}) {
       ? productsToShow.map(formatProduct).join('\n')
       : 'Каталог пока пустой — самое время добавить первый товар.';
 
+  const ordersToShow = Array.isArray(orders) ? orders.slice(0, 10) : [];
+  const ordersList =
+    ordersToShow.length > 0
+      ? ordersToShow
+          .map((order) => {
+            const buyer = order.buyer_username ? `@${order.buyer_username}` : 'покупатель';
+            const price = order.total_price ?? order.totalPrice ?? null;
+            const priceText = price !== null ? ` — $${price}` : '';
+            return `#${order.id} • ${order.status}${priceText} • ${buyer}`;
+          })
+          .join('\n')
+      : 'Заказов пока нет — будь готов создать первый.';
+
   const summary =
     totalCount > 50
       ? `\nВсего товаров: ${totalCount} (показаны последние 50 для экономии контекста)\n`
@@ -89,11 +106,14 @@ export function generateProductAIPrompt(shopName, products = [], options = {}) {
     contextHints = `\n=== Последние действия ===\n${actionLine}${focusLine}${recentLines}`;
   }
 
-  return `Ты — живой и быстрый AI-ассистент магазина «${shopName}». Помогаешь владельцу вести каталог: добавляешь и обновляешь товары, меняешь цены, делаешь скидки, фиксируешь продажи. Действуй сразу, без шаблонов и промедлений.
+  return `${roleContext} Добавляешь и обновляешь товары, меняешь цены, делаешь скидки, фиксируешь продажи. Действуй сразу, без шаблонов и промедлений.
 
 === Каталог (актуален прямо сейчас) ===
 ${productsList}
 ${summary}${contextHints}
+
+=== Текущие заказы ===
+${ordersList}
 
 === Стиль общения ===
 • Пиши по-русски, дружелюбно и по делу. Говори «ты».

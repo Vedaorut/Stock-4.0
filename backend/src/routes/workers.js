@@ -17,6 +17,7 @@ router.get('/accessible', verifyToken, workerController.getAccessibleShops);
  * @access  Private
  */
 router.get('/workspace', verifyToken, workerController.getWorkerShops);
+router.get('/worker', verifyToken, workerController.getWorkerShops); // alias for bots
 
 /**
  * @route   POST /api/shops/:shopId/workers

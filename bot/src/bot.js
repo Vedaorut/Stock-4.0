@@ -38,6 +38,7 @@ import { setupBuyerHandlers } from './handlers/buyer/index.js';
 import { setupCommonHandlers } from './handlers/common.js';
 import { setupAIProductHandlers } from './handlers/seller/aiProducts.js';
 import { setupWorkspaceHandlers } from './handlers/workspace/index.js';
+import { setupWorkerHandlers } from './handlers/worker/index.js';
 import { handleHealthCommand } from './commands/health.js'; // P1-BOT-015
 
 // Override is needed when system env already has vars (e.g., from shell)
@@ -134,6 +135,7 @@ setupSellerHandlers(bot);
 setupFollowHandlers(bot);
 setupBuyerHandlers(bot);
 setupWorkspaceHandlers(bot);
+setupWorkerHandlers(bot);
 setupCommonHandlers(bot);
 
 // AI Product Management (must be registered last to handle text messages)

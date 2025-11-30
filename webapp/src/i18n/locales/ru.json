@@ -14,6 +14,11 @@
     "clear": "Очистить"
   },
 
+  "product": {
+    "syncedFrom": "из {shop}",
+    "synced": "Синхр."
+  },
+
   "tabs": {
     "subscriptions": "Подписки",
     "follows": "Следить",

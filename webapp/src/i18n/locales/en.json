@@ -14,6 +14,11 @@
     "clear": "Clear"
   },
 
+  "product": {
+    "syncedFrom": "from {shop}",
+    "synced": "Synced"
+  },
+
   "tabs": {
     "subscriptions": "Subscriptions",
     "follows": "Follows",

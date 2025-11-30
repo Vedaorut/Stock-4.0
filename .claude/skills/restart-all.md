@@ -1,18 +1,20 @@
 ---
 name: restart-all
-description: Safely restart Backend, Bot, WebApp, ngrok using stop.sh and start.sh scripts. Use after code changes or when services hang.
+description: Safely restart Backend, Bot, WebApp with Cloudflare tunnel. Use after code changes or when services hang.
 ---
 
 # Restart All Skill
 
-Safely restart all services using the professional stop.sh and start.sh scripts.
+Safely restart all services with fresh Cloudflare tunnel.
 
 ## What this skill does:
 
-1. Uses `./stop.sh` to gracefully stop all services
-2. Waits 3 seconds for clean shutdown
-3. Verifies all processes stopped
-4. Uses `./start.sh` to restart everything with fresh ngrok tunnel
+1. Stops all services (backend, bot, cloudflared)
+2. Waits for clean shutdown
+3. Starts fresh cloudflared tunnel
+4. Updates .env files with new tunnel URL
+5. Rebuilds webapp
+6. Starts Backend + Bot
 
 ## Usage:
 
@@ -22,49 +24,78 @@ Say: **"restart all"** or **"restart everything"** or **"reboot"** or **"restart
 
 ```bash
 PROJECT_DIR="/Users/sile/Documents/Status Stock 4.0"
+cd "$PROJECT_DIR"
 
 echo "🔄 Restarting all services..."
 
-# Stop all services
-cd "$PROJECT_DIR"
-./stop.sh
+# 1. Stop all services
+pkill -f cloudflared 2>/dev/null
+pkill -f "node.*backend" 2>/dev/null
+pkill -f "node.*bot" 2>/dev/null
+echo "✓ Stopped existing processes"
 
-# Wait for clean shutdown
-echo "⏳ Waiting 3 seconds for clean shutdown..."
 sleep 3
 
-# Verify ports are free
-echo "✓ Checking ports..."
+# 2. Verify ports are free
 if lsof -ti:3000 >/dev/null 2>&1; then
-  echo "⚠️  Warning: Port 3000 still occupied. Force killing..."
+  echo "⚠️  Port 3000 still occupied. Force killing..."
   lsof -ti:3000 | xargs kill -9
 fi
 
-# Restart everything
-echo "🚀 Restarting with fresh ngrok tunnel..."
-./start.sh
+# 3. Start cloudflared tunnel
+echo "🚀 Starting Cloudflare tunnel..."
+cloudflared tunnel --url http://localhost:3000 > logs/cloudflared.log 2>&1 &
+sleep 5
+
+# 4. Get tunnel URL
+TUNNEL_URL=$(grep -o 'https://[a-z0-9-]*\.trycloudflare\.com' logs/cloudflared.log | head -1)
+
+if [ -z "$TUNNEL_URL" ]; then
+  echo "❌ Failed to get cloudflared URL. Check logs/cloudflared.log"
+  exit 1
+fi
+
+echo "✅ Tunnel: $TUNNEL_URL"
+
+# 5. Update .env files
+sed -i '' "s|WEBAPP_URL=.*|WEBAPP_URL=$TUNNEL_URL|" backend/.env
+sed -i '' "s|FRONTEND_URL=.*|FRONTEND_URL=$TUNNEL_URL|" backend/.env
+sed -i '' "s|WEBAPP_URL=.*|WEBAPP_URL=$TUNNEL_URL|" bot/.env
+sed -i '' "s|VITE_API_URL=.*|VITE_API_URL=$TUNNEL_URL/api|" webapp/.env
+sed -i '' "s|VITE_API_URL=.*|VITE_API_URL=$TUNNEL_URL/api|" webapp/.env.production
+
+# 6. Rebuild webapp
+echo "📦 Rebuilding webapp..."
+cd webapp && npm run build > ../logs/webapp-build.log 2>&1 && cd ..
+
+# 7. Start Backend
+echo "🔧 Starting Backend..."
+cd backend && npm run dev > ../logs/backend.log 2>&1 &
+cd ..
+sleep 3
+
+# 8. Start Bot
+echo "🤖 Starting Bot..."
+cd bot && npm start > ../logs/bot.log 2>&1 &
+cd ..
+sleep 2
+
+# 9. Verify
+echo ""
+echo "╔════════════════════════════════════╗"
+echo "║        ✅ RESTART COMPLETE         ║"
+echo "╠════════════════════════════════════╣"
+echo "║ Tunnel: $TUNNEL_URL"
+echo "║ Backend: http://localhost:3000     ║"
+echo "║ Logs: logs/                        ║"
+echo "╚════════════════════════════════════╝"
 ```
-
-## What stop.sh does:
-
-- Stops Backend (port 3000)
-- Stops Bot processes
-- Stops Webapp dev server
-- Stops ngrok tunnel
-- Uses SIGKILL (-9) for reliable cleanup
-
-## What start.sh does:
-
-- Starts fresh ngrok tunnel
-- Updates all .env files with new URL
-- Rebuilds webapp
-- Starts Backend + Bot
 
 ## Safety features:
 
-- ✅ Professional scripts with error handling
-- ✅ Port verification before restart
-- ✅ Fresh ngrok URL on each restart
+- ✅ Clean shutdown before restart
+- ✅ Port verification
+- ✅ Fresh tunnel URL on each restart
 - ✅ Automatic .env updates
 
 ## When to use:
@@ -72,14 +103,18 @@ echo "🚀 Restarting with fresh ngrok tunnel..."
 - 🔄 After code changes (backend, bot, or webapp)
 - 🔄 When services are unresponsive
 - 🔄 After config changes (.env files)
-- 🔄 When ngrok tunnel expired
+- 🔄 When tunnel disconnected
 - 🔄 After merge conflicts
-- 🔄 Periodic restart for stability
 
 ## Verify restart:
 
-After restart, check:
+```bash
+# Check backend health
+curl http://localhost:3000/health
 
-- Backend: `curl http://localhost:3000/health`
-- ngrok: `curl -s http://localhost:4040/api/tunnels | jq '.tunnels[0].public_url'`
-- Logs: `tail -f logs/backend.log logs/bot.log`
+# Check tunnel
+curl -I $TUNNEL_URL
+
+# Watch logs
+tail -f logs/backend.log logs/bot.log
+```

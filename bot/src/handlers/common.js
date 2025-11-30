@@ -8,6 +8,8 @@ import { handleBuyerRole } from './buyer/index.js';
 import logger from '../utils/logger.js';
 import * as smartMessage from '../utils/smartMessage.js';
 import { messages } from '../texts/messages.js';
+import { workerMenu } from '../keyboards/worker.js';
+import { handleWorkerDashboard } from './worker/index.js';
 
 const {
   start: startMessages,
@@ -69,6 +71,9 @@ const handleMainMenu = async (ctx) => {
     } else if (savedRole === 'buyer') {
       logger.info(`User ${ctx.from.id} has saved role: buyer, redirecting to buyer dashboard`);
       return await handleBuyerRole(ctx);
+    } else if (savedRole === 'worker') {
+      logger.info(`User ${ctx.from.id} has saved role: worker, redirecting to worker dashboard`);
+      return await handleRoleWorker(ctx);
     }
 
     // No saved role - show role selection
@@ -134,6 +139,11 @@ const handleBack = async (ctx) => {
         text: sellerMessages.panel,
         keyboard: sellerMenu(0, { hasFollows: ctx.session?.hasFollows }),
       });
+    } else if (ctx.session.role === 'worker') {
+      await smartMessage.send(ctx, {
+        text: 'Меню сотрудника',
+        keyboard: workerMenu(),
+      });
     } else if (ctx.session.role === 'buyer') {
       await smartMessage.send(ctx, {
         text: buyerMessages.panel,
@@ -166,27 +176,12 @@ const handleRoleToggle = async (ctx) => {
   try {
     await ctx.answerCbQuery();
 
-    // Check if user has workspace shops to show Worker option
-    let hasWorkspaceShops = false;
-    if (ctx.session.token) {
-      try {
-        const workspaceShops = await shopApi.getWorkerShops(ctx.session.token);
-        hasWorkspaceShops = Array.isArray(workspaceShops) && workspaceShops.length > 0;
-      } catch (error) {
-        logger.warn('Failed to check workspace shops:', error.message);
-      }
-    }
-
-    // Build role selection keyboard
+    // Build role selection keyboard - ALWAYS show all 3 options
     const buttons = [
-      [Markup.button.callback('\u{1F464} Покупатель', 'role:buyer')],
-      [Markup.button.callback('\u{1F3EA} Продавец', 'role:seller')],
+      [Markup.button.callback('\u{1F6D2} Покупаю', 'role:buyer')],
+      [Markup.button.callback('\u{1F3EA} Продаю', 'role:seller')],
+      [Markup.button.callback('\u{1F477} Сотрудник', 'role:worker')],
     ];
-
-    // Only show Worker option if user has workspace shops
-    if (hasWorkspaceShops) {
-      buttons.push([Markup.button.callback('\u{1F477} Работник', 'role:worker')]);
-    }
 
     await smartMessage.send(ctx, {
       text: 'Выберите роль:',
@@ -296,8 +291,25 @@ const handleRoleWorker = async (ctx) => {
   try {
     // Check for workspace shops
     if (!ctx.session.token) {
-      await ctx.answerCbQuery('\u274C Требуется авторизация', { show_alert: true });
+      if (ctx.callbackQuery) {
+        await ctx.answerCbQuery('\u274C Требуется авторизация', { show_alert: true });
+      }
       return;
+    }
+
+    if (ctx.callbackQuery) {
+      await ctx.answerCbQuery();
+    }
+
+    try {
+      await authApi.updateRole('worker', ctx.session.token);
+      ctx.session.role = 'worker';
+      if (ctx.session.user) {
+        ctx.session.user.selectedRole = 'worker';
+      }
+    } catch (error) {
+      logger.error('Failed to persist worker role:', error);
+      ctx.session.role = 'worker';
     }
 
     let workspaceShops;
@@ -309,15 +321,21 @@ const handleRoleWorker = async (ctx) => {
       return;
     }
 
-    // No workspace shops
+    // No workspace shops - show informative message with user's Telegram ID
     if (!Array.isArray(workspaceShops) || workspaceShops.length === 0) {
-      await ctx.answerCbQuery('\u274C Вы не являетесь работником ни одного магазина', {
-        show_alert: true,
+      await smartMessage.send(ctx, {
+        text:
+          '\u{1F477} *Режим сотрудника*\n\n' +
+          'Вы ещё не добавлены как сотрудник ни в один магазин.\n\n' +
+          '\u{1F4A1} *Как стать сотрудником:*\n' +
+          '\u2022 Попросите владельца магазина добавить вас\n' +
+          '\u2022 Он должен указать ваш @username или Telegram ID\n\n' +
+          `\u{1F4CD} _Ваш ID: \`${ctx.from.id}\`_`,
+        keyboard: Markup.inlineKeyboard([[Markup.button.callback('\u00AB Назад', 'role:toggle')]]),
+        parse_mode: 'Markdown',
       });
       return;
     }
-
-    await ctx.answerCbQuery();
 
     // If only 1 shop - directly enter workspace
     if (workspaceShops.length === 1) {
@@ -326,10 +344,16 @@ const handleRoleWorker = async (ctx) => {
 
       ctx.session.role = 'worker';
       ctx.session.workspaceShopId = shop.id;
-      ctx.session.selectedShop = shop;
+      ctx.session.workspaceShop = shop;
+      ctx.session.shopId = shop.id;
+      ctx.session.shopName = shop.name;
+      ctx.session.shopTier = shop.tier;
+      ctx.session.isShopOwner = false;
 
-      // Workers have seller-like access - redirect to seller menu
-      await handleSellerRole(ctx);
+      await smartMessage.send(ctx, {
+        text: `\u{1F477} Вы работаете в магазине "${shop.name}".`,
+        keyboard: workerMenu(),
+      });
       return;
     }
 
@@ -397,10 +421,14 @@ const handleSelectWorkspace = async (ctx) => {
 
     ctx.session.role = 'worker';
     ctx.session.workspaceShopId = shop.id;
-    ctx.session.selectedShop = shop;
+    ctx.session.workspaceShop = shop;
+    ctx.session.shopId = shop.id;
+    ctx.session.shopName = shop.name;
+    ctx.session.shopTier = shop.tier;
+    ctx.session.isShopOwner = false;
 
-    // Workers have seller-like access - redirect to seller menu
-    await handleSellerRole(ctx);
+    // Show worker dashboard/menu
+    await handleWorkerDashboard(ctx);
   } catch (error) {
     logger.error('Error in workspace selection handler:', error);
     try {

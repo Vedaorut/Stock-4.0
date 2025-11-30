@@ -253,8 +253,13 @@ export const syncedProductQueries = {
       `SELECT 
         sp.*,
         sp.conflict_status,
+        sp.custom_markup_type,
+        sp.custom_markup_percentage,
+        sp.custom_markup_fixed,
         sf.follower_shop_id,
         sf.markup_percentage,
+        sf.markup_type,
+        sf.markup_fixed,
         sf.mode,
         p_source.price as source_price,
         p_source.stock_quantity as source_stock,
@@ -373,8 +378,22 @@ export const syncedProductQueries = {
       `SELECT 
         p_synced.price as synced_price,
         p_source.price as source_price,
+        sp.custom_markup_type,
+        sp.custom_markup_percentage,
+        sp.custom_markup_fixed,
+        sf.markup_type,
         sf.markup_percentage,
-        ROUND(p_source.price * (1 + sf.markup_percentage / 100), 2) as expected_price
+        sf.markup_fixed,
+        CASE
+          WHEN sp.custom_markup_type = 'fixed' THEN
+            ROUND(p_source.price + COALESCE(sp.custom_markup_fixed, 0), 2)
+          WHEN sp.custom_markup_type = 'percentage' THEN
+            ROUND(p_source.price * (1 + COALESCE(sp.custom_markup_percentage, 0) / 100), 2)
+          WHEN sf.markup_type = 'fixed' THEN
+            ROUND(p_source.price + COALESCE(sf.markup_fixed, 0), 2)
+          ELSE
+            ROUND(p_source.price * (1 + COALESCE(sf.markup_percentage, 0) / 100), 2)
+        END as expected_price
        FROM synced_products sp
        JOIN shop_follows sf ON sp.follow_id = sf.id
        JOIN products p_source ON sp.source_product_id = p_source.id

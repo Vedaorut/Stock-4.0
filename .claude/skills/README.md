@@ -2,15 +2,14 @@
 
 **14 профессиональных SKILLS** для быстрой разработки, дебаггинга, тестирования, дизайна и deployment.
 
-## ✅ ВСЕ SKILLS ОБНОВЛЕНЫ (November 4, 2025)
+## ✅ ВСЕ SKILLS ОБНОВЛЕНЫ (November 30, 2025)
 
-Все skills были **полностью переписаны** под реальную структуру проекта:
+Все skills были **полностью переписаны** под Cloudflare Tunnel (вместо ngrok):
 
+- ✅ Используют **cloudflared** вместо ngrok (без лимитов!)
 - ✅ Используют реальные пути (`/Users/sile/Documents/Status Stock 4.0`)
-- ✅ Используют существующие скрипты (`./start.sh`, `./stop.sh`)
-- ✅ Корректные пути к логам (`backend/logs/error-YYYY-MM-DD.log`, `bot/logs/error.log`)
-- ✅ Правильные npm команды (`npm run test:coverage`)
-- ✅ Поддержка ngrok (критично для проекта!)
+- ✅ Корректные пути к логам (`logs/cloudflared.log`, `logs/backend.log`, `logs/bot.log`)
+- ✅ Правильные npm команды
 - ✅ YAML frontmatter во всех skills
 
 ---
@@ -20,7 +19,7 @@
 Просто скажи Claude фразу из "Usage" любого skill:
 
 ```
-"quick start"           → Запустит всё (Backend + Bot + ngrok)
+"quick start"           → Запустит всё (Backend + Bot + Cloudflare tunnel)
 "health check"          → Проверит здоровье системы
 "analyze logs"          → Найдет и покажет ошибки
 "check ui"              → Валидирует дизайн
@@ -38,25 +37,25 @@ Claude автоматически выполнит все необходимые
 **1. quick-start** - Моментальный запуск всего stack
 
 - ✅ Останавливает существующие процессы
-- ✅ Запускает ngrok tunnel
-- ✅ Обновляет .env файлы с ngrok URL
+- ✅ Запускает Cloudflare tunnel
+- ✅ Обновляет .env файлы с tunnel URL
 - ✅ Билдит webapp
 - ✅ Стартует Backend + Bot
 - Usage: `"quick start"` or `"start project"`
 
 **2. restart-all** - Безопасный перезапуск
 
-- ✅ Использует `./stop.sh`
+- ✅ Останавливает все процессы
 - ✅ Проверяет что все процессы остановлены
-- ✅ Использует `./start.sh` для нового старта
-- ✅ Новый ngrok tunnel каждый раз
+- ✅ Стартует fresh Cloudflare tunnel
+- ✅ Новый tunnel URL каждый раз
 - Usage: `"restart all"` or `"restart services"`
 
 **3. health-check** - Комплексная проверка здоровья
 
 - ✅ Backend API health endpoint
 - ✅ Bot process status
-- ✅ **ngrok tunnel status** (критично!)
+- ✅ **Cloudflare tunnel status** (критично!)
 - ✅ PostgreSQL connection
 - ✅ Recent error logs analysis
 - Usage: `"health check"` or `"status"`
@@ -67,9 +66,9 @@ Claude автоматически выполнит все необходимые
 
 **4. analyze-logs** - Умный анализ error логов
 
-- ✅ Backend: `backend/logs/error-YYYY-MM-DD.log`
-- ✅ Bot: `bot/logs/error.log`
-- ✅ ngrok: `logs/ngrok.log`
+- ✅ Backend: `logs/backend.log`
+- ✅ Bot: `logs/bot.log`
+- ✅ Cloudflared: `logs/cloudflared.log`
 - ✅ Категоризация ошибок
 - ✅ Top 5 most frequent errors
 - Usage: `"analyze logs"` or `"what's wrong"`
@@ -79,7 +78,7 @@ Claude автоматически выполнит все необходимые
 - ✅ Port conflicts (EADDRINUSE)
 - ✅ Database connection (ECONNREFUSED)
 - ✅ Missing dependencies
-- ✅ **ngrok tunnel expired** (критично!)
+- ✅ **Tunnel disconnected** (критично!)
 - ✅ Import/Export errors
 - Usage: `"fix errors"` or `"auto fix"`
 
@@ -88,7 +87,6 @@ Claude автоматически выполнит все необходимые
 - ✅ 3000 (Backend)
 - ✅ 5173 (WebApp dev)
 - ✅ 5432 (PostgreSQL)
-- ✅ **4040 (ngrok dashboard)**
 - Usage: `"check ports"` or `"port status"`
 
 ---
@@ -152,22 +150,22 @@ Claude автоматически выполнит все необходимые
 
 ---
 
-### 🌐 ngrok Management (1) - НОВЫЙ!
+### 🌐 Tunnel Management (1)
 
-**13. ngrok-management** - Управление ngrok tunnel
+**13. tunnel-management** - Управление Cloudflare tunnel
 
-- ✅ Check ngrok status and URL
-- ✅ Restart expired tunnels
+- ✅ Check cloudflared status and URL
+- ✅ Restart disconnected tunnels
 - ✅ Update all .env files
 - ✅ Rebuild webapp with new URL
 - ✅ Verify tunnel working
-- Usage: `"check ngrok"` or `"restart ngrok"`
+- Usage: `"check tunnel"` or `"restart tunnel"` or `"cloudflare status"`
 
-**КРИТИЧНО:** Этот проект **ТРЕБУЕТ ngrok** для Telegram Mini App. Without it, Mini App button won't work!
+**КРИТИЧНО:** Этот проект **ТРЕБУЕТ tunnel** для Telegram Mini App. Without it, Mini App button won't work!
 
 ---
 
-### 🚀 Deployment (1) - НОВЫЙ!
+### 🚀 Deployment (1)
 
 **14. production-deploy** - Pre-deployment checklist
 
@@ -220,59 +218,30 @@ Claude автоматически выполнит все необходимые
 ### После system sleep/wake:
 
 ```
-1. "check ngrok"           # ngrok tunnel expires!
-2. If expired: "restart ngrok"
+1. "check tunnel"          # Tunnel may have died!
+2. If dead: "restart tunnel"
 3. "health check"          # Verify all OK
 ```
 
 ---
 
-## 💡 Pro Tips
+## 💡 Почему Cloudflare вместо ngrok
 
-### Комбинирование SKILLS:
+| Feature | Cloudflare | ngrok (free) |
+|---------|------------|--------------|
+| Session limit | **None** | 2 hours |
+| Request limit | **None** | 40/min |
+| Registration | Not required | Required |
+| Speed | Fast (global CDN) | Good |
 
-**Morning workflow:**
-
-```
-"quick start" → "health check" → "analyze logs"
-```
-
-**Before commit:**
-
-```
-"run tests" → "check ui" → "check animations"
-```
-
-**Emergency fix:**
-
-```
-"analyze logs" → "fix errors" → "health check"
-```
-
-**Weekly check:**
-
-```
-"health check" → "analyze logs" → "production check"
-```
-
-### Когда использовать какой skill:
-
-| Ситуация             | Skill                       |
-| -------------------- | --------------------------- |
-| Первый запуск дня    | quick-start                 |
-| После git pull       | restart-all                 |
-| Что-то сломалось     | analyze-logs → fix-errors   |
-| Mini App не работает | check-ngrok → restart-ngrok |
-| Перед коммитом       | run-tests → ui-check        |
-| Перед deploy         | production-deploy           |
-| Система зависла      | restart-all                 |
+**Вывод:** Cloudflare tunnel лучше для разработки - без лимитов и ограничений.
 
 ---
 
 ## 📊 Статистика
 
 **Всего:** 14 SKILLS  
-**Категорий:** 7 (Development, Debug, Testing, Design, Database, ngrok, Deployment)
+**Категорий:** 7 (Development, Debug, Testing, Design, Database, Tunnel, Deployment)
 
 **Охват:**
 
@@ -281,105 +250,12 @@ Claude автоматически выполнит все необходимые
 - 🧪 Testing: Backend + Bot
 - 🎨 Design: UI + Animations
 - 🗄️ Database: Migrations + Queries
-- 🌐 ngrok: Tunnel management
+- 🌐 Tunnel: Cloudflare management
 - 🚀 Deployment: Pre-flight checklist
 
 ---
 
-## 🔧 Кастомизация
-
-Вы можете редактировать любой skill файл для:
-
-- Изменения путей (если проект переместился)
-- Добавления новых команд
-- Настройки thresholds
-- Добавления своих проверок
-
-**Формат skill файла:**
-
-````markdown
----
-name: skill-name
-description: What it does + when to use
----
-
-# Skill Title
-
-## What this skill does:
-
-[List of what it does]
-
-## Usage:
-
-Say: **"trigger phrase"**
-
-## Commands:
-
-```bash
-# Actual bash commands
-```
-````
-
-[Rest of documentation]
-
-```
-
----
-
-## 🚧 Roadmap (Следующие недели)
-
-### Priority 1 (На этой неделе):
-- [ ] `crypto-wallet-validator` - Валидация BTC/ETH/TRON addresses
-- [ ] `telegram-bot-automation` - Автоматизация bot handlers/scenes
-- [ ] `payment-processor` - End-to-end payment flow testing
-
-### Priority 2 (На следующей неделе):
-- [ ] `webhook-delivery-testing` - Webhook idempotency checks
-- [ ] `monitoring-alerting` - Real-time error monitoring
-- [ ] `backup-recovery-automation` - Automated daily backups
-
-### Future:
-- [ ] Hooks integration (auto-lint, auto-format)
-- [ ] Skill chaining (auto-compose complex workflows)
-- [ ] E-Commerce Operations Agent (master skill)
-
----
-
-## 📖 Дополнительные ресурсы
-
-- **Исследование best practices:** `.claude/SKILLS_RESEARCH.md` (13,000+ words)
-- **Официальная документация:** [docs.claude.com/claude-code/skills](https://docs.claude.com/en/docs/claude-code/skills)
-- **Project structure:** `README.md` (корень проекта)
-- **Database schema:** `backend/database/schema.sql`
-- **Development cheatsheet:** `DEV_CHEATSHEET.md`
-
----
-
-## ✨ Что изменилось в November 4, 2025
-
-### Полная переработка всех skills:
-
-**Было (до исправления):**
-- ❌ Неправильные пути (использовали `$PROJECT_DIR` без значения)
-- ❌ Не использовали существующие скрипты (`start.sh`, `stop.sh`)
-- ❌ Игнорировали ngrok (критично для проекта!)
-- ❌ Неправильные npm команды
-- ❌ Нет YAML frontmatter
-
-**Стало (после исправления):**
-- ✅ Реальные абсолютные пути
-- ✅ Используют профессиональные скрипты
-- ✅ ngrok management встроен во все dev skills
-- ✅ Правильные npm команды из package.json
-- ✅ YAML frontmatter везде
-- ✅ 2 новых skills (ngrok-management, production-deploy)
-
-**Результат:** Все skills **реально работают** на твоём проекте!
-
----
-
-**Created:** 2025-10-31
-**Updated:** 2025-11-04
-**Version:** 2.0 (Complete Rewrite)
+**Created:** 2025-10-31  
+**Updated:** 2025-11-30  
+**Version:** 3.0 (Cloudflare migration)  
 **Project:** Status Stock 4.0 - Telegram E-Commerce Platform
-```
