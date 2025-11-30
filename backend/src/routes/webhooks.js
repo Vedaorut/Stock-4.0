@@ -130,17 +130,18 @@ router.post('/crystalpay', async (req, res) => {
       // may convert currencies internally. The amount check is primary.
     }
 
-    await client.query('COMMIT');
-
     // 7. Process payment based on invoice type
     if (invoice.subscription_id) {
-      // Handle subscription payment
+      // Handle subscription payment INSIDE transaction
       const result = await invoicePaymentService.processSubscriptionPayment({
         subscriptionId: invoice.subscription_id,
         txHash: `crystalpay_${payload.id}`,
         invoiceId: invoice.id,
         purpose: invoice.purpose
       });
+
+      // COMMIT only after successful payment processing
+      await client.query('COMMIT');
 
       logger.info('[Webhook] CrystalPay: Subscription payment processed', {
         invoiceId: invoice.id,
@@ -150,6 +151,7 @@ router.post('/crystalpay', async (req, res) => {
       return res.json({ status: 'success', confirmed: result.ok });
 
     } else {
+      await client.query('COMMIT');
       logger.warn('[Webhook] CrystalPay: Invoice has no subscription', {
         invoiceId: invoice.id
       });

@@ -9,26 +9,132 @@ const router = express.Router();
 
 // Internal secret for protecting broadcast endpoint
 const INTERNAL_SECRET = process.env.INTERNAL_SECRET;
+// Bot token for cryptographic signature verification (proves request comes from bot)
+const BOT_TOKEN = config.telegram?.botToken;
 
 if (!INTERNAL_SECRET) {
   throw new Error('INTERNAL_SECRET environment variable is required');
 }
 
+if (!BOT_TOKEN) {
+  throw new Error('TELEGRAM_BOT_TOKEN is required for internal auth signature verification');
+}
+
+// Allowed IPs for internal API (localhost + Docker networks)
+const ALLOWED_INTERNAL_IPS = [
+  '127.0.0.1',
+  '::1',
+  '::ffff:127.0.0.1',
+  'localhost',
+  // Docker bridge network
+  /^172\.(1[6-9]|2[0-9]|3[0-1])\./,
+  /^192\.168\./,
+  /^10\./,
+];
+
+function isAllowedIP(ip) {
+  if (!ip) {return false;}
+
+  return ALLOWED_INTERNAL_IPS.some((allowed) => {
+    if (allowed instanceof RegExp) {
+      return allowed.test(ip);
+    }
+    return ip === allowed || ip.includes(allowed);
+  });
+}
+
 /**
- * Middleware to verify internal requests
+ * Middleware to verify internal requests with HMAC signature
+ *
+ * Headers required:
+ * - x-internal-secret: shared secret
+ * - x-internal-timestamp: request timestamp (anti-replay)
+ * - x-internal-signature: HMAC-SHA256(body + timestamp, secret)
  */
 function verifyInternalSecret(req, res, next) {
   const secret = req.headers['x-internal-secret'];
+  const timestamp = req.headers['x-internal-timestamp'];
+  const signature = req.headers['x-internal-signature'];
+  const clientIP = req.ip || req.connection?.remoteAddress;
 
+  // 1. Check IP whitelist (defense in depth)
+  if (!isAllowedIP(clientIP)) {
+    logger.warn('Internal API access from non-whitelisted IP', {
+      ip: clientIP,
+      path: req.path,
+    });
+    return res.status(403).json({
+      success: false,
+      error: 'Forbidden - IP not allowed',
+    });
+  }
+
+  // 2. Check secret
   if (secret !== INTERNAL_SECRET) {
     logger.warn('Unauthorized internal API access attempt', {
-      ip: req.ip,
+      ip: clientIP,
       path: req.path,
     });
     return res.status(401).json({
       success: false,
       error: 'Unauthorized',
     });
+  }
+
+  // 3. For auth endpoints, require HMAC signature (additional security)
+  if (req.path.includes('/auth/')) {
+    // Check timestamp (±5 minutes window, anti-replay)
+    const now = Date.now();
+    const requestTime = parseInt(timestamp, 10);
+
+    if (!timestamp || isNaN(requestTime) || Math.abs(now - requestTime) > 5 * 60 * 1000) {
+      logger.warn('Internal API request with invalid/expired timestamp', {
+        ip: clientIP,
+        path: req.path,
+        timestamp,
+        now,
+      });
+      return res.status(401).json({
+        success: false,
+        error: 'Request expired or invalid timestamp',
+      });
+    }
+
+    // Check HMAC signature
+    if (!signature) {
+      logger.warn('Internal API auth request without signature', {
+        ip: clientIP,
+        path: req.path,
+      });
+      return res.status(401).json({
+        success: false,
+        error: 'Missing signature',
+      });
+    }
+
+    // Use BOT_TOKEN for HMAC - proves request comes from bot (not just someone with INTERNAL_SECRET)
+    // Even if INTERNAL_SECRET leaks, attacker cannot forge signature without BOT_TOKEN
+    const payload = JSON.stringify(req.body) + timestamp;
+    const expectedSignature = crypto
+      .createHmac('sha256', BOT_TOKEN)
+      .update(payload)
+      .digest('hex');
+
+    // Timing-safe comparison
+    const sigBuffer = Buffer.from(signature || '');
+    const expectedBuffer = Buffer.from(expectedSignature);
+
+    if (sigBuffer.length !== expectedBuffer.length ||
+        !crypto.timingSafeEqual(sigBuffer, expectedBuffer)) {
+      logger.warn('Internal API request with invalid signature', {
+        ip: clientIP,
+        path: req.path,
+      });
+      return res.status(401).json({
+        success: false,
+        error: 'Invalid signature',
+      });
+    }
   }
 
   next();

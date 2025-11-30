@@ -60,28 +60,37 @@ export function stopPaymentVerificationWorker() {
 
 /**
  * Process all pending payments
+ * Uses Atomic Claim Pattern to prevent race conditions
  */
 async function processPendingPayments() {
   const client = await getClient();
   
   try {
-    // 1. Get pending payments with FOR UPDATE SKIP LOCKED
+    // 1. Atomically claim AND mark payments as 'processing'
+    await client.query('BEGIN');
+    
     const pendingResult = await client.query(
-      `SELECT 
-         p.id, p.order_id, p.tx_hash, p.currency, p.amount,
-         p.recipient_address, p.expected_crypto_amount,
-         p.blockchain_confirmations,
-         o.crypto_amount, o.crypto_currency, o.payment_address, o.status as order_status
-       FROM payments p
-       JOIN orders o ON p.order_id = o.id
-       WHERE p.status = 'pending'
-         AND p.subscription_id IS NULL
-         AND o.status = 'pending'
-         AND p.created_at > NOW() - INTERVAL '${MAX_AGE_HOURS} hours'
-       ORDER BY p.created_at ASC
-       LIMIT ${BATCH_SIZE}
-       FOR UPDATE OF p SKIP LOCKED`
+      `UPDATE payments p
+       SET status = 'processing', updated_at = NOW()
+       FROM (
+         SELECT p2.id
+         FROM payments p2
+         JOIN orders o ON p2.order_id = o.id
+         WHERE p2.status = 'pending'
+           AND p2.subscription_id IS NULL
+           AND o.status = 'pending'
+           AND p2.created_at > NOW() - INTERVAL '${MAX_AGE_HOURS} hours'
+         ORDER BY p2.created_at ASC
+         LIMIT ${BATCH_SIZE}
+         FOR UPDATE OF p2 SKIP LOCKED
+       ) selected
+       WHERE p.id = selected.id
+       RETURNING p.id, p.order_id, p.tx_hash, p.currency, p.amount,
+                 p.recipient_address, p.expected_crypto_amount,
+                 p.blockchain_confirmations`
     );
+    
+    await client.query('COMMIT');
     
     const pendingPayments = pendingResult.rows;
     
@@ -91,27 +100,36 @@ async function processPendingPayments() {
     
     logger.info(`[PaymentWorker] Processing ${pendingPayments.length} pending payments`);
     
+    // 2. Process OUTSIDE transaction - each payment separately
     for (const payment of pendingPayments) {
       try {
-        await verifyAndProcessPayment(payment, client);
+        await verifyAndProcessPaymentSafe(payment);
         // Small delay to avoid rate limiting
         await sleep(500);
       } catch (error) {
+        // Revert status to pending on error
+        await query(
+          `UPDATE payments SET status = 'pending', updated_at = NOW() WHERE id = $1`,
+          [payment.id]
+        );
         logger.error(`[PaymentWorker] Error processing payment ${payment.id}:`, {
           error: error.message
         });
       }
     }
     
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw error;
   } finally {
     client.release();
   }
 }
 
 /**
- * Verify single payment and update status
+ * Verify single payment and update status (safe - no client parameter)
  */
-async function verifyAndProcessPayment(payment, client) {
+async function verifyAndProcessPaymentSafe(payment) {
   const { 
     id: paymentId, 
     order_id: orderId, 
@@ -141,32 +159,51 @@ async function verifyAndProcessPayment(payment, client) {
     confirmations: result.confirmations
   });
   
-  // Update confirmations
-  await client.query(
+  // Update confirmations (simple query, no transaction needed)
+  await query(
     `UPDATE payments 
-     SET blockchain_confirmations = $1,
-         last_checked_at = NOW(),
-         updated_at = NOW()
+     SET blockchain_confirmations = $1, last_checked_at = NOW(), updated_at = NOW()
      WHERE id = $2`,
     [result.confirmations || 0, paymentId]
   );
   
   // If verified - confirm order
   if (result.verified) {
-    await confirmOrderPayment(orderId, paymentId, result, client);
+    await confirmOrderPayment(orderId, paymentId, result);
     return;
   }
   
   // If failed - mark payment as failed
   if (result.status === 'failed' && result.error) {
-    await failPayment(paymentId, result.error, client);
+    await query(
+      `UPDATE payments
+       SET status = 'failed', verification_status = 'failed', verification_error = $2, updated_at = NOW()
+       WHERE id = $1`,
+      [paymentId, result.error]
+    );
+    logger.warn(`[PaymentWorker] Payment ${paymentId} failed: ${result.error}`);
+    return;
   }
+
+  // Not verified and not failed (e.g., waiting for more confirmations)
+  // Return status back to 'pending' for next polling iteration
+  await query(
+    `UPDATE payments
+     SET status = 'pending', last_checked_at = NOW(), updated_at = NOW()
+     WHERE id = $1`,
+    [paymentId]
+  );
+
+  logger.debug(`[PaymentWorker] Payment ${paymentId} returned to pending (${result.confirmations || 0} confirmations)`);
 }
 
 /**
  * Confirm order after successful payment verification
+ * Uses its own client - no nested transactions
  */
-async function confirmOrderPayment(orderId, paymentId, verificationResult, client) {
+async function confirmOrderPayment(orderId, paymentId, verificationResult) {
+  const client = await getClient();
+  
   try {
     await client.query('BEGIN');
     
@@ -183,7 +220,30 @@ async function confirmOrderPayment(orderId, paymentId, verificationResult, clien
     const order = orderResult.rows[0];
     if (!order || order.status !== 'pending') {
       await client.query('ROLLBACK');
-      logger.info(`[PaymentWorker] Order ${orderId} already processed`);
+
+      // FIX: Update payment status to prevent stuck 'processing' payments
+      if (!order) {
+        // Order not found - return payment to pending for retry
+        await query(
+          `UPDATE payments SET status = 'pending', updated_at = NOW() WHERE id = $1`,
+          [paymentId]
+        );
+        logger.warn(`[PaymentWorker] Order ${orderId} not found, payment ${paymentId} returned to pending`);
+      } else if (order.status === 'confirmed') {
+        // Order already confirmed - sync payment status
+        await query(
+          `UPDATE payments SET status = 'confirmed', verification_status = 'confirmed', updated_at = NOW() WHERE id = $1`,
+          [paymentId]
+        );
+        logger.info(`[PaymentWorker] Order ${orderId} already confirmed, synced payment ${paymentId}`);
+      } else {
+        // Order cancelled/failed - mark payment accordingly
+        await query(
+          `UPDATE payments SET status = 'failed', verification_status = 'failed', verification_error = $2, updated_at = NOW() WHERE id = $1`,
+          [paymentId, `Order status: ${order.status}`]
+        );
+        logger.warn(`[PaymentWorker] Order ${orderId} is ${order.status}, payment ${paymentId} marked failed`);
+      }
       return;
     }
     
@@ -249,23 +309,9 @@ async function confirmOrderPayment(orderId, paymentId, verificationResult, clien
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;
+  } finally {
+    client.release();
   }
-}
-
-/**
- * Mark payment as failed
- */
-async function failPayment(paymentId, errorCode, client) {
-  await client.query(
-    `UPDATE payments 
-     SET verification_status = 'failed',
-         verification_error = $2,
-         updated_at = NOW()
-     WHERE id = $1`,
-    [paymentId, errorCode]
-  );
-  
-  logger.warn(`[PaymentWorker] Payment ${paymentId} failed: ${errorCode}`);
 }
 
 /**
@@ -317,6 +363,6 @@ function sleep(ms) {
 }
 
 // Export for testing
-export { processPendingPayments, verifyAndProcessPayment };
+export { processPendingPayments, verifyAndProcessPaymentSafe };
 
 export default { startPaymentVerificationWorker, stopPaymentVerificationWorker };
