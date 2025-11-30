@@ -333,7 +333,7 @@ export default function SubscriptionModal({ isOpen, onClose }) {
                           animate={{ height: 'auto', opacity: 1 }}
                           exit={{ height: 0, opacity: 0 }}
                         >
-                          {history.map((p, i) => (
+                          {history.map((p, _i) => (
                             <div key={p.id} className="flex items-center justify-between py-2 px-3 rounded-lg bg-white/5 text-xs">
                               <div className="flex items-center gap-2">
                                 <span>{p.tier === 'pro' ? '⭐' : '📦'}</span>

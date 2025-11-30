@@ -596,3 +596,25 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER prevent_circular_follows
 BEFORE INSERT OR UPDATE ON shop_follows
 FOR EACH ROW EXECUTE FUNCTION check_circular_follow();
+
+-- ============================================
+-- Chain Copy Prevention Trigger
+-- Prevents copying products that are already synced copies
+-- ============================================
+CREATE OR REPLACE FUNCTION check_source_not_copy()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM synced_products
+    WHERE synced_product_id = NEW.source_product_id
+  ) THEN
+    RAISE EXCEPTION 'Cannot sync product %: it is already a synced copy (chain copying not allowed)',
+      NEW.source_product_id;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER prevent_copy_of_copy
+BEFORE INSERT ON synced_products
+FOR EACH ROW EXECUTE FUNCTION check_source_not_copy();

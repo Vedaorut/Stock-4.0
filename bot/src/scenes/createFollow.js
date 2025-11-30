@@ -3,7 +3,7 @@ import { successButtons, cancelButton } from '../keyboards/common.js';
 import { followApi, shopApi } from '../utils/api.js';
 import logger from '../utils/logger.js';
 import * as smartMessage from '../utils/smartMessage.js';
-import { reply as cleanReply } from '../utils/cleanReply.js';
+import { reply as _cleanReply } from '../utils/cleanReply.js';
 import { messages } from '../texts/messages.js';
 
 const { general: generalMessages, follows: followMessages } = messages;

@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
-import { motion } from 'framer-motion'; // Used in JSX
+import { useState, useEffect, useCallback } from 'react';
+import { motion } from 'framer-motion';
 import Header from '../components/Layout/Header';
 import { useApi } from '../hooks/useApi';
 import { useStore } from '../store/useStore';
@@ -7,59 +7,66 @@ import { useTelegram } from '../hooks/useTelegram';
 import { useTranslation } from '../i18n/useTranslation';
 
 export default function Subscriptions() {
-  const [subscriptions, setSubscriptions] = useState([]);
+  const [myShop, setMyShop] = useState(null);
+  const [follows, setFollows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const { get } = useApi(); // ✅ FIX: Use stable useApi instead of useShopApi
+  const { get } = useApi();
   const { triggerHaptic } = useTelegram();
   const { t } = useTranslation();
   const token = useStore((state) => state.token);
+  const setMyShops = useStore((state) => state.setMyShops);
 
-  const loadSubscriptions = useCallback(
+  const loadData = useCallback(
     async (signal) => {
-      const { data, error } = await get('/subscriptions/my-shops', { signal });
+      try {
+        // 1. Load my shop
+        const { data: shopsData, error: shopsError } = await get('/shops/my', { signal });
+        
+        if (signal?.aborted) return { status: 'aborted' };
+        
+        if (shopsError) {
+          console.error('[Subscriptions] Error loading shops:', shopsError);
+          return { status: 'error', error: 'Не удалось загрузить данные' };
+        }
 
-      if (signal?.aborted) {
-        return { status: 'aborted' };
+        const shops = Array.isArray(shopsData?.data) ? shopsData.data : [];
+        const shop = shops[0] || null;
+        
+        setMyShop(shop);
+        setMyShops(shops); // Save to global store
+        
+        // 2. Load follows (subscriptions to other shops)
+        if (shop) {
+          const { data: followsData, error: followsError } = await get('/follows/my', {
+            params: { shopId: shop.id },
+            signal,
+          });
+          
+          if (signal?.aborted) return { status: 'aborted' };
+          
+          if (followsError) {
+            console.error('[Subscriptions] Error loading follows:', followsError);
+            // Don't fail completely, just show my shop without follows
+            setFollows([]);
+          } else {
+            const followsList = Array.isArray(followsData?.data) ? followsData.data : [];
+            setFollows(followsList);
+          }
+        } else {
+          setFollows([]);
+        }
+
+        return { status: 'success' };
+      } catch (err) {
+        console.error('[Subscriptions] Unexpected error:', err);
+        return { status: 'error', error: err.message };
       }
-
-      if (error) {
-        console.error('[Subscriptions] 🔴 ERROR:', error);
-        return { status: 'error', error: 'Failed to load subscriptions' };
-      }
-
-      const subscriptionsList = data?.data || [];
-
-      if (!Array.isArray(subscriptionsList)) {
-        console.error('[Subscriptions] 🔴 INVALID FORMAT:', data);
-        return { status: 'error', error: 'Invalid data format from server' };
-      }
-
-      const validSubscriptions = subscriptionsList.filter((sub) => sub && sub.id && sub.shop_name);
-
-      // Normalize data for shop subscriptions (payment tier data)
-      const normalized = validSubscriptions.map((item) => ({
-        id: item.id,
-        shopId: item.shop_id,
-        shopName: item.shop_name,
-        tier: item.tier,
-        amount: item.amount,
-        currency: item.currency,
-        periodStart: item.period_start,
-        periodEnd: item.period_end,
-        status: item.status,
-        createdAt: item.created_at,
-        verifiedAt: item.verified_at,
-      }));
-
-      setSubscriptions(normalized);
-      return { status: 'success' };
     },
-    [get]
+    [get, setMyShops]
   );
 
   useEffect(() => {
-    // ✅ Wait for token before loading
     if (!token) {
       setLoading(false);
       return;
@@ -70,7 +77,7 @@ export default function Subscriptions() {
 
     const controller = new AbortController();
 
-    loadSubscriptions(controller.signal)
+    loadData(controller.signal)
       .then((result) => {
         if (!controller.signal.aborted && result?.status === 'error') {
           setError(result.error);
@@ -79,38 +86,37 @@ export default function Subscriptions() {
       .finally(() => {
         if (!controller.signal.aborted) {
           setLoading(false);
-        } else {
         }
       });
 
-    // Listen for WebSocket subscription payment confirmations
-    const handleSubscriptionConfirmed = (_event) => {
-      // Reload subscriptions to show updated status
-      loadSubscriptions();
-    };
+    return () => controller.abort();
+  }, [token, loadData]);
 
-    window.addEventListener('subscription_confirmed', handleSubscriptionConfirmed);
+  // Click on MY shop
+  const handleMyShopClick = () => {
+    triggerHaptic('medium');
+    const { setCurrentShop, setActiveTab } = useStore.getState();
 
-    return () => {
-      controller.abort();
-      window.removeEventListener('subscription_confirmed', handleSubscriptionConfirmed);
-    };
-  }, [token, loadSubscriptions]); // Added loadSubscriptions
+    setCurrentShop(null); // null = show my shop in Catalog
+    setActiveTab('catalog');
+  };
 
-  const handleShopClick = (subscription) => {
+  // Click on followed shop (subscription to other shop)
+  const handleFollowClick = (follow) => {
     triggerHaptic('medium');
     const { setCurrentShop, setActiveTab } = useStore.getState();
 
     setCurrentShop({
-      id: subscription.shopId,
-      name: subscription.shopName,
-      logo: null, // Shop subscriptions don't include logo
+      id: follow.source_shop_id,
+      name: follow.source_shop_name,
+      logo: null,
+      isOwned: false, // This is NOT my shop
     });
 
     setActiveTab('catalog');
   };
 
-  const hasSubscriptions = useMemo(() => subscriptions.length > 0, [subscriptions]);
+  const hasData = myShop || follows.length > 0;
 
   return (
     <div
@@ -144,14 +150,14 @@ export default function Subscriptions() {
             </svg>
             <h3 className="text-lg font-semibold text-gray-400 mb-2">{error}</h3>
             <motion.button
-              onClick={loadSubscriptions}
+              onClick={() => loadData()}
               className="touch-target bg-orange-primary hover:bg-orange-light text-white font-semibold px-6 rounded-xl transition-colors duration-300 mt-4"
               whileTap={{ scale: 0.95 }}
             >
-              Retry
+              Повторить
             </motion.button>
           </div>
-        ) : !hasSubscriptions ? (
+        ) : !hasData ? (
           <div className="flex flex-col items-center justify-center py-12 text-center">
             <svg
               className="w-16 h-16 text-gray-600 mb-4"
@@ -171,91 +177,85 @@ export default function Subscriptions() {
           </div>
         ) : (
           <div className="space-y-4">
-            {subscriptions.map((subscription) => {
-              // Tier badge configuration
-              const tierConfig = {
-                FREE: {
-                  bg: 'bg-gray-500/20',
-                  text: 'text-gray-400',
-                  label: 'FREE',
-                },
-                BASIC: {
-                  bg: 'bg-blue-500/20',
-                  text: 'text-blue-400',
-                  label: 'BASIC',
-                },
-                PRO: {
-                  bg: 'bg-orange-500/20',
-                  text: 'text-orange-400',
-                  label: 'PRO',
-                },
-              };
-
-              const tier = subscription.tier?.toUpperCase() || 'FREE';
-              const config = tierConfig[tier] || tierConfig.FREE;
-              const isActive = subscription.status === 'active';
-
-              return (
-                <motion.div
-                  key={subscription.id}
-                  onClick={() => handleShopClick(subscription)}
-                  className="glass-card rounded-2xl p-6 cursor-pointer min-h-[90px]"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  whileHover={{ scale: 1.01, y: -2 }}
-                  whileTap={{ scale: 0.99 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  <div className="flex items-center justify-between">
-                    {/* Left side - main information */}
-                    <div className="flex-1 space-y-2">
-                      {/* Shop name */}
-                      <h3
-                        className="text-xl font-bold text-white"
-                        style={{ letterSpacing: '-0.01em' }}
-                      >
-                        {subscription.shopName}
-                      </h3>
-
-                      {/* Tier badge + Status indicator */}
-                      <div className="flex items-center gap-2">
-                        {/* Tier badge */}
-                        <span
-                          className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${config.bg} ${config.text}`}
-                        >
-                          {config.label}
-                        </span>
-
-                        {/* Status indicator */}
-                        <span
-                          className={`flex items-center gap-1.5 text-xs font-medium ${isActive ? 'text-green-400' : 'text-gray-500'}`}
-                        >
-                          <span
-                            className={`w-2 h-2 rounded-full ${isActive ? 'bg-green-400' : 'bg-gray-500'}`}
-                          ></span>
-                          {isActive ? 'Active' : 'Inactive'}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Right side - navigation arrow */}
-                    <svg
-                      className="w-6 h-6 text-orange-primary flex-shrink-0 ml-4"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
+            {/* MY SHOP - always on top */}
+            {myShop && (
+              <motion.div
+                onClick={handleMyShopClick}
+                className="glass-card rounded-2xl p-6 cursor-pointer min-h-[90px] border border-orange-primary/30"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                whileHover={{ scale: 1.01, y: -2 }}
+                whileTap={{ scale: 0.99 }}
+                transition={{ duration: 0.2 }}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <h3
+                      className="text-xl font-bold text-white"
+                      style={{ letterSpacing: '-0.01em' }}
                     >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2.5}
-                        d="M9 5l7 7-7 7"
-                      />
-                    </svg>
+                      {myShop.name}
+                    </h3>
                   </div>
-                </motion.div>
-              );
-            })}
+                  <svg
+                    className="w-6 h-6 text-orange-primary flex-shrink-0 ml-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2.5}
+                      d="M9 5l7 7-7 7"
+                    />
+                  </svg>
+                </div>
+              </motion.div>
+            )}
+
+            {/* FOLLOWED SHOPS - subscriptions to other shops */}
+            {follows.map((follow, index) => (
+              <motion.div
+                key={follow.id}
+                onClick={() => handleFollowClick(follow)}
+                className="glass-card rounded-2xl p-6 cursor-pointer min-h-[90px]"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                whileHover={{ scale: 1.01, y: -2 }}
+                whileTap={{ scale: 0.99 }}
+                transition={{ duration: 0.2, delay: index * 0.05 }}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex-1 space-y-2">
+                    <h3
+                      className="text-xl font-bold text-white"
+                      style={{ letterSpacing: '-0.01em' }}
+                    >
+                      {follow.source_shop_name}
+                    </h3>
+                    <div className="flex items-center gap-2">
+                      <span className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-blue-500/20 text-blue-400">
+                        {follow.source_products_count || 0} товаров
+                      </span>
+                    </div>
+                  </div>
+                  <svg
+                    className="w-6 h-6 text-orange-primary flex-shrink-0 ml-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2.5}
+                      d="M9 5l7 7-7 7"
+                    />
+                  </svg>
+                </div>
+              </motion.div>
+            ))}
           </div>
         )}
       </div>

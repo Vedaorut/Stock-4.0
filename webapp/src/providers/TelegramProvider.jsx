@@ -60,6 +60,7 @@ export function TelegramProvider({ children }) {
 
       // Log once to help diagnose incorrect base URLs in production
       if (!apiLoggedRef.current) {
+        // eslint-disable-next-line no-console
         console.log('[TelegramProvider] Using API base URL:', API_URL);
         apiLoggedRef.current = true;
       }

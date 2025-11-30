@@ -289,7 +289,7 @@ async function notifySellerPaymentReceived(orderId) {
       [orderId]
     );
     
-    if (result.rows.length === 0) return;
+    if (result.rows.length === 0) {return;}
     
     const order = result.rows[0];
     

@@ -89,7 +89,7 @@ jest.unstable_mockModule('../../src/services/orderService.js', () => ({
 }));
 
 // Import mocked modules
-const { getClient } = await import('../../src/config/database.js');
+const { getClient: _getClient } = await import('../../src/config/database.js');
 const {
   orderQueries,
   shopQueries,

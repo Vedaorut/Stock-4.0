@@ -12,7 +12,7 @@ export default function Follows() {
   const { get } = useApi();
   const token = useStore((state) => state.token);
   const myShop = useStore((state) => state.myShop);
-  const setMyShop = useStore((state) => state.setMyShop);
+  const setMyShops = useStore((state) => state.setMyShops);
   const { triggerHaptic } = useTelegram();
   const { t } = useTranslation();
 
@@ -43,7 +43,7 @@ export default function Follows() {
         }
 
         shop = shops[0];
-        setMyShop(shop);
+        setMyShops(shops);  // Save ALL shops to store
       }
 
       const { data: followsResponse, error: followsError } = await get('/follows/my', {
@@ -65,7 +65,7 @@ export default function Follows() {
       useStore.getState().setHasFollows(list.length > 0);
       return { status: 'success' };
     },
-    [get, myShop, setMyShop]
+    [get, myShop, setMyShops]
   );
 
   useEffect(() => {

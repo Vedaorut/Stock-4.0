@@ -185,6 +185,16 @@ export const useStore = create(
       // My shop (seller's own shop for Follows page)
       myShop: null,
       setMyShop: (shop) => set({ myShop: shop }),
+      
+      // All user's shops (for multi-shop ownership)
+      myShops: [],
+      setMyShops: (shops) => set({ 
+        myShops: shops,
+        myShop: shops[0] || null  // First shop = primary (backward compatibility)
+      }),
+      
+      // Helper to check if shop belongs to current user
+      isOwnShop: (shopId) => get().myShops.some(s => s.id === shopId),
 
       // Subscriptions
       subscriptions: [],
@@ -262,9 +272,10 @@ export const useStore = create(
           return;
         }
 
-        // ✅ FIX: Always create minimal shop object - currentShop loaded correctly via /shops/my
-        // Don't use shops.find() which could return stale mock data
-        const shop = { id: shopId, name: 'Loading...' };
+        // ✅ FIX: Get shop name from currentShop or myShops
+        const { currentShop: existingShop, myShops } = get();
+        const shopName = existingShop?.name || myShops?.find(s => s.id === shopId)?.name || 'Shop';
+        const shop = { id: shopId, name: shopName };
 
         // ✅ FIX: ALWAYS clear currentOrder to force fresh creation
         // This prevents stale order reuse after cart quantity changes

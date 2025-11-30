@@ -116,7 +116,7 @@ const ProductCard = memo(function ProductCard({ product, onPreorder: _onPreorder
   const toast = useToast();
   const platform = usePlatform();
   const android = isAndroid(platform);
-  const { t } = useTranslation();
+  const { t: _t } = useTranslation();
 
   const { cardSurface, quickSpring, pressSpring } = useMemo(
     () => getSurfaceStyles(platform),

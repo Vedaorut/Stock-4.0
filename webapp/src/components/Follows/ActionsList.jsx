@@ -2,7 +2,6 @@ import { PencilIcon, ArrowPathIcon, TrashIcon } from '@heroicons/react/24/outlin
 import InteractiveListItem from '../common/InteractiveListItem';
 
 export default function ActionsList({ mode, markup, markupType, onEditMarkup, onSwitchMode, onDelete }) {
-  const modeLabel = mode === 'monitor' ? 'Мониторинг' : 'Перепродажа';
   const switchToMode = mode === 'monitor' ? 'resell' : 'monitor';
   const switchToLabel = switchToMode === 'monitor' ? 'Мониторинг' : 'Перепродажа';
 

@@ -58,6 +58,7 @@ syncQueue.process('sync-products', async (job) => {
       followId,
       synced: results.synced,
       skipped: results.skipped,
+      blockedCopies: results.blockedCopies,
       errors: results.errors,
     };
   } catch (error) {

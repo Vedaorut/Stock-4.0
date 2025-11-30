@@ -19,7 +19,7 @@ function FollowCard({ follow, onModeSwitch, onDelete }) {
 
   const handleDelete = async () => {
     triggerHaptic('medium');
-    const confirmed = await confirm(`Отписаться от "${follow.shop?.name || 'магазина'}"?`);
+    const confirmed = await confirm(`Отписаться от "${follow.source_shop_name || 'магазина'}"?`);
     if (confirmed) {
       triggerHaptic('success');
       onDelete(follow.id);
@@ -42,10 +42,10 @@ function FollowCard({ follow, onModeSwitch, onDelete }) {
       <div className="flex items-start justify-between gap-3 mb-3">
         <div className="flex-1 min-w-0">
           <h3 className="text-white font-semibold mb-1 truncate">
-            {follow.shop?.name || `Магазин #${follow.target_shop_id}`}
+            {follow.source_shop_name || `Магазин #${follow.target_shop_id}`}
           </h3>
-          {follow.shop?.description && (
-            <p className="text-sm text-gray-400 truncate">{follow.shop.description}</p>
+          {follow.source_shop_logo && (
+            <p className="text-sm text-gray-400 truncate">@{follow.source_username || ''}</p>
           )}
         </div>
         <motion.button
@@ -464,9 +464,9 @@ export default function FollowsModal({ isOpen, onClose }) {
                       >
                         <div className="flex-1 min-w-0">
                           <p className="text-white font-medium truncate">{shop.name}</p>
-                          <p className="text-xs text-gray-400 truncate">
-                            {shop.description || `ID: ${shop.id}`}
-                          </p>
+                          {shop.description && (
+                            <p className="text-xs text-gray-400 truncate">{shop.description}</p>
+                          )}
                         </div>
                         <motion.button
                           onClick={() => handleAddFollow(shop.id)}

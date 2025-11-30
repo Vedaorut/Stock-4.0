@@ -183,7 +183,7 @@ export async function verifyPayment(txHash, chain, expectedAddress, expectedAmou
   } catch (error) {
     logger.error('[BlockchainVerification] Verification error', {
       txHash,
-      chain: normalizedChain,
+      chain,
       error: error.message,
       stack: error.stack,
     });

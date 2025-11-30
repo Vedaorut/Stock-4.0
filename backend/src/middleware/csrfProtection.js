@@ -34,7 +34,6 @@ import { config } from '../config/env.js';
  * @param {function} next - Express next middleware
  */
 export const validateOrigin = (req, res, next) => {
-  const path = req.path || '';
   const originalUrl = req.originalUrl || '';
 
   // Skip for safe HTTP methods (read-only)

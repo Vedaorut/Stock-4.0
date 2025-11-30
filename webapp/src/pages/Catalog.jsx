@@ -39,7 +39,9 @@ export default function Catalog() {
     setCurrentShop, 
     setProducts, 
     setCartOpen, 
-    token 
+    token,
+    myShops,
+    setMyShops
   } = useStore(
     useShallow((state) => ({
       products: state.products,
@@ -48,6 +50,8 @@ export default function Catalog() {
       setProducts: state.setProducts,
       setCartOpen: state.setCartOpen,
       token: state.token,
+      myShops: state.myShops,
+      setMyShops: state.setMyShops,
     }))
   );
 
@@ -67,14 +71,19 @@ export default function Catalog() {
           return { status: 'error', error: apiError };
         }
 
-        const shop = data?.data?.[0] || null;
+        const shops = data?.data || [];
+        const shop = shops[0] || null;
+        
+        // Save ALL shops to store for multi-shop ownership detection
+        setMyShops(shops);
+        
         if (shop) setMyShop(shop);
         return { status: 'success', shop };
       } catch (err) {
         return { status: 'error', error: err.message };
       }
     },
-    [get]
+    [get, setMyShops]
   );
 
   const loadProducts = useCallback(
@@ -161,7 +170,10 @@ export default function Catalog() {
   const displayShop = currentShop || myShop;
   const displayShopLogo = displayShop?.logo || displayShop?.image || null;
   const isViewingOwnShop = !currentShop && myShop;
-  const isViewingSubscription = currentShop && myShop && currentShop.id !== myShop.id;
+  
+  // Check if currentShop belongs to user (using myShops array for multi-shop ownership)
+  const isCurrentShopOwned = currentShop && myShops.some(s => s.id === currentShop.id);
+  const isViewingSubscription = currentShop && !isCurrentShopOwned;
 
   // Back Button Logic
   const backHandler = useMemo(() => {

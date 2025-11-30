@@ -50,10 +50,12 @@ export function getApiBaseUrl() {
     FALLBACK_API;
 
   if (envRaw && !envUrl) {
+    // eslint-disable-next-line no-console
     console.warn(`[apiBase] Invalid VITE_API_URL "${envRaw}", falling back to origin/fallback`);
   }
 
   if (shouldIgnoreEnv) {
+    // eslint-disable-next-line no-console
     console.warn(
       `[apiBase] Ignoring localhost VITE_API_URL (${envUrl}) because app origin is ${originUrl}`
     );
@@ -61,6 +63,7 @@ export function getApiBaseUrl() {
 
   if (!loggedApiBase) {
     const source = envUrl && !shouldIgnoreEnv ? 'env' : originUrl ? 'origin' : 'fallback';
+    // eslint-disable-next-line no-console
     console.log(`[apiBase] Resolved API base: ${resolved} (source: ${source})`, {
       envRaw: envRaw || null,
       origin: originUrl || null,

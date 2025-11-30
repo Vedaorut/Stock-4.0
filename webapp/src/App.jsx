@@ -102,8 +102,8 @@ function App() {
         }
 
         const primaryShop = shops[0];
-        // Save myShop to store for Follows page
-        useStore.getState().setMyShop(primaryShop);
+        // Save ALL shops to store for multi-shop ownership detection
+        useStore.getState().setMyShops(shops);
 
         // Use consistent endpoint: /follows/my with shopId param
         const { data: followsResponse } = await get('/follows/my', {

@@ -191,7 +191,7 @@ const handleMarkupInput = async (ctx) => {
 
       await ctx.reply(message, followDetailMenu(followId, follow.mode));
 
-      const successMsg = markupType === 'fixed'
+      const _successMsg = markupType === 'fixed'
         ? followMessages.markupFixedUpdated(markup)
         : followMessages.markupUpdated(markup);
 

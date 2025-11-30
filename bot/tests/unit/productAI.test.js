@@ -7,7 +7,7 @@
  * Run: npm run test:unit -- productAI
  */
 
-import { describe, it, expect, beforeEach, jest } from '@jest/globals';
+import { describe, it, expect, beforeEach, jest as _jest } from '@jest/globals';
 
 import {
   noteProductContext,

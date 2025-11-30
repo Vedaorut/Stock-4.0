@@ -1,5 +1,6 @@
 import { getClient } from '../../../config/database.js';
-import { orderQueries } from '../../../database/queries/index.js';
+// orderQueries imported for future use
+import { orderQueries as _orderQueries } from '../../../database/queries/index.js';
 import telegramService from '../../../services/telegram.js';
 import logger from '../../../utils/logger.js';
 import { validateStatusTransition } from '../../../utils/orderStateValidator.js';

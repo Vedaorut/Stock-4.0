@@ -51,6 +51,7 @@ function WarningIcon({ className }) {
 }
 
 // Animated Success Checkmark
+// eslint-disable-next-line no-unused-vars
 function SuccessCheckmark() {
   return (
     <motion.div
@@ -115,6 +116,7 @@ function SuccessCheckmark() {
 }
 
 // Loading Spinner
+// eslint-disable-next-line no-unused-vars
 function LoadingSpinner() {
   return (
     <motion.div

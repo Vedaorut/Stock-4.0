@@ -177,13 +177,14 @@ export const paymentController = {
           // BIP-21: bitcoin:address?amount=X
           paymentURI = `bitcoin:${address}?amount=${amount}`;
           break;
-        case 'ETH':
+        case 'ETH': {
           // EIP-681: ethereum:address?value=X (value in wei)
           // Convert ETH to wei (string to avoid precision loss)
           const ethFloat = parseFloat(amount);
           const wei = Number.isFinite(ethFloat) ? BigInt(Math.round(ethFloat * 1e18)).toString() : amount;
           paymentURI = `ethereum:${address}?value=${wei}`;
           break;
+        }
         case 'USDT':
           // TRC-20 Tron format
           // TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t is USDT contract on Tron

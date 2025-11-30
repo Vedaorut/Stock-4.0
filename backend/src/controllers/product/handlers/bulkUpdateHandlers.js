@@ -1,5 +1,5 @@
 import { getClient } from '../../../config/database.js';
-import { productQueries, shopQueries } from '../../../database/queries/index.js';
+import { productQueries as _productQueries, shopQueries } from '../../../database/queries/index.js';
 import { asyncHandler } from '../../../middleware/errorHandler.js';
 import { NotFoundError, UnauthorizedError } from '../../../utils/errors.js';
 import logger from '../../../utils/logger.js';

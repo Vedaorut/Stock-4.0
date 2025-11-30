@@ -214,7 +214,7 @@ export async function handleAIProductCommand(ctx) {
       error: error.message,
       stack: error.stack,
       userId: ctx.from?.id,
-      shopId,
+      shopId: ctx.session?.shopId || ctx.session?.workspaceShopId,
       command: userMessage?.substring(0, 100),
       timestamp: new Date().toISOString(),
     });

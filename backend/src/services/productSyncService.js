@@ -77,6 +77,17 @@ export async function copyProductWithMarkup(sourceProductId, followId) {
       throw new Error(`Source product ${sourceProductId} not found`);
     }
 
+    // Check if source product is itself a synced copy (prevent chain copying)
+    const isCopy = await syncedProductQueries.findBySyncedProductId(sourceProductId);
+    if (isCopy) {
+      logger.warn(
+        `[CopyProtection] Blocked: Product ${sourceProductId} is already a synced copy ` +
+        `(original source: ${isCopy.source_product_id}, follow: ${isCopy.follow_id}). ` +
+        `Skipping to prevent chain copying.`
+      );
+      return null; // Return null to indicate blocked (different from existing check which returns record)
+    }
+
     // Check if already synced
     const existing = await syncedProductQueries.findBySourceAndFollow(sourceProductId, followId);
     if (existing) {
@@ -237,12 +248,18 @@ export async function syncAllProductsForFollow(followId) {
       limit: 1000,
     });
 
-    const results = { synced: 0, skipped: 0, errors: 0 };
+    const results = { synced: 0, skipped: 0, errors: 0, blockedCopies: 0 };
 
     // OPTIMIZED: Parallel execution with Promise.allSettled (prevents one error from stopping all)
     const syncPromises = sourceProducts.map((product) =>
       copyProductWithMarkup(product.id, followId)
-        .then(() => ({ status: 'synced', productId: product.id }))
+        .then((result) => {
+          // null = blocked chain copy, existing record = skipped (already synced)
+          if (result === null) {
+            return { status: 'blocked', productId: product.id };
+          }
+          return { status: 'synced', productId: product.id };
+        })
         .catch((error) => ({
           status: error.message.includes('already synced') ? 'skipped' : 'error',
           productId: product.id,
@@ -258,6 +275,8 @@ export async function syncAllProductsForFollow(followId) {
         results.synced++;
       } else if (result.status === 'skipped') {
         results.skipped++;
+      } else if (result.status === 'blocked') {
+        results.blockedCopies++;
       } else {
         results.errors++;
         logger.error(`Failed to sync product ${result.productId}:`, result.error);
@@ -265,7 +284,7 @@ export async function syncAllProductsForFollow(followId) {
     }
 
     logger.info(
-      `Bulk sync for follow ${followId}: ${results.synced} synced, ${results.skipped} skipped, ${results.errors} errors`
+      `Bulk sync for follow ${followId}: ${results.synced} synced, ${results.skipped} skipped, ${results.blockedCopies} blocked (chain copies), ${results.errors} errors`
     );
     return results;
   } catch (error) {

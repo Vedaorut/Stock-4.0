@@ -52,7 +52,7 @@ const { pool } = await import('../../src/config/database.js');
 const logger = (await import('../../src/utils/logger.js')).default;
 const {
   SUBSCRIPTION_PRICES,
-  GRACE_PERIOD_DAYS,
+  GRACE_PERIOD_DAYS: _GRACE_PERIOD_DAYS,
 } = await import('../../src/config/subscriptionPricing.js');
 
 const {
