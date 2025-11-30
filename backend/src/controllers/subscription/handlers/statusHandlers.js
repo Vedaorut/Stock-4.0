@@ -56,6 +56,7 @@ export const getHistory = asyncHandler(async (req, res) => {
 /**
  * Get subscription pricing info
  * GET /api/subscriptions/pricing
+ * Note: Only monthly subscription available
  */
 export const getPricing = asyncHandler(async (req, res) => {
   try {
@@ -63,10 +64,9 @@ export const getPricing = asyncHandler(async (req, res) => {
       basic: {
         price: subscriptionService.SUBSCRIPTION_PRICES.basic,
         currency: 'USD',
-        period: '30 days',
+        period: 'month',
         pricing: {
           month: subscriptionService.SUBSCRIPTION_PRICES.basic,
-          year: subscriptionService.SUBSCRIPTION_PRICES_YEARLY.basic,
         },
         features: [
           'Create and manage shop',
@@ -78,10 +78,9 @@ export const getPricing = asyncHandler(async (req, res) => {
       pro: {
         price: subscriptionService.SUBSCRIPTION_PRICES.pro,
         currency: 'USD',
-        period: '30 days',
+        period: 'month',
         pricing: {
           month: subscriptionService.SUBSCRIPTION_PRICES.pro,
-          year: subscriptionService.SUBSCRIPTION_PRICES_YEARLY.pro,
         },
         features: [
           'All Basic features',

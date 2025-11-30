@@ -40,7 +40,7 @@ const checkMigrationEligibility = asyncHandler(async (req, res) => {
     const validation = await rateLimit.validateMigration(shopId);
 
     if (!validation.valid) {
-      return res.status(403).json({
+      return res.status(200).json({
         eligible: false,
         error: validation.error,
         message: validation.message,

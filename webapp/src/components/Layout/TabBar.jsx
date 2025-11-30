@@ -59,19 +59,18 @@ const TabBar = memo(function TabBar() {
   );
 
   // Tabs Configuration
+  // Order: Subscriptions → Catalog → Follows → Settings
   const tabs = useMemo(() => {
     const list = [
       { id: 'subscriptions', label: t('tabs.subscriptions'), Icon: Icons.Subscriptions },
+      { id: 'catalog', label: t('tabs.catalog'), Icon: Icons.Catalog },
     ];
 
     if (hasFollows) {
       list.push({ id: 'follows', label: t('tabs.follows'), Icon: Icons.Follows });
     }
 
-    list.push(
-      { id: 'catalog', label: t('tabs.catalog'), Icon: Icons.Catalog },
-      { id: 'settings', label: t('tabs.settings'), Icon: Icons.Settings }
-    );
+    list.push({ id: 'settings', label: t('tabs.settings'), Icon: Icons.Settings });
 
     return list;
   }, [t, hasFollows]);

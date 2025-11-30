@@ -1,10 +1,168 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ClockIcon } from '@heroicons/react/24/outline';
 import PageHeader from '../common/PageHeader';
 import { useTelegram } from '../../hooks/useTelegram';
 import { useBackButton } from '../../hooks/useBackButton';
 import { useApi } from '../../hooks/useApi';
+
+// Animated Warning Icon
+function WarningIcon({ className }) {
+  return (
+    <motion.div
+      className={className}
+      initial={{ scale: 0, rotate: -180 }}
+      animate={{ scale: 1, rotate: 0 }}
+      transition={{ type: 'spring', stiffness: 200, damping: 15, delay: 0.1 }}
+    >
+      <motion.div
+        className="w-24 h-24 rounded-full flex items-center justify-center"
+        style={{
+          background: 'linear-gradient(135deg, rgba(255, 170, 0, 0.2) 0%, rgba(255, 107, 0, 0.3) 100%)',
+          boxShadow: '0 0 40px rgba(255, 140, 0, 0.3), 0 0 80px rgba(255, 107, 0, 0.15)',
+        }}
+        animate={{
+          boxShadow: [
+            '0 0 40px rgba(255, 140, 0, 0.3), 0 0 80px rgba(255, 107, 0, 0.15)',
+            '0 0 60px rgba(255, 140, 0, 0.4), 0 0 100px rgba(255, 107, 0, 0.2)',
+            '0 0 40px rgba(255, 140, 0, 0.3), 0 0 80px rgba(255, 107, 0, 0.15)',
+          ],
+        }}
+        transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+      >
+        <motion.svg
+          className="w-12 h-12 text-orange-400"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+          initial={{ pathLength: 0 }}
+          animate={{ pathLength: 1 }}
+          transition={{ duration: 0.5, delay: 0.3 }}
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+          />
+        </motion.svg>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// Animated Success Checkmark
+function SuccessCheckmark() {
+  return (
+    <motion.div
+      className="relative"
+      initial={{ scale: 0 }}
+      animate={{ scale: 1 }}
+      transition={{ type: 'spring', stiffness: 200, damping: 12, delay: 0.1 }}
+    >
+      <motion.div
+        className="w-28 h-28 rounded-full flex items-center justify-center"
+        style={{
+          background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(16, 185, 129, 0.3) 100%)',
+          boxShadow: '0 0 40px rgba(34, 197, 94, 0.3), 0 0 80px rgba(34, 197, 94, 0.15)',
+        }}
+        animate={{
+          scale: [1, 1.05, 1],
+        }}
+        transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
+      >
+        <motion.svg
+          className="w-14 h-14 text-green-500"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+          initial={{ pathLength: 0 }}
+          animate={{ pathLength: 1 }}
+          transition={{ duration: 0.4, delay: 0.4, ease: 'easeOut' }}
+        >
+          <motion.path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2.5}
+            d="M5 13l4 4L19 7"
+            initial={{ pathLength: 0 }}
+            animate={{ pathLength: 1 }}
+            transition={{ duration: 0.4, delay: 0.4 }}
+          />
+        </motion.svg>
+      </motion.div>
+
+      {/* Burst particles */}
+      {[...Array(8)].map((_, i) => (
+        <motion.div
+          key={i}
+          className="absolute w-2 h-2 rounded-full bg-green-400"
+          style={{
+            top: '50%',
+            left: '50%',
+          }}
+          initial={{ x: '-50%', y: '-50%', scale: 0 }}
+          animate={{
+            x: `calc(-50% + ${Math.cos((i * Math.PI * 2) / 8) * 60}px)`,
+            y: `calc(-50% + ${Math.sin((i * Math.PI * 2) / 8) * 60}px)`,
+            scale: [0, 1, 0],
+            opacity: [0, 1, 0],
+          }}
+          transition={{ duration: 0.6, delay: 0.3 + i * 0.03 }}
+        />
+      ))}
+    </motion.div>
+  );
+}
+
+// Loading Spinner
+function LoadingSpinner() {
+  return (
+    <motion.div
+      className="flex flex-col items-center justify-center py-16"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+    >
+      <div className="relative w-16 h-16">
+        <motion.div
+          className="absolute inset-0 rounded-full border-4 border-orange-500/20"
+        />
+        <motion.div
+          className="absolute inset-0 rounded-full border-4 border-transparent border-t-orange-500"
+          animate={{ rotate: 360 }}
+          transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+        />
+      </div>
+      <motion.p
+        className="mt-4 text-gray-400 text-sm"
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+      >
+        Проверяем права на миграцию...
+      </motion.p>
+    </motion.div>
+  );
+}
+
+// Info Card Item
+function InfoItem({ icon, text, variant = 'default' }) {
+  const variants = {
+    default: 'text-gray-300',
+    success: 'text-green-400',
+    warning: 'text-orange-400',
+  };
+
+  return (
+    <motion.div
+      className="flex items-center gap-3"
+      initial={{ opacity: 0, x: -10 }}
+      animate={{ opacity: 1, x: 0 }}
+    >
+      <span className={`text-lg ${variants[variant]}`}>{icon}</span>
+      <span className={`text-sm ${variants[variant]}`}>{text}</span>
+    </motion.div>
+  );
+}
 
 export default function MigrationModal({ isOpen, onClose }) {
   const { triggerHaptic, confirm, alert } = useTelegram();
@@ -19,18 +177,13 @@ export default function MigrationModal({ isOpen, onClose }) {
   const [migrationError, setMigrationError] = useState(null);
   const [countdown, setCountdown] = useState(null);
   const [channelError, setChannelError] = useState(null);
+  const [isChannelValid, setIsChannelValid] = useState(false);
 
   // AbortController ref for migrate operation
   const migrateAbortControllerRef = useRef(null);
 
   /**
-   * Parse and validate Telegram channel input
-   * Removes common prefixes and validates format
-   * Returns { isValid, cleaned, error }
-   */
-  /**
    * Get proper Russian declension for "days"
-   * 1 день, 2 дня, 5 дней
    */
   const getDaysLabel = (count) => {
     const lastDigit = count % 10;
@@ -51,6 +204,9 @@ export default function MigrationModal({ isOpen, onClose }) {
     return 'дней';
   };
 
+  /**
+   * Parse and validate Telegram channel input
+   */
   const parseChannelInput = (input) => {
     if (!input || !input.trim()) {
       return {
@@ -62,9 +218,9 @@ export default function MigrationModal({ isOpen, onClose }) {
 
     // Remove common prefixes
     let cleaned = input.trim();
-    cleaned = cleaned.replace(/^https?:\/\//, ''); // Remove https://
-    cleaned = cleaned.replace(/^t\.me\//, ''); // Remove t.me/
-    cleaned = cleaned.replace(/^@/, ''); // Remove @
+    cleaned = cleaned.replace(/^https?:\/\//, '');
+    cleaned = cleaned.replace(/^t\.me\//, '');
+    cleaned = cleaned.replace(/^@/, '');
 
     // Validate format: 5-32 characters, alphanumeric + underscore
     const channelRegex = /^[a-zA-Z0-9_]{5,32}$/;
@@ -77,7 +233,7 @@ export default function MigrationModal({ isOpen, onClose }) {
       } else if (cleaned.length > 32) {
         error = 'Максимум 32 символа';
       } else {
-        error = 'Только латиница, цифры и _ (подчеркивание)';
+        error = 'Только латиница, цифры и _';
       }
 
       return {
@@ -89,7 +245,7 @@ export default function MigrationModal({ isOpen, onClose }) {
 
     return {
       isValid: true,
-      cleaned: `@${cleaned}`, // Add @ prefix back for consistency
+      cleaned: `@${cleaned}`,
       error: null,
     };
   };
@@ -98,19 +254,18 @@ export default function MigrationModal({ isOpen, onClose }) {
   useBackButton(isOpen, () => {
     if (step > 1 && step < 3) {
       setStep(step - 1);
-      setMigrationError(null); // Очистить migration error при возврате
+      setMigrationError(null);
     } else {
       onClose();
     }
   });
 
-  // Check eligibility function with AbortController support
+  // Check eligibility function
   const checkEligibility = useCallback(async (signal) => {
     try {
-      // Get user's shop
       const { data: shopsResponse, error: shopsError } = await get('/shops/my', {
         signal,
-        timeout: 10000, // 10 second timeout to prevent infinite loading
+        timeout: 10000,
       });
 
       if (signal?.aborted) return { status: 'aborted' };
@@ -132,19 +287,16 @@ export default function MigrationModal({ isOpen, onClose }) {
       const primaryShop = shops[0];
       setShop(primaryShop);
 
-      // Check migration eligibility
       const { data: eligibilityData, error: eligibilityError } = await get(
         `/shops/${primaryShop.id}/migration/check`,
-        {
-          signal,
-          timeout: 10000, // 10 second timeout to prevent infinite loading
-        }
+        { signal, timeout: 10000 }
       );
 
       if (signal?.aborted) return { status: 'aborted' };
 
       if (eligibilityError) {
-        setErrorMessage('Ошибка проверки прав на миграцию. Попробуйте позже.');
+        // Show actual error message from API (e.g., "Channel migration is a PRO feature")
+        setErrorMessage(eligibilityError);
         setStep(1);
         return { status: 'error' };
       }
@@ -158,43 +310,37 @@ export default function MigrationModal({ isOpen, onClose }) {
         return { status: 'error' };
       }
 
-      // Success - переход к step 2 (input)
-      setStep(2);
+      setStep(1); // Stay on step 1 for hero screen
       return { status: 'success' };
     } catch (err) {
       if (signal?.aborted) return { status: 'aborted' };
-
       console.error('Eligibility check failed:', err);
-      setErrorMessage('Ошибка проверки прав. Попробуйте позже.');
+      // Show actual error message if available
+      const message = err?.message || 'Ошибка проверки прав. Попробуйте позже.';
+      setErrorMessage(message);
       setStep(1);
       return { status: 'error' };
     }
   }, [get]);
 
-  // Step 2: Check eligibility when opening modal
+  // Check eligibility when opening modal
   useEffect(() => {
     if (!isOpen) return;
 
     setLoading(true);
-    setErrorMessage(null); // Сброс ошибки перед проверкой
+    setErrorMessage(null);
 
     const controller = new AbortController();
 
     checkEligibility(controller.signal)
-      .then((result) => {
-        if (!controller.signal.aborted && result?.status === 'error') {
-          console.error('Failed to check eligibility');
-        }
-      })
       .finally(() => {
-        // Always reset loading, even on abort
         setLoading(false);
       });
 
     return () => controller.abort();
   }, [isOpen, checkEligibility]);
 
-  // Cleanup migrate request when modal closes or unmounts
+  // Cleanup migrate request when modal closes
   useEffect(() => {
     if (!isOpen && migrateAbortControllerRef.current) {
       migrateAbortControllerRef.current.abort();
@@ -209,15 +355,9 @@ export default function MigrationModal({ isOpen, onClose }) {
     };
   }, [isOpen]);
 
-  const handleNext = () => {
-    triggerHaptic('light');
-    setStep(step + 1);
-  };
-
   const handleMigrate = async () => {
     setMigrationError(null);
 
-    // Validate and clean channel input
     const { isValid, cleaned, error } = parseChannelInput(newChannel);
 
     if (!isValid) {
@@ -232,7 +372,6 @@ export default function MigrationModal({ isOpen, onClose }) {
 
     if (!confirmed) return;
 
-    // Cancel previous migrate request if exists
     if (migrateAbortControllerRef.current) {
       migrateAbortControllerRef.current.abort();
     }
@@ -242,12 +381,11 @@ export default function MigrationModal({ isOpen, onClose }) {
 
     try {
       const { data, error: postError } = await post(`/shops/${shop.id}/migration`, {
-        newChannelUrl: cleaned, // Use cleaned value
+        newChannelUrl: cleaned,
         oldChannelUrl: shop.channel_url,
         signal: migrateAbortControllerRef.current.signal,
       });
 
-      // Check if aborted before updating state
       if (migrateAbortControllerRef.current?.signal.aborted) return;
 
       if (postError) {
@@ -260,12 +398,10 @@ export default function MigrationModal({ isOpen, onClose }) {
       setStep(3);
       triggerHaptic('success');
 
-      // Haptic feedback для успеха
       if (window.Telegram?.WebApp?.HapticFeedback) {
         window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
       }
 
-      // Автоматическое закрытие через 3 секунды с countdown
       setCountdown(3);
       const countdownInterval = setInterval(() => {
         setCountdown((prev) => {
@@ -278,9 +414,7 @@ export default function MigrationModal({ isOpen, onClose }) {
         });
       }, 1000);
     } catch (err) {
-      // Ignore AbortError - request was cancelled intentionally
       if (err.name === 'AbortError') return;
-
       console.error('Migration failed:', err);
       setMigrationError('Ошибка миграции. Попробуйте позже.');
     } finally {
@@ -288,498 +422,508 @@ export default function MigrationModal({ isOpen, onClose }) {
     }
   };
 
+  // Handle channel input change with validation
+  const handleChannelChange = (e) => {
+    const value = e.target.value;
+    setNewChannel(value);
+
+    if (value) {
+      const { isValid, error: validationError } = parseChannelInput(value);
+      setChannelError(validationError);
+      setIsChannelValid(isValid);
+    } else {
+      setChannelError(null);
+      setIsChannelValid(false);
+    }
+  };
+
+  const subscriberCount = eligibility?.subscriberCount || 0;
+  const daysUntilNext = eligibility?.limits?.daysUntilNext || 0;
+  const canMigrate = daysUntilNext === 0 && !errorMessage;
+
   return (
     <AnimatePresence>
       {isOpen && (
         <motion.div
-          className="fixed inset-0 z-50 bg-dark-bg overflow-y-auto"
+          className="fixed inset-0 z-50 bg-[#181818] overflow-y-auto"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
         >
           <PageHeader
-            title={
-              step === 1
-                ? 'Миграция канала'
-                : step === 2
-                  ? 'Новый канал'
-                  : 'Готово'
-            }
+            title={step === 3 ? 'Готово' : 'Миграция'}
             onBack={step === 1 || step === 3 ? onClose : () => setStep(step - 1)}
             variant="close"
           />
 
           <div
-            className="px-4 py-6 pb-20"
+            className="px-4 pb-8"
             style={{ paddingTop: 'calc(env(safe-area-inset-top) + 72px)' }}
           >
-            {step === 1 ? (
-              // Info screen with loading state
-              loading ? (
+            <AnimatePresence mode="wait">
+              {/* STEP 1: Hero Screen */}
+              {step === 1 && (
                 <motion.div
-                  className="flex flex-col items-center justify-center py-12"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
+                  key="step1"
+                  className="flex flex-col"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  transition={{ duration: 0.3 }}
                 >
-                  <div className="w-16 h-16 border-4 border-orange-primary border-t-transparent rounded-full animate-spin mb-4"></div>
-                  <p className="text-gray-400">Проверяем права на миграцию...</p>
-                </motion.div>
-              ) : (
-              <motion.div
-                className="space-y-6"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-              >
-                {/* Error Message */}
-                {errorMessage && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="bg-red-500/10 border border-red-500/20 rounded-2xl p-4"
-                  >
-                    <div className="flex items-start gap-3">
-                      <svg
-                        className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                        />
-                      </svg>
-                      <div className="flex-1">
-                        <p className="text-red-400 text-sm mb-3">{errorMessage}</p>
+                  {loading ? (
+                    <LoadingSpinner />
+                  ) : (
+                    <>
+                      {/* Hero Section */}
+                      <div className="flex flex-col items-center text-center pt-4 pb-6">
+                        <WarningIcon className="mb-6" />
 
-                        {/* Retry Button */}
-                        <motion.button
-                          onClick={() => {
-                            setErrorMessage(null);
-                            triggerHaptic('light');
-                            setLoading(true);
-                            // Retry eligibility check in loading state
-                            const controller = new AbortController();
-                            checkEligibility(controller.signal).finally(() => {
-                              setLoading(false);
-                            });
-                          }}
-                          disabled={loading}
-                          className="text-sm text-orange-500 hover:text-orange-400 disabled:opacity-50
-                                     font-medium flex items-center gap-2 transition-colors"
-                          whileTap={!loading ? { scale: 0.95 } : {}}
+                        <motion.h1
+                          className="text-2xl font-bold text-white mb-2"
+                          style={{ letterSpacing: '-0.02em' }}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: 0.2 }}
                         >
-                          <svg
-                            className="w-4 h-4"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                            />
-                          </svg>
-                          {loading ? 'Проверяем...' : 'Попробовать снова'}
-                        </motion.button>
-                      </div>
-                    </div>
-                  </motion.div>
-                )}
+                          Канал заблокирован?
+                        </motion.h1>
 
-                <div className="glass-card rounded-2xl p-6">
-                  <div className="flex items-center gap-4 mb-4">
-                    <div className="w-12 h-12 rounded-full bg-orange-primary/20 flex items-center justify-center">
-                      <svg
-                        className="w-6 h-6 text-orange-primary"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                        />
-                      </svg>
-                    </div>
-                    <h2 className="text-xl font-bold text-white">Канал заблокирован?</h2>
-                  </div>
-
-                  <div className="space-y-4 text-gray-300">
-                    <p>
-                      Функция миграции позволяет уведомить всех ваших подписчиков о переезде на
-                      новый канал.
-                    </p>
-
-                    <div className="bg-white/5 rounded-xl p-4 space-y-3">
-                      <h3 className="font-semibold text-white">Как это работает:</h3>
-                      <ul className="space-y-2 text-sm">
-                        <li className="flex items-start gap-2">
-                          <span className="text-orange-primary mt-0.5">1.</span>
-                          <span>Вы указываете новый канал</span>
-                        </li>
-                        <li className="flex items-start gap-2">
-                          <span className="text-orange-primary mt-0.5">2.</span>
-                          <span>Система отправляет уведомления всем подписчикам</span>
-                        </li>
-                        <li className="flex items-start gap-2">
-                          <span className="text-orange-primary mt-0.5">3.</span>
-                          <span>Старый магазин автоматически деактивируется</span>
-                        </li>
-                      </ul>
-                    </div>
-
-                    <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4">
-                      <p className="text-yellow-400 text-sm">
-                        ⚠️ Внимание: это действие нельзя отменить. Убедитесь, что новый канал готов
-                        к приёму подписчиков.
-                      </p>
-                    </div>
-
-                    <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4">
-                      <h3 className="font-semibold text-white mb-2">Требования:</h3>
-                      <ul className="space-y-1 text-sm text-blue-400">
-                        <li>✓ PRO подписка активна</li>
-                        <li>✓ Нет недавних миграций (1 раз в 30 дней)</li>
-                      </ul>
-                    </div>
-
-                    {/* Rate Limit Info */}
-                    {eligibility?.limits && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="mt-6 p-4 bg-blue-500/10 border border-blue-500/30 rounded-xl"
-                      >
-                        <div className="flex items-start gap-3">
-                          <ClockIcon className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
-                          <div className="flex-1">
-                            <h4 className="text-sm font-semibold text-blue-400 mb-2">
-                              Информация о лимитах
-                            </h4>
-
-                            {eligibility.limits.lastMigrationDate && (
-                              <p className="text-sm text-gray-300 mb-2">
-                                Последняя миграция:{' '}
-                                <span className="text-white font-medium">
-                                  {new Date(
-                                    eligibility.limits.lastMigrationDate
-                                  ).toLocaleDateString('ru-RU', {
-                                    day: 'numeric',
-                                    month: 'long',
-                                    year: 'numeric',
-                                  })}
-                                </span>
-                              </p>
-                            )}
-
-                            {eligibility.limits.daysUntilNext > 0 ? (
-                              <>
-                                <p className="text-sm text-gray-300 mb-3">
-                                  Следующая миграция доступна через:{' '}
-                                  <span className="text-orange-500 font-medium">
-                                    {eligibility.limits.daysUntilNext}{' '}
-                                    {getDaysLabel(eligibility.limits.daysUntilNext)}
-                                  </span>
-                                </p>
-
-                                {/* Progress bar */}
-                                <div className="mt-3">
-                                  <div className="w-full h-2 bg-gray-800 rounded-full overflow-hidden">
-                                    <motion.div
-                                      initial={{ width: 0 }}
-                                      animate={{
-                                        width: `${Math.max(
-                                          0,
-                                          Math.min(
-                                            100,
-                                            ((30 - eligibility.limits.daysUntilNext) / 30) * 100
-                                          )
-                                        )}%`,
-                                      }}
-                                      transition={{ duration: 0.8, ease: 'easeOut' }}
-                                      className="h-full bg-gradient-to-r from-orange-500 to-orange-400"
-                                    />
-                                  </div>
-                                  <p className="text-xs text-gray-500 mt-1">
-                                    {30 - eligibility.limits.daysUntilNext} из 30 дней прошло
-                                  </p>
-                                </div>
-                              </>
-                            ) : (
-                              <p className="text-sm text-green-400 font-medium">
-                                ✓ Миграция доступна прямо сейчас
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      </motion.div>
-                    )}
-                  </div>
-                </div>
-
-                <motion.button
-                  onClick={() => {
-                    triggerHaptic('light');
-                    setStep(2);
-                  }}
-                  disabled={eligibility?.limits?.daysUntilNext > 0}
-                  className="w-full h-12 rounded-xl font-semibold text-white disabled:opacity-50 disabled:cursor-not-allowed"
-                  style={{
-                    background:
-                      eligibility?.limits?.daysUntilNext > 0
-                        ? 'rgba(255, 255, 255, 0.1)'
-                        : 'linear-gradient(135deg, #FF6B00 0%, #FF8533 100%)',
-                  }}
-                  whileTap={eligibility?.limits?.daysUntilNext > 0 ? {} : { scale: 0.98 }}
-                >
-                  {eligibility?.limits?.daysUntilNext > 0
-                    ? `Доступно через ${eligibility.limits.daysUntilNext} ${getDaysLabel(eligibility.limits.daysUntilNext)}`
-                    : 'Продолжить'}
-                </motion.button>
-              </motion.div>
-              )
-            ) : step === 2 ? (
-              // Input screen
-              <motion.div
-                className="space-y-6"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-              >
-                {/* Migration Error Message */}
-                {migrationError && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="bg-red-500/10 border border-red-500/20 rounded-2xl p-4"
-                  >
-                    <div className="flex items-start gap-3">
-                      <svg
-                        className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                        />
-                      </svg>
-                      <div className="flex-1">
-                        <p className="text-red-400 text-sm mb-3">{migrationError}</p>
-
-                        {/* Retry Button */}
-                        <motion.button
-                          onClick={async () => {
-                            setMigrationError(null);
-                            triggerHaptic('light');
-                            await handleMigrate();
-                          }}
-                          disabled={loading || !newChannel.trim() || channelError !== null}
-                          className="text-sm text-orange-500 hover:text-orange-400 disabled:opacity-50
-                                     font-medium flex items-center gap-2 transition-colors"
-                          whileTap={
-                            !loading && newChannel.trim() && !channelError ? { scale: 0.95 } : {}
-                          }
-                        >
-                          <svg
-                            className="w-4 h-4"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                            />
-                          </svg>
-                          {loading ? 'Отправка...' : 'Попробовать снова'}
-                        </motion.button>
-                      </div>
-                    </div>
-                  </motion.div>
-                )}
-
-                <div className="glass-card rounded-2xl p-6">
-                  <h2 className="text-xl font-bold text-white mb-4">Новый канал</h2>
-
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm text-gray-400 mb-2">Telegram канал</label>
-                      <input
-                        type="text"
-                        value={newChannel}
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          setNewChannel(value);
-
-                          // Real-time validation
-                          if (value) {
-                            const { error: validationError } = parseChannelInput(value);
-                            setChannelError(validationError);
-                          } else {
-                            setChannelError(null);
-                          }
-                        }}
-                        placeholder="@your_channel или https://t.me/your_channel"
-                        className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-orange-primary transition-colors"
-                        autoFocus
-                      />
-
-                      {/* Validation Error */}
-                      {channelError && (
                         <motion.p
-                          className="text-red-400 text-sm mt-2 flex items-center gap-2"
-                          initial={{ opacity: 0, y: -5 }}
+                          className="text-gray-400 text-sm max-w-[280px]"
+                          initial={{ opacity: 0, y: 10 }}
                           animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: 0.3 }}
                         >
-                          <svg
-                            className="w-4 h-4"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                            />
-                          </svg>
-                          {channelError}
+                          Уведомим всех подписчиков о новом канале
                         </motion.p>
-                      )}
+                      </div>
 
-                      {/* Helper Text */}
-                      {!channelError && newChannel && (
+                      {/* Error Message */}
+                      {errorMessage && (
                         <motion.div
-                          className="mt-3 p-3 bg-green-500/10 border border-green-500/30 rounded-xl"
-                          initial={{ opacity: 0, y: -5 }}
-                          animate={{ opacity: 1, y: 0 }}
+                          initial={{ opacity: 0, scale: 0.95 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          className="mb-4 p-4 rounded-2xl bg-red-500/10 border border-red-500/20"
                         >
-                          <p className="text-sm text-green-400">
-                            ✓ Канал будет сохранён как:{' '}
-                            <strong>{parseChannelInput(newChannel).cleaned}</strong>
-                          </p>
+                          <div className="flex items-start gap-3">
+                            <div className="w-8 h-8 rounded-full bg-red-500/20 flex items-center justify-center flex-shrink-0">
+                              <svg className="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </div>
+                            <div className="flex-1">
+                              <p className="text-red-400 text-sm">{errorMessage}</p>
+                              <motion.button
+                                onClick={() => {
+                                  setErrorMessage(null);
+                                  triggerHaptic('light');
+                                  setLoading(true);
+                                  const controller = new AbortController();
+                                  checkEligibility(controller.signal).finally(() => {
+                                    setLoading(false);
+                                  });
+                                }}
+                                className="mt-2 text-sm text-orange-500 font-medium flex items-center gap-1"
+                                whileTap={{ scale: 0.95 }}
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                </svg>
+                                Попробовать снова
+                              </motion.button>
+                            </div>
+                          </div>
                         </motion.div>
                       )}
 
-                      {!newChannel && (
-                        <p className="text-gray-500 text-sm mt-2">
-                          Формат: @channel_name или https://t.me/channel_name
-                        </p>
+                      {/* Info Card */}
+                      {!errorMessage && eligibility && (
+                        <motion.div
+                          className="p-4 rounded-2xl space-y-3"
+                          style={{
+                            background: 'rgba(255, 255, 255, 0.03)',
+                            border: '1px solid rgba(255, 255, 255, 0.06)',
+                          }}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: 0.4 }}
+                        >
+                          <InfoItem
+                            icon="&#10003;"
+                            text={`${subscriberCount} подписчиков получат уведомление`}
+                            variant="success"
+                          />
+                          <InfoItem
+                            icon="&#10003;"
+                            text="Новый канал будет сохранен в магазине"
+                            variant="success"
+                          />
+                        </motion.div>
                       )}
-                    </div>
 
-                    {eligibility && (
-                      <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4">
-                        <p className="text-blue-400 text-sm">
-                          📊 Уведомления получат {eligibility.subscriberCount || 0} подписчиков
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </div>
+                      {/* Rate Limit Warning */}
+                      {daysUntilNext > 0 && (
+                        <motion.div
+                          className="mt-4 p-4 rounded-2xl"
+                          style={{
+                            background: 'rgba(255, 170, 0, 0.08)',
+                            border: '1px solid rgba(255, 170, 0, 0.15)',
+                          }}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: 0.5 }}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-orange-500/20 flex items-center justify-center flex-shrink-0">
+                              <svg className="w-5 h-5 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                            </div>
+                            <div className="flex-1">
+                              <p className="text-orange-400 text-sm font-medium">
+                                Доступно через {daysUntilNext} {getDaysLabel(daysUntilNext)}
+                              </p>
+                              <div className="mt-2 w-full h-1.5 bg-gray-800 rounded-full overflow-hidden">
+                                <motion.div
+                                  className="h-full rounded-full"
+                                  style={{ background: 'linear-gradient(90deg, #FF6B00, #FF8C42)' }}
+                                  initial={{ width: 0 }}
+                                  animate={{ width: `${((30 - daysUntilNext) / 30) * 100}%` }}
+                                  transition={{ duration: 0.8, ease: 'easeOut', delay: 0.6 }}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        </motion.div>
+                      )}
 
-                <motion.button
-                  onClick={handleMigrate}
-                  disabled={loading || !newChannel.trim() || channelError !== null}
-                  className="w-full h-12 rounded-xl font-semibold text-white disabled:opacity-50 disabled:cursor-not-allowed"
-                  style={{
-                    background:
-                      !loading && newChannel.trim() && !channelError
-                        ? 'linear-gradient(135deg, #FF6B00 0%, #FF8533 100%)'
-                        : 'rgba(255, 255, 255, 0.1)',
-                  }}
-                  whileTap={!loading && newChannel.trim() && !channelError ? { scale: 0.98 } : {}}
+                      {/* CTA Button */}
+                      <motion.button
+                        onClick={() => {
+                          triggerHaptic('light');
+                          setStep(2);
+                        }}
+                        disabled={!canMigrate}
+                        className="mt-6 w-full h-14 rounded-2xl font-semibold text-white text-base disabled:opacity-40"
+                        style={{
+                          background: canMigrate
+                            ? 'linear-gradient(135deg, #FF6B00 0%, #FF8C42 100%)'
+                            : 'rgba(255, 255, 255, 0.1)',
+                          boxShadow: canMigrate ? '0 4px 20px rgba(255, 107, 0, 0.3)' : 'none',
+                        }}
+                        whileTap={canMigrate ? { scale: 0.98 } : {}}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.5 }}
+                      >
+                        {daysUntilNext > 0
+                          ? `Доступно через ${daysUntilNext} ${getDaysLabel(daysUntilNext)}`
+                          : 'Начать миграцию'}
+                      </motion.button>
+                    </>
+                  )}
+                </motion.div>
+              )}
+
+              {/* STEP 2: Input Screen */}
+              {step === 2 && (
+                <motion.div
+                  key="step2"
+                  className="flex flex-col"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  transition={{ duration: 0.3 }}
                 >
-                  {loading ? 'Отправка уведомлений...' : 'Запустить миграцию'}
-                </motion.button>
-              </motion.div>
-            ) : step === 3 ? (
-              // Success screen
-              <motion.div
-                className="space-y-6"
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-              >
-                <div className="glass-card rounded-2xl p-6 text-center">
-                  <motion.div
-                    className="w-20 h-20 mx-auto mb-4 rounded-full bg-green-500/20 flex items-center justify-center"
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    transition={{ type: 'spring', stiffness: 200, damping: 15 }}
+                  {/* Title */}
+                  <motion.h2
+                    className="text-xl font-bold text-white mb-6"
+                    style={{ letterSpacing: '-0.02em' }}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
                   >
-                    <svg
-                      className="w-10 h-10 text-green-500"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
+                    Новый канал
+                  </motion.h2>
+
+                  {/* Migration Error */}
+                  {migrationError && (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="mb-4 p-4 rounded-2xl bg-red-500/10 border border-red-500/20"
                     >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M5 13l4 4L19 7"
-                      />
-                    </svg>
+                      <div className="flex items-start gap-3">
+                        <div className="w-8 h-8 rounded-full bg-red-500/20 flex items-center justify-center flex-shrink-0">
+                          <svg className="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-red-400 text-sm">{migrationError}</p>
+                          <motion.button
+                            onClick={async () => {
+                              setMigrationError(null);
+                              triggerHaptic('light');
+                              await handleMigrate();
+                            }}
+                            disabled={loading || !newChannel.trim() || channelError !== null}
+                            className="mt-2 text-sm text-orange-500 font-medium flex items-center gap-1 disabled:opacity-50"
+                            whileTap={{ scale: 0.95 }}
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                            Попробовать снова
+                          </motion.button>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+
+                  {/* Input Field */}
+                  <motion.div
+                    className="relative"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.1 }}
+                  >
+                    <input
+                      type="text"
+                      value={newChannel}
+                      onChange={handleChannelChange}
+                      placeholder="@channel"
+                      autoFocus
+                      className="w-full h-14 px-4 pr-12 rounded-2xl text-white text-base placeholder-gray-500 outline-none transition-all"
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        border: channelError
+                          ? '2px solid rgba(239, 68, 68, 0.5)'
+                          : isChannelValid
+                            ? '2px solid rgba(34, 197, 94, 0.5)'
+                            : '2px solid rgba(255, 255, 255, 0.1)',
+                      }}
+                    />
+
+                    {/* Validation Icon */}
+                    <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                      <AnimatePresence mode="wait">
+                        {isChannelValid && (
+                          <motion.div
+                            key="valid"
+                            initial={{ scale: 0, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0, opacity: 0 }}
+                            transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+                            className="w-6 h-6 rounded-full bg-green-500/20 flex items-center justify-center"
+                          >
+                            <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                            </svg>
+                          </motion.div>
+                        )}
+                        {channelError && newChannel && (
+                          <motion.div
+                            key="invalid"
+                            initial={{ scale: 0, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0, opacity: 0 }}
+                            transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+                            className="w-6 h-6 rounded-full bg-red-500/20 flex items-center justify-center"
+                          >
+                            <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
                   </motion.div>
 
-                  <h2 className="text-2xl font-bold text-white mb-2">Миграция запущена!</h2>
-                  <p className="text-gray-400 mb-4">Уведомления отправляются всем подписчикам</p>
+                  {/* Error Message */}
+                  <AnimatePresence>
+                    {channelError && newChannel && (
+                      <motion.p
+                        className="mt-2 text-red-400 text-sm"
+                        initial={{ opacity: 0, y: -5, height: 0 }}
+                        animate={{ opacity: 1, y: 0, height: 'auto' }}
+                        exit={{ opacity: 0, y: -5, height: 0 }}
+                      >
+                        {channelError}
+                      </motion.p>
+                    )}
+                  </AnimatePresence>
 
+                  {/* Valid Channel Preview */}
+                  <AnimatePresence>
+                    {isChannelValid && (
+                      <motion.div
+                        className="mt-3 p-3 rounded-xl"
+                        style={{
+                          background: 'rgba(34, 197, 94, 0.1)',
+                          border: '1px solid rgba(34, 197, 94, 0.2)',
+                        }}
+                        initial={{ opacity: 0, y: -5, height: 0 }}
+                        animate={{ opacity: 1, y: 0, height: 'auto' }}
+                        exit={{ opacity: 0, y: -5, height: 0 }}
+                      >
+                        <p className="text-green-400 text-sm">
+                          Канал: <span className="font-semibold">{parseChannelInput(newChannel).cleaned}</span>
+                        </p>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  {/* Subscriber Count Info */}
+                  <motion.div
+                    className="mt-4 p-4 rounded-2xl flex items-center gap-3"
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.03)',
+                      border: '1px solid rgba(255, 255, 255, 0.06)',
+                    }}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.2 }}
+                  >
+                    <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center">
+                      <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                      </svg>
+                    </div>
+                    <p className="text-gray-300 text-sm">
+                      <span className="text-white font-semibold">{subscriberCount}</span> подписчиков получат уведомление
+                    </p>
+                  </motion.div>
+
+                  {/* CTA Button */}
+                  <motion.button
+                    onClick={handleMigrate}
+                    disabled={loading || !newChannel.trim() || channelError !== null}
+                    className="mt-6 w-full h-14 rounded-2xl font-semibold text-white text-base disabled:opacity-40 flex items-center justify-center gap-2"
+                    style={{
+                      background: !loading && isChannelValid
+                        ? 'linear-gradient(135deg, #FF6B00 0%, #FF8C42 100%)'
+                        : 'rgba(255, 255, 255, 0.1)',
+                      boxShadow: !loading && isChannelValid ? '0 4px 20px rgba(255, 107, 0, 0.3)' : 'none',
+                    }}
+                    whileTap={!loading && isChannelValid ? { scale: 0.98 } : {}}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.3 }}
+                  >
+                    {loading ? (
+                      <>
+                        <motion.div
+                          className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full"
+                          animate={{ rotate: 360 }}
+                          transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                        />
+                        Отправка...
+                      </>
+                    ) : (
+                      'Отправить уведомления'
+                    )}
+                  </motion.button>
+                </motion.div>
+              )}
+
+              {/* STEP 3: Success Screen */}
+              {step === 3 && (
+                <motion.div
+                  key="step3"
+                  className="flex flex-col items-center text-center pt-8"
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  {/* Success Animation */}
+                  <SuccessCheckmark />
+
+                  <motion.h1
+                    className="mt-6 text-2xl font-bold text-white"
+                    style={{ letterSpacing: '-0.02em' }}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.3 }}
+                  >
+                    Миграция запущена!
+                  </motion.h1>
+
+                  <motion.p
+                    className="mt-2 text-gray-400 text-sm"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.4 }}
+                  >
+                    Уведомления отправляются подписчикам
+                  </motion.p>
+
+                  {/* Result Card */}
+                  {migrationResult && (
+                    <motion.div
+                      className="mt-6 w-full p-4 rounded-2xl space-y-3"
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.03)',
+                        border: '1px solid rgba(255, 255, 255, 0.06)',
+                      }}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.5 }}
+                    >
+                      <div className="flex items-center justify-between py-2 border-b border-white/5">
+                        <span className="text-gray-400 text-sm">Новый канал</span>
+                        <span className="text-white font-semibold">{migrationResult.newChannelUrl}</span>
+                      </div>
+                      <div className="flex items-center justify-between py-2">
+                        <span className="text-gray-400 text-sm">Отправлено</span>
+                        <span className="text-green-400 font-semibold">{migrationResult.notificationsSent || 0} уведомлений</span>
+                      </div>
+                    </motion.div>
+                  )}
+
+                  {/* Countdown */}
                   {countdown !== null && (
-                    <motion.p
-                      className="text-sm text-gray-500 mb-6"
+                    <motion.div
+                      className="mt-6 flex items-center gap-2 text-gray-500 text-sm"
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
+                      transition={{ delay: 0.6 }}
                     >
-                      Закроется через {countdown}...
-                    </motion.p>
+                      <span>Закроется через</span>
+                      <motion.span
+                        key={countdown}
+                        className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center text-white font-semibold text-xs"
+                        initial={{ scale: 1.3, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+                      >
+                        {countdown}
+                      </motion.span>
+                    </motion.div>
                   )}
 
-                  {migrationResult && (
-                    <div className="space-y-3 text-left">
-                      <div className="bg-white/5 rounded-xl p-4">
-                        <p className="text-sm text-gray-400 mb-1">Новый канал:</p>
-                        <p className="text-white font-semibold">{migrationResult.newChannelUrl}</p>
-                      </div>
-
-                      <div className="bg-white/5 rounded-xl p-4">
-                        <p className="text-sm text-gray-400 mb-1">Статус уведомлений:</p>
-                        <p className="text-green-400 font-semibold">
-                          {migrationResult.notificationsSent || 0} отправлено
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                <motion.button
-                  onClick={() => {
-                    setCountdown(null); // Остановить countdown
-                    onClose();
-                  }}
-                  className="w-full h-12 rounded-xl font-semibold text-white"
-                  style={{
-                    background: 'rgba(255, 255, 255, 0.1)',
-                  }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  Закрыть сейчас
-                </motion.button>
-              </motion.div>
-            ) : null}
+                  {/* Close Button */}
+                  <motion.button
+                    onClick={() => {
+                      setCountdown(null);
+                      onClose();
+                    }}
+                    className="mt-6 w-full h-14 rounded-2xl font-semibold text-white text-base"
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.08)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                    }}
+                    whileTap={{ scale: 0.98 }}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.7 }}
+                  >
+                    Закрыть
+                  </motion.button>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </motion.div>
       )}
