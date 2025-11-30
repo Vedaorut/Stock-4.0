@@ -304,8 +304,10 @@ export async function updateMarkupForFollow(followId, markupType, markupValue) {
     }
 
     // Now read synced products WITH FOR UPDATE lock (inside transaction)
+    // Include custom_markup fields to respect per-product markup settings
     const syncedResult = await client.query(
       `SELECT sp.id, sp.synced_product_id, sp.source_product_id, sp.conflict_status,
+              sp.custom_markup_type, sp.custom_markup_percentage, sp.custom_markup_fixed,
               p.price as source_product_price
        FROM synced_products sp
        JOIN products p ON p.id = sp.source_product_id
@@ -323,16 +325,20 @@ export async function updateMarkupForFollow(followId, markupType, markupValue) {
       return 0;
     }
 
-    logger.info(`updateMarkupForFollow: Processing ${productsToUpdate.length} products for follow ${followId}`);
+    // Filter out products with custom_markup - they should NOT be updated by global markup change
+    const productsWithoutCustomMarkup = productsToUpdate.filter((sync) => !sync.custom_markup_type);
+    const skippedCount = productsToUpdate.length - productsWithoutCustomMarkup.length;
+
+    logger.info(`updateMarkupForFollow: Processing ${productsWithoutCustomMarkup.length} products for follow ${followId} (skipping ${skippedCount} with custom markup)`);
 
     // Sequential update with FOR UPDATE locks (not parallel to avoid deadlocks)
-    for (const sync of productsToUpdate) {
+    for (const sync of productsWithoutCustomMarkup) {
       // Lock product row
       await client.query('SELECT id FROM products WHERE id = $1 FOR UPDATE', [
         sync.synced_product_id,
       ]);
 
-      // Update product price
+      // Update product price with global markup (custom_markup products are already filtered out)
       const newPrice = calculatePriceWithMarkup(sync.source_product_price, markupType, markupValue);
       await client.query('UPDATE products SET price = $1, updated_at = NOW() WHERE id = $2', [
         newPrice,
@@ -347,9 +353,10 @@ export async function updateMarkupForFollow(followId, markupType, markupValue) {
 
     // Commit transaction
     await client.query('COMMIT');
-    const count = productsToUpdate.length;
+    const count = productsWithoutCustomMarkup.length;
     logger.info(`updateMarkupForFollow: Transaction committed for follow ${followId}`, {
       productsUpdated: count,
+      productsSkipped: skippedCount,
     });
     return count;
   } catch (error) {

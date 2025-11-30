@@ -4,6 +4,7 @@ import Header from '../components/Layout/Header';
 import ActionsList from '../components/Follows/ActionsList';
 import ConfirmDialog from '../components/Follows/ConfirmDialog';
 import MarkupSliderModal from '../components/Follows/MarkupSliderModal';
+import ProductMarkupModal from '../components/Follows/ProductMarkupModal';
 import { useFollowsApi } from '../hooks/useApi';
 import { useStore } from '../store/useStore';
 import { useTelegram } from '../hooks/useTelegram';
@@ -11,17 +12,21 @@ import { useBackButton } from '../hooks/useBackButton';
 
 export default function FollowDetail() {
   const followDetailId = useStore((state) => state.followDetailId);
-  const { getDetail, updateMarkup, switchMode, deleteFollow } = useFollowsApi();
+  const { getDetail, updateMarkup, switchMode, deleteFollow, getProducts, updateProductMarkup, resetProductMarkup } = useFollowsApi();
   const { triggerHaptic } = useTelegram();
 
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [follow, setFollow] = useState(null);
+  const [products, setProducts] = useState([]);
+  const [productsLoading, setProductsLoading] = useState(false);
 
   // Modal states
   const [isMarkupModalOpen, setIsMarkupModalOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isSwitchModeDialogOpen, setIsSwitchModeDialogOpen] = useState(false);
+  const [isProductMarkupModalOpen, setIsProductMarkupModalOpen] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState(null);
 
   // Back button handler
   const handleBack = useCallback(() => {
@@ -53,6 +58,29 @@ export default function FollowDetail() {
     [followDetailId, getDetail]
   );
 
+  // Load products for this follow
+  const loadProducts = useCallback(
+    async (signal) => {
+      if (!followDetailId) return;
+
+      setProductsLoading(true);
+      try {
+        const response = await getProducts(followDetailId, { signal });
+        if (signal?.aborted) return;
+
+        const productsData = response.data?.data?.products || response.data?.products || [];
+        setProducts(Array.isArray(productsData) ? productsData : []);
+      } catch (err) {
+        console.error('[FollowDetail] Error loading products:', err);
+      } finally {
+        if (!signal?.aborted) {
+          setProductsLoading(false);
+        }
+      }
+    },
+    [followDetailId, getProducts]
+  );
+
   useEffect(() => {
     if (!followDetailId) {
       setIsLoading(false);
@@ -69,6 +97,8 @@ export default function FollowDetail() {
         if (!controller.signal.aborted && result?.status === 'error') {
           setError(result.error);
           setFollow(null);
+        } else if (!controller.signal.aborted && result?.status === 'success') {
+          loadProducts(controller.signal);
         }
       })
       .finally(() => {
@@ -78,7 +108,7 @@ export default function FollowDetail() {
       });
 
     return () => controller.abort();
-  }, [followDetailId, loadFollow]);
+  }, [followDetailId, loadFollow, loadProducts]);
 
   // Handle markup update
   const handleUpdateMarkup = useCallback(
@@ -133,6 +163,50 @@ export default function FollowDetail() {
       triggerHaptic('error');
     }
   }, [followDetailId, deleteFollow, triggerHaptic]);
+
+  // Handle product click for individual markup
+  const handleProductClick = useCallback((product) => {
+    triggerHaptic('light');
+    setSelectedProduct(product);
+    setIsProductMarkupModalOpen(true);
+  }, [triggerHaptic]);
+
+  // Handle update product markup
+  const handleUpdateProductMarkup = useCallback(
+    async (markupData) => {
+      if (!followDetailId || !selectedProduct) return;
+
+      triggerHaptic('medium');
+      try {
+        const productId = selectedProduct.synced_product?.id || selectedProduct.id;
+        await updateProductMarkup(followDetailId, productId, markupData);
+        triggerHaptic('success');
+        // Reload products to see updated price
+        loadProducts();
+      } catch (err) {
+        console.error('[FollowDetail] Error updating product markup:', err);
+        triggerHaptic('error');
+      }
+    },
+    [followDetailId, selectedProduct, updateProductMarkup, triggerHaptic, loadProducts]
+  );
+
+  // Handle reset product markup
+  const handleResetProductMarkup = useCallback(async () => {
+    if (!followDetailId || !selectedProduct) return;
+
+    triggerHaptic('medium');
+    try {
+      const productId = selectedProduct.synced_product?.id || selectedProduct.id;
+      await resetProductMarkup(followDetailId, productId);
+      triggerHaptic('success');
+      // Reload products to see updated price
+      loadProducts();
+    } catch (err) {
+      console.error('[FollowDetail] Error resetting product markup:', err);
+      triggerHaptic('error');
+    }
+  }, [followDetailId, selectedProduct, resetProductMarkup, triggerHaptic, loadProducts]);
 
   // Get display values
   const shopName = follow?.source_shop_name || follow?.shop_name || 'Loading...';
@@ -246,6 +320,80 @@ export default function FollowDetail() {
                 }}
               />
             </motion.div>
+
+            {/* Products Section */}
+            {follow.mode === 'resell' && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.15 }}
+                className="mt-6"
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-white font-bold text-lg">Товары</h3>
+                  <span className="text-white/40 text-sm">{products.length} шт</span>
+                </div>
+
+                {productsLoading ? (
+                  <div className="flex justify-center py-8">
+                    <div className="w-6 h-6 border-2 border-[#FF6B00] border-t-transparent rounded-full animate-spin" />
+                  </div>
+                ) : products.length === 0 ? (
+                  <div className="bg-white/5 rounded-2xl p-6 text-center border border-white/5">
+                    <div className="text-white/30 text-sm">Нет синхронизированных товаров</div>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {products.map((product) => (
+                      <motion.div
+                        key={product.id}
+                        onClick={() => handleProductClick(product)}
+                        className="bg-white/5 rounded-2xl p-4 border border-white/5 hover:bg-white/[0.07] transition-colors cursor-pointer active:scale-[0.98]"
+                        whileTap={{ scale: 0.98 }}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1 min-w-0 mr-4">
+                            <div className="flex items-center gap-2">
+                              <h4 className="text-white font-medium text-sm truncate">
+                                {product.synced_product?.name || product.source_product?.name || product.name}
+                              </h4>
+                              {product.pricing?.has_custom_markup && (
+                                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-[#FF6B00]/20 text-[#FF6B00] flex-shrink-0">
+                                  Custom
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className="text-white/40 text-xs line-through">
+                                ${product.source_product?.price || product.original_price || product.price}
+                              </span>
+                              <span className="text-[#FF6B00] text-xs">→</span>
+                              <span className="text-[#2ECC71] font-bold text-sm">
+                                ${product.synced_product?.price || product.price}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {(product.synced_product?.stock_quantity ?? product.stock_quantity) > 0 ? (
+                              <span className="px-2 py-1 rounded-full text-[10px] font-medium bg-[#2ECC71]/10 text-[#2ECC71] border border-[#2ECC71]/20">
+                                {product.synced_product?.stock_quantity ?? product.stock_quantity} шт
+                              </span>
+                            ) : (
+                              <span className="px-2 py-1 rounded-full text-[10px] font-medium bg-red-500/10 text-red-400 border border-red-500/20">
+                                Нет в наличии
+                              </span>
+                            )}
+                            <svg className="w-4 h-4 text-white/30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                          </div>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                )}
+              </motion.div>
+            )}
           </>
         ) : null}
       </div>
@@ -283,6 +431,22 @@ export default function FollowDetail() {
         confirmText="Delete"
         cancelText="Cancel"
         danger
+      />
+
+      <ProductMarkupModal
+        isOpen={isProductMarkupModalOpen}
+        onClose={() => {
+          setIsProductMarkupModalOpen(false);
+          setSelectedProduct(null);
+        }}
+        onConfirm={handleUpdateProductMarkup}
+        onReset={handleResetProductMarkup}
+        product={selectedProduct}
+        globalMarkup={{
+          type: markupType,
+          percentage: markupPercentage,
+          fixed: markupFixed,
+        }}
       />
     </div>
   );
