@@ -176,12 +176,27 @@ const handleRoleToggle = async (ctx) => {
   try {
     await ctx.answerCbQuery();
 
-    // Build role selection keyboard - ALWAYS show all 3 options
+    // Check if user is a worker in any shop
+    let isWorker = false;
+    if (ctx.session.token) {
+      try {
+        const workerShops = await shopApi.getWorkerShops(ctx.session.token);
+        isWorker = Array.isArray(workerShops) && workerShops.length > 0;
+      } catch {
+        // Silently ignore - just don't show worker option
+      }
+    }
+
+    // Build role selection keyboard
     const buttons = [
       [Markup.button.callback('\u{1F6D2} Покупаю', 'role:buyer')],
       [Markup.button.callback('\u{1F3EA} Продаю', 'role:seller')],
-      [Markup.button.callback('\u{1F477} Сотрудник', 'role:worker')],
     ];
+
+    // Only show worker option if user is actually a worker
+    if (isWorker) {
+      buttons.push([Markup.button.callback('\u{1F477} Сотрудник', 'role:worker')]);
+    }
 
     await smartMessage.send(ctx, {
       text: 'Выберите роль:',

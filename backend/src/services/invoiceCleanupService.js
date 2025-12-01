@@ -39,41 +39,55 @@ export async function cleanupExpiredInvoices() {
       [invoiceIds]
     );
 
-    // Cancel associated orders (if any)
+    // Cancel associated orders (if any) - but NOT orders with submitted payment (tx_hash)
     const orderIds = expiredInvoices.filter((inv) => inv.order_id).map((inv) => inv.order_id);
+    let cancelledOrderIds = [];
 
     if (orderIds.length > 0) {
-      await client.query(
+      // Only cancel orders that have NO payment with tx_hash submitted
+      // Orders with tx_hash are awaiting blockchain confirmation and should NOT be cancelled
+      const cancelResult = await client.query(
         `
-        UPDATE orders
+        UPDATE orders o
         SET status = 'cancelled', updated_at = NOW()
-        WHERE id = ANY($1) AND status = 'pending'
+        WHERE o.id = ANY($1)
+        AND o.status = 'pending'
+        AND NOT EXISTS (
+          SELECT 1 FROM payments pay
+          WHERE pay.order_id = o.id
+          AND pay.tx_hash IS NOT NULL
+        )
+        RETURNING o.id
       `,
         [orderIds]
       );
 
-      // Release reserved stock
-      await client.query(
-        `
-        UPDATE products p
-        SET reserved_quantity = reserved_quantity - oi.quantity
-        FROM order_items oi
-        WHERE oi.product_id = p.id
-        AND oi.order_id = ANY($1)
-      `,
-        [orderIds]
-      );
+      // Release reserved stock only for actually cancelled orders
+      cancelledOrderIds = cancelResult.rows.map((r) => r.id);
+      if (cancelledOrderIds.length > 0) {
+        await client.query(
+          `
+          UPDATE products p
+          SET reserved_quantity = reserved_quantity - oi.quantity
+          FROM order_items oi
+          WHERE oi.product_id = p.id
+          AND oi.order_id = ANY($1)
+        `,
+          [cancelledOrderIds]
+        );
+      }
     }
 
     await client.query('COMMIT');
 
     logger.info(`[Invoice Cleanup] Cleaned ${expiredInvoices.length} expired invoices`, {
-      orders_cancelled: orderIds.length,
+      orders_cancelled: cancelledOrderIds.length,
+      orders_skipped_with_payment: orderIds.length - cancelledOrderIds.length,
     });
 
     return {
       cleaned: expiredInvoices.length,
-      orders_cancelled: orderIds.length,
+      orders_cancelled: cancelledOrderIds.length,
     };
   } catch (error) {
     await client.query('ROLLBACK');

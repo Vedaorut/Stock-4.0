@@ -4,16 +4,23 @@ import logger from '../utils/logger.js';
 
 /**
  * Auto-cancel unpaid orders after 20 minutes and free reserved stock
+ * IMPORTANT: Only cancels orders WITHOUT a submitted payment (tx_hash)
  */
 async function cancelUnpaidOrders() {
   try {
-    // Find orders pending for > 20 minutes
+    // Find orders pending for > 20 minutes that have NO payment with tx_hash
+    // Orders with submitted tx_hash should NOT be cancelled - they're awaiting blockchain confirmation
     const result = await query(
       `SELECT o.id, o.product_id, o.quantity, p.name as product_name
        FROM orders o
        JOIN products p ON o.product_id = p.id
        WHERE o.status = 'pending'
-       AND o.created_at < NOW() - INTERVAL '20 minutes'`
+       AND o.created_at < NOW() - INTERVAL '20 minutes'
+       AND NOT EXISTS (
+         SELECT 1 FROM payments pay
+         WHERE pay.order_id = o.id
+         AND pay.tx_hash IS NOT NULL
+       )`
     );
 
     const orders = result.rows;

@@ -1,6 +1,7 @@
 import { orderQueries, shopQueries } from '../../../database/queries/index.js';
 import { asyncHandler } from '../../../middleware/errorHandler.js';
 import logger from '../../../utils/logger.js';
+import cryptoPriceService from '../../../services/cryptoPriceService.js';
 import {
   ConflictError,
   NotFoundError,
@@ -25,6 +26,15 @@ export const getPaymentInfo = asyncHandler(async (req, res) => {
     throw new NotFoundError('Order');
   }
 
+  // DEBUG: Log available wallets from order data
+  logger.info('[getPaymentInfo] Order wallets:', {
+    orderId: id,
+    wallet_btc: !!orderData.wallet_btc,
+    wallet_eth: !!orderData.wallet_eth,
+    wallet_usdt: !!orderData.wallet_usdt,
+    wallet_ltc: !!orderData.wallet_ltc,
+  });
+
   if (orderData.buyer_id !== userId) {
     throw new UnauthorizedError('Only buyer can view payment info');
   }
@@ -34,6 +44,15 @@ export const getPaymentInfo = asyncHandler(async (req, res) => {
   }
 
   const walletMap = buildWalletMap(orderData);
+
+  // DEBUG: Log wallet map and requested currency
+  logger.info('[getPaymentInfo] Wallet map built:', {
+    orderId: id,
+    requestedCurrency: currencyUpper,
+    availableCurrencies: Object.keys(walletMap).filter(k => walletMap[k]),
+    walletMap,
+  });
+
   const walletAddress = walletMap[currencyUpper];
   if (!walletAddress) {
     const available = Object.entries(walletMap)
@@ -45,12 +64,31 @@ export const getPaymentInfo = asyncHandler(async (req, res) => {
     );
   }
 
-  const { cryptoPriceService } = await import('../../../services/cryptoPriceService.js');
-  const priceChain = currencyUpper === 'USDT_TRC20' ? 'USDT' : currencyUpper;
-  const { cryptoAmount, usdRate } = await cryptoPriceService.convertAndRound(
-    parseFloat(orderData.total_price),
-    priceChain
-  );
+  // Fetch crypto price with proper error handling
+  // ВАЖНО: cryptoPriceService использует USDT_TRC20 как ключ, НЕ конвертируем в USDT
+  const priceChain = currencyUpper;
+
+  let cryptoAmount, usdRate;
+  try {
+    const priceResult = await cryptoPriceService.convertAndRound(
+      parseFloat(orderData.total_price),
+      priceChain
+    );
+    cryptoAmount = priceResult.cryptoAmount;
+    usdRate = priceResult.usdRate;
+  } catch (priceError) {
+    logger.error('[getPaymentInfo] Crypto price fetch failed', {
+      orderId: id,
+      currency: currencyUpper,
+      priceChain,
+      error: priceError.message,
+      stack: priceError.stack,
+    });
+    // Return user-friendly error with specific code for frontend
+    throw new ValidationError(
+      `price_service_error: Unable to get ${currencyUpper} exchange rate. Please try again.`
+    );
+  }
 
   await orderQueries.setCryptoPayment(id, {
     cryptoAmount,

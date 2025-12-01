@@ -18,10 +18,15 @@ const formatPrice = (value) => {
 };
 
 const ensureShopSession = (ctx) => {
-  const shopId = ctx.session.currentShopId ?? ctx.session.shopId ?? null;
+  // PRIORITY: Use shopId (current shop from session/recovery)
+  // currentShopId may be stale from old session
+  const shopId = ctx.session.shopId ?? ctx.session.currentShopId ?? null;
+
+  // Sync currentShopId with shopId to prevent stale values
   if (shopId && ctx.session.currentShopId !== shopId) {
     ctx.session.currentShopId = shopId;
   }
+
   return shopId;
 };
 

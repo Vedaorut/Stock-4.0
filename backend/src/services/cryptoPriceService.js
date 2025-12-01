@@ -19,6 +19,8 @@ import {
 // CoinGecko API configuration
 const COINGECKO_API_URL = 'https://api.coingecko.com/api/v3/simple/price';
 const PRICE_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const MAX_RETRIES = 2;
+const INITIAL_RETRY_DELAY = 1000; // 1 second
 
 // Mapping: chain → CoinGecko coin ID
 const COINGECKO_IDS = {
@@ -39,6 +41,54 @@ const CRYPTO_DECIMALS = {
 // Price cache (in-memory)
 const priceCache = {};
 let lastFetchTime = 0;
+
+/**
+ * Sleep utility for retry delays
+ * @param {number} ms - Milliseconds to sleep
+ */
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Fetch prices from CoinGecko with retry logic
+ * @param {number} retryCount - Current retry attempt
+ * @returns {Promise<object>} API response data
+ */
+async function fetchPricesWithRetry(retryCount = 0) {
+  const coinIds = Object.values(COINGECKO_IDS)
+    .filter((value, index, self) => self.indexOf(value) === index)
+    .join(',');
+
+  try {
+    const response = await axios.get(COINGECKO_API_URL, {
+      params: {
+        ids: coinIds,
+        vs_currencies: 'usd',
+      },
+      timeout: 10000,
+    });
+    return response.data;
+  } catch (error) {
+    // Handle rate limiting (429)
+    if (error.response?.status === 429) {
+      logger.warn('[CryptoPriceService] Rate limited by CoinGecko (429)');
+
+      // Retry with exponential backoff if retries remaining
+      if (retryCount < MAX_RETRIES) {
+        const delay = INITIAL_RETRY_DELAY * Math.pow(2, retryCount);
+        logger.info(`[CryptoPriceService] Retrying in ${delay}ms (attempt ${retryCount + 1}/${MAX_RETRIES})`);
+        await sleep(delay);
+        return fetchPricesWithRetry(retryCount + 1);
+      }
+
+      // No retries left, throw with specific message
+      const rateLimitError = new Error('Rate limited by CoinGecko');
+      rateLimitError.isRateLimit = true;
+      throw rateLimitError;
+    }
+
+    throw error;
+  }
+}
 
 /**
  * Get current cryptocurrency price in USD
@@ -64,21 +114,11 @@ export async function getCryptoPrice(chain) {
     // Fetch fresh prices from CoinGecko
     logger.info('[CryptoPriceService] Fetching fresh prices from CoinGecko...');
 
-    const coinIds = Object.values(COINGECKO_IDS)
-      .filter((value, index, self) => self.indexOf(value) === index) // Unique IDs only
-      .join(',');
-
-    const response = await axios.get(COINGECKO_API_URL, {
-      params: {
-        ids: coinIds,
-        vs_currencies: 'usd',
-      },
-      timeout: 10000, // 10 second timeout
-    });
+    const data = await fetchPricesWithRetry();
 
     // Update cache with all fetched prices
     for (const [chainName, coinId] of Object.entries(COINGECKO_IDS)) {
-      const price = response.data[coinId]?.usd;
+      const price = data[coinId]?.usd;
       if (price) {
         priceCache[chainName] = price;
       }
@@ -96,6 +136,14 @@ export async function getCryptoPrice(chain) {
 
     return price;
   } catch (error) {
+    // Special handling for rate limit - use stale cache as fallback
+    if (error.isRateLimit && priceCache[chain]) {
+      logger.warn(
+        `[CryptoPriceService] Rate limited, using stale cached price for ${chain}: $${priceCache[chain]}`
+      );
+      return priceCache[chain];
+    }
+
     logger.error('[CryptoPriceService] Failed to fetch crypto price:', {
       chain,
       error: error.message,

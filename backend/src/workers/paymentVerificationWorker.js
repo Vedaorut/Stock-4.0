@@ -31,7 +31,7 @@ export function startPaymentVerificationWorker() {
   logger.info(`  - Poll interval: ${POLL_INTERVAL / 1000} seconds`);
   logger.info(`  - Max payment age: ${MAX_AGE_HOURS} hours`);
   logger.info(`  - Batch size: ${BATCH_SIZE} payments`);
-  
+
   // Run immediately on start
   processPendingPayments().catch((err) => {
     logger.error('[PaymentWorker] Initial run failed:', err);
@@ -62,13 +62,21 @@ export function stopPaymentVerificationWorker() {
  * Process all pending payments
  * Uses Atomic Claim Pattern to prevent race conditions
  */
+/**
+ * Process all pending payments
+ * Uses Atomic Claim Pattern to prevent race conditions
+ * Implements Smart Polling to respect API rate limits
+ */
 async function processPendingPayments() {
   const client = await getClient();
-  
+
   try {
     // 1. Atomically claim AND mark payments as 'processing'
+    // OPTIMIZATION: Added last_checked_at filters to prevent API rate limit exhaustion
+    // BTC/LTC: Check every 10 minutes (matches block time + saves API calls)
+    // ETH/USDT: Check every 2 minutes (faster blocks)
     await client.query('BEGIN');
-    
+
     const pendingResult = await client.query(
       `UPDATE payments p
        SET status = 'processing', updated_at = NOW()
@@ -80,6 +88,11 @@ async function processPendingPayments() {
            AND p2.subscription_id IS NULL
            AND o.status = 'pending'
            AND p2.created_at > NOW() - INTERVAL '${MAX_AGE_HOURS} hours'
+           AND (
+             p2.last_checked_at IS NULL 
+             OR (p2.currency IN ('BTC', 'LTC') AND p2.last_checked_at < NOW() - INTERVAL '10 minutes')
+             OR (p2.currency NOT IN ('BTC', 'LTC') AND p2.last_checked_at < NOW() - INTERVAL '2 minutes')
+           )
          ORDER BY p2.created_at ASC
          LIMIT ${BATCH_SIZE}
          FOR UPDATE OF p2 SKIP LOCKED
@@ -89,23 +102,24 @@ async function processPendingPayments() {
                  p.recipient_address, p.expected_crypto_amount,
                  p.blockchain_confirmations`
     );
-    
+
     await client.query('COMMIT');
-    
+
     const pendingPayments = pendingResult.rows;
-    
+
     if (pendingPayments.length === 0) {
+      // No payments need checking right now
       return;
     }
-    
-    logger.info(`[PaymentWorker] Processing ${pendingPayments.length} pending payments`);
-    
+
+    logger.info(`[PaymentWorker] Processing ${pendingPayments.length} pending payments (Smart Polling)`);
+
     // 2. Process OUTSIDE transaction - each payment separately
     for (const payment of pendingPayments) {
       try {
         await verifyAndProcessPaymentSafe(payment);
         // Small delay to avoid rate limiting
-        await sleep(500);
+        await sleep(1000); // Increased to 1s for safety
       } catch (error) {
         // Revert status to pending on error
         await query(
@@ -117,9 +131,9 @@ async function processPendingPayments() {
         });
       }
     }
-    
+
   } catch (error) {
-    await client.query('ROLLBACK').catch(() => {});
+    await client.query('ROLLBACK').catch(() => { });
     throw error;
   } finally {
     client.release();
@@ -130,21 +144,21 @@ async function processPendingPayments() {
  * Verify single payment and update status (safe - no client parameter)
  */
 async function verifyAndProcessPaymentSafe(payment) {
-  const { 
-    id: paymentId, 
-    order_id: orderId, 
-    tx_hash: txHash, 
+  const {
+    id: paymentId,
+    order_id: orderId,
+    tx_hash: txHash,
     currency,
     recipient_address: recipientAddress,
     expected_crypto_amount: expectedAmount
   } = payment;
-  
+
   logger.debug(`[PaymentWorker] Verifying payment ${paymentId}`, {
     orderId,
     txHash: txHash.substring(0, 20) + '...',
     currency
   });
-  
+
   // Call blockchain verification service
   const result = await blockchainVerificationService.verifyPayment(
     txHash,
@@ -152,13 +166,13 @@ async function verifyAndProcessPaymentSafe(payment) {
     recipientAddress,
     parseFloat(expectedAmount)
   );
-  
+
   logger.debug(`[PaymentWorker] Verification result for ${paymentId}:`, {
     verified: result.verified,
     status: result.status,
     confirmations: result.confirmations
   });
-  
+
   // Update confirmations (simple query, no transaction needed)
   await query(
     `UPDATE payments 
@@ -166,13 +180,13 @@ async function verifyAndProcessPaymentSafe(payment) {
      WHERE id = $2`,
     [result.confirmations || 0, paymentId]
   );
-  
+
   // If verified - confirm order
   if (result.verified) {
     await confirmOrderPayment(orderId, paymentId, result);
     return;
   }
-  
+
   // If failed - mark payment as failed
   if (result.status === 'failed' && result.error) {
     await query(
@@ -203,10 +217,10 @@ async function verifyAndProcessPaymentSafe(payment) {
  */
 async function confirmOrderPayment(orderId, paymentId, verificationResult) {
   const client = await getClient();
-  
+
   try {
     await client.query('BEGIN');
-    
+
     // 1. Lock order
     const orderResult = await client.query(
       `SELECT o.*, oi.product_id, oi.quantity
@@ -216,7 +230,7 @@ async function confirmOrderPayment(orderId, paymentId, verificationResult) {
        FOR UPDATE OF o`,
       [orderId]
     );
-    
+
     const order = orderResult.rows[0];
     if (!order || order.status !== 'pending') {
       await client.query('ROLLBACK');
@@ -246,7 +260,7 @@ async function confirmOrderPayment(orderId, paymentId, verificationResult) {
       }
       return;
     }
-    
+
     // 2. Deduct stock for all items
     const itemsResult = await client.query(
       `SELECT oi.product_id, oi.quantity, p.stock_quantity, p.is_preorder
@@ -256,14 +270,14 @@ async function confirmOrderPayment(orderId, paymentId, verificationResult) {
        FOR UPDATE OF p`,
       [orderId]
     );
-    
+
     for (const item of itemsResult.rows) {
       if (!item.is_preorder) {
         if (item.stock_quantity < item.quantity) {
           // Insufficient stock - still confirm but log warning
           logger.warn(`[PaymentWorker] Insufficient stock for product ${item.product_id}`);
         }
-        
+
         await client.query(
           `UPDATE products 
            SET stock_quantity = GREATEST(0, stock_quantity - $1), updated_at = NOW()
@@ -272,7 +286,7 @@ async function confirmOrderPayment(orderId, paymentId, verificationResult) {
         );
       }
     }
-    
+
     // 3. Update order status
     await client.query(
       `UPDATE orders 
@@ -282,7 +296,7 @@ async function confirmOrderPayment(orderId, paymentId, verificationResult) {
        WHERE id = $1`,
       [orderId]
     );
-    
+
     // 4. Update payment status
     await client.query(
       `UPDATE payments 
@@ -292,20 +306,20 @@ async function confirmOrderPayment(orderId, paymentId, verificationResult) {
        WHERE id = $1`,
       [paymentId]
     );
-    
+
     await client.query('COMMIT');
-    
+
     logger.info(`[PaymentWorker] Order ${orderId} confirmed`, {
       paymentId,
       txHash: verificationResult.txHash,
       confirmations: verificationResult.confirmations
     });
-    
+
     // 5. Notify seller (async, outside transaction)
     notifySellerPaymentReceived(orderId).catch(err => {
       logger.error('[PaymentWorker] Notification error:', err);
     });
-    
+
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;
@@ -320,39 +334,84 @@ async function confirmOrderPayment(orderId, paymentId, verificationResult) {
 async function notifySellerPaymentReceived(orderId) {
   try {
     const result = await query(
-      `SELECT o.id as order_id, o.total_price, o.currency,
-              p.name as product_name,
-              u.telegram_id as seller_telegram_id,
-              buyer.telegram_id as buyer_telegram_id
+      `SELECT
+         o.id as order_id,
+         o.total_price,
+         o.currency,
+         o.buyer_contact,
+         p.name as product_name,
+         oi.quantity,
+         pay.currency as crypto_currency,
+         pay.expected_crypto_amount,
+         u.telegram_id as seller_telegram_id,
+         u.username as seller_username,
+         u.first_name as seller_first_name,
+         buyer.telegram_id as buyer_telegram_id,
+         buyer.username as buyer_username,
+         buyer.first_name as buyer_first_name,
+         s.name as shop_name
        FROM orders o
        JOIN order_items oi ON o.id = oi.order_id
        JOIN products p ON oi.product_id = p.id
        JOIN shops s ON p.shop_id = s.id
        JOIN users u ON s.owner_id = u.id
        LEFT JOIN users buyer ON o.buyer_id = buyer.id
+       LEFT JOIN payments pay ON pay.order_id = o.id AND pay.status = 'confirmed'
        WHERE o.id = $1
        LIMIT 1`,
       [orderId]
     );
-    
-    if (result.rows.length === 0) {return;}
-    
+
+    if (result.rows.length === 0) { return; }
+
     const order = result.rows[0];
-    
+
     // Notify seller
     if (order.seller_telegram_id) {
-      const message = `💰 Получен платёж!\n\nЗаказ #${order.order_id}\n📦 ${order.product_name}\n💵 ${order.total_price} ${order.currency}\n\nСтатус: ✅ Подтверждён`;
-      
-      await telegramService.sendMessage(order.seller_telegram_id, message);
+      const buyerContact = order.buyer_username
+        ? `@${order.buyer_username}`
+        : order.buyer_first_name || 'Покупатель';
+
+      const sellerMessage = [
+        '💰 *Получен платёж!*',
+        '',
+        `🧾 Заказ #${order.order_id}`,
+        `📦 ${order.product_name} × ${order.quantity || 1}`,
+        `💵 ${order.total_price} ${order.currency}`,
+        `💎 ${order.expected_crypto_amount} ${order.crypto_currency}`,
+        '',
+        `👤 Покупатель: ${buyerContact}`,
+        order.buyer_contact ? `📞 ${order.buyer_contact}` : null,
+      ].filter(Boolean).join('\n');
+
+      await telegramService.sendMessage(order.seller_telegram_id, sellerMessage, {
+        parse_mode: 'Markdown'
+      });
     }
-    
+
     // Notify buyer
     if (order.buyer_telegram_id) {
-      const message = `✅ Платёж подтверждён!\n\nЗаказ #${order.order_id}\n📦 ${order.product_name}\n\nПродавец уведомлён о вашем заказе.`;
-      
-      await telegramService.sendMessage(order.buyer_telegram_id, message);
+      const sellerContact = order.seller_username
+        ? `@${order.seller_username}`
+        : order.seller_first_name || 'Продавец';
+
+      const buyerMessage = [
+        '✅ *Платёж подтверждён!*',
+        '',
+        `🧾 Заказ #${order.order_id}`,
+        `📦 ${order.product_name}`,
+        `💵 ${order.total_price} ${order.currency}`,
+        `💎 ${order.expected_crypto_amount} ${order.crypto_currency}`,
+        '',
+        `🏪 Магазин: ${order.shop_name}`,
+        `👤 Продавец: ${sellerContact}`,
+      ].join('\n');
+
+      await telegramService.sendMessage(order.buyer_telegram_id, buyerMessage, {
+        parse_mode: 'Markdown'
+      });
     }
-    
+
   } catch (error) {
     logger.error('[PaymentWorker] notifySellerPaymentReceived error:', error);
   }
