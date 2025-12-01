@@ -49,6 +49,7 @@ const migrateChannelScene = new Scenes.WizardScene(
   },
   async (ctx) => {
     if (!ctx.callbackQuery) {
+      await ctx.reply('Пожалуйста, используйте кнопки для подтверждения миграции.');
       return;
     }
 
@@ -164,6 +165,7 @@ const migrateChannelScene = new Scenes.WizardScene(
   },
   async (ctx) => {
     if (!ctx.callbackQuery) {
+      await ctx.reply('Пожалуйста, используйте кнопки для отправки уведомлений.');
       return;
     }
 
@@ -233,5 +235,14 @@ const migrateChannelScene = new Scenes.WizardScene(
     return ctx.scene.leave();
   }
 );
+
+migrateChannelScene.leave(async (ctx) => {
+  // Clear wizard state to prevent memory leak
+  if (ctx.wizard) {
+    delete ctx.wizard.state;
+  }
+  ctx.scene.state = {};
+  logger.info(`User ${ctx.from?.id} left migrateChannel scene`);
+});
 
 export default migrateChannelScene;

@@ -6,6 +6,7 @@ import logger from '../../../utils/logger.js';
 import { validateStatusUpdate } from '../../../validators/orderValidator.js';
 import { NotFoundError, UnauthorizedError, ValidationError } from '../../../utils/errors.js';
 import { updateOrderStatusWithStockLogic } from '../../../services/orderService.js';
+import { broadcast } from '../../../utils/websocket.js';
 
 /**
  * Update order status
@@ -43,6 +44,13 @@ export const updateStatus = asyncHandler(async (req, res) => {
     await client.query('COMMIT');
 
     const updatedOrder = await orderQueries.findById(id);
+
+    // Emit WebSocket event for real-time updates
+    broadcast('order_status', {
+      orderId: updatedOrder.id,
+      status: updatedOrder.status,
+      shopId: order.shop_id,
+    });
 
     try {
       await telegramService.notifyOrderStatusUpdate(order.buyer_telegram_id, {

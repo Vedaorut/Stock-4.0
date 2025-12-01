@@ -150,6 +150,7 @@ const paySubscriptionScene = new Scenes.WizardScene(
   // Step 2: Handle tier selection and show crypto options
   async (ctx) => {
     if (!ctx.callbackQuery) {
+      await ctx.reply('Пожалуйста, используйте кнопки для выбора тарифа.');
       return;
     }
 
@@ -200,6 +201,7 @@ const paySubscriptionScene = new Scenes.WizardScene(
   // Step 3: Handle payment method selection and create CrystalPay invoice
   async (ctx) => {
     if (!ctx.callbackQuery) {
+      await ctx.reply('Пожалуйста, используйте кнопки для выбора способа оплаты.');
       return;
     }
 
@@ -324,6 +326,7 @@ const paySubscriptionScene = new Scenes.WizardScene(
   // Step 4: Handle payment status check via CrystalPay
   async (ctx) => {
     if (!ctx.callbackQuery) {
+      await ctx.reply('Пожалуйста, используйте кнопки для проверки статуса оплаты.');
       return;
     }
 

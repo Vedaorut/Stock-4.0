@@ -5,7 +5,7 @@ import config from './config/index.js';
 import logger from './utils/logger.js';
 import { reply as cleanReply } from './utils/cleanReply.js';
 import { logWebAppConfig, getWebAppUrl } from './utils/webappUrl.js';
-import { messages, buttons as buttonText } from './texts/messages.js';
+import { messages } from './texts/messages.js';
 const { general: generalMessages } = messages;
 
 // Middleware
@@ -197,13 +197,23 @@ export async function startBot() {
     // Log WebApp configuration before launch
     logWebAppConfig();
 
-    // Automatically set Menu Button with WebApp URL BEFORE launch
+    // Set bot commands for menu
+    try {
+      await bot.telegram.setMyCommands([
+        { command: 'start', description: 'Главное меню' },
+      ]);
+      logger.info('Bot commands configured');
+    } catch (cmdError) {
+      logger.warn('Failed to set bot commands:', cmdError.message);
+    }
+
+    // Set Menu Button with WebApp
     try {
       const webappUrl = getWebAppUrl();
       await bot.telegram.setChatMenuButton({
         menu_button: {
           type: 'web_app',
-          text: buttonText.myShop,
+          text: 'Меню',
           web_app: { url: webappUrl },
         },
       });

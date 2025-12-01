@@ -5,6 +5,7 @@ import logger from '../utils/logger.js';
 import { activatePromoSubscription } from '../services/subscriptionService.js';
 import { validateAddress } from '../utils/addressValidation.js';
 import * as promoCodeQueries from '../../database/queries/promoCodeQueries.js';
+import { broadcast } from '../utils/websocket.js';
 
 /**
  * Shop Controller
@@ -237,8 +238,16 @@ export const shopController = {
       // SECURITY: Filter sensitive data if not owner
       const isOwner = req.user && req.user.id === shop.owner_id;
 
+      // Build list of available crypto currencies for ALL users (owners and buyers)
+      const availableCryptos = [];
+      if (shop.wallet_btc) {availableCryptos.push('BTC');}
+      if (shop.wallet_eth) {availableCryptos.push('ETH');}
+      if (shop.wallet_usdt) {availableCryptos.push('USDT_TRC20');}
+      if (shop.wallet_ltc) {availableCryptos.push('LTC');}
+      shop.availableCryptos = availableCryptos;
+
       if (!isOwner) {
-        // Remove sensitive fields for non-owners
+        // Remove sensitive fields for non-owners (wallet addresses, subscription info)
         delete shop.wallet_btc;
         delete shop.wallet_eth;
         delete shop.wallet_usdt;
@@ -276,9 +285,19 @@ export const shopController = {
     try {
       const shops = await shopQueries.findByOwnerId(req.user.id);
 
+      // Add availableCryptos for each shop (owner can see which cryptos are configured)
+      const shopsWithCryptos = shops.map((shop) => {
+        const availableCryptos = [];
+        if (shop.wallet_btc) {availableCryptos.push('BTC');}
+        if (shop.wallet_eth) {availableCryptos.push('ETH');}
+        if (shop.wallet_usdt) {availableCryptos.push('USDT_TRC20');}
+        if (shop.wallet_ltc) {availableCryptos.push('LTC');}
+        return { ...shop, availableCryptos };
+      });
+
       return res.status(200).json({
         success: true,
-        data: shops,
+        data: shopsWithCryptos,
       });
     } catch (error) {
       if (error.code) {
@@ -329,6 +348,9 @@ export const shopController = {
         logo,
         isActive,
       });
+
+      // Emit WebSocket event for real-time updates
+      broadcast('shop_updated', { shopId: parseInt(id, 10) });
 
       return res.status(200).json({
         success: true,

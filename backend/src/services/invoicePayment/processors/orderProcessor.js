@@ -24,6 +24,7 @@ import { ORDER_STATES } from '../constants.js';
 import { ValidationError } from '../../../utils/errors.js';
 import logger from '../../../utils/logger.js';
 import * as blockchainVerificationService from '../../blockchainVerificationService.js';
+import { broadcast } from '../../../utils/websocket.js';
 
 /**
  * Process crypto payment for an order using invoice as single source of truth.
@@ -251,6 +252,13 @@ export async function processOrderPayment({
     await markInvoicePaid(client, invoice.id, verifyTxHash);
 
     await client.query('COMMIT');
+
+    // Emit WebSocket event for real-time UI updates
+    broadcast('order_status', {
+      orderId: order.id,
+      status: 'confirmed',
+      shopId: order.shop_id,
+    });
 
     // Notify about confirmed order (async, outside transaction)
     notifyOrderConfirmed(order.id).catch((err) => {

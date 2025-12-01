@@ -5,6 +5,7 @@ import telegramService from '../../../services/telegram.js';
 import logger from '../../../utils/logger.js';
 import { validateStatusTransition } from '../../../utils/orderStateValidator.js';
 import { respondWithDbError } from '../utils/errors.js';
+import { broadcast } from '../../../utils/websocket.js';
 
 /**
  * Bulk update order status
@@ -100,7 +101,15 @@ export const bulkUpdateStatus = async (req, res) => {
       };
     });
 
+    // Emit WebSocket events and send notifications for each updated order
     foundOrders.forEach(async (order) => {
+      // Emit WebSocket event for real-time UI updates
+      broadcast('order_status', {
+        orderId: order.id,
+        status,
+        shopId: order.shop_id,
+      });
+
       try {
         if (order.buyer_telegram_id) {
           await telegramService.notifyOrderStatusUpdate(order.buyer_telegram_id, {

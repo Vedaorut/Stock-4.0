@@ -4,6 +4,7 @@ import { NotFoundError, UnauthorizedError } from '../../../utils/errors.js';
 import logger from '../../../utils/logger.js';
 import { isAuthorizedToManageShop } from '../utils/authorization.js';
 import { respondWithDbError } from '../utils/errors.js';
+import { broadcast } from '../../../utils/websocket.js';
 
 /**
  * Create new product
@@ -36,6 +37,9 @@ export const create = asyncHandler(async (req, res) => {
       stockQuantity,
       isPreorder: is_preorder,
     });
+
+    // Emit WebSocket event for real-time updates
+    broadcast('product_added', { shopId, productId: product.id });
 
     return res.status(201).json({
       success: true,

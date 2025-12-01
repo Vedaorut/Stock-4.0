@@ -5,6 +5,7 @@ import logger from '../../../utils/logger.js';
 import { isAuthorizedToManageShop } from '../utils/authorization.js';
 import { respondWithDbError } from '../utils/errors.js';
 import { validateProductIds } from '../validators/payloadValidators.js';
+import { broadcast } from '../../../utils/websocket.js';
 
 /**
  * Delete product
@@ -33,7 +34,11 @@ export const deleteProduct = asyncHandler(async (req, res) => {
       );
     }
 
+    const shopId = existingProduct.shop_id;
     await productQueries.delete(id);
+
+    // Emit WebSocket event for real-time updates
+    broadcast('product_deleted', { shopId, productId: parseInt(id, 10) });
 
     return res.status(200).json({
       success: true,
@@ -69,6 +74,11 @@ export const bulkDeleteAll = asyncHandler(async (req, res) => {
     }
 
     const deletedProducts = await productQueries.bulkDeleteByShopId(shopId);
+
+    // Emit WebSocket event for each deleted product
+    deletedProducts.forEach(product => {
+      broadcast('product_deleted', { shopId, productId: product.id });
+    });
 
     return res.status(200).json({
       success: true,
@@ -111,6 +121,11 @@ export const bulkDeleteByIds = asyncHandler(async (req, res) => {
     }
 
     const deletedProducts = await productQueries.bulkDeleteByIds(productIds, shopId);
+
+    // Emit WebSocket event for each deleted product
+    deletedProducts.forEach(product => {
+      broadcast('product_deleted', { shopId, productId: product.id });
+    });
 
     return res.status(200).json({
       success: true,

@@ -215,6 +215,21 @@ const getSettingsSections = (t, lang, viewMode) => {
           ),
           value: languageNames[lang] || 'Русский',
         },
+        {
+          id: 'switch-mode',
+          label: viewMode === 'seller' ? 'Переключить на покупателя' : 'Переключить на продавца',
+          description: viewMode === 'seller' ? 'Режим покупок' : 'Управление магазином',
+          icon: (
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
+              />
+            </svg>
+          ),
+        },
       ],
     },
   ];
@@ -233,9 +248,11 @@ const getSettingsSections = (t, lang, viewMode) => {
 };
 
 export default function Settings() {
-  const { user, triggerHaptic } = useTelegram();
+  const { user, triggerHaptic, alert, showConfirm } = useTelegram();
   const { t, lang } = useTranslation();
   const viewMode = useStore((state) => state.viewMode);
+  const setViewMode = useStore((state) => state.setViewMode);
+  const { put } = useApi();
   const [showWallets, setShowWallets] = useState(false);
   const [showLanguage, setShowLanguage] = useState(false);
   const [showProducts, setShowProducts] = useState(false);
@@ -287,8 +304,38 @@ export default function Settings() {
       case 'shop-orders':
         setShowShopOrders(true);
         break;
+      case 'switch-mode':
+        handleSwitchMode();
+        break;
       default:
         break;
+    }
+  };
+
+  const handleSwitchMode = async () => {
+    const newMode = viewMode === 'seller' ? 'buyer' : 'seller';
+    const _title = newMode === 'seller' ? 'Стать продавцом?' : 'Стать покупателем?';
+    const message = newMode === 'seller'
+      ? 'Вы переключитесь в режим управления магазином.'
+      : 'Вы переключитесь в режим покупок.';
+
+    const confirmed = await showConfirm(message);
+
+    if (confirmed) {
+      try {
+        // Optimistic update
+        setViewMode(newMode);
+
+        // API update
+        await put('/auth/role', { role: newMode });
+
+        triggerHaptic('success');
+      } catch (error) {
+        // Revert on error
+        setViewMode(viewMode);
+        console.error('Failed to switch mode:', error);
+        alert('Не удалось переключить режим');
+      }
     }
   };
 
@@ -362,9 +409,8 @@ export default function Settings() {
                     <InteractiveListItem
                       key={item.id}
                       onClick={() => handleSettingClick(item.id)}
-                      className={`w-full flex items-center gap-4 text-left ${
-                        !isLast ? 'border-b border-white/5' : ''
-                      }`}
+                      className={`w-full flex items-center gap-4 text-left ${!isLast ? 'border-b border-white/5' : ''
+                        }`}
                       style={{
                         minHeight: '72px',
                         padding: '16px 18px',

@@ -61,7 +61,9 @@ export function useApi() {
           const response = await makeRequest(currentToken);
           return { data: response.data, error: null };
         } catch (err) {
-          if (import.meta.env.DEV) console.error(`API ${method} ${endpoint} error:`, err);
+          if (import.meta.env.DEV) {
+            console.error(`API ${method} ${endpoint} error:`, err);
+          }
 
           // Handle axios native timeout
           if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
@@ -87,7 +89,9 @@ export function useApi() {
               const retryResponse = await makeRequest(newToken);
               return { data: retryResponse.data, error: null };
             } catch (refreshError) {
-              console.error('[useApi] Token refresh failed:', refreshError);
+              if (import.meta.env.DEV) {
+                console.error('[useApi] Token refresh failed:', refreshError);
+              }
               // Token refresh failed - return original 401 error
               return { data: null, error: 'Session expired. Please restart the app.' };
             }
@@ -210,9 +214,9 @@ export function useShopApi() {
         return await api.post('/orders', orderData);
       },
 
-      // Подтвердить оплату
+      // Подтвердить оплату (submit transaction hash)
       confirmPayment: async (orderId, paymentData) => {
-        return await api.post(`/orders/${orderId}/confirm`, paymentData);
+        return await api.post(`/orders/${orderId}/submit-payment`, paymentData);
       },
 
       // Получить заказы пользователя
@@ -247,7 +251,9 @@ export function useFollowsApi() {
         const response = await api.get(`/follows/${followId}`, { signal: options.signal });
         // api.get returns { data, error } - check for errors
         if (response.error) {
-          console.error('Error getting follow detail:', response.error);
+          if (import.meta.env.DEV) {
+            console.error('Error getting follow detail:', response.error);
+          }
           return { error: response.error };
         }
         return response;
@@ -261,7 +267,9 @@ export function useFollowsApi() {
         const response = await api.get(url, { signal });
         // api.get returns { data, error } - check for errors
         if (response.error) {
-          console.error('Error getting follow products:', response.error);
+          if (import.meta.env.DEV) {
+            console.error('Error getting follow products:', response.error);
+          }
           return { error: response.error };
         }
         return response;
@@ -281,7 +289,9 @@ export function useFollowsApi() {
           const response = await api.put(`/follows/${followId}/markup`, payload);
           return response.data;
         } catch (error) {
-          console.error('Error updating markup:', error);
+          if (import.meta.env.DEV) {
+            console.error('Error updating markup:', error);
+          }
           throw error;
         }
       },
@@ -308,7 +318,9 @@ export function useFollowsApi() {
           const response = await api.put(`/follows/${followId}/mode`, body);
           return response.data;
         } catch (error) {
-          console.error('Error switching mode:', error);
+          if (import.meta.env.DEV) {
+            console.error('Error switching mode:', error);
+          }
           throw error;
         }
       },
@@ -319,7 +331,9 @@ export function useFollowsApi() {
           await api.delete(`/follows/${followId}`);
           return { success: true };
         } catch (error) {
-          console.error('Error deleting follow:', error);
+          if (import.meta.env.DEV) {
+            console.error('Error deleting follow:', error);
+          }
           throw error;
         }
       },
@@ -335,7 +349,9 @@ export function useFollowsApi() {
           const response = await api.put(`/follows/${followId}/products/${productId}/markup`, payload);
           return response.data;
         } catch (error) {
-          console.error('Error updating product markup:', error);
+          if (import.meta.env.DEV) {
+            console.error('Error updating product markup:', error);
+          }
           throw error;
         }
       },
@@ -346,7 +362,9 @@ export function useFollowsApi() {
           const response = await api.delete(`/follows/${followId}/products/${productId}/markup`);
           return response.data;
         } catch (error) {
-          console.error('Error resetting product markup:', error);
+          if (import.meta.env.DEV) {
+            console.error('Error resetting product markup:', error);
+          }
           throw error;
         }
       },

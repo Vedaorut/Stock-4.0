@@ -36,6 +36,7 @@ import { notifySubscriptionActivated } from '../notifications/index.js';
 import { INVOICE_PURPOSES, INVOICE_STATES } from '../../../constants/invoice.js';
 import { ValidationError } from '../../../utils/errors.js';
 import logger from '../../../utils/logger.js';
+import { broadcast } from '../../../utils/websocket.js';
 
 /**
  * Process crypto payment for a shop subscription using invoice as single source of truth.
@@ -247,6 +248,14 @@ export async function processSubscriptionPayment({
     // CRITICAL: Notification OUTSIDE transaction
     if (finalizeResult.ok && finalizeResult.state === 'confirmed') {
       await notifySubscriptionActivated(subscriptionId);
+
+      // Emit WebSocket event for real-time UI updates
+      broadcast('subscription_payment_confirmed', {
+        subscriptionId,
+        userId: subscription.user_id,
+        shopId: subscription.shop_id,
+        tier: subscription.tier,
+      });
     }
 
     return finalizeResult;

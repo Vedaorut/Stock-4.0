@@ -151,6 +151,7 @@ const upgradeShopScene = new Scenes.WizardScene(
   // Step 2: Handle confirmation and show crypto options
   async (ctx) => {
     if (!ctx.callbackQuery) {
+      await ctx.reply('Пожалуйста, используйте кнопки для подтверждения.');
       return;
     }
 
@@ -193,6 +194,7 @@ const upgradeShopScene = new Scenes.WizardScene(
   // Step 3: Handle crypto selection and generate upgrade invoice
   async (ctx) => {
     if (!ctx.callbackQuery) {
+      await ctx.reply('Пожалуйста, используйте кнопки для выбора криптовалюты.');
       return;
     }
 
