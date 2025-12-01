@@ -1,4 +1,4 @@
-import { api, logger } from './config.js';
+import { api } from './config.js';
 
 export const shopApi = {
   // Get user's shop

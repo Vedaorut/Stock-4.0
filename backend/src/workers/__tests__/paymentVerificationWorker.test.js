@@ -44,6 +44,7 @@ jest.unstable_mockModule('../../utils/logger.js', () => ({
 
 // Import after mocks
 const {
+  // eslint-disable-next-line no-unused-vars
   startPaymentVerificationWorker,
   stopPaymentVerificationWorker,
   processPendingPayments,

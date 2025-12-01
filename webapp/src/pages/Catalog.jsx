@@ -9,7 +9,7 @@ import { useTelegram } from '../hooks/useTelegram';
 import { useBackButton } from '../hooks/useBackButton';
 import { useTranslation } from '../i18n/useTranslation';
 import { useApi } from '../hooks/useApi';
-import { normalizeProduct } from '../store/useStore';
+// normalizeProduct import removed - not used
 
 // Skeleton loader component
 function ProductCardSkeleton() {
@@ -98,7 +98,6 @@ export default function Catalog() {
     token,
     myShops,
     setMyShops,
-    viewMode
   } = useStore(
     useShallow((state) => ({
       products: state.products,
@@ -109,7 +108,6 @@ export default function Catalog() {
       token: state.token,
       myShops: state.myShops,
       setMyShops: state.setMyShops,
-      viewMode: state.viewMode,
     }))
   );
 

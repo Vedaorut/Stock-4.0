@@ -59,8 +59,8 @@ export function TelegramProvider({ children }) {
     try {
       const API_URL = getApiBaseUrl();
 
-      // Log once to help diagnose incorrect base URLs in production
-      if (!apiLoggedRef.current) {
+      // Log once to help diagnose incorrect base URLs (DEV only)
+      if (import.meta.env.DEV && !apiLoggedRef.current) {
         // eslint-disable-next-line no-console
         console.log('[TelegramProvider] Using API base URL:', API_URL);
         apiLoggedRef.current = true;
