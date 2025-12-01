@@ -181,11 +181,30 @@ describe('Follow Shop - Create/View/Delete Flow (P0)', () => {
 
     testBot.captor.reset();
 
-    // Step 8: Delete follow
+    // Step 8: Delete follow - now with confirmation dialog
+    mock.onGet('/follows/1').reply(200, {
+      data: {
+        id: 1,
+        source_shop_id: 777,
+        source_shop_name: 'SourceShop',
+        target_shop_id: 1,
+        mode: 'monitor',
+      },
+    });
     mock.onDelete('/follows/1').reply(200, { success: true });
     mock.onGet(/\/follows\/my/).reply(200, { data: [] }); // Empty list after delete
 
+    // Click delete → shows confirmation
     await testBot.handleUpdate(callbackUpdate('follow_delete:1'));
+    await new Promise((resolve) => setImmediate(resolve));
+
+    const confirmText = testBot.getLastReplyText();
+    expect(confirmText).toContain('Удалить подписку');
+
+    testBot.captor.reset();
+
+    // Confirm delete
+    await testBot.handleUpdate(callbackUpdate('confirm_delete_follow:1'));
     await new Promise((resolve) => setImmediate(resolve));
 
     // After delete, returns to empty follow list

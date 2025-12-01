@@ -66,11 +66,6 @@ export const shopResultsKeyboard = (shops) => {
     buttons.push([Markup.button.callback(`${shop.name}${suffix}`, `shop:view:${shop.id}`)]);
   }
 
-  // Show "and X more" if there are more results
-  if (shops.length > 10) {
-    buttons.push([Markup.button.callback(`… ещё ${shops.length - 10}`, 'noop:more')]);
-  }
-
   buttons.push([Markup.button.callback(buttonText.back, 'buyer:main')]);
 
   return Markup.inlineKeyboard(buttons);

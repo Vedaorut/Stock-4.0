@@ -4,6 +4,8 @@
  * User-friendly error messages for bot
  */
 
+import logger from './logger.js';
+
 /**
  * Format API error for user display
  * @param {Error} error - Error object
@@ -40,7 +42,7 @@ export async function handleApiCall(ctx, apiCall, errorPrefix = 'Ошибка') 
   try {
     return await apiCall();
   } catch (error) {
-    console.error(`${errorPrefix}:`, error);
+    logger.error(`${errorPrefix}:`, error);
     await ctx.reply(formatError(error));
     return null;
   }
@@ -56,7 +58,7 @@ export async function safeReply(ctx, message, extra = {}) {
   try {
     return await ctx.reply(message, extra);
   } catch (error) {
-    console.error('Failed to send message:', error);
+    logger.error('Failed to send message:', error);
   }
 }
 
@@ -70,7 +72,7 @@ export async function safeEdit(ctx, message, extra = {}) {
   try {
     return await ctx.editMessageText(message, extra);
   } catch (error) {
-    console.error('Failed to edit message:', error);
+    logger.error('Failed to edit message:', error);
     // Fallback to sending new message
     return await safeReply(ctx, message, extra);
   }
@@ -86,7 +88,7 @@ export async function safeAnswerCbQuery(ctx, text = null, showAlert = false) {
   try {
     return await ctx.answerCbQuery(text, showAlert);
   } catch (error) {
-    console.error('Failed to answer callback query:', error);
+    logger.error('Failed to answer callback query:', error);
   }
 }
 

@@ -20,7 +20,9 @@ class PaymentErrorBoundary extends React.Component {
   }
 
   componentDidCatch(error, errorInfo) {
-    console.error('[PaymentErrorBoundary] Error caught:', error, errorInfo);
+    if (import.meta.env.DEV) {
+      console.error('[PaymentErrorBoundary] Error caught:', error, errorInfo);
+    }
   }
 
   handleReset = () => {

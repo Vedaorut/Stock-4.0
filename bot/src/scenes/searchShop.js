@@ -88,9 +88,11 @@ const showResults = async (ctx) => {
       userId: ctx.from.id,
     });
 
-    // Show ALL results in ONE message
+    // Show results (limited to 10 for clean UI)
+    const moreInfo = shops.length > 10 ? `\n\n_Показаны первые 10 из ${shops.length}_` : '';
+
     await smartMessage.send(ctx, {
-      text: `${buyerMessages.searchResultsTitle(shops.length)}\n${shopList}`,
+      text: `${buyerMessages.searchResultsTitle(shops.length)}\n${shopList}${moreInfo}`,
       keyboard: shopResultsKeyboard(shops),
     });
 

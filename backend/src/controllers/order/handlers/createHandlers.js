@@ -22,7 +22,7 @@ export const create = asyncHandler(async (req, res) => {
 
   const client = await getClient();
   try {
-    await client.query('BEGIN ISOLATION LEVEL SERIALIZABLE');
+    await client.query('BEGIN ISOLATION LEVEL READ COMMITTED');
 
     const validatedData = await validateProductsForOrder(cartItems, client);
 

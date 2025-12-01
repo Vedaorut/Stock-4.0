@@ -92,20 +92,13 @@ export const getMyOrders = asyncHandler(async (req, res) => {
         statuses: statusFilter,
       });
     } else {
-      // Worker fallback: aggregate orders across worker shops
+      // Worker fallback: single query for all worker shops (N+1 fix)
       const shopIds = workerShops.map((s) => s.id);
-      const combined = [];
-      for (const id of shopIds) {
-        const shopOrders = await orderQueries.findByShopId(id, {
-          limit,
-          offset,
-          statuses: statusFilter,
-        });
-        combined.push(...shopOrders);
-      }
-      orders = combined
-        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-        .slice(offset, offset + limit);
+      orders = await orderQueries.findByShopIds(shopIds, {
+        limit,
+        offset,
+        statuses: statusFilter,
+      });
     }
   } else {
     orders = await orderQueries.findByBuyerId(req.user.id, limit, offset);

@@ -23,6 +23,41 @@ export function setupApiMocks(axiosInstance = axios) {
 
   mock.onGet('/api/auth/profile').reply(200, testUsers.seller);
 
+  // Internal auth endpoint (bot-to-backend authentication)
+  // Validates x-internal-secret, x-internal-timestamp, x-internal-signature headers
+  mock.onPost('/api/internal/auth/bot-register').reply((config) => {
+    const headers = config.headers || {};
+
+    // Validate required internal auth headers
+    if (!headers['x-internal-secret'] || !headers['x-internal-timestamp'] || !headers['x-internal-signature']) {
+      return [401, { error: 'Missing internal auth headers' }];
+    }
+
+    // Parse request body
+    let body;
+    try {
+      body = typeof config.data === 'string' ? JSON.parse(config.data) : config.data;
+    } catch {
+      return [400, { error: 'Invalid JSON body' }];
+    }
+
+    // Return successful auth response
+    return [
+      200,
+      {
+        token: testTokens.seller,
+        user: {
+          id: body.telegramId || 123456789,
+          telegram_id: body.telegramId || 123456789,
+          username: body.username || 'testuser',
+          first_name: body.firstName || 'Test',
+          last_name: body.lastName || 'User',
+          selected_role: 'buyer',
+        },
+      },
+    ];
+  });
+
   // Shops endpoints
   mock.onPost('/api/shops').reply(201, testShops.active);
   mock.onGet('/api/shops/my').reply(200, [testShops.active]);

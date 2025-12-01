@@ -4,14 +4,23 @@
  * Verifies cryptocurrency payments via public blockchain APIs.
  * Supports: Bitcoin (BTC), Litecoin (LTC), Ethereum (ETH), USDT TRC20.
  *
+ * API Providers:
+ * - BTC: Blockstream Esplora (free, no key required) - https://blockstream.info/api
+ * - LTC: BlockCypher (100 req/hour free) - https://api.blockcypher.com
+ * - ETH: Etherscan (5 req/sec, free) - requires ETHERSCAN_API_KEY
+ * - USDT TRC20: TronGrid (15 QPS, free) - optional TRONGRID_API_KEY
+ *
  * Features:
  * - Multi-chain verification with chain-specific min confirmations
  * - 2% amount tolerance for network fees
  * - Retry logic with exponential backoff for API failures
  * - Comprehensive error handling with descriptive messages
- * - Double-spend detection (Bitcoin/Litecoin)
  * - Transaction receipt validation (Ethereum)
  * - Smart contract event parsing (USDT TRC20)
+ *
+ * Env vars:
+ * - ETHERSCAN_API_KEY: API key for Etherscan (required for ETH)
+ * - TRONGRID_API_KEY: API key for TronGrid (optional)
  */
 
 import axios from 'axios';
@@ -19,11 +28,22 @@ import crypto from 'crypto';
 import logger from '../utils/logger.js';
 import { SUPPORTED_CURRENCIES } from '../utils/constants.js';
 
+/**
+ * Verification result status types
+ * Used to differentiate between error types for proper retry handling
+ */
+export const VERIFICATION_STATUS = {
+  SUCCESS: 'SUCCESS',           // Transaction verified successfully (may be pending or confirmed)
+  TX_NOT_FOUND: 'TX_NOT_FOUND', // Transaction doesn't exist on blockchain
+  TX_INVALID: 'TX_INVALID',     // Transaction exists but is invalid (wrong address, failed, etc.)
+  API_ERROR: 'API_ERROR',       // Network/API issues - caller should retry later
+};
+
 // API endpoints configuration
 const BLOCKCHAIN_CONFIG = {
   BTC: {
-    provider: 'blockcypher',
-    baseUrl: 'https://api.blockcypher.com/v1/btc/main',
+    provider: 'blockstream',
+    baseUrl: 'https://blockstream.info/api',
     minConfirmations: SUPPORTED_CURRENCIES.BTC.confirmations,
     decimals: SUPPORTED_CURRENCIES.BTC.decimals,
   },
@@ -62,15 +82,30 @@ const AMOUNT_TOLERANCE = 0.02;
 const API_TIMEOUT = 10000;
 
 /**
+ * Custom error class for API failures
+ * Allows callers to distinguish API errors from other errors
+ */
+class BlockchainAPIError extends Error {
+  constructor(message, statusCode = null) {
+    super(message);
+    this.name = 'BlockchainAPIError';
+    this.statusCode = statusCode;
+    this.isAPIError = true;
+  }
+}
+
+/**
  * Fetch data from API with retry logic
  *
  * @param {string} url - API endpoint URL
  * @param {object} options - Axios request options
  * @param {number} retries - Number of retry attempts (default: 3)
  * @returns {Promise<object>} API response data
- * @throws {Error} If all retries fail
+ * @throws {BlockchainAPIError} If all retries fail
  */
 async function fetchWithRetry(url, options = {}, retries = 3) {
+  let lastError = null;
+
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
       const response = await axios({
@@ -80,6 +115,7 @@ async function fetchWithRetry(url, options = {}, retries = 3) {
       });
       return response.data;
     } catch (error) {
+      lastError = error;
       const isLastAttempt = attempt === retries;
 
       // Log retry attempts
@@ -97,10 +133,15 @@ async function fetchWithRetry(url, options = {}, retries = 3) {
           error: error.message,
           response: error.response?.data,
         });
-        throw error;
       }
     }
   }
+
+  // Wrap in BlockchainAPIError for easy identification
+  throw new BlockchainAPIError(
+    `API request failed: ${lastError.message}`,
+    lastError.response?.status
+  );
 }
 
 /**
@@ -114,12 +155,19 @@ async function fetchWithRetry(url, options = {}, retries = 3) {
  *
  * Result format:
  * {
- *   verified: boolean,        // True if payment is valid and confirmed
+ *   verified: boolean,         // True if payment is valid and confirmed
  *   status: string,            // 'pending' | 'confirmed' | 'failed'
+ *   resultStatus: string,      // VERIFICATION_STATUS: SUCCESS | TX_NOT_FOUND | TX_INVALID | API_ERROR
  *   confirmations: number,     // Current number of confirmations
  *   amount: string,            // Actual amount received (as string to preserve precision)
  *   error?: string             // Error message if verification failed
  * }
+ *
+ * Caller should use resultStatus to determine retry strategy:
+ * - API_ERROR: Retry later (network/API issues)
+ * - TX_NOT_FOUND: Transaction doesn't exist (may appear later for new txs)
+ * - TX_INVALID: Don't retry (permanent failure - wrong address, failed tx, etc.)
+ * - SUCCESS: Transaction found and valid (check 'verified' for confirmation status)
  */
 export async function verifyPayment(txHash, chain, expectedAddress, expectedAmount) {
   try {
@@ -131,6 +179,7 @@ export async function verifyPayment(txHash, chain, expectedAddress, expectedAmou
       return {
         verified: false,
         status: 'failed',
+        resultStatus: VERIFICATION_STATUS.TX_INVALID,
         confirmations: 0,
         amount: '0',
         error: 'Invalid transaction hash',
@@ -141,6 +190,7 @@ export async function verifyPayment(txHash, chain, expectedAddress, expectedAmou
       return {
         verified: false,
         status: 'failed',
+        resultStatus: VERIFICATION_STATUS.TX_INVALID,
         confirmations: 0,
         amount: '0',
         error: `Unsupported chain: ${normalizedChain}`,
@@ -170,7 +220,14 @@ export async function verifyPayment(txHash, chain, expectedAddress, expectedAmou
         result = await verifyUSDTTRC20Payment(txHash, expectedAddress, expectedAmount);
         break;
       default:
-        throw new Error(`No verifier implemented for chain: ${chain}`);
+        return {
+          verified: false,
+          status: 'failed',
+          resultStatus: VERIFICATION_STATUS.TX_INVALID,
+          confirmations: 0,
+          amount: '0',
+          error: `No verifier implemented for chain: ${chain}`,
+        };
     }
 
     logger.info('[BlockchainVerification] Verification complete', {
@@ -185,12 +242,18 @@ export async function verifyPayment(txHash, chain, expectedAddress, expectedAmou
       txHash,
       chain,
       error: error.message,
+      isAPIError: error.isAPIError || false,
       stack: error.stack,
     });
+
+    // Distinguish API errors from other errors
+    const isAPIError = error.isAPIError || error.code === 'ECONNREFUSED' ||
+                       error.code === 'ETIMEDOUT' || error.code === 'ENOTFOUND';
 
     return {
       verified: false,
       status: 'failed',
+      resultStatus: isAPIError ? VERIFICATION_STATUS.API_ERROR : VERIFICATION_STATUS.TX_INVALID,
       confirmations: 0,
       amount: '0',
       error: `Verification failed: ${error.message}`,
@@ -199,7 +262,8 @@ export async function verifyPayment(txHash, chain, expectedAddress, expectedAmou
 }
 
 /**
- * Verify Bitcoin payment using BlockCypher API
+ * Verify Bitcoin payment using Blockstream Esplora API
+ * Free, no API key required, generous rate limits
  *
  * @param {string} txHash - Transaction hash
  * @param {string} expectedAddress - Expected recipient address
@@ -207,75 +271,77 @@ export async function verifyPayment(txHash, chain, expectedAddress, expectedAmou
  * @returns {Promise<object>} Verification result
  */
 export async function verifyBitcoinPayment(txHash, expectedAddress, expectedAmount) {
-  try {
-    const config = BLOCKCHAIN_CONFIG.BTC;
-    const url = `${config.baseUrl}/txs/${txHash}`;
+  const config = BLOCKCHAIN_CONFIG.BTC;
+  const url = `${config.baseUrl}/tx/${txHash}`;
 
-    // Fetch transaction data from BlockCypher
-    const tx = await fetchWithRetry(url);
+  // Fetch transaction data from Blockstream (may throw BlockchainAPIError)
+  const tx = await fetchWithRetry(url);
 
-    // Check for double-spend
-    if (tx.double_spend) {
-      return {
-        verified: false,
-        status: 'failed',
-        confirmations: 0,
-        amount: '0',
-        error: 'Transaction flagged as double-spend',
-      };
-    }
-
-    // Find output to our address
-    const output = tx.outputs?.find((o) => o.addresses?.includes(expectedAddress));
-
-    if (!output) {
-      return {
-        verified: false,
-        status: 'failed',
-        confirmations: tx.confirmations || 0,
-        amount: '0',
-        error: 'Payment not sent to expected address',
-      };
-    }
-
-    // Convert satoshi to BTC
-    const amountBTC = (output.value / Math.pow(10, config.decimals)).toFixed(config.decimals);
-    const expectedBTC = parseFloat(expectedAmount);
-
-    // Check amount with tolerance
-    const minAmount = expectedBTC * (1 - AMOUNT_TOLERANCE);
-    if (parseFloat(amountBTC) < minAmount) {
-      return {
-        verified: false,
-        status: 'failed',
-        confirmations: tx.confirmations || 0,
-        amount: amountBTC,
-        error: `Insufficient amount: expected ${expectedBTC} BTC, received ${amountBTC} BTC`,
-      };
-    }
-
-    // Check confirmations
-    const confirmations = tx.confirmations || 0;
-    const verified = confirmations >= config.minConfirmations;
-
+  if (!tx || !tx.txid) {
     return {
-      verified,
-      status: verified ? 'confirmed' : 'pending',
-      confirmations,
-      amount: amountBTC,
+      verified: false,
+      status: 'failed',
+      resultStatus: VERIFICATION_STATUS.TX_NOT_FOUND,
+      confirmations: 0,
+      amount: '0',
+      error: 'Transaction not found',
     };
-  } catch (error) {
-    logger.error('[BlockchainVerification] Bitcoin verification failed', {
-      txHash,
-      error: error.message,
-    });
-    throw new Error(`Bitcoin verification failed: ${error.message}`);
   }
+
+  // Find output to our address (Blockstream uses scriptpubkey_address)
+  const output = tx.vout?.find((o) => o.scriptpubkey_address === expectedAddress);
+
+  if (!output) {
+    return {
+      verified: false,
+      status: 'failed',
+      resultStatus: VERIFICATION_STATUS.TX_INVALID,
+      confirmations: 0,
+      amount: '0',
+      error: 'Payment not sent to expected address',
+    };
+  }
+
+  // Blockstream returns value in satoshi
+  const amountBTC = (output.value / Math.pow(10, config.decimals)).toFixed(config.decimals);
+  const expectedBTC = parseFloat(expectedAmount);
+
+  // Check amount with tolerance
+  const minAmount = expectedBTC * (1 - AMOUNT_TOLERANCE);
+  if (parseFloat(amountBTC) < minAmount) {
+    return {
+      verified: false,
+      status: 'failed',
+      resultStatus: VERIFICATION_STATUS.TX_INVALID,
+      confirmations: 0,
+      amount: amountBTC,
+      error: `Insufficient amount: expected ${expectedBTC} BTC, received ${amountBTC} BTC`,
+    };
+  }
+
+  // Calculate confirmations from block height
+  let confirmations = 0;
+  if (tx.status?.confirmed && tx.status?.block_height) {
+    // Get current block height
+    const currentHeightUrl = `${config.baseUrl}/blocks/tip/height`;
+    const currentHeight = await fetchWithRetry(currentHeightUrl);
+    confirmations = currentHeight - tx.status.block_height + 1;
+  }
+
+  const verified = confirmations >= config.minConfirmations;
+
+  return {
+    verified,
+    status: verified ? 'confirmed' : 'pending',
+    resultStatus: VERIFICATION_STATUS.SUCCESS,
+    confirmations,
+    amount: amountBTC,
+  };
 }
 
 /**
  * Verify Litecoin payment using BlockCypher API
- * (Same logic as Bitcoin, different endpoint)
+ * Rate limit: 100 req/hour (free tier)
  *
  * @param {string} txHash - Transaction hash
  * @param {string} expectedAddress - Expected recipient address
@@ -283,70 +349,77 @@ export async function verifyBitcoinPayment(txHash, expectedAddress, expectedAmou
  * @returns {Promise<object>} Verification result
  */
 export async function verifyLitecoinPayment(txHash, expectedAddress, expectedAmount) {
-  try {
-    const config = BLOCKCHAIN_CONFIG.LTC;
-    const url = `${config.baseUrl}/txs/${txHash}`;
+  const config = BLOCKCHAIN_CONFIG.LTC;
+  const url = `${config.baseUrl}/txs/${txHash}`;
 
-    // Fetch transaction data from BlockCypher
-    const tx = await fetchWithRetry(url);
+  // Fetch transaction data from BlockCypher (may throw BlockchainAPIError)
+  const tx = await fetchWithRetry(url);
 
-    // Check for double-spend
-    if (tx.double_spend) {
-      return {
-        verified: false,
-        status: 'failed',
-        confirmations: 0,
-        amount: '0',
-        error: 'Transaction flagged as double-spend',
-      };
-    }
-
-    // Find output to our address
-    const output = tx.outputs?.find((o) => o.addresses?.includes(expectedAddress));
-
-    if (!output) {
-      return {
-        verified: false,
-        status: 'failed',
-        confirmations: tx.confirmations || 0,
-        amount: '0',
-        error: 'Payment not sent to expected address',
-      };
-    }
-
-    // Convert litoshi to LTC
-    const amountLTC = (output.value / Math.pow(10, config.decimals)).toFixed(config.decimals);
-    const expectedLTC = parseFloat(expectedAmount);
-
-    // Check amount with tolerance
-    const minAmount = expectedLTC * (1 - AMOUNT_TOLERANCE);
-    if (parseFloat(amountLTC) < minAmount) {
-      return {
-        verified: false,
-        status: 'failed',
-        confirmations: tx.confirmations || 0,
-        amount: amountLTC,
-        error: `Insufficient amount: expected ${expectedLTC} LTC, received ${amountLTC} LTC`,
-      };
-    }
-
-    // Check confirmations
-    const confirmations = tx.confirmations || 0;
-    const verified = confirmations >= config.minConfirmations;
-
+  if (!tx || !tx.hash) {
     return {
-      verified,
-      status: verified ? 'confirmed' : 'pending',
-      confirmations,
-      amount: amountLTC,
+      verified: false,
+      status: 'failed',
+      resultStatus: VERIFICATION_STATUS.TX_NOT_FOUND,
+      confirmations: 0,
+      amount: '0',
+      error: 'Transaction not found',
     };
-  } catch (error) {
-    logger.error('[BlockchainVerification] Litecoin verification failed', {
-      txHash,
-      error: error.message,
-    });
-    throw new Error(`Litecoin verification failed: ${error.message}`);
   }
+
+  // Check for double-spend
+  if (tx.double_spend) {
+    return {
+      verified: false,
+      status: 'failed',
+      resultStatus: VERIFICATION_STATUS.TX_INVALID,
+      confirmations: 0,
+      amount: '0',
+      error: 'Transaction flagged as double-spend',
+    };
+  }
+
+  // Find output to our address (BlockCypher uses addresses array)
+  const output = tx.outputs?.find((o) => o.addresses?.includes(expectedAddress));
+
+  if (!output) {
+    return {
+      verified: false,
+      status: 'failed',
+      resultStatus: VERIFICATION_STATUS.TX_INVALID,
+      confirmations: tx.confirmations || 0,
+      amount: '0',
+      error: 'Payment not sent to expected address',
+    };
+  }
+
+  // BlockCypher returns value in litoshi (smallest unit)
+  const amountLTC = (output.value / Math.pow(10, config.decimals)).toFixed(config.decimals);
+  const expectedLTC = parseFloat(expectedAmount);
+
+  // Check amount with tolerance
+  const minAmount = expectedLTC * (1 - AMOUNT_TOLERANCE);
+  if (parseFloat(amountLTC) < minAmount) {
+    return {
+      verified: false,
+      status: 'failed',
+      resultStatus: VERIFICATION_STATUS.TX_INVALID,
+      confirmations: tx.confirmations || 0,
+      amount: amountLTC,
+      error: `Insufficient amount: expected ${expectedLTC} LTC, received ${amountLTC} LTC`,
+    };
+  }
+
+  // Check confirmations
+  const confirmations = tx.confirmations || 0;
+  const verified = confirmations >= config.minConfirmations;
+
+  return {
+    verified,
+    status: verified ? 'confirmed' : 'pending',
+    resultStatus: VERIFICATION_STATUS.SUCCESS,
+    confirmations,
+    amount: amountLTC,
+  };
 }
 
 /**
@@ -358,106 +431,111 @@ export async function verifyLitecoinPayment(txHash, expectedAddress, expectedAmo
  * @returns {Promise<object>} Verification result
  */
 export async function verifyEthereumPayment(txHash, expectedAddress, expectedAmount) {
-  try {
-    const config = BLOCKCHAIN_CONFIG.ETH;
-    const apiKey = process.env.ETHERSCAN_API_KEY;
+  const config = BLOCKCHAIN_CONFIG.ETH;
+  const apiKey = process.env.ETHERSCAN_API_KEY;
 
-    if (!apiKey) {
-      throw new Error('ETHERSCAN_API_KEY not configured');
-    }
-
-    // Get transaction details
-    const txUrl = `${config.baseUrl}?module=proxy&action=eth_getTransactionByHash&txhash=${txHash}&apikey=${apiKey}`;
-    const txData = await fetchWithRetry(txUrl);
-
-    if (!txData.result) {
-      return {
-        verified: false,
-        status: 'failed',
-        confirmations: 0,
-        amount: '0',
-        error: 'Transaction not found',
-      };
-    }
-
-    const tx = txData.result;
-
-    // Verify recipient address
-    if (tx.to?.toLowerCase() !== expectedAddress.toLowerCase()) {
-      return {
-        verified: false,
-        status: 'failed',
-        confirmations: 0,
-        amount: '0',
-        error: 'Payment not sent to expected address',
-      };
-    }
-
-    // Convert wei to ETH
-    const valueWei = parseInt(tx.value, 16);
-    const amountETH = (valueWei / Math.pow(10, config.decimals)).toFixed(6); // 6 decimals for display
-    const expectedETH = parseFloat(expectedAmount);
-
-    // Check amount with tolerance
-    const minAmount = expectedETH * (1 - AMOUNT_TOLERANCE);
-    if (parseFloat(amountETH) < minAmount) {
-      return {
-        verified: false,
-        status: 'failed',
-        confirmations: 0,
-        amount: amountETH,
-        error: `Insufficient amount: expected ${expectedETH} ETH, received ${amountETH} ETH`,
-      };
-    }
-
-    // Get transaction receipt for status and confirmations
-    const receiptUrl = `${config.baseUrl}?module=proxy&action=eth_getTransactionReceipt&txhash=${txHash}&apikey=${apiKey}`;
-    const receiptData = await fetchWithRetry(receiptUrl);
-
-    const receipt = receiptData.result;
-    if (!receipt) {
-      return {
-        verified: false,
-        status: 'pending',
-        confirmations: 0,
-        amount: amountETH,
-        error: 'Transaction pending',
-      };
-    }
-
-    // Check transaction status (0x1 = success, 0x0 = failed)
-    if (receipt.status !== '0x1') {
-      return {
-        verified: false,
-        status: 'failed',
-        confirmations: 0,
-        amount: amountETH,
-        error: 'Transaction failed on blockchain',
-      };
-    }
-
-    // Calculate confirmations
-    const blockNumber = parseInt(receipt.blockNumber, 16);
-    const currentBlockUrl = `${config.baseUrl}?module=proxy&action=eth_blockNumber&apikey=${apiKey}`;
-    const currentBlockData = await fetchWithRetry(currentBlockUrl);
-    const currentBlock = parseInt(currentBlockData.result, 16);
-
-    const confirmations = currentBlock - blockNumber;
-    const verified = confirmations >= config.minConfirmations;
-
+  if (!apiKey) {
+    // Configuration error - not an API error, but not retryable
     return {
-      verified,
-      status: verified ? 'confirmed' : 'pending',
-      confirmations,
+      verified: false,
+      status: 'failed',
+      resultStatus: VERIFICATION_STATUS.TX_INVALID,
+      confirmations: 0,
+      amount: '0',
+      error: 'ETHERSCAN_API_KEY not configured',
+    };
+  }
+
+  // Get transaction details (may throw BlockchainAPIError)
+  const txUrl = `${config.baseUrl}?module=proxy&action=eth_getTransactionByHash&txhash=${txHash}&apikey=${apiKey}`;
+  const txData = await fetchWithRetry(txUrl);
+
+  if (!txData.result) {
+    return {
+      verified: false,
+      status: 'failed',
+      resultStatus: VERIFICATION_STATUS.TX_NOT_FOUND,
+      confirmations: 0,
+      amount: '0',
+      error: 'Transaction not found',
+    };
+  }
+
+  const tx = txData.result;
+
+  // Verify recipient address
+  if (tx.to?.toLowerCase() !== expectedAddress.toLowerCase()) {
+    return {
+      verified: false,
+      status: 'failed',
+      resultStatus: VERIFICATION_STATUS.TX_INVALID,
+      confirmations: 0,
+      amount: '0',
+      error: 'Payment not sent to expected address',
+    };
+  }
+
+  // Convert wei to ETH
+  const valueWei = parseInt(tx.value, 16);
+  const amountETH = (valueWei / Math.pow(10, config.decimals)).toFixed(6); // 6 decimals for display
+  const expectedETH = parseFloat(expectedAmount);
+
+  // Check amount with tolerance
+  const minAmount = expectedETH * (1 - AMOUNT_TOLERANCE);
+  if (parseFloat(amountETH) < minAmount) {
+    return {
+      verified: false,
+      status: 'failed',
+      resultStatus: VERIFICATION_STATUS.TX_INVALID,
+      confirmations: 0,
+      amount: amountETH,
+      error: `Insufficient amount: expected ${expectedETH} ETH, received ${amountETH} ETH`,
+    };
+  }
+
+  // Get transaction receipt for status and confirmations
+  const receiptUrl = `${config.baseUrl}?module=proxy&action=eth_getTransactionReceipt&txhash=${txHash}&apikey=${apiKey}`;
+  const receiptData = await fetchWithRetry(receiptUrl);
+
+  const receipt = receiptData.result;
+  if (!receipt) {
+    return {
+      verified: false,
+      status: 'pending',
+      resultStatus: VERIFICATION_STATUS.SUCCESS,
+      confirmations: 0,
       amount: amountETH,
     };
-  } catch (error) {
-    logger.error('[BlockchainVerification] Ethereum verification failed', {
-      txHash,
-      error: error.message,
-    });
-    throw new Error(`Ethereum verification failed: ${error.message}`);
   }
+
+  // Check transaction status (0x1 = success, 0x0 = failed)
+  if (receipt.status !== '0x1') {
+    return {
+      verified: false,
+      status: 'failed',
+      resultStatus: VERIFICATION_STATUS.TX_INVALID,
+      confirmations: 0,
+      amount: amountETH,
+      error: 'Transaction failed on blockchain',
+    };
+  }
+
+  // Calculate confirmations
+  const blockNumber = parseInt(receipt.blockNumber, 16);
+  const currentBlockUrl = `${config.baseUrl}?module=proxy&action=eth_blockNumber&apikey=${apiKey}`;
+  const currentBlockData = await fetchWithRetry(currentBlockUrl);
+  const currentBlock = parseInt(currentBlockData.result, 16);
+
+  const confirmations = currentBlock - blockNumber;
+  const verified = confirmations >= config.minConfirmations;
+
+  return {
+    verified,
+    status: verified ? 'confirmed' : 'pending',
+    resultStatus: VERIFICATION_STATUS.SUCCESS,
+    confirmations,
+    amount: amountETH,
+  };
 }
 
 /**
@@ -467,15 +545,21 @@ export async function verifyEthereumPayment(txHash, expectedAddress, expectedAmo
  * @param {string} expectedAddress - Expected recipient address
  * @param {string|number} expectedAmount - Expected amount in USDT
  * @returns {Promise<object>} Verification result
+ *
+ * Retry strategy:
+ * - API_ERROR (network/timeout): Caller should retry
+ * - TX_NOT_FOUND: May appear later for new txs, can retry
+ * - TX_INVALID: Transaction exists but validation failed, don't retry
  */
 export async function verifyUSDTTRC20Payment(txHash, expectedAddress, expectedAmount) {
-  try {
-    const config = BLOCKCHAIN_CONFIG.USDT;
-    const apiKey = process.env.TRONGRID_API_KEY;
+  const config = BLOCKCHAIN_CONFIG.USDT;
+  const apiKey = process.env.TRONGRID_API_KEY;
 
-    // Get transaction info
+  // Get transaction info (may throw BlockchainAPIError on network issues)
+  let txInfo;
+  try {
     const url = `${config.baseUrl}/wallet/gettransactioninfobyid`;
-    const txInfo = await fetchWithRetry(url, {
+    txInfo = await fetchWithRetry(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -483,98 +567,135 @@ export async function verifyUSDTTRC20Payment(txHash, expectedAddress, expectedAm
       },
       data: { value: txHash },
     });
-
-    if (!txInfo || Object.keys(txInfo).length === 0) {
+  } catch (error) {
+    // Network/API error - caller should retry
+    if (error.isAPIError) {
+      logger.error('[BlockchainVerification] TRON API error fetching transaction', {
+        txHash,
+        error: error.message,
+      });
       return {
         verified: false,
         status: 'failed',
+        resultStatus: VERIFICATION_STATUS.API_ERROR,
         confirmations: 0,
         amount: '0',
-        error: 'Transaction not found',
+        error: `TRON API error: ${error.message}`,
       };
     }
+    throw error; // Re-throw non-API errors
+  }
 
-    // Check transaction receipt (0 = failed, 1 = success)
-    if (txInfo.receipt?.result !== 'SUCCESS') {
-      return {
-        verified: false,
-        status: 'failed',
-        confirmations: 0,
-        amount: '0',
-        error: 'Transaction failed on blockchain',
-      };
-    }
+  if (!txInfo || Object.keys(txInfo).length === 0) {
+    return {
+      verified: false,
+      status: 'failed',
+      resultStatus: VERIFICATION_STATUS.TX_NOT_FOUND,
+      confirmations: 0,
+      amount: '0',
+      error: 'Transaction not found',
+    };
+  }
 
-    // Parse Transfer event from logs
-    const transferEvent = txInfo.log?.find(
-      (log) =>
-        log.address === config.contractAddress &&
-        log.topics &&
-        log.topics[0] === 'ddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef' // Transfer event signature
-    );
+  // Check transaction receipt (0 = failed, 1 = success)
+  if (txInfo.receipt?.result !== 'SUCCESS') {
+    return {
+      verified: false,
+      status: 'failed',
+      resultStatus: VERIFICATION_STATUS.TX_INVALID,
+      confirmations: 0,
+      amount: '0',
+      error: 'Transaction failed on blockchain',
+    };
+  }
 
-    if (!transferEvent) {
-      return {
-        verified: false,
-        status: 'failed',
-        confirmations: 0,
-        amount: '0',
-        error: 'Not a USDT transfer transaction',
-      };
-    }
+  // Parse Transfer event from logs
+  const transferEvent = txInfo.log?.find(
+    (log) =>
+      log.address === config.contractAddress &&
+      log.topics &&
+      log.topics[0] === 'ddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef' // Transfer event signature
+  );
 
-    // Decode recipient address from topics[2] (topics[1] is sender)
-    const recipientHex = '41' + transferEvent.topics[2].substring(24); // Add TRON prefix, remove padding
-    const recipientAddress = hexToBase58(recipientHex);
+  if (!transferEvent) {
+    return {
+      verified: false,
+      status: 'failed',
+      resultStatus: VERIFICATION_STATUS.TX_INVALID,
+      confirmations: 0,
+      amount: '0',
+      error: 'Not a USDT transfer transaction',
+    };
+  }
 
-    if (recipientAddress !== expectedAddress) {
-      return {
-        verified: false,
-        status: 'failed',
-        confirmations: 0,
-        amount: '0',
-        error: 'Payment not sent to expected address',
-      };
-    }
+  // Decode recipient address from topics[2] (topics[1] is sender)
+  const recipientHex = '41' + transferEvent.topics[2].substring(24); // Add TRON prefix, remove padding
+  const recipientAddress = hexToBase58(recipientHex);
 
-    // Decode amount from data field
-    const amountHex = transferEvent.data;
-    const amountRaw = parseInt(amountHex, 16);
-    const amountUSDT = (amountRaw / Math.pow(10, config.decimals)).toFixed(config.decimals);
-    const expectedUSDT = parseFloat(expectedAmount);
+  if (recipientAddress !== expectedAddress) {
+    return {
+      verified: false,
+      status: 'failed',
+      resultStatus: VERIFICATION_STATUS.TX_INVALID,
+      confirmations: 0,
+      amount: '0',
+      error: 'Payment not sent to expected address',
+    };
+  }
 
-    // Check amount with tolerance
-    const minAmount = expectedUSDT * (1 - AMOUNT_TOLERANCE);
-    if (parseFloat(amountUSDT) < minAmount) {
-      return {
-        verified: false,
-        status: 'failed',
-        confirmations: txInfo.confirmations || 0,
-        amount: amountUSDT,
-        error: `Insufficient amount: expected ${expectedUSDT} USDT, received ${amountUSDT} USDT`,
-      };
-    }
+  // Decode amount from data field
+  const amountHex = transferEvent.data;
+  const amountRaw = parseInt(amountHex, 16);
+  const amountUSDT = (amountRaw / Math.pow(10, config.decimals)).toFixed(config.decimals);
+  const expectedUSDT = parseFloat(expectedAmount);
 
-    // Calculate confirmations
-    const confirmations = txInfo.blockNumber
+  // Check amount with tolerance
+  const minAmount = expectedUSDT * (1 - AMOUNT_TOLERANCE);
+  if (parseFloat(amountUSDT) < minAmount) {
+    return {
+      verified: false,
+      status: 'failed',
+      resultStatus: VERIFICATION_STATUS.TX_INVALID,
+      confirmations: txInfo.confirmations || 0,
+      amount: amountUSDT,
+      error: `Insufficient amount: expected ${expectedUSDT} USDT, received ${amountUSDT} USDT`,
+    };
+  }
+
+  // Calculate confirmations (may throw BlockchainAPIError on network issues)
+  let confirmations = 0;
+  try {
+    confirmations = txInfo.blockNumber
       ? await getTronConfirmations(txInfo.blockNumber)
       : 0;
-
-    const verified = confirmations >= config.minConfirmations;
-
-    return {
-      verified,
-      status: verified ? 'confirmed' : 'pending',
-      confirmations,
-      amount: amountUSDT,
-    };
   } catch (error) {
-    logger.error('[BlockchainVerification] USDT TRC20 verification failed', {
-      txHash,
-      error: error.message,
-    });
-    throw new Error(`USDT TRC20 verification failed: ${error.message}`);
+    // If we can't get confirmations due to API error, still return SUCCESS
+    // with 0 confirmations - caller will retry and eventually get them
+    // The important part is that amount and recipient were verified
+    if (error.isAPIError) {
+      logger.warn('[BlockchainVerification] TRON API error getting confirmations (will retry), using 0', {
+        txHash,
+        blockNumber: txInfo.blockNumber,
+        error: error.message,
+      });
+    } else {
+      logger.error('[BlockchainVerification] Unexpected error getting TRON confirmations', {
+        txHash,
+        blockNumber: txInfo.blockNumber,
+        error: error.message,
+      });
+    }
   }
+
+  const verified = confirmations >= config.minConfirmations;
+
+  return {
+    verified,
+    status: verified ? 'confirmed' : 'pending',
+    resultStatus: VERIFICATION_STATUS.SUCCESS,
+    confirmations,
+    amount: amountUSDT,
+  };
 }
 
 /**
@@ -582,30 +703,23 @@ export async function verifyUSDTTRC20Payment(txHash, expectedAddress, expectedAm
  *
  * @param {number} blockNumber - Transaction block number
  * @returns {Promise<number>} Number of confirmations
+ * @throws {BlockchainAPIError} If TronGrid API fails - caller should retry
  */
 async function getTronConfirmations(blockNumber) {
-  try {
-    const config = BLOCKCHAIN_CONFIG.USDT;
-    const apiKey = process.env.TRONGRID_API_KEY;
+  const config = BLOCKCHAIN_CONFIG.USDT;
+  const apiKey = process.env.TRONGRID_API_KEY;
 
-    const url = `${config.baseUrl}/wallet/getnowblock`;
-    const currentBlock = await fetchWithRetry(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(apiKey && { 'TRON-PRO-API-KEY': apiKey }),
-      },
-    });
+  const url = `${config.baseUrl}/wallet/getnowblock`;
+  const currentBlock = await fetchWithRetry(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(apiKey && { 'TRON-PRO-API-KEY': apiKey }),
+    },
+  });
 
-    const currentBlockNumber = currentBlock.block_header?.raw_data?.number || 0;
-    return currentBlockNumber - blockNumber;
-  } catch (error) {
-    logger.error('[BlockchainVerification] Failed to get TRON confirmations', {
-      blockNumber,
-      error: error.message,
-    });
-    return 0;
-  }
+  const currentBlockNumber = currentBlock.block_header?.raw_data?.number || 0;
+  return currentBlockNumber - blockNumber;
 }
 
 /**
@@ -648,6 +762,7 @@ function hexToBase58(hexAddress) {
 }
 
 export default {
+  VERIFICATION_STATUS,
   verifyPayment,
   verifyBitcoinPayment,
   verifyLitecoinPayment,

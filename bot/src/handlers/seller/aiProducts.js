@@ -486,7 +486,7 @@ export async function handleAIBackToSelection(ctx) {
       inline_keyboard: [
         ...pending.options.map((opt) => [
           {
-            text: `${opt.name} (${opt.price})`,
+            text: `${opt.name} ($${opt.price})`,
             callback_data: `ai_select:${opt.id}`,
           },
         ]),

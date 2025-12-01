@@ -6,10 +6,15 @@
  * - Queue-based processing
  * - Error handling for blocked/deleted users
  * - Progress tracking in channel_migrations table
+ * - Uses Telegram HTTP API directly (no bot instance required)
  */
 
 import pool from '../config/database.js';
 import logger from '../utils/logger.js';
+import { config } from '../config/env.js';
+
+// Get bot token from config
+const BOT_TOKEN = config.telegram?.botToken || process.env.TELEGRAM_BOT_TOKEN;
 
 // Message delay to respect Telegram rate limits (100ms = 10 msg/sec)
 const MESSAGE_DELAY_MS = 100;
@@ -17,6 +22,41 @@ const MESSAGE_DELAY_MS = 100;
 // Retry configuration
 const MAX_RETRIES = 3;
 const INITIAL_RETRY_DELAY_MS = 1000; // 1 second
+
+/**
+ * Send message via Telegram HTTP API directly (no bot instance required)
+ * @param {string} chatId - Telegram chat/user ID
+ * @param {string} text - Message text (HTML formatted)
+ * @returns {Promise<object>} Telegram API response
+ */
+async function sendTelegramMessage(chatId, text) {
+  if (!BOT_TOKEN) {
+    throw new Error('TELEGRAM_BOT_TOKEN is not configured');
+  }
+
+  const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      chat_id: chatId,
+      text: text,
+      parse_mode: 'HTML',
+      disable_web_page_preview: false,
+    }),
+  });
+
+  const data = await response.json();
+
+  if (!data.ok) {
+    const error = new Error(data.description || 'Telegram API error');
+    error.response = { error_code: data.error_code, description: data.description };
+    throw error;
+  }
+
+  return data.result;
+}
 
 /**
  * Send message with exponential backoff retry logic
@@ -179,15 +219,16 @@ async function incrementCounter(migrationId, success) {
 
 /**
  * Send migration message to a single subscriber with retry logic
- * @param {object} bot - Telegram bot instance
+ * Uses Telegram HTTP API directly (no bot instance required)
  * @param {string} telegramId - Telegram user ID
  * @param {string} shopName - Shop name
  * @param {string} newChannelUrl - New channel URL
  * @param {string} oldChannelUrl - Old channel URL (optional)
+ * @param {number} shopId - Shop ID (for cleanup on error)
+ * @param {number} userId - User ID (for cleanup on error)
  * @returns {Promise<boolean>} Success status
  */
 async function sendMigrationMessage(
-  bot,
   telegramId,
   shopName,
   newChannelUrl,
@@ -205,12 +246,9 @@ async function sendMigrationMessage(
     message += `✅ Новый канал: ${newChannelUrl}\n\n`;
     message += `Подпишитесь, чтобы не пропустить важные обновления и новые товары!`;
 
-    // Send with retry logic
+    // Send with retry logic using Telegram HTTP API
     await sendWithRetry(async () => {
-      await bot.telegram.sendMessage(telegramId, message, {
-        parse_mode: 'HTML',
-        disable_web_page_preview: false,
-      });
+      await sendTelegramMessage(telegramId, message);
     });
 
     logger.info(`[Broadcast] Message sent to ${telegramId}`);
@@ -252,7 +290,7 @@ async function sendMigrationMessage(
 
 /**
  * Broadcast channel migration to all shop subscribers
- * @param {object} bot - Telegram bot instance
+ * Uses Telegram HTTP API directly (no bot instance required)
  * @param {number} shopId - Shop ID
  * @param {string} shopName - Shop name
  * @param {string} newChannelUrl - New channel URL
@@ -261,7 +299,6 @@ async function sendMigrationMessage(
  * @returns {Promise<{migrationId: number, sent: number, failed: number, total: number}>}
  */
 async function broadcastMigration(
-  bot,
   shopId,
   shopName,
   newChannelUrl,
@@ -291,9 +328,8 @@ async function broadcastMigration(
     for (let i = 0; i < subscribers.length; i++) {
       const subscriber = subscribers[i];
 
-      // Send message
+      // Send message using Telegram HTTP API
       const success = await sendMigrationMessage(
-        bot,
         subscriber.telegram_id,
         shopName,
         newChannelUrl,

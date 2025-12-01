@@ -3,9 +3,14 @@
  *
  * Provides persistent session storage using Redis
  * Sessions are stored with 24h TTL
+ *
+ * Security: Sensitive fields (token, user) are encrypted with AES-256-GCM
+ * if SESSION_ENCRYPTION_KEY is configured. Old plaintext sessions
+ * are automatically migrated to encrypted format on next access.
  */
 
 import logger from '../utils/logger.js';
+import { encryptSensitiveFields, decryptSensitiveFields } from '../utils/sessionCrypto.js';
 
 /**
  * Create Redis session middleware
@@ -26,7 +31,13 @@ export function createRedisSession(redis) {
     // Load session from Redis
     try {
       const data = await redis.get(sessionKey);
-      ctx.session = data ? JSON.parse(data) : {};
+      if (data) {
+        const parsed = JSON.parse(data);
+        // Decrypt sensitive fields (handles both encrypted and plaintext)
+        ctx.session = decryptSensitiveFields(parsed);
+      } else {
+        ctx.session = {};
+      }
     } catch (error) {
       logger.error(`Failed to load session for ${chatId}:`, error);
       ctx.session = {};
@@ -35,7 +46,9 @@ export function createRedisSession(redis) {
     // Add explicit save method for handlers that need it
     ctx.session.save = async () => {
       try {
-        const sessionData = JSON.stringify(ctx.session);
+        // Encrypt sensitive fields before saving
+        const encryptedSession = encryptSensitiveFields(ctx.session);
+        const sessionData = JSON.stringify(encryptedSession);
         await redis.setex(sessionKey, 86400, sessionData);
         logger.debug(`Session manually saved for ${chatId}`, {
           hasShopId: !!ctx.session?.shopId,
@@ -57,8 +70,12 @@ export function createRedisSession(redis) {
       const newSession = JSON.stringify(ctx.session);
 
       if (newSession !== originalSession) {
+        // Encrypt sensitive fields before saving
+        const encryptedSession = encryptSensitiveFields(ctx.session);
+        const sessionData = JSON.stringify(encryptedSession);
+
         // Save with 24h TTL (86400 seconds)
-        await redis.setex(sessionKey, 86400, newSession);
+        await redis.setex(sessionKey, 86400, sessionData);
 
         logger.debug(`Session saved for ${chatId}`, {
           hasShopId: !!ctx.session?.shopId,

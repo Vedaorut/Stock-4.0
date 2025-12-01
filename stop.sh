@@ -2,8 +2,10 @@
 
 #############################################
 # Telegram Shop - Stop All Services
-# Останавливает Backend + Bot + Webapp + ngrok
+# Останавливает Backend + Bot + Webapp + Cloudflare
 #############################################
+
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Colors
 RED='\033[0;31m'
@@ -34,9 +36,15 @@ if [ -f "$PROJECT_ROOT/.bot.pid" ]; then
   rm -f "$PROJECT_ROOT/.bot.pid"
 fi
 
+if [ -f "$PROJECT_ROOT/.cloudflared.pid" ]; then
+  echo "  ├─ Cloudflare (by PID)..."
+  kill $(cat "$PROJECT_ROOT/.cloudflared.pid") 2>/dev/null || true
+  rm -f "$PROJECT_ROOT/.cloudflared.pid"
+fi
+
+# Also remove old ngrok pid if exists
 if [ -f "$PROJECT_ROOT/.ngrok.pid" ]; then
-  echo "  ├─ ngrok (by PID)..."
-  kill $(cat "$PROJECT_ROOT/.ngrok.pid") 2>/dev/null || true
+  echo "  ├─ Cleaning up old ngrok PID file..."
   rm -f "$PROJECT_ROOT/.ngrok.pid"
 fi
 
@@ -50,19 +58,19 @@ pkill -f "npm.*dev" 2>/dev/null || true
 pkill -f "npm.*start" 2>/dev/null || true
 lsof -ti:3000 | xargs kill -9 2>/dev/null || true
 pkill -f "vite" 2>/dev/null || true
-pkill -x ngrok 2>/dev/null || true
+pkill -x cloudflared 2>/dev/null || true
 
 sleep 2
 
 echo ""
 
 # Verify cleanup
-REMAINING=$(ps aux | grep -E "node.*(server|bot)|nodemon|vite|ngrok" | grep -v grep | grep -v mcp-server | wc -l)
+REMAINING=$(ps aux | grep -E "node.*(server|bot)|nodemon|vite|cloudflared" | grep -v grep | grep -v mcp-server | wc -l)
 if [ "$REMAINING" -gt 0 ]; then
   echo -e "${YELLOW}⚠️  Warning: $REMAINING project processes still running${NC}"
   echo ""
   echo -e "${BLUE}Active processes:${NC}"
-  ps aux | grep -E "node.*(server|bot)|nodemon|vite|ngrok" | grep -v grep | grep -v mcp-server
+  ps aux | grep -E "node.*(server|bot)|nodemon|vite|cloudflared" | grep -v grep | grep -v mcp-server
   echo ""
   echo -e "${YELLOW}Tip: Try running this script again or manually kill with:${NC}"
   echo -e "  ${BLUE}kill -9 <PID>${NC}"
@@ -70,8 +78,8 @@ else
   echo -e "${GREEN}✅ All Telegram Shop processes stopped${NC}"
   echo ""
   echo -e "${BLUE}Verify with:${NC}"
-  echo -e "  ${BLUE}lsof -ti:3000${NC}  # Should return nothing"
-  echo -e "  ${BLUE}pgrep ngrok${NC}    # Should return nothing"
+  echo -e "  ${BLUE}lsof -ti:3000${NC}        # Should return nothing"
+  echo -e "  ${BLUE}pgrep cloudflared${NC}    # Should return nothing"
 fi
 
 echo ""

@@ -200,9 +200,9 @@ export default function Catalog() {
     [get, setCurrentShop]
   );
 
-  // Search products across subscriptions/follows
+  // Search products - local filter for current shop's products
   const searchProducts = useCallback(
-    async (query, signal) => {
+    (query) => {
       if (!query || query.trim().length < 2) {
         setSearchResults([]);
         return;
@@ -210,49 +210,25 @@ export default function Catalog() {
 
       setIsSearching(true);
 
-      try {
-        // Build query params based on view mode
-        const params = { query: query.trim() };
+      // Local search within current shop's products
+      const searchTerm = query.trim().toLowerCase();
+      const filtered = products.filter((product) => {
+        const name = (product.name || '').toLowerCase();
+        const description = (product.description || '').toLowerCase();
+        return name.includes(searchTerm) || description.includes(searchTerm);
+      });
 
-        // In buyer mode: search in subscriptions
-        // In seller mode: search in follows
-        if (viewMode === 'seller') {
-          params.follows = true;
-        } else {
-          params.subscriptions = true;
-        }
+      // Add shop info for display
+      const resultsWithShop = filtered.map((product) => ({
+        ...product,
+        shop_id: displayShop?.id,
+        shop_name: displayShop?.name || 'Shop',
+      }));
 
-        const { data, error: apiError } = await get('/products/search', {
-          params,
-          signal,
-        });
-
-        if (signal?.aborted) return;
-
-        if (apiError) {
-          if (import.meta.env.DEV) {
-            console.error('[Catalog] searchProducts ERROR:', apiError);
-          }
-          setSearchResults([]);
-          return;
-        }
-
-        const items = Array.isArray(data?.data) ? data.data.map(normalizeProduct) : [];
-        setSearchResults(items);
-      } catch (err) {
-        if (err.name !== 'AbortError' && err.code !== 'ERR_CANCELED') {
-          if (import.meta.env.DEV) {
-            console.error('[Catalog] searchProducts error:', err);
-          }
-        }
-        setSearchResults([]);
-      } finally {
-        if (!signal?.aborted) {
-          setIsSearching(false);
-        }
-      }
+      setSearchResults(resultsWithShop);
+      setIsSearching(false);
     },
-    [get, viewMode]
+    [products, displayShop]
   );
 
   // Debounced search handler
@@ -275,11 +251,10 @@ export default function Catalog() {
 
       setIsSearchActive(true);
 
-      // Debounce 300ms
+      // Debounce 150ms (faster for local search)
       debounceTimerRef.current = setTimeout(() => {
-        const controller = new AbortController();
-        searchProducts(query, controller.signal);
-      }, 300);
+        searchProducts(query);
+      }, 150);
     },
     [searchProducts]
   );

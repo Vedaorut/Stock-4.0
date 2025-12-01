@@ -1,0 +1,15 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 14
+    },
+    "auditLog": "/Users/sile/Documents/Status Stock 4.0/logs/.8227b215e8f5638ea43ae6a607b4358a556cbae8-audit.json",
+    "files": [
+        {
+            "date": 1764486473373,
+            "name": "/Users/sile/Documents/Status Stock 4.0/logs/error-2025-11-30.log",
+            "hash": "4e0ae64e5d1e9f08b96ca151a11f856628b3446810e540d64b1ab7dacd77ff5f"
+        }
+    ],
+    "hashType": "sha256"
+}

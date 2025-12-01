@@ -8,7 +8,6 @@ import express from 'express';
 import * as subscriptionController from '../controllers/subscriptionController.js';
 import { verifyToken } from '../middleware/auth.js';
 import { subscriptionCreationLimiter } from '../middleware/rateLimiter.js';
-import logger from '../utils/logger.js';
 
 const router = express.Router();
 
@@ -50,57 +49,25 @@ router.get('/check/:shopId', subscriptionController.checkSubscription);
 router.get('/', subscriptionController.getUserSubscriptions);
 
 /**
+ * POST /api/subscriptions
+ * Subscribe to a shop (buyer subscribes for notifications)
+ *
+ * Body: {
+ *   shopId: number,
+ *   telegramId?: string
+ * }
+ *
+ * Returns: { success: true, data: subscription }
+ */
+router.post('/', subscriptionController.createSubscription);
+
+/**
  * GET /api/subscriptions/my-shops
  * Get shop subscriptions for current user's shops (seller view)
  *
  * Returns payment subscriptions (basic/pro tier) for shops owned by user
  */
 router.get('/my-shops', subscriptionController.getMyShopSubscriptions);
-
-/**
- * POST /api/subscriptions/pay
- * Pay for monthly subscription (renewal or new)
- *
- * Body: {
- *   shopId: number,
- *   tier: 'basic' | 'pro',
- *   txHash: string,
- *   currency: 'BTC' | 'ETH' | 'USDT' | 'LTC',
- *   paymentAddress: string
- * }
- *
- * @security Rate limited to 5 req/hour
- */
-router.post('/pay', subscriptionCreationLimiter, (req, res, next) => {
-  logger.warn('[DEPRECATED] /subscriptions/pay endpoint is deprecated. Use /subscriptions/:id/payment/generate + /subscriptions/:id/payment/confirm instead.', {
-    userId: req.userId,
-    ip: req.ip,
-  });
-  res.set('X-Deprecation-Warning', 'This endpoint is deprecated. Use invoice flow instead.');
-  next();
-}, subscriptionController.paySubscription);
-
-/**
- * POST /api/subscriptions/upgrade
- * Upgrade shop from free to PRO tier
- *
- * Body: {
- *   shopId: number,
- *   txHash: string,
- *   currency: 'BTC' | 'ETH' | 'USDT' | 'LTC',
- *   paymentAddress: string
- * }
- *
- * @security Rate limited to 5 req/hour
- */
-router.post('/upgrade', subscriptionCreationLimiter, (req, res, next) => {
-  logger.warn('[DEPRECATED] /subscriptions/upgrade endpoint is deprecated. Use /subscriptions/:id/upgrade/payment/generate + /subscriptions/:id/upgrade/payment/confirm instead.', {
-    userId: req.userId,
-    ip: req.ip,
-  });
-  res.set('X-Deprecation-Warning', 'This endpoint is deprecated. Use invoice flow instead.');
-  next();
-}, subscriptionController.upgradeShop);
 
 /**
  * GET /api/subscriptions/upgrade-cost/:shopId

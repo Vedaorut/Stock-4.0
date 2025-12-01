@@ -40,6 +40,10 @@ jest.unstable_mockModule('../../src/database/queries/index.js', () => ({
     findByTxHash: jest.fn(),
     createForDirectCrypto: jest.fn(),
   },
+  workerQueries: {
+    findByShopAndUser: jest.fn(),
+    getWorkerShops: jest.fn(),
+  },
 }));
 
 jest.unstable_mockModule('../../src/services/telegram.js', () => ({

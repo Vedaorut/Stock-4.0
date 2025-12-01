@@ -116,7 +116,7 @@ const handleMarkupInput = async (ctx) => {
       const prompt = markupType === 'fixed'
         ? followMessages.markupFixedPrompt
         : followMessages.markupPercentagePrompt;
-      await cleanReply(ctx, 'Пожалуйста, отправьте наценку текстом (только число).\\n\\n' + prompt, cancelButton);
+      await cleanReply(ctx, 'Пожалуйста, отправьте наценку текстом (только число).\n\n' + prompt, cancelButton);
       return;
     }
 

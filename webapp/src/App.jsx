@@ -57,6 +57,18 @@ function App() {
     loadLanguage();
   }, []);
 
+  // Set view mode from user's selected_role (from backend)
+  // NOTE: selected_role can be null for new users - default to 'buyer'
+  useEffect(() => {
+    if (isReady && user) {
+      // If selected_role is explicitly 'seller', use seller mode
+      // Otherwise (null, undefined, 'buyer') use buyer mode
+      const mode = user.selected_role === 'seller' ? 'seller' : 'buyer';
+      // Debug log removed - viewMode is set correctly
+      useStore.getState().setViewMode(mode);
+    }
+  }, [isReady, user]);
+
   // Инициализация Telegram WebApp
   useEffect(() => {
     if (window.Telegram?.WebApp) {

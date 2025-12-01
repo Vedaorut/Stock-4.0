@@ -2,7 +2,7 @@
 
 #############################################
 # Telegram Shop - Full Stack Startup Script
-# Автоматический запуск Backend + Bot + ngrok
+# Автоматический запуск Backend + Bot + Cloudflare Tunnel
 #############################################
 
 set -e  # Exit on error
@@ -47,14 +47,14 @@ pkill -f "nodemon.*bot" 2>/dev/null || true
 echo "  ├─ Webapp processes..."
 pkill -f "vite" 2>/dev/null || true
 
-# Kill ngrok
-echo "  ├─ ngrok..."
-pkill -x ngrok 2>/dev/null || true
+# Kill cloudflared
+echo "  ├─ cloudflared..."
+pkill -x cloudflared 2>/dev/null || true
 
 sleep 2
 
 # Verify cleanup
-REMAINING=$(ps aux | grep -E "node.*(server|bot)|nodemon|vite|ngrok" | grep -v grep | grep -v mcp-server | wc -l)
+REMAINING=$(ps aux | grep -E "node.*(server|bot)|nodemon|vite|cloudflared" | grep -v grep | grep -v mcp-server | wc -l)
 if [ "$REMAINING" -gt 0 ]; then
   echo -e "  ${YELLOW}!${NC} Warning: $REMAINING project processes still running"
 else
@@ -77,48 +77,49 @@ fi
 echo ""
 
 #############################################
-# Step 2: Start ngrok tunnel
+# Step 2: Start Cloudflare Quick Tunnel
 #############################################
-echo -e "${YELLOW}[2/6]${NC} Starting ngrok tunnel..."
+echo -e "${YELLOW}[2/6]${NC} Starting Cloudflare tunnel..."
 
-ngrok http 3000 --log=stdout > "$LOG_DIR/ngrok.log" 2>&1 &
-NGROK_PID=$!
-echo $NGROK_PID > "$PROJECT_ROOT/.ngrok.pid"
+cloudflared tunnel --url http://localhost:3000 > "$LOG_DIR/cloudflared.log" 2>&1 &
+CLOUDFLARED_PID=$!
+echo $CLOUDFLARED_PID > "$PROJECT_ROOT/.cloudflared.pid"
 
-# Wait for ngrok to start
-echo "  └─ Waiting for ngrok to initialize..."
-sleep 3
+# Wait for cloudflared to start
+echo "  └─ Waiting for cloudflared to initialize..."
+sleep 5
 
-# Get ngrok URL
-NGROK_URL=""
-for i in {1..10}; do
-  if NGROK_URL=$(curl -s http://localhost:4040/api/tunnels | grep -o '"public_url":"https://[^"]*"' | head -1 | cut -d'"' -f4); then
-    if [ -n "$NGROK_URL" ]; then
-      echo -e "  ${GREEN}✓${NC} ngrok URL: ${GREEN}$NGROK_URL${NC}"
+# Get Cloudflare URL from logs
+TUNNEL_URL=""
+for i in {1..15}; do
+  if TUNNEL_URL=$(grep -o 'https://[a-zA-Z0-9-]*\.trycloudflare\.com' "$LOG_DIR/cloudflared.log" | head -1); then
+    if [ -n "$TUNNEL_URL" ]; then
+      echo -e "  ${GREEN}✓${NC} Cloudflare URL: ${GREEN}$TUNNEL_URL${NC}"
       break
     fi
   fi
   sleep 1
 done
 
-if [ -z "$NGROK_URL" ]; then
-  echo -e "  ${RED}✗${NC} Failed to get ngrok URL"
-  echo -e "  ${YELLOW}!${NC} Check if ngrok is installed: ${BLUE}brew install ngrok${NC}"
+if [ -z "$TUNNEL_URL" ]; then
+  echo -e "  ${RED}✗${NC} Failed to get Cloudflare tunnel URL"
+  echo -e "  ${YELLOW}!${NC} Check if cloudflared is installed: ${BLUE}brew install cloudflared${NC}"
+  echo -e "  ${YELLOW}!${NC} Check logs: ${BLUE}cat $LOG_DIR/cloudflared.log${NC}"
   exit 1
 fi
 
 echo ""
 
 #############################################
-# Step 3: Update .env files with ngrok URL
+# Step 3: Update .env files with tunnel URL
 #############################################
 echo -e "${YELLOW}[3/6]${NC} Updating configuration files..."
 
 # Update backend/.env
 if [ -f "$PROJECT_ROOT/backend/.env" ]; then
-  sed -i '' "s|FRONTEND_URL=.*|FRONTEND_URL=$NGROK_URL|g" "$PROJECT_ROOT/backend/.env"
-  sed -i '' "s|WEBAPP_URL=.*|WEBAPP_URL=$NGROK_URL|g" "$PROJECT_ROOT/backend/.env"
-  sed -i '' "s|CRYSTALPAY_CALLBACK_URL=.*|CRYSTALPAY_CALLBACK_URL=$NGROK_URL/api/webhooks/crystalpay|g" "$PROJECT_ROOT/backend/.env"
+  sed -i '' "s|FRONTEND_URL=.*|FRONTEND_URL=$TUNNEL_URL|g" "$PROJECT_ROOT/backend/.env"
+  sed -i '' "s|WEBAPP_URL=.*|WEBAPP_URL=$TUNNEL_URL|g" "$PROJECT_ROOT/backend/.env"
+  sed -i '' "s|CRYSTALPAY_CALLBACK_URL=.*|CRYSTALPAY_CALLBACK_URL=$TUNNEL_URL/api/webhooks/crystalpay|g" "$PROJECT_ROOT/backend/.env"
   echo -e "  ${GREEN}✓${NC} Updated backend/.env"
 else
   echo -e "  ${RED}✗${NC} backend/.env not found"
@@ -127,7 +128,7 @@ fi
 
 # Update bot/.env
 if [ -f "$PROJECT_ROOT/bot/.env" ]; then
-  sed -i '' "s|WEBAPP_URL=.*|WEBAPP_URL=$NGROK_URL|g" "$PROJECT_ROOT/bot/.env"
+  sed -i '' "s|WEBAPP_URL=.*|WEBAPP_URL=$TUNNEL_URL|g" "$PROJECT_ROOT/bot/.env"
   echo -e "  ${GREEN}✓${NC} Updated bot/.env"
 else
   echo -e "  ${RED}✗${NC} bot/.env not found"
@@ -136,7 +137,7 @@ fi
 
 # Update webapp/.env
 if [ -f "$PROJECT_ROOT/webapp/.env" ]; then
-  sed -i '' "s|VITE_API_URL=.*|VITE_API_URL=$NGROK_URL/api|g" "$PROJECT_ROOT/webapp/.env"
+  sed -i '' "s|VITE_API_URL=.*|VITE_API_URL=$TUNNEL_URL/api|g" "$PROJECT_ROOT/webapp/.env"
   echo -e "  ${GREEN}✓${NC} Updated webapp/.env"
 else
   echo -e "  ${RED}✗${NC} webapp/.env not found"
@@ -145,7 +146,7 @@ fi
 
 # Update webapp/.env.production (Vite uses this for production builds!)
 if [ -f "$PROJECT_ROOT/webapp/.env.production" ]; then
-  sed -i '' "s|VITE_API_URL=.*|VITE_API_URL=$NGROK_URL/api|g" "$PROJECT_ROOT/webapp/.env.production"
+  sed -i '' "s|VITE_API_URL=.*|VITE_API_URL=$TUNNEL_URL/api|g" "$PROJECT_ROOT/webapp/.env.production"
   echo -e "  ${GREEN}✓${NC} Updated webapp/.env.production"
 fi
 
@@ -161,11 +162,6 @@ if [[ "$WEBAPP_API_URL" != *"/api" ]]; then
   sed -i '' "s|VITE_API_URL=.*|VITE_API_URL=$WEBAPP_API_URL|g" "$PROJECT_ROOT/webapp/.env"
   sed -i '' "s|VITE_API_URL=.*|VITE_API_URL=$WEBAPP_API_URL|g" "$PROJECT_ROOT/webapp/.env.production"
   echo -e "  ${YELLOW}!${NC} Normalized webapp API URL to include /api: ${BLUE}$WEBAPP_API_URL${NC}"
-fi
-
-if [[ "$WEBAPP_API_URL" == http://localhost* && "$NGROK_URL" != http://localhost:3000* ]]; then
-  echo -e "  ${YELLOW}!${NC} Warning: webapp VITE_API_URL still points to localhost (${BLUE}$WEBAPP_API_URL${NC})"
-  echo -e "     Build will continue, but requests may fail if accessed via ngrok."
 fi
 
 echo -e "  └─ Webapp API URL: ${BLUE}$WEBAPP_API_URL${NC}"
@@ -217,7 +213,7 @@ echo ""
 #############################################
 # Step 6: Start Telegram Bot
 #############################################
-echo -e "${YELLOW}[6/7]${NC} Starting Telegram Bot..."
+echo -e "${YELLOW}[6/6]${NC} Starting Telegram Bot..."
 
 cd "$PROJECT_ROOT/bot"
 npm start > "$LOG_DIR/bot.log" 2>&1 &
@@ -237,33 +233,30 @@ fi
 echo ""
 
 #############################################
-# Step 7: Summary
+# Summary
 #############################################
-echo -e "${YELLOW}[7/7]${NC} Startup complete!"
-echo ""
 echo -e "${BLUE}╔════════════════════════════════════════════════════╗${NC}"
 echo -e "${BLUE}║                   🎉 READY!                        ║${NC}"
 echo -e "${BLUE}╚════════════════════════════════════════════════════╝${NC}"
 echo ""
 echo -e "${GREEN}Services:${NC}"
 echo -e "  ├─ Backend API:     ${BLUE}http://localhost:3000/api${NC}"
-echo -e "  ├─ WebApp (ngrok):  ${BLUE}$NGROK_URL${NC}"
-echo -e "  ├─ Health Check:    ${BLUE}http://localhost:3000/health${NC}"
-echo -e "  └─ ngrok Dashboard: ${BLUE}http://localhost:4040${NC}"
+echo -e "  ├─ WebApp (tunnel): ${BLUE}$TUNNEL_URL${NC}"
+echo -e "  └─ Health Check:    ${BLUE}http://localhost:3000/health${NC}"
 echo ""
 echo -e "${GREEN}Logs:${NC}"
-echo -e "  ├─ Backend: ${BLUE}tail -f $LOG_DIR/backend.log${NC}"
-echo -e "  ├─ Bot:     ${BLUE}tail -f $LOG_DIR/bot.log${NC}"
-echo -e "  ├─ Webapp:  ${BLUE}cat $LOG_DIR/webapp-build.log${NC}"
-echo -e "  └─ ngrok:   ${BLUE}tail -f $LOG_DIR/ngrok.log${NC}"
+echo -e "  ├─ Backend:     ${BLUE}tail -f $LOG_DIR/backend.log${NC}"
+echo -e "  ├─ Bot:         ${BLUE}tail -f $LOG_DIR/bot.log${NC}"
+echo -e "  ├─ Webapp:      ${BLUE}cat $LOG_DIR/webapp-build.log${NC}"
+echo -e "  └─ Cloudflare:  ${BLUE}tail -f $LOG_DIR/cloudflared.log${NC}"
 echo ""
 echo -e "${GREEN}Process IDs:${NC}"
-echo -e "  ├─ ngrok:   ${BLUE}$NGROK_PID${NC}"
-echo -e "  ├─ Backend: ${BLUE}$BACKEND_PID${NC}"
-echo -e "  └─ Bot:     ${BLUE}$BOT_PID${NC}"
+echo -e "  ├─ Cloudflare:  ${BLUE}$CLOUDFLARED_PID${NC}"
+echo -e "  ├─ Backend:     ${BLUE}$BACKEND_PID${NC}"
+echo -e "  └─ Bot:         ${BLUE}$BOT_PID${NC}"
 echo ""
 echo -e "${YELLOW}To stop all services:${NC}"
-echo -e "  ${BLUE}./stop.sh${NC} or ${BLUE}lsof -ti:3000 | xargs kill -9 && pkill ngrok${NC}"
+echo -e "  ${BLUE}./stop.sh${NC}"
 echo ""
 echo -e "${GREEN}Telegram Bot:${NC}"
 echo -e "  └─ Open Telegram → Find your bot → Click Menu Button${NC}"

@@ -321,7 +321,10 @@ const handleModeSelection = async (ctx) => {
       }
     } else {
       // Ask for markup for resell mode
-      await ctx.editMessageText(followMessages.markupPrompt);
+      await ctx.editMessageText(
+        followMessages.markupPrompt,
+        Markup.inlineKeyboard([[Markup.button.callback('❌ Отмена', 'cancel_scene')]])
+      );
       return ctx.wizard.next();
     }
   } catch (error) {
@@ -336,6 +339,7 @@ const handleMarkup = async (ctx) => {
     if (!ctx.message || !ctx.message.text) {
       await smartMessage.send(ctx, {
         text: 'Пожалуйста, отправьте наценку текстом (только число).\n\n' + followMessages.createResellPrompt,
+        keyboard: cancelButton,
       });
       return;
     }
@@ -350,7 +354,10 @@ const handleMarkup = async (ctx) => {
     const markup = parseFloat(markupText);
 
     if (isNaN(markup) || markup < 1 || markup > 500) {
-      await smartMessage.send(ctx, { text: followMessages.createMarkupInvalid });
+      await smartMessage.send(ctx, { 
+        text: followMessages.createMarkupInvalid,
+        keyboard: cancelButton,
+      });
       return;
     }
 

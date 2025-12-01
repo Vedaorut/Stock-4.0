@@ -82,34 +82,6 @@ export const requireFollowOwner = async (req, res, next) => {
   }
 };
 
-/**
- * @deprecated NOT IN USE - Subscription endpoints verify ownership in controllers
- *
- * Require user to own the subscription (via shop ownership)
- * Checks that the subscription's shop is owned by the authenticated user
- *
- * Note: This is a placeholder. Subscription routes need to be refactored
- * to use subscription IDs instead of shop IDs directly.
- * Most subscription endpoints already verify shop ownership through controller logic.
- *
- * If you need subscription ownership verification, implement it in the controller
- * or refactor subscription routes to use subscription IDs.
- */
-export const requireSubscriptionOwner = async (req, res, _next) => {
-  logger.warn('[DEPRECATED] requireSubscriptionOwner middleware called but NOT IN USE', {
-    subscriptionId: req.params.id,
-    userId: req.user?.id,
-    route: req.originalUrl,
-  });
-
-  return res.status(501).json({
-    success: false,
-    error:
-      'This middleware is deprecated and not in use. Use controller-level authorization instead.',
-  });
-};
-
 export default {
   requireFollowOwner,
-  requireSubscriptionOwner,
 };

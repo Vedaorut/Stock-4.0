@@ -205,7 +205,12 @@ export const productQueries = {
   // Bulk delete products by shop ID (excludes synced products)
   bulkDeleteByShopId: async (shopId) => {
     const result = await query(
-      'DELETE FROM products WHERE shop_id = $1 AND (is_synced = false OR is_synced IS NULL) RETURNING id, shop_id, name',
+      `DELETE FROM products p
+       WHERE p.shop_id = $1
+         AND NOT EXISTS (
+           SELECT 1 FROM synced_products sp WHERE sp.synced_product_id = p.id
+         )
+       RETURNING id, shop_id, name`,
       [shopId]
     );
     return result.rows;
@@ -214,8 +219,11 @@ export const productQueries = {
   // Bulk delete products by IDs (with ownership check via shopId, excludes synced products)
   bulkDeleteByIds: async (productIds, shopId) => {
     const result = await query(
-      `DELETE FROM products
-       WHERE id = ANY($1) AND shop_id = $2 AND (is_synced = false OR is_synced IS NULL)
+      `DELETE FROM products p
+       WHERE p.id = ANY($1) AND p.shop_id = $2
+         AND NOT EXISTS (
+           SELECT 1 FROM synced_products sp WHERE sp.synced_product_id = p.id
+         )
        RETURNING id, shop_id, name`,
       [productIds, shopId]
     );

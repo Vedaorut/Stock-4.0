@@ -154,14 +154,14 @@ export const paymentController = {
       const { address, amount, currency } = req.body;
 
       // Validate inputs (explicit checks to avoid falsy issues with amount: 0)
-      if (!address || amount === undefined || amount === null || !currency) {
-        throw new ValidationError('Missing required fields: address, amount, currency');
+      if (!address || !currency) {
+        throw new ValidationError('Missing required fields: address, currency');
       }
 
-      // Validate amount is positive number
-      const parsedAmount = parseFloat(amount);
-      if (isNaN(parsedAmount) || parsedAmount <= 0) {
-        throw new ValidationError('Amount must be a positive number greater than 0');
+      // Validate amount is non-negative number (0 allowed for address-only QR)
+      const parsedAmount = parseFloat(amount || 0);
+      if (isNaN(parsedAmount) || parsedAmount < 0) {
+        throw new ValidationError('Amount must be a non-negative number');
       }
 
       // Validate currency
@@ -171,28 +171,33 @@ export const paymentController = {
       }
 
       // Generate payment URI based on currency standard
+      // When amount is 0, generate address-only URI (for displaying seller wallet)
+      const hasAmount = parsedAmount > 0;
       let paymentURI;
       switch (currency.toUpperCase()) {
         case 'BTC':
-          // BIP-21: bitcoin:address?amount=X
-          paymentURI = `bitcoin:${address}?amount=${amount}`;
+          // BIP-21: bitcoin:address?amount=X (or just bitcoin:address)
+          paymentURI = hasAmount ? `bitcoin:${address}?amount=${parsedAmount}` : `bitcoin:${address}`;
           break;
         case 'ETH': {
           // EIP-681: ethereum:address?value=X (value in wei)
-          // Convert ETH to wei (string to avoid precision loss)
-          const ethFloat = parseFloat(amount);
-          const wei = Number.isFinite(ethFloat) ? BigInt(Math.round(ethFloat * 1e18)).toString() : amount;
-          paymentURI = `ethereum:${address}?value=${wei}`;
+          if (hasAmount) {
+            const wei = BigInt(Math.round(parsedAmount * 1e18)).toString();
+            paymentURI = `ethereum:${address}?value=${wei}`;
+          } else {
+            paymentURI = `ethereum:${address}`;
+          }
           break;
         }
         case 'USDT':
-          // TRC-20 Tron format
-          // TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t is USDT contract on Tron
-          paymentURI = `tronlink://send?token=TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t&to=${address}&amount=${amount}`;
+          // TRC-20 Tron format - for amount=0, just use address
+          paymentURI = hasAmount
+            ? `tronlink://send?token=TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t&to=${address}&amount=${parsedAmount}`
+            : address;
           break;
         case 'LTC':
-          // BIP-21: litecoin:address?amount=X
-          paymentURI = `litecoin:${address}?amount=${amount}`;
+          // BIP-21: litecoin:address?amount=X (or just litecoin:address)
+          paymentURI = hasAmount ? `litecoin:${address}?amount=${parsedAmount}` : `litecoin:${address}`;
           break;
       }
 

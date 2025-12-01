@@ -20,6 +20,7 @@ jest.unstable_mockModule('../../utils/logger.js', () => ({
 }));
 
 const {
+  VERIFICATION_STATUS,
   verifyPayment,
   verifyBitcoinPayment,
   verifyLitecoinPayment,
@@ -32,37 +33,72 @@ describe('Blockchain Verification Service', () => {
     jest.clearAllMocks();
   });
 
+  describe('VERIFICATION_STATUS constants', () => {
+    it('should export all status types', () => {
+      expect(VERIFICATION_STATUS.SUCCESS).toBe('SUCCESS');
+      expect(VERIFICATION_STATUS.TX_NOT_FOUND).toBe('TX_NOT_FOUND');
+      expect(VERIFICATION_STATUS.TX_INVALID).toBe('TX_INVALID');
+      expect(VERIFICATION_STATUS.API_ERROR).toBe('API_ERROR');
+    });
+  });
+
   describe('verifyPayment - dispatcher', () => {
-    it('should return error for invalid transaction hash', async () => {
+    it('should return TX_INVALID for invalid transaction hash', async () => {
       const result = await verifyPayment('', 'BTC', 'address', '1.0');
 
       expect(result.verified).toBe(false);
       expect(result.status).toBe('failed');
+      expect(result.resultStatus).toBe(VERIFICATION_STATUS.TX_INVALID);
       expect(result.error).toContain('Invalid transaction hash');
     });
 
-    it('should return error for unsupported chain', async () => {
+    it('should return TX_INVALID for unsupported chain', async () => {
       const result = await verifyPayment('txhash', 'DOGE', 'address', '1.0');
 
       expect(result.verified).toBe(false);
       expect(result.status).toBe('failed');
+      expect(result.resultStatus).toBe(VERIFICATION_STATUS.TX_INVALID);
       expect(result.error).toContain('Unsupported chain');
+    });
+
+    it('should return API_ERROR when blockchain API fails', async () => {
+      const networkError = new Error('ECONNREFUSED');
+      networkError.code = 'ECONNREFUSED';
+      mockAxios.mockRejectedValue(networkError);
+
+      const result = await verifyPayment('txhash', 'BTC', 'address', '1.0');
+
+      expect(result.verified).toBe(false);
+      expect(result.status).toBe('failed');
+      expect(result.resultStatus).toBe(VERIFICATION_STATUS.API_ERROR);
     });
   });
 
   describe('verifyBitcoinPayment', () => {
+    // Blockstream Esplora API response format:
+    // { txid, vout: [{ scriptpubkey_address, value }], status: { confirmed, block_height } }
+    // Note: value is returned in satoshi
+
     it('should verify confirmed BTC transaction successfully', async () => {
+      // Mock tx response
       mockAxios.mockResolvedValueOnce({
         data: {
-          confirmations: 3,
-          double_spend: false,
-          outputs: [
+          txid: 'txhash',
+          vout: [
             {
-              addresses: ['1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa'],
+              scriptpubkey_address: '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa',
               value: 100000000, // 1 BTC in satoshi
             },
           ],
+          status: {
+            confirmed: true,
+            block_height: 100,
+          },
         },
+      });
+      // Mock current height response
+      mockAxios.mockResolvedValueOnce({
+        data: 102, // 3 confirmations (102 - 100 + 1)
       });
 
       const result = await verifyBitcoinPayment(
@@ -80,15 +116,21 @@ describe('Blockchain Verification Service', () => {
     it('should detect pending BTC transaction (insufficient confirmations)', async () => {
       mockAxios.mockResolvedValueOnce({
         data: {
-          confirmations: 1,
-          double_spend: false,
-          outputs: [
+          txid: 'txhash',
+          vout: [
             {
-              addresses: ['1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa'],
+              scriptpubkey_address: '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa',
               value: 100000000,
             },
           ],
+          status: {
+            confirmed: true,
+            block_height: 100,
+          },
         },
+      });
+      mockAxios.mockResolvedValueOnce({
+        data: 100, // 1 confirmation
       });
 
       const result = await verifyBitcoinPayment(
@@ -102,18 +144,9 @@ describe('Blockchain Verification Service', () => {
       expect(result.confirmations).toBe(1);
     });
 
-    it('should reject double-spend transaction', async () => {
+    it('should return failed for transaction not found', async () => {
       mockAxios.mockResolvedValueOnce({
-        data: {
-          confirmations: 3,
-          double_spend: true,
-          outputs: [
-            {
-              addresses: ['1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa'],
-              value: 100000000,
-            },
-          ],
-        },
+        data: null,
       });
 
       const result = await verifyBitcoinPayment(
@@ -124,20 +157,20 @@ describe('Blockchain Verification Service', () => {
 
       expect(result.verified).toBe(false);
       expect(result.status).toBe('failed');
-      expect(result.error).toContain('double-spend');
+      expect(result.error).toContain('not found');
     });
 
     it('should reject payment to wrong address', async () => {
       mockAxios.mockResolvedValueOnce({
         data: {
-          confirmations: 3,
-          double_spend: false,
-          outputs: [
+          txid: 'txhash',
+          vout: [
             {
-              addresses: ['1WrongAddressHere'],
+              scriptpubkey_address: '1WrongAddressHere',
               value: 100000000,
             },
           ],
+          status: { confirmed: false },
         },
       });
 
@@ -155,14 +188,14 @@ describe('Blockchain Verification Service', () => {
     it('should reject insufficient amount (with tolerance)', async () => {
       mockAxios.mockResolvedValueOnce({
         data: {
-          confirmations: 3,
-          double_spend: false,
-          outputs: [
+          txid: 'txhash',
+          vout: [
             {
-              addresses: ['1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa'],
+              scriptpubkey_address: '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa',
               value: 95000000, // 0.95 BTC (< 0.98 BTC minimum with 2% tolerance)
             },
           ],
+          status: { confirmed: false },
         },
       });
 
@@ -180,15 +213,21 @@ describe('Blockchain Verification Service', () => {
     it('should accept amount within tolerance (99% of expected)', async () => {
       mockAxios.mockResolvedValueOnce({
         data: {
-          confirmations: 3,
-          double_spend: false,
-          outputs: [
+          txid: 'txhash',
+          vout: [
             {
-              addresses: ['1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa'],
+              scriptpubkey_address: '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa',
               value: 99000000, // 0.99 BTC (>= 0.98 BTC minimum)
             },
           ],
+          status: {
+            confirmed: true,
+            block_height: 100,
+          },
         },
+      });
+      mockAxios.mockResolvedValueOnce({
+        data: 102,
       });
 
       const result = await verifyBitcoinPayment(
@@ -204,6 +243,10 @@ describe('Blockchain Verification Service', () => {
   });
 
   describe('verifyLitecoinPayment', () => {
+    // BlockCypher API response format:
+    // { confirmations, double_spend, outputs: [{ addresses: [], value }] }
+    // Note: value is in litoshi, addresses is an array
+
     it('should verify confirmed LTC transaction successfully', async () => {
       mockAxios.mockResolvedValueOnce({
         data: {
@@ -212,7 +255,7 @@ describe('Blockchain Verification Service', () => {
           outputs: [
             {
               addresses: ['LdP8Qox1VAhCzLJNqrr74YovaWYyNBUWvL'],
-              value: 100000000, // 1 LTC
+              value: 100000000, // 1 LTC in litoshi
             },
           ],
         },
@@ -227,6 +270,31 @@ describe('Blockchain Verification Service', () => {
       expect(result.verified).toBe(true);
       expect(result.status).toBe('confirmed');
       expect(result.confirmations).toBe(6);
+    });
+
+    it('should reject double-spend LTC transaction', async () => {
+      mockAxios.mockResolvedValueOnce({
+        data: {
+          confirmations: 6,
+          double_spend: true,
+          outputs: [
+            {
+              addresses: ['LdP8Qox1VAhCzLJNqrr74YovaWYyNBUWvL'],
+              value: 100000000,
+            },
+          ],
+        },
+      });
+
+      const result = await verifyLitecoinPayment(
+        'txhash',
+        'LdP8Qox1VAhCzLJNqrr74YovaWYyNBUWvL',
+        '1.0'
+      );
+
+      expect(result.verified).toBe(false);
+      expect(result.status).toBe('failed');
+      expect(result.error).toContain('double-spend');
     });
   });
 
@@ -352,7 +420,22 @@ describe('Blockchain Verification Service', () => {
 
       expect(result.verified).toBe(false);
       expect(result.status).toBe('failed');
+      expect(result.resultStatus).toBe(VERIFICATION_STATUS.TX_NOT_FOUND);
       expect(result.error).toContain('not found');
+    });
+
+    it('should return API_ERROR when TronGrid API fails', async () => {
+      // Simulate API error (network timeout)
+      const apiError = new Error('ETIMEDOUT');
+      apiError.code = 'ETIMEDOUT';
+      mockAxios.mockRejectedValueOnce(apiError);
+
+      const result = await verifyUSDTTRC20Payment('txhash', 'address', '100.0');
+
+      expect(result.verified).toBe(false);
+      expect(result.status).toBe('failed');
+      expect(result.resultStatus).toBe(VERIFICATION_STATUS.API_ERROR);
+      expect(result.error).toContain('TRON API error');
     });
 
     // Note: Full USDT TRC20 verification test requires TronWeb library

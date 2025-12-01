@@ -284,7 +284,7 @@ const ProductCard = memo(function ProductCard({ product, onPreorder: _onPreorder
               <div className="space-y-0.5">
                 <div className="flex items-center gap-1.5">
                   <span className="text-xs text-gray-400 line-through font-medium">
-                    ${Math.round(originalPrice)}
+                    ${parseFloat(originalPrice).toFixed(2)}
                   </span>
                   <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-500 text-white">
                     -{Math.round(discountPercentage)}%
@@ -298,7 +298,7 @@ const ProductCard = memo(function ProductCard({ product, onPreorder: _onPreorder
                     whiteSpace: 'nowrap',
                   }}
                 >
-                  ${Math.round(product.price)}
+                  ${parseFloat(product.price).toFixed(2)}
                 </span>
               </div>
             ) : (
@@ -310,7 +310,7 @@ const ProductCard = memo(function ProductCard({ product, onPreorder: _onPreorder
                   whiteSpace: 'nowrap',
                 }}
               >
-                ${Math.round(product.price)}
+                ${parseFloat(product.price).toFixed(2)}
               </span>
             )}
 

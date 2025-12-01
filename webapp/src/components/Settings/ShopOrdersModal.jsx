@@ -11,19 +11,19 @@ const STATUS = {
   pending: { label: 'Ожидание', color: '#FFCC00', dot: 'bg-yellow-400' },
   verifying: { label: 'Проверка', color: '#3B82F6', dot: 'bg-blue-500' },
   confirmed: { label: 'Оплачен', color: '#22C55E', dot: 'bg-green-500' },
-  issued: { label: 'Выдан', color: '#8B5CF6', dot: 'bg-purple-500' },
-  completed: { label: 'Завершён', color: '#10B981', dot: 'bg-emerald-500' },
+  shipped: { label: 'Выдан', color: '#8B5CF6', dot: 'bg-purple-500' },
+  delivered: { label: 'Завершён', color: '#10B981', dot: 'bg-emerald-500' },
   cancelled: { label: 'Отменён', color: '#EF4444', dot: 'bg-red-500' },
 };
 
 // Status transitions for seller/worker actions
 const STATUS_ACTIONS = {
   confirmed: [
-    { status: 'issued', label: 'Выдать товар', color: 'bg-purple-500' },
+    { status: 'shipped', label: 'Выдать товар', color: 'bg-purple-500' },
     { status: 'cancelled', label: 'Отменить', color: 'bg-red-500/20 text-red-400' },
   ],
-  issued: [
-    { status: 'completed', label: 'Завершить', color: 'bg-emerald-500' },
+  shipped: [
+    { status: 'delivered', label: 'Завершить', color: 'bg-emerald-500' },
   ],
 };
 

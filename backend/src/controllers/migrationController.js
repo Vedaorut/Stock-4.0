@@ -70,7 +70,7 @@ const checkMigrationEligibility = asyncHandler(async (req, res) => {
 /**
  * Initiate channel migration broadcast
  * POST /api/shops/:shopId/migration
- * Body: { newChannelUrl: string, oldChannelUrl?: string, botInstance: object }
+ * Body: { newChannelUrl: string, oldChannelUrl?: string }
  */
 const initiateMigration = asyncHandler(async (req, res) => {
   try {
@@ -109,14 +109,6 @@ const initiateMigration = asyncHandler(async (req, res) => {
       });
     }
 
-    // Check if bot instance is available
-    if (!global.botInstance) {
-      return res.status(503).json({
-        error: 'Bot service unavailable',
-        message: 'Telegram bot is not running. Please contact support.',
-      });
-    }
-
     // Get subscriber count
     const subscribers = await broadcastService.getShopSubscribers(shopId);
 
@@ -124,7 +116,6 @@ const initiateMigration = asyncHandler(async (req, res) => {
     setImmediate(async () => {
       try {
         await broadcastService.broadcastMigration(
-          global.botInstance,
           shopId,
           shop.name,
           newChannelUrl,

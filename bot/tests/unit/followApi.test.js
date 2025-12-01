@@ -184,7 +184,8 @@ describe('followApi - Unit Tests', () => {
     it('markup как строка → конвертировать в число', async () => {
       mock.onPut('/follows/20/markup').reply(200, { data: { id: 20, markup_percentage: 15 } });
 
-      await followApi.updateMarkup(20, '15', 'test-token');
+      // Pass as object (new format) with string value
+      await followApi.updateMarkup(20, { markupPercentage: '15', markupType: 'percentage' }, 'test-token');
 
       const requestData = JSON.parse(mock.history.put[0].data);
       expect(requestData.markupPercentage).toBe(15);

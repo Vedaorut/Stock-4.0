@@ -178,8 +178,8 @@ export const validateStatusUpdate = async (order, newStatus, userId) => {
       throw new ValidationError('Only pending orders can be cancelled by buyer');
     }
   } else if (order.owner_id && order.owner_id === userId) {
-    // Seller can update to: confirmed, shipped, cancelled
-    const allowedStatuses = ['confirmed', 'shipped', 'cancelled'];
+    // Seller can update to: confirmed, shipped, delivered, cancelled
+    const allowedStatuses = ['confirmed', 'shipped', 'delivered', 'cancelled'];
     if (!allowedStatuses.includes(newStatus)) {
       throw new UnauthorizedError(`Sellers can only update status to: ${allowedStatuses.join(', ')}`);
     }
@@ -190,7 +190,7 @@ export const validateStatusUpdate = async (order, newStatus, userId) => {
       throw new UnauthorizedError('You do not have permission to update this order');
     }
 
-    const allowedStatuses = ['confirmed', 'shipped', 'cancelled'];
+    const allowedStatuses = ['confirmed', 'shipped', 'delivered', 'cancelled'];
     if (!allowedStatuses.includes(newStatus)) {
       throw new UnauthorizedError(`Workers can only update status to: ${allowedStatuses.join(', ')}`);
     }

@@ -11,6 +11,7 @@ export { default as orderItemQueries } from './orderItemQueries.js';
 export { default as paymentQueries } from './paymentQueries.js';
 export { default as invoiceQueries } from './invoiceQueries.js';
 export { default as subscriptionQueries } from './subscriptionQueries.js';
+export { default as refreshTokenQueries } from './refreshTokenQueries.js';
 
 // Import existing worker and webhook queries from models/
 export { workerQueries } from '../../models/workerQueries.js';
@@ -26,6 +27,7 @@ export default {
   paymentQueries: (await import('./paymentQueries.js')).default,
   invoiceQueries: (await import('./invoiceQueries.js')).default,
   subscriptionQueries: (await import('./subscriptionQueries.js')).default,
+  refreshTokenQueries: (await import('./refreshTokenQueries.js')).default,
   workerQueries: (await import('../../models/workerQueries.js')).workerQueries,
   processedWebhookQueries: (await import('../../models/processedWebhookQueries.js'))
     .processedWebhookQueries,

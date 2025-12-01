@@ -1,56 +1,10 @@
 import * as subscriptionService from '../../../services/subscriptionService.js';
 import * as subscriptionInvoiceService from '../../../services/subscriptionInvoiceService.js';
 import { asyncHandler } from '../../../middleware/errorHandler.js';
-import { ValidationError } from '../../../utils/errors.js';
 import logger from '../../../utils/logger.js';
 import invoicePaymentService from '../../../services/invoicePaymentService.js';
 import { verifyShopOwnership, verifySubscriptionOwnership } from '../utils/ownership.js';
 import { ensurePaymentProof } from '../validators/payloadValidators.js';
-
-/**
- * Upgrade shop from basic to PRO tier
- * POST /api/subscriptions/upgrade
- */
-export const upgradeShop = asyncHandler(async (req, res) => {
-  try {
-    const { shopId, txHash, currency, paymentAddress, paymentLink, txLink, transactionUrl } =
-      req.body;
-    const userId = req.user.id;
-
-    const paymentProof = txHash || paymentLink || txLink || transactionUrl;
-
-    if (!shopId || !paymentProof || !currency || !paymentAddress) {
-      throw new ValidationError(
-        'Missing required fields: shopId, txHash/paymentLink, currency, paymentAddress'
-      );
-    }
-
-    const ownershipCheck = await verifyShopOwnership(shopId, userId);
-    if (!ownershipCheck.success) {
-      return res.status(ownershipCheck.status).json({ error: ownershipCheck.error });
-    }
-
-    const subscription = await subscriptionService.upgradeShopToPro(
-      shopId,
-      txHash,
-      currency,
-      paymentAddress,
-      paymentLink || txLink || transactionUrl
-    );
-
-    logger.info(`[SubscriptionController] Shop ${shopId} upgraded to PRO tier`);
-
-    res.status(200).json({
-      success: true,
-      subscription,
-      message: 'Shop upgraded to PRO tier successfully',
-      newTier: 'pro',
-    });
-  } catch (error) {
-    logger.error('[SubscriptionController] Error upgrading shop:', error);
-    throw error;
-  }
-});
 
 /**
  * Get upgrade cost for shop

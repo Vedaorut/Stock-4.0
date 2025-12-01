@@ -1,11 +1,9 @@
 import {
-  paySubscription,
   generatePaymentInvoice,
   getPaymentStatus,
   confirmPaymentWithTxHash,
 } from './handlers/paymentHandlers.js';
 import {
-  upgradeShop,
   getUpgradeCost,
   generateUpgradePaymentInvoice,
   getUpgradePaymentStatus,
@@ -16,12 +14,11 @@ import {
   checkSubscription,
   getUserSubscriptions,
   getMyShopSubscriptions,
+  createSubscription,
 } from './handlers/userHandlers.js';
 import { createPendingSubscription } from './handlers/pendingHandlers.js';
 
 export {
-  paySubscription,
-  upgradeShop,
   getUpgradeCost,
   getStatus,
   getHistory,
@@ -29,6 +26,7 @@ export {
   checkSubscription,
   getUserSubscriptions,
   getMyShopSubscriptions,
+  createSubscription,
   generatePaymentInvoice,
   generateUpgradePaymentInvoice,
   getPaymentStatus,
@@ -39,8 +37,6 @@ export {
 };
 
 const subscriptionController = {
-  paySubscription,
-  upgradeShop,
   getUpgradeCost,
   getStatus,
   getHistory,
@@ -48,6 +44,7 @@ const subscriptionController = {
   checkSubscription,
   getUserSubscriptions,
   getMyShopSubscriptions,
+  createSubscription,
   generatePaymentInvoice,
   generateUpgradePaymentInvoice,
   getPaymentStatus,

@@ -65,12 +65,16 @@ export const useWebSocket = () => {
             const data = JSON.parse(event.data);
             handleWebSocketMessage(data);
           } catch (error) {
-            console.error('Failed to parse WebSocket message:', error);
+            if (import.meta.env.DEV) {
+              console.error('Failed to parse WebSocket message:', error);
+            }
           }
         };
 
         ws.onerror = (error) => {
-          console.error('❌ WebSocket error:', error);
+          if (import.meta.env.DEV) {
+            console.error('❌ WebSocket error:', error);
+          }
         };
 
         ws.onclose = (_event) => {
@@ -97,7 +101,9 @@ export const useWebSocket = () => {
           }, delay);
         };
       } catch (error) {
-        console.error('Failed to create WebSocket connection:', error);
+        if (import.meta.env.DEV) {
+          console.error('Failed to create WebSocket connection:', error);
+        }
         setIsConnected(false);
 
         if (!mounted) return; // ✅ Don't retry if unmounted

@@ -91,8 +91,10 @@ function verifyInternalSecret(req, res, next) {
       logger.warn('Internal API request with invalid/expired timestamp', {
         ip: clientIP,
         path: req.path,
-        timestamp,
-        now,
+        receivedTimestamp: timestamp || 'MISSING',
+        requestTime: requestTime || 'NaN',
+        serverNow: now,
+        diff: Math.abs(now - requestTime),
       });
       return res.status(401).json({
         success: false,
@@ -287,6 +289,75 @@ router.post('/auth/bot-register', verifyInternalSecret, async (req, res) => {
 });
 
 /**
+ * GET /api/internal/subscriptions/:telegramId
+ * Get user subscriptions by telegram_id (for bot)
+ *
+ * Headers: { x-internal-secret: string }
+ * Returns: { success: true, data: [...subscriptions] }
+ */
+router.get('/subscriptions/:telegramId', verifyInternalSecret, async (req, res) => {
+  try {
+    const { telegramId } = req.params;
+
+    if (!telegramId) {
+      return res.status(400).json({
+        success: false,
+        error: 'telegramId is required',
+      });
+    }
+
+    // Find user by telegram_id
+    const user = await userQueries.findByTelegramId(telegramId);
+
+    if (!user) {
+      return res.json({
+        success: true,
+        data: [],
+      });
+    }
+
+    // Get subscriptions from subscriptions table (buyer subscriptions)
+    const { query } = await import('../config/database.js');
+    const result = await query(
+      `SELECT
+         sub.id,
+         sub.shop_id,
+         s.name as shop_name,
+         s.logo as shop_logo,
+         s.description as shop_description,
+         sub.created_at
+       FROM subscriptions sub
+       LEFT JOIN shops s ON sub.shop_id = s.id
+       WHERE sub.user_id = $1
+       ORDER BY sub.created_at DESC`,
+      [user.id]
+    );
+
+    logger.info('[Internal] User subscriptions fetched', {
+      telegramId,
+      userId: user.id,
+      count: result.rows.length,
+    });
+
+    res.json({
+      success: true,
+      data: result.rows,
+    });
+  } catch (error) {
+    logger.error('[Internal] Get subscriptions error:', {
+      error: error.message,
+      telegramId: req.params.telegramId,
+    });
+
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get subscriptions',
+      details: error.message,
+    });
+  }
+});
+
+/**
  * POST /api/internal/admin/recover-subscription/:subscriptionId
  * Manually create shop for paid subscription (admin recovery tool)
  *
@@ -321,6 +392,20 @@ router.post('/admin/recover-subscription/:subscriptionId', verifyInternalSecret,
     }
 
     const sub = subscription.rows[0];
+
+    // Check if user already has an active shop
+    const existingShop = await query(
+      `SELECT id, name FROM shops WHERE owner_id = $1 AND is_active = true LIMIT 1`,
+      [sub.user_id]
+    );
+
+    if (existingShop.rows.length > 0) {
+      return res.status(409).json({
+        success: false,
+        error: 'User already has an active shop',
+        existingShop: existingShop.rows[0],
+      });
+    }
 
     // Create shop with auto-generated name
     const shopName = `Shop_${sub.username || sub.telegram_id}_${Date.now()}`;

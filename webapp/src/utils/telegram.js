@@ -55,7 +55,9 @@ export function initTelegramApp() {
       });
 
       tg.onEvent('fullscreenFailed', (error) => {
-        console.error('❌ Fullscreen failed:', error);
+        if (import.meta.env.DEV) {
+          console.error('❌ Fullscreen failed:', error);
+        }
       });
     }
 
@@ -67,7 +69,9 @@ export function initTelegramApp() {
       isExpanded: tg.isExpanded,
     };
   } catch (error) {
-    console.error('Telegram WebApp initialization error:', error);
+    if (import.meta.env.DEV) {
+      console.error('Telegram WebApp initialization error:', error);
+    }
     return null;
   }
 }

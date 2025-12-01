@@ -1,13 +1,50 @@
-# CLAUDE.md
+# Status Stock - CLAUDE.md
 
-## Project
+## Project Overview
 
-**Status Stock** — Telegram E-Commerce платформа.
+**Status Stock** — Telegram E-Commerce platform for digital shops with crypto payments.
 
 ```
-backend/   → Express API + PostgreSQL + WebSocket
-bot/       → Telegram Bot (Telegraf.js)
-webapp/    → React Mini App (TailwindCSS + Framer Motion)
+backend/   Express + PostgreSQL + WebSocket + Redis (Bull queues)
+bot/       Telegraf.js Telegram Bot with scenes
+webapp/    React + Vite + TailwindCSS + Zustand (Mini App)
+```
+
+---
+
+## Subagent Delegation Matrix
+
+**ALWAYS delegate code work to specialized agents:**
+
+| Task | Delegate To | Proactive |
+|------|-------------|-----------|
+| API endpoints, Express routes | `backend-architect` | Yes |
+| React components, TailwindCSS | `frontend-developer` | Yes |
+| PostgreSQL, migrations, SQL | `database-designer` | Yes |
+| Telegraf handlers, scenes, keyboards | `telegram-bot-expert` | Yes |
+| Bugs, test failures, errors | `debug-master` | Yes |
+| Crypto payments, blockchain | `crypto-integration-specialist` | Yes |
+| UI/UX research, design patterns | `design-researcher` | Yes |
+| Documentation, tutorials | `internel` | No |
+| Codebase exploration | `Explore` | Always |
+
+### Delegation Examples
+
+**Feature implementation (parallel):**
+```
+Task 1 → frontend-developer: "Build PaymentModal component with crypto selection"
+Task 2 → backend-architect: "Create POST /api/payments/initiate endpoint"
+Task 3 → database-designer: "Add payments table with status enum"
+```
+
+**Bug fixing:**
+```
+Task → debug-master: "Backend crashes on startup with error: X. Find root cause and fix."
+```
+
+**Complex exploration:**
+```
+Task → Explore: "How does payment verification flow work? Trace from order creation to confirmation."
 ```
 
 ---
@@ -15,155 +52,89 @@ webapp/    → React Mini App (TailwindCSS + Framer Motion)
 ## Commands
 
 ```bash
-# Development
-./start.sh              # Start all (ngrok + backend + bot)
+# Full stack
+./start.sh              # Cloudflare + backend + bot
 ./stop.sh               # Stop all
-npm run dev             # Backend + WebApp dev mode
+
+# Development
+cd backend && npm run dev        # Backend :3000
+cd bot && npm run dev            # Telegram bot
+cd webapp && npm run dev         # React :5173
 
 # Testing
-npm test                # Run tests
-npm run test:coverage   # Tests + coverage
+cd backend && npm test           # Jest
+cd backend && npm run lint       # ESLint
+cd bot && npm test               # Bot tests
 
 # Database
-psql telegram_shop      # Connect to DB
+psql telegram_shop               # Connect
 ```
 
 ---
 
-## Tools — Когда что использовать
+## Architecture Quick Reference
 
-### Поиск кода
-
-| Задача | Инструмент |
-|--------|------------|
-| "Как работает X?", "Где логика Y?" | `mcp__morph-mcp__warp_grep` |
-| Точный паттерн: `TODO`, `error` | `Grep` |
-| Найти файл по имени | `Glob` |
-
-```javascript
-// Семантический поиск — понимает контекст, находит связи
-mcp__morph-mcp__warp_grep({
-  repoPath: "/Users/sile/Documents/Status Stock 4.0",
-  query: "payment crypto verification"
-})
-
-// Точный поиск — regex, быстро
-Grep({ pattern: "handleRoleWorker", path: "bot/src" })
+### Backend Request Flow
+```
+routes/ → controllers/ → services/ → database/queries/
 ```
 
-### Работа с файлами
+**Key Services:**
+- `blockchainVerificationService.js` — Crypto payment verification
+- `subscriptionService.js` — Shop subscription management
+- `paymentVerificationWorker.js` — Background payment polling
 
-| Задача | Инструмент |
-|--------|------------|
-| Читать файл | `mcp__filesystem__read_text_file` или `Read` |
-| Редактировать | `mcp__morph-mcp__edit_file` (быстро) или `Edit` |
-| Список файлов | `mcp__filesystem__list_directory` |
-| Создать папку | `mcp__filesystem__create_directory` |
-
-```javascript
-// Быстрое редактирование — показывай только изменения
-mcp__morph-mcp__edit_file({
-  path: "/path/to/file.js",
-  code_edit: `
-// ... existing code ...
-
-function newFunc() {
-  return true;
-}
-
-// ... existing code ...
-  `,
-  instruction: "Add newFunc after imports"
-})
+### Bot Structure
+```
+handlers/ → command/callback handlers
+scenes/   → WizardScenes for multi-step flows
+keyboards/ → Inline keyboard builders
 ```
 
-### Bash — ТОЛЬКО для
+### WebApp State
+```
+store/useStore.js → Zustand (products, cart, orders, user)
+hooks/useApi.js   → Axios with token refresh
+hooks/useWebSocket.js → Real-time updates
+```
 
-- `npm run`, `npm test` — запуск/тесты
-- `git` команды
-- `psql` — SQL запросы
-- `./start.sh`, `./stop.sh`
-
-**НЕ используй Bash для:** чтения файлов, поиска, редактирования.
+### Database Schema
+```
+users → shops → products → orders → order_items
+              ↘ shop_workers (PRO tier)
+              ↘ shop_follows → synced_products
+              ↘ subscriptions
+```
 
 ---
 
-## Workflow
+## Business Rules
 
-**ВАЖНО: В начале работы ВСЕГДА используй `warp_grep` для изучения кодовой базы!**
-
-```
-1. warp_grep  → СНАЧАЛА разведка, понять архитектуру
-2. Read       → потом прочитать конкретные файлы
-3. edit_file  → внести правки
-4. Grep       → проверить результат
-```
-
-**Не прыгай сразу в файлы** — сначала пойми контекст через warp_grep.
-
----
-
-## Субагенты
-
-| Агент | Когда |
-|-------|-------|
-| `telegram-bot-expert` | Telegraf handlers, scenes, keyboards |
-| `backend-architect` | API endpoints, архитектура |
-| `database-designer` | PostgreSQL, миграции, SQL |
-| `frontend-developer` | React, TailwindCSS, Mini App |
-| `debug-master` | Баги, тесты, ошибки |
-| `Explore` | Быстрый поиск по кодовой базе |
-
-**При делегировании указывай инструменты:**
-
-```javascript
-Task({
-  subagent_type: 'debug-master',
-  prompt: `
-    Используй mcp__morph-mcp__warp_grep для поиска.
-    Используй mcp__morph-mcp__edit_file для правок.
-
-    ЗАДАЧА: [описание]
-  `
-})
-```
+- **Follows:** BASIC = 2, PRO = unlimited
+- **Workers:** PRO tier only
+- **Subscription grace:** 2 days
+- **Cloudflare tunnel required** for Mini App
 
 ---
 
 ## Code Style
 
-- ES modules: `import/export`
-- Функции: arrow functions
-- Async: `async/await`, не callbacks
-- Именование: camelCase (переменные), PascalCase (компоненты)
+- ES modules (`import/export`)
+- Arrow functions, `async/await`
+- camelCase (vars), PascalCase (components)
 
 ---
 
-## Важно
+## Anti-Patterns
 
-- **ngrok обязателен** — Mini App требует HTTPS
-- **Логи:** `backend/logs/`, `bot/logs/`
-- **НЕ редактируй:** `.env` файлы вручную
-- **НЕ создавай:** .md отчёты после задач
+**NEVER:**
+- Edit `.env` files
+- Create REPORT.md / SUMMARY.md files
+- Write code directly (delegate to agents)
+- Use Bash for file operations
 
----
-
-## Структура БД
-
-```
-users → shops → products → orders
-              ↘ shop_workers
-              ↘ shop_follows → synced_products
-```
-
----
-
-## Skills (триггеры)
-
-- `"quick start"` — запуск всего
-- `"health check"` — проверка статуса
-- `"analyze logs"` — анализ ошибок
-- `"run tests"` — тесты
-- `"check ngrok"` — статус tunnel
-
-Полный список: `.claude/skills/README.md`
+**ALWAYS:**
+- Delegate to specialized agents
+- Use MCP tools for file ops
+- Run tests after changes
+- Keep changes minimal and focused

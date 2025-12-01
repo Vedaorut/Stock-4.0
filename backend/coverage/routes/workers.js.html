@@ -25,7 +25,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/6</span>
+                <span class='fraction'>0/9</span>
             </div>
         
             
@@ -46,7 +46,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/6</span>
+                <span class='fraction'>0/9</span>
             </div>
         
             
@@ -106,7 +106,46 @@
 <a name='L41'></a><a href='#L41'>41</a>
 <a name='L42'></a><a href='#L42'>42</a>
 <a name='L43'></a><a href='#L43'>43</a>
-<a name='L44'></a><a href='#L44'>44</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L44'></a><a href='#L44'>44</a>
+<a name='L45'></a><a href='#L45'>45</a>
+<a name='L46'></a><a href='#L46'>46</a>
+<a name='L47'></a><a href='#L47'>47</a>
+<a name='L48'></a><a href='#L48'>48</a>
+<a name='L49'></a><a href='#L49'>49</a>
+<a name='L50'></a><a href='#L50'>50</a>
+<a name='L51'></a><a href='#L51'>51</a>
+<a name='L52'></a><a href='#L52'>52</a>
+<a name='L53'></a><a href='#L53'>53</a>
+<a name='L54'></a><a href='#L54'>54</a>
+<a name='L55'></a><a href='#L55'>55</a>
+<a name='L56'></a><a href='#L56'>56</a>
+<a name='L57'></a><a href='#L57'>57</a>
+<a name='L58'></a><a href='#L58'>58</a>
+<a name='L59'></a><a href='#L59'>59</a>
+<a name='L60'></a><a href='#L60'>60</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -126,13 +165,6 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -168,6 +200,7 @@ const router = <span class="cstat-no" title="statement not covered" >express.Rou
  * @access  Private
  */
 <span class="cstat-no" title="statement not covered" >router.get('/workspace', verifyToken, workerController.getWorkerShops);</span>
+<span class="cstat-no" title="statement not covered" >router.get('/worker', verifyToken, workerController.getWorkerShops); </span>// alias for bots
 &nbsp;
 /**
  * @route   POST /api/shops/:shopId/workers
@@ -191,6 +224,21 @@ const router = <span class="cstat-no" title="statement not covered" >express.Rou
  */
 <span class="cstat-no" title="statement not covered" >router.delete('/:shopId/workers/:workerId', verifyToken, workerController.remove);</span>
 &nbsp;
+/**
+ * @route   PATCH /api/workers/mute
+ * @desc    Toggle notification mute for worker's workspace shop
+ * @access  Private (Worker only)
+ * @body    { shop_id: number }
+ */
+<span class="cstat-no" title="statement not covered" >router.patch('/mute', verifyToken, workerController.toggleNotificationMute);</span>
+&nbsp;
+/**
+ * @route   GET /api/workers/mute/:shopId
+ * @desc    Get notification mute status for a specific shop
+ * @access  Private (Worker only)
+ */
+<span class="cstat-no" title="statement not covered" >router.get('/mute/:shopId', verifyToken, workerController.getNotificationMuteStatus);</span>
+&nbsp;
 export default router;
 &nbsp;</pre></td></tr></table></pre>
 
@@ -199,7 +247,7 @@ export default router;
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-11-08T16:48:59.527Z
+                at 2025-12-01T20:33:04.652Z
             </div>
         <script src="../prettify.js"></script>
         <script>

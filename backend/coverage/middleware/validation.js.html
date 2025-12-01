@@ -25,28 +25,28 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/40</span>
+                <span class='fraction'>0/44</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/31</span>
+                <span class='fraction'>0/37</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/10</span>
+                <span class='fraction'>0/11</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/40</span>
+                <span class='fraction'>0/44</span>
             </div>
         
             
@@ -482,7 +482,21 @@
 <a name='L417'></a><a href='#L417'>417</a>
 <a name='L418'></a><a href='#L418'>418</a>
 <a name='L419'></a><a href='#L419'>419</a>
-<a name='L420'></a><a href='#L420'>420</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L420'></a><a href='#L420'>420</a>
+<a name='L421'></a><a href='#L421'>421</a>
+<a name='L422'></a><a href='#L422'>422</a>
+<a name='L423'></a><a href='#L423'>423</a>
+<a name='L424'></a><a href='#L424'>424</a>
+<a name='L425'></a><a href='#L425'>425</a>
+<a name='L426'></a><a href='#L426'>426</a>
+<a name='L427'></a><a href='#L427'>427</a>
+<a name='L428'></a><a href='#L428'>428</a>
+<a name='L429'></a><a href='#L429'>429</a>
+<a name='L430'></a><a href='#L430'>430</a>
+<a name='L431'></a><a href='#L431'>431</a>
+<a name='L432'></a><a href='#L432'>432</a>
+<a name='L433'></a><a href='#L433'>433</a>
+<a name='L434'></a><a href='#L434'>434</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -544,10 +558,6 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -767,6 +777,24 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -945,21 +973,17 @@ export const authValidation = <span class="cstat-no" title="statement not covere
     validate,
   ],
 &nbsp;
+  // SECURITY: register endpoint now extracts user data from verified x-telegram-init-data header
+  // Body validation removed - all user data comes from cryptographically verified initData
   register: [
-    body('telegramId').isInt({ min: 1 }).withMessage('Valid Telegram ID is required'),
-    body('username')
-      .optional()
-      .isLength({ min: 3, max: 32 })
-      .withMessage('Username must be 3-32 characters'),
-    body('firstName')
-      .notEmpty()
-      .isLength({ max: 64 })
-      .withMessage('First name is required (max 64 characters)'),
+    // No body validation needed - controller uses initData from header
     validate,
   ],
 &nbsp;
   updateRole: [
-    body('role').isIn(['buyer', 'seller']).withMessage('Role must be either "buyer" or "seller"'),
+    body('role')
+      .isIn(['buyer', 'seller', 'worker'])
+      .withMessage('Role must be either "buyer", "seller", or "worker"'),
     validate,
   ],
 };
@@ -1186,7 +1210,25 @@ export const orderValidation = <span class="cstat-no" title="statement not cover
 export const paymentValidation = <span class="cstat-no" title="statement not covered" >{</span>
   verify: [
     body('orderId').isInt({ min: 1 }).withMessage('Valid order ID is required'),
-    body('txHash').notEmpty().trim().withMessage('Transaction hash is required'),
+    body('txHash')
+      .optional({ nullable: true })
+      .trim(),
+    body('paymentLink')
+      .optional({ nullable: true })
+      .trim(),
+    body('txLink')
+      .optional({ nullable: true })
+      .trim(),
+    body('transactionUrl')
+      .optional({ nullable: true })
+      .trim(),
+    body('txHash').custom(<span class="fstat-no" title="function not covered" >(v</span>alue, { req }) =&gt; {
+      const proof = <span class="cstat-no" title="statement not covered" >value || req.body.paymentLink || req.body.txLink || req.body.transactionUrl;</span>
+<span class="cstat-no" title="statement not covered" >      if (!proof) {</span>
+<span class="cstat-no" title="statement not covered" >        throw new Error('Transaction hash or payment link is required');</span>
+      }
+<span class="cstat-no" title="statement not covered" >      return true;</span>
+    }),
     body('currency')
       .isIn(['BTC', 'ETH', 'USDT', 'LTC'])
       .withMessage('Currency must be BTC, ETH, USDT, or LTC'),
@@ -1327,7 +1369,7 @@ export default {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-11-08T16:48:59.527Z
+                at 2025-12-01T20:33:04.652Z
             </div>
         <script src="../prettify.js"></script>
         <script>

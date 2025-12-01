@@ -1,11 +1,24 @@
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { config } from '../config/env.js';
-import { userQueries } from '../database/queries/index.js';
+import { userQueries, refreshTokenQueries } from '../database/queries/index.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import { NotFoundError, UnauthenticatedError, ValidationError } from '../utils/errors.js';
 import telegramService from '../services/telegram.js';
 import logger from '../utils/logger.js';
+
+/**
+ * Generate a cryptographically secure refresh token
+ * @returns {string} Random 32-byte hex string
+ */
+const generateRefreshToken = () => crypto.randomBytes(32).toString('hex');
+
+/**
+ * Hash a refresh token for storage
+ * @param {string} token - Plain refresh token
+ * @returns {string} SHA-256 hash
+ */
+const hashRefreshToken = (token) => crypto.createHash('sha256').update(token).digest('hex');
 
 /**
  * Authentication Controller
@@ -55,7 +68,7 @@ export const authController = {
         });
       }
 
-      // Generate JWT token
+      // Generate JWT access token
       const token = jwt.sign(
         {
           id: user.id,
@@ -67,10 +80,16 @@ export const authController = {
         { expiresIn: config.jwt.expiresIn }
       );
 
+      // Generate refresh token
+      const refreshToken = generateRefreshToken();
+      const refreshTokenHash = hashRefreshToken(refreshToken);
+      await refreshTokenQueries.create(user.id, refreshTokenHash);
+
       return res.status(200).json({
         success: true,
         data: {
           token,
+          refreshToken,
           user: {
             id: user.id,
             telegram_id: user.telegram_id,
@@ -144,7 +163,7 @@ export const authController = {
         logger.info(`Existing user logged in: ${telegramId} (@${username})`);
       }
 
-      // Generate JWT token
+      // Generate JWT access token
       const token = jwt.sign(
         {
           id: user.id,
@@ -156,8 +175,14 @@ export const authController = {
         { expiresIn: config.jwt.expiresIn }
       );
 
+      // Generate refresh token
+      const refreshToken = generateRefreshToken();
+      const refreshTokenHash = hashRefreshToken(refreshToken);
+      await refreshTokenQueries.create(user.id, refreshTokenHash);
+
       return res.status(isNewUser ? 201 : 200).json({
         token,
+        refreshToken,
         user: {
           id: user.id,
           telegram_id: Number(user.telegram_id),
@@ -307,7 +332,7 @@ export const authController = {
         logger.info(`User authenticated via WebApp: ${userData.id} (@${userData.username})`);
       }
 
-      // Generate JWT token
+      // Generate JWT access token
       const token = jwt.sign(
         {
           id: user.id,
@@ -319,10 +344,16 @@ export const authController = {
         { expiresIn: config.jwt.expiresIn }
       );
 
+      // Generate refresh token
+      const refreshToken = generateRefreshToken();
+      const refreshTokenHash = hashRefreshToken(refreshToken);
+      await refreshTokenQueries.create(user.id, refreshTokenHash);
+
       return res.status(200).json({
         success: true,
         data: {
           token,
+          refreshToken,
           user: {
             id: user.id,
             telegram_id: Number(user.telegram_id),
@@ -396,7 +427,7 @@ export const authController = {
         }
       }
 
-      // Generate JWT token
+      // Generate JWT access token
       const token = jwt.sign(
         {
           id: user.id,
@@ -408,9 +439,15 @@ export const authController = {
         { expiresIn: config.jwt.expiresIn }
       );
 
+      // Generate refresh token
+      const refreshToken = generateRefreshToken();
+      const refreshTokenHash = hashRefreshToken(refreshToken);
+      await refreshTokenQueries.create(user.id, refreshTokenHash);
+
       return res.status(isNewUser ? 201 : 200).json({
         success: true,
         token,
+        refreshToken,
         user: {
           id: user.id,
           telegram_id: Number(user.telegram_id),
@@ -423,6 +460,90 @@ export const authController = {
       });
     } catch (error) {
       logger.error('Telegram validate error', { error: error.message, stack: error.stack });
+      throw error;
+    }
+  }),
+
+
+  /**
+   * Refresh access token using refresh token
+   * @route POST /api/auth/refresh
+   */
+  refreshToken: asyncHandler(async (req, res) => {
+    try {
+      const { refreshToken } = req.body;
+
+      if (!refreshToken) {
+        throw new ValidationError('Refresh token is required');
+      }
+
+      // Hash the provided token for lookup
+      const tokenHash = hashRefreshToken(refreshToken);
+
+      // Find valid token in database
+      const tokenRecord = await refreshTokenQueries.findValidByHash(tokenHash);
+
+      if (!tokenRecord) {
+        logger.warn('Invalid or expired refresh token attempt');
+        throw new UnauthenticatedError('Invalid or expired refresh token');
+      }
+
+      // Get full user data
+      const user = await userQueries.findById(tokenRecord.user_id);
+
+      if (!user) {
+        // User was deleted but token still exists - revoke it
+        await refreshTokenQueries.revoke(tokenHash);
+        throw new UnauthenticatedError('User not found');
+      }
+
+      // Generate new access token
+      const newAccessToken = jwt.sign(
+        {
+          id: user.id,
+          telegram_id: Number(user.telegram_id),
+          username: user.username,
+          jti: crypto.randomBytes(16).toString('hex'),
+        },
+        config.jwt.secret,
+        { expiresIn: config.jwt.expiresIn }
+      );
+
+      logger.info(`Token refreshed for user: ${user.telegram_id}`);
+
+      return res.status(200).json({
+        success: true,
+        data: {
+          token: newAccessToken,
+        },
+      });
+    } catch (error) {
+      logger.error('Refresh token error', { error: error.message, stack: error.stack });
+      throw error;
+    }
+  }),
+
+
+  /**
+   * Logout - revoke refresh token
+   * @route POST /api/auth/logout
+   */
+  logout: asyncHandler(async (req, res) => {
+    try {
+      const { refreshToken } = req.body;
+
+      if (refreshToken) {
+        const tokenHash = hashRefreshToken(refreshToken);
+        await refreshTokenQueries.revoke(tokenHash);
+        logger.info(`Refresh token revoked for user: ${req.user?.id}`);
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: 'Logged out successfully',
+      });
+    } catch (error) {
+      logger.error('Logout error', { error: error.message, stack: error.stack });
       throw error;
     }
   }),

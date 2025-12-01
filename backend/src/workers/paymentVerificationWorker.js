@@ -170,7 +170,9 @@ async function verifyAndProcessPaymentSafe(payment) {
   logger.debug(`[PaymentWorker] Verification result for ${paymentId}:`, {
     verified: result.verified,
     status: result.status,
-    confirmations: result.confirmations
+    resultStatus: result.resultStatus,
+    confirmations: result.confirmations,
+    error: result.error
   });
 
   // Update confirmations (simple query, no transaction needed)
@@ -187,28 +189,72 @@ async function verifyAndProcessPaymentSafe(payment) {
     return;
   }
 
-  // If failed - mark payment as failed
-  if (result.status === 'failed' && result.error) {
+  // Handle different error statuses:
+  // - API_ERROR: Network/API issues - keep as pending, will retry automatically
+  // - TX_NOT_FOUND: Transaction not found - keep as pending, may appear later
+  // - TX_INVALID: Permanent failure (invalid address, failed tx, wrong amount) - mark as failed
+  if (result.resultStatus === blockchainVerificationService.VERIFICATION_STATUS.API_ERROR) {
+    // Network/API error - return to pending for automatic retry
+    await query(
+      `UPDATE payments
+       SET status = 'pending', last_checked_at = NOW(), updated_at = NOW()
+       WHERE id = $1`,
+      [paymentId]
+    );
+    logger.warn(`[PaymentWorker] Payment ${paymentId} API error (will retry): ${result.error}`);
+    return;
+  }
+
+  if (result.resultStatus === blockchainVerificationService.VERIFICATION_STATUS.TX_NOT_FOUND) {
+    // Transaction not found - may appear later (for recently sent transactions)
+    // Keep pending for retry
+    await query(
+      `UPDATE payments
+       SET status = 'pending', last_checked_at = NOW(), updated_at = NOW()
+       WHERE id = $1`,
+      [paymentId]
+    );
+    logger.debug(`[PaymentWorker] Payment ${paymentId} not found yet (will retry)`);
+    return;
+  }
+
+  if (result.resultStatus === blockchainVerificationService.VERIFICATION_STATUS.TX_INVALID) {
+    // Permanent failure - don't retry
     await query(
       `UPDATE payments
        SET status = 'failed', verification_status = 'failed', verification_error = $2, updated_at = NOW()
        WHERE id = $1`,
       [paymentId, result.error]
     );
-    logger.warn(`[PaymentWorker] Payment ${paymentId} failed: ${result.error}`);
+    logger.warn(`[PaymentWorker] Payment ${paymentId} failed permanently: ${result.error}`);
     return;
   }
 
-  // Not verified and not failed (e.g., waiting for more confirmations)
+  // Fallback for SUCCESS status but not yet verified (waiting for more confirmations)
   // Return status back to 'pending' for next polling iteration
+  if (result.resultStatus === blockchainVerificationService.VERIFICATION_STATUS.SUCCESS && !result.verified) {
+    await query(
+      `UPDATE payments
+       SET status = 'pending', last_checked_at = NOW(), updated_at = NOW()
+       WHERE id = $1`,
+      [paymentId]
+    );
+    logger.debug(`[PaymentWorker] Payment ${paymentId} returned to pending (${result.confirmations || 0} confirmations)`);
+    return;
+  }
+
+  // Unexpected state - log and return to pending
+  logger.warn(`[PaymentWorker] Payment ${paymentId} in unexpected state:`, {
+    resultStatus: result.resultStatus,
+    verified: result.verified,
+    status: result.status
+  });
   await query(
     `UPDATE payments
      SET status = 'pending', last_checked_at = NOW(), updated_at = NOW()
      WHERE id = $1`,
     [paymentId]
   );
-
-  logger.debug(`[PaymentWorker] Payment ${paymentId} returned to pending (${result.confirmations || 0} confirmations)`);
 }
 
 /**

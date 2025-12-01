@@ -885,9 +885,23 @@ export const resetProductMarkup = asyncHandler(async (req, res) => {
     // Reset custom markup to NULL (use global)
     const updated = await syncedProductQueries.resetCustomMarkup(syncedProduct.id);
 
+    // BUG FIX: Recalculate price with global follow markup
+    const sourceProduct = await productQueries.findById(syncedProduct.source_product_id);
+    const sourcePrice = Number(sourceProduct.price);
+    const globalMarkupType = follow.markup_type || 'percentage';
+    const globalMarkupValue = globalMarkupType === 'fixed'
+      ? Number(follow.markup_fixed || 0)
+      : Number(follow.markup_percentage || 0);
+    const newPrice = calculatePriceWithMarkup(sourcePrice, globalMarkupType, globalMarkupValue);
+    await productQueries.update(syncedProductId, { price: newPrice });
+
     logger.info('Product markup reset to global', {
       followId,
       syncedProductId,
+      globalMarkupType,
+      globalMarkupValue,
+      sourcePrice,
+      newPrice,
       userId: req.user.id,
     });
 

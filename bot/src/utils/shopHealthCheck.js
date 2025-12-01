@@ -1,4 +1,5 @@
 import { walletApi, productApi } from './api.js';
+import logger from './logger.js';
 
 /**
  * Проверить состояние магазина (для статус-бара)
@@ -15,7 +16,7 @@ async function checkShopHealth(shopId, token) {
       // Проверяем есть ли хотя бы один непустой кошелек
       hasWallets = Object.values(wallets).some((addr) => addr && addr.trim() !== '');
     } catch (err) {
-      console.warn('Wallet health check failed:', err);
+      logger.warn('Wallet health check failed', { error: err.message });
       // Если endpoint недоступен, считаем что кошельков нет
       hasWallets = false;
     }
@@ -26,7 +27,7 @@ async function checkShopHealth(shopId, token) {
       const products = await productApi.getShopProducts(shopId);
       productsCount = Array.isArray(products) ? products.length : 0;
     } catch (err) {
-      console.warn('Product health check failed:', err);
+      logger.warn('Product health check failed', { error: err.message });
       // Если endpoint недоступен, считаем что товаров нет
       productsCount = 0;
     }
@@ -36,7 +37,7 @@ async function checkShopHealth(shopId, token) {
       productsCount,
     };
   } catch (error) {
-    console.error('Error checking shop health:', error);
+    logger.error('Error checking shop health', { error: error.message, stack: error.stack });
     // В случае ошибки возвращаем безопасные значения
     return {
       hasWallets: true, // Не показываем предупреждение если не уверены

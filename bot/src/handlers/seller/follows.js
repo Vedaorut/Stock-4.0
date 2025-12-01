@@ -286,7 +286,7 @@ export const handleFollowSettings = async (ctx) => {
 };
 
 /**
- * Delete follow with confirmation
+ * Show delete confirmation dialog
  */
 export const handleDeleteFollow = async (ctx) => {
   try {
@@ -299,8 +299,57 @@ export const handleDeleteFollow = async (ctx) => {
       return;
     }
 
+    // Fetch follow details to show in confirmation
+    let follow;
+    try {
+      follow = await followApi.getFollowDetail(followId, ctx.session.token);
+    } catch (error) {
+      if (error.response?.status === 404) {
+        await ctx.editMessageText(followMessages.notFound, followsMenu(false));
+        return;
+      }
+      throw error;
+    }
+
+    const shopName = follow.source_shop_name || follow.sourceShopName || 'Магазин';
+    const isResell = follow.mode === 'resell';
+
+    let confirmMessage = `⚠️ Удалить подписку?\n\nМагазин: ${shopName}`;
+    if (isResell) {
+      confirmMessage += '\n\n❗ Все скопированные товары будут удалены!';
+    }
+
+    const confirmKeyboard = Markup.inlineKeyboard([
+      [
+        Markup.button.callback('✅ Да, удалить', `confirm_delete_follow:${followId}`),
+        Markup.button.callback('❌ Отмена', `cancel_delete_follow:${followId}`),
+      ],
+    ]);
+
+    await ctx.editMessageText(confirmMessage, confirmKeyboard);
+    logger.info(`User ${ctx.from.id} requested delete confirmation for follow ${followId}`);
+  } catch (error) {
+    logger.error('Error showing delete confirmation:', error);
+    await ctx.editMessageText(followMessages.deleteError, followsMenu(false));
+  }
+};
+
+/**
+ * Confirm and execute follow deletion
+ */
+export const handleConfirmDeleteFollow = async (ctx) => {
+  try {
+    await ctx.answerCbQuery('Удаляем...');
+
+    const followId = parseInt(ctx.match[1]);
+
+    if (!ctx.session.token) {
+      await ctx.editMessageText(generalMessages.authorizationRequired);
+      return;
+    }
+
     await followApi.deleteFollow(followId, ctx.session.token);
-    logger.info(`User ${ctx.from.id} deleted follow ${followId}`);
+    logger.info(`User ${ctx.from.id} confirmed and deleted follow ${followId}`);
 
     const follows = await followApi.getMyFollows(ctx.session.shopId, ctx.session.token);
     const hasFollows = Array.isArray(follows) && follows.length > 0;
@@ -326,6 +375,36 @@ export const handleDeleteFollow = async (ctx) => {
   } catch (error) {
     logger.error('Error deleting follow:', error);
     await ctx.editMessageText(followMessages.deleteError, followsMenu(false));
+  }
+};
+
+/**
+ * Cancel follow deletion - return to follow detail
+ */
+export const handleCancelDeleteFollow = async (ctx) => {
+  try {
+    await ctx.answerCbQuery('Отменено');
+
+    const followId = parseInt(ctx.match[1]);
+
+    if (!ctx.session.token) {
+      await ctx.editMessageText(generalMessages.authorizationRequired);
+      return;
+    }
+
+    // Return to follow settings view
+    const follow = await followApi.getFollowDetail(followId, ctx.session.token);
+    const message = formatFollowDetail(follow);
+    await ctx.editMessageText(message, followDetailMenu(followId, follow.mode));
+    logger.info(`User ${ctx.from.id} cancelled delete for follow ${followId}`);
+  } catch (error) {
+    logger.error('Error cancelling delete:', error);
+    // If follow not found, go back to list
+    if (error.response?.status === 404) {
+      await ctx.editMessageText(followMessages.notFound, followsMenu(false));
+    } else {
+      await ctx.editMessageText(followMessages.loadError, followsMenu(false));
+    }
   }
 };
 
@@ -362,7 +441,27 @@ export const handleSwitchMode = async (ctx) => {
       return;
     }
 
-    // Switch to monitor mode (no markup needed)
+    // Switching to monitor mode - show warning if there are synced products
+    const syncedCount =
+      follow.synced_products_count ?? follow.synced_count ?? follow.syncedProducts ?? 0;
+
+    if (syncedCount > 0) {
+      // Show confirmation warning
+      const warningText = `\u26a0\ufe0f Сменить режим на Мониторинг?\n\nСкопированные товары (${syncedCount} шт) будут удалены из вашего магазина.`;
+
+      await ctx.editMessageText(
+        warningText,
+        Markup.inlineKeyboard([
+          [
+            Markup.button.callback('\u2705 Да, сменить', `follow_mode_confirm:${followId}`),
+            Markup.button.callback('\u274c Отмена', `follow_settings:${followId}`),
+          ],
+        ])
+      );
+      return;
+    }
+
+    // No synced products - switch immediately
     await followApi.switchMode(followId, newMode, ctx.session.token);
 
     const updated = await followApi.getFollowDetail(followId, ctx.session.token);
@@ -377,6 +476,42 @@ export const handleSwitchMode = async (ctx) => {
     if (error.response?.status === 402) {
       await ctx.editMessageText(followMessages.limitReached, followsMenu(false));
     } else if (error.response?.status === 404) {
+      await ctx.editMessageText(followMessages.notFound, followsMenu(false));
+    } else if (errorMsg?.toLowerCase().includes('circular')) {
+      await ctx.editMessageText(followMessages.modeLimit, followsMenu(false));
+    } else {
+      await ctx.editMessageText(followMessages.switchError, followsMenu(false));
+    }
+  }
+};
+
+/**
+ * Confirm switch to monitor mode (after warning about synced products deletion)
+ */
+export const handleConfirmSwitchToMonitor = async (ctx) => {
+  try {
+    await ctx.answerCbQuery('Переключаем...');
+
+    const followId = parseInt(ctx.match[1]);
+
+    if (!ctx.session.token) {
+      await ctx.editMessageText(generalMessages.authorizationRequired);
+      return;
+    }
+
+    // Execute the switch to monitor mode
+    await followApi.switchMode(followId, 'monitor', ctx.session.token);
+
+    const updated = await followApi.getFollowDetail(followId, ctx.session.token);
+    const message = formatFollowDetail(updated);
+    await ctx.editMessageText(message, followDetailMenu(followId, updated.mode));
+    logger.info(`User ${ctx.from.id} confirmed switch follow ${followId} to monitor`);
+  } catch (error) {
+    logger.error('Error confirming mode switch:', error);
+
+    const errorMsg = error.response?.data?.error;
+
+    if (error.response?.status === 404) {
       await ctx.editMessageText(followMessages.notFound, followsMenu(false));
     } else if (errorMsg?.toLowerCase().includes('circular')) {
       await ctx.editMessageText(followMessages.modeLimit, followsMenu(false));
@@ -437,11 +572,20 @@ export const setupFollowHandlers = (bot) => {
   // View follow settings
   bot.action(/^follow_settings:(\d+)$/, handleFollowSettings);
 
-  // Delete follow (pattern: follow_delete:123)
+  // Delete follow (pattern: follow_delete:123) - shows confirmation
   bot.action(/^follow_delete:(\d+)$/, handleDeleteFollow);
+
+  // Confirm delete follow (pattern: confirm_delete_follow:123)
+  bot.action(/^confirm_delete_follow:(\d+)$/, handleConfirmDeleteFollow);
+
+  // Cancel delete follow (pattern: cancel_delete_follow:123)
+  bot.action(/^cancel_delete_follow:(\d+)$/, handleCancelDeleteFollow);
 
   // Switch mode (pattern: follow_mode:123)
   bot.action(/^follow_mode:(\d+)$/, handleSwitchMode);
+
+  // Confirm switch to monitor mode (pattern: follow_mode_confirm:123)
+  bot.action(/^follow_mode_confirm:(\d+)$/, handleConfirmSwitchToMonitor);
 
   // Edit markup (pattern: follow_edit:123) - now enters scene
   bot.action(/^follow_edit:(\d+)$/, handleEditMarkup);

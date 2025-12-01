@@ -23,16 +23,16 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/8</span>
+                <span class='fraction'>8/8</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">50% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/4</span>
+                <span class='fraction'>2/4</span>
             </div>
         
             
@@ -44,9 +44,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/8</span>
+                <span class='fraction'>8/8</span>
             </div>
         
             
@@ -61,7 +61,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line low'></div>
+    <div class='status-line high'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -117,41 +117,41 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -165,18 +165,18 @@ import { config } from '../config/env.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 &nbsp;
-const __filename = <span class="cstat-no" title="statement not covered" >fileURLToPath(import.meta.url);</span>
-const __dirname = <span class="cstat-no" title="statement not covered" >path.dirname(__filename);</span>
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 &nbsp;
 // Транспорты для файлов с ротацией
-const fileRotateTransport = <span class="cstat-no" title="statement not covered" >new DailyRotateFile({</span>
+const fileRotateTransport = new DailyRotateFile({
   filename: path.join(__dirname, '../../logs/combined-%DATE%.log'),
   datePattern: 'YYYY-MM-DD',
   maxFiles: '14d',
   level: 'info',
 });
 &nbsp;
-const errorRotateTransport = <span class="cstat-no" title="statement not covered" >new DailyRotateFile({</span>
+const errorRotateTransport = new DailyRotateFile({
   filename: path.join(__dirname, '../../logs/error-%DATE%.log'),
   datePattern: 'YYYY-MM-DD',
   maxFiles: '30d',
@@ -184,22 +184,22 @@ const errorRotateTransport = <span class="cstat-no" title="statement not covered
 });
 &nbsp;
 // Формат логов
-const logFormat = <span class="cstat-no" title="statement not covered" >winston.format.combine(</span>
+const logFormat = winston.format.combine(
   winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
   winston.format.errors({ stack: true }),
   winston.format.json()
 );
 &nbsp;
 // Создание logger
-const logger = <span class="cstat-no" title="statement not covered" >winston.createLogger({</span>
-  level: config.nodeEnv === 'production' ? 'info' : 'debug',
+const logger = winston.createLogger({
+  level: config.nodeEnv === 'production' ? <span class="branch-0 cbranch-no" title="branch not covered" >'info' </span>: 'debug',
   format: logFormat,
   transports: [fileRotateTransport, errorRotateTransport],
 });
 &nbsp;
 // Console transport для development
-<span class="cstat-no" title="statement not covered" >if (config.nodeEnv !== 'production') {</span>
-<span class="cstat-no" title="statement not covered" >  logger.add(</span>
+<span class="missing-if-branch" title="else path not taken" >E</span>if (config.nodeEnv !== 'production') {
+  logger.add(
     new winston.transports.Console({
       format: winston.format.combine(winston.format.colorize(), winston.format.simple()),
     })
@@ -214,7 +214,7 @@ export default logger;
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-11-08T16:48:59.457Z
+                at 2025-12-01T20:33:04.544Z
             </div>
         <script src="../prettify.js"></script>
         <script>

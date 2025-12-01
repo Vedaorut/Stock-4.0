@@ -21,9 +21,6 @@ import { showSellerMainMenu } from '../utils/sellerNavigation.js';
 
 const { general: generalMessages, subscription: subMessages } = messages;
 
-const BASIC_PRICE_RUB = 990;
-const PRO_PRICE_RUB = 1490;
-
 // CrystalPay payment methods
 const PAYMENT_METHODS = {
   BTC: 'BITCOIN',
@@ -67,12 +64,9 @@ const paySubscriptionScene = new Scenes.WizardScene(
         ctx.wizard.state.tier = enteredWithTier;
         ctx.wizard.state.subscriptionId = subscriptionId;
         ctx.wizard.state.createShopAfter = createShopAfter;
-        const amount = enteredWithTier === 'pro' ? PRO_PRICE_RUB : BASIC_PRICE_RUB;
-        ctx.wizard.state.amount = amount;
 
         // Skip to crypto selection (Step 3)
         const message = `📦 <b>Подписка:</b> ${enteredWithTier === 'pro' ? 'Pro' : 'Basic'}
-💰 <b>Стоимость:</b> ${amount} ₽
 
 Выберите способ оплаты:`;
 
@@ -177,12 +171,9 @@ const paySubscriptionScene = new Scenes.WizardScene(
 
     await ctx.answerCbQuery();
 
-    const amount = tier === 'pro' ? PRO_PRICE_RUB : BASIC_PRICE_RUB;
     ctx.wizard.state.tier = tier;
-    ctx.wizard.state.amount = amount;
 
     const message = `📦 <b>Подписка:</b> ${tier === 'pro' ? 'Pro' : 'Basic'}
-💰 <b>Стоимость:</b> ${amount} ₽
 
 Выберите способ оплаты:`;
 
@@ -239,7 +230,7 @@ const paySubscriptionScene = new Scenes.WizardScene(
       // Show loading message
       await ctx.editMessageText('⏳ Создаём счёт на оплату...', { parse_mode: 'HTML' });
 
-      const { tier, amount, subscriptionId, createShopAfter } = ctx.wizard.state;
+      const { tier, subscriptionId, createShopAfter } = ctx.wizard.state;
       const token = ctx.session.token;
 
       // Check auth token before API call
@@ -283,7 +274,6 @@ const paySubscriptionScene = new Scenes.WizardScene(
       // Prepare message
       const message = [
         `📦 <b>Подписка:</b> ${tier === 'pro' ? 'Pro' : 'Basic'}`,
-        `💰 <b>Стоимость:</b> ${amount} ₽`,
         `💳 <b>Метод:</b> ${methodLabel}`,
         '',
         '💡 <i>Поле "Email" — вводите что угодно, нам не нужен</i>',
@@ -345,7 +335,7 @@ const paySubscriptionScene = new Scenes.WizardScene(
       await ctx.answerCbQuery('Проверяем статус оплаты...');
 
       try {
-        const { invoiceId, tier, createShopAfter, subscriptionId, crystalPayUrl, amount, paymentMethod } = ctx.wizard.state;
+        const { invoiceId, tier, createShopAfter, subscriptionId, crystalPayUrl, paymentMethod } = ctx.wizard.state;
         const token = ctx.session.token;
 
         // Check auth token before API call
@@ -435,7 +425,6 @@ const paySubscriptionScene = new Scenes.WizardScene(
         await ctx.editMessageText(
           [
             `📦 <b>Подписка:</b> ${tier === 'pro' ? 'Pro' : 'Basic'}`,
-            `💰 <b>Стоимость:</b> ${amount} ₽`,
             `💳 <b>Метод:</b> ${methodLabel}`,
             '',
             '⏳ <b>Оплата пока не получена.</b>',

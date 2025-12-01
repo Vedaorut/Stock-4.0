@@ -35,7 +35,7 @@ export const CRYPTO_OPTIONS = [
     color: '#627EEA',
   },
   {
-    id: 'USDT',
+    id: 'USDT_TRC20',
     name: 'Tether',
     network: 'TRC20',
     icon: '₮',
@@ -93,6 +93,7 @@ export const calculateCryptoAmount = (usdAmount, crypto) => {
   const rates = {
     BTC: 0.000024, // ~$42,000 per BTC
     USDT: 1.0, // 1:1 with USD
+    USDT_TRC20: 1.0, // 1:1 with USD
     LTC: 0.011, // ~$90 per LTC
     ETH: 0.00042, // ~$2,400 per ETH
   };
@@ -101,7 +102,7 @@ export const calculateCryptoAmount = (usdAmount, crypto) => {
 
   // Format based on crypto type
   if (crypto === 'BTC') return amount.toFixed(8);
-  if (crypto === 'USDT') return amount.toFixed(2);
+  if (crypto === 'USDT' || crypto === 'USDT_TRC20') return amount.toFixed(2);
   if (crypto === 'LTC') return amount.toFixed(5);
   if (crypto === 'ETH') return amount.toFixed(6);
 
@@ -111,16 +112,19 @@ export const calculateCryptoAmount = (usdAmount, crypto) => {
 /**
  * Format crypto amount with proper decimal places
  * @param {number} amount - The crypto amount (guaranteed NUMBER from Store)
- * @param {string} crypto - The cryptocurrency type (BTC, ETH, USDT, LTC)
+ * @param {string} crypto - The cryptocurrency type (BTC, ETH, USDT, USDT_TRC20, LTC)
  * @returns {string} Formatted amount as string
  */
 export const formatCryptoAmount = (amount, crypto) => {
+  // Safely parse amount to avoid crashes on undefined/NaN
+  const numAmount = parseFloat(amount) || 0;
+
   // Format based on crypto type
-  if (crypto === 'BTC') return amount.toFixed(8);
-  if (crypto === 'USDT') return amount.toFixed(2);
-  if (crypto === 'LTC') return amount.toFixed(5);
-  if (crypto === 'ETH') return amount.toFixed(6);
+  if (crypto === 'BTC') return numAmount.toFixed(8);
+  if (crypto === 'USDT' || crypto === 'USDT_TRC20') return numAmount.toFixed(2);
+  if (crypto === 'LTC') return numAmount.toFixed(5);
+  if (crypto === 'ETH') return numAmount.toFixed(6);
 
   // Default fallback
-  return amount.toFixed(8);
+  return numAmount.toFixed(8);
 };

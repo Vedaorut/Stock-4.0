@@ -204,7 +204,9 @@ export default function FollowsModal({ isOpen, onClose }) {
             });
           }
         } catch (limitError) {
-          console.error('[FollowsModal] Error parsing limit info:', limitError);
+          if (import.meta.env.DEV) {
+            console.error('[FollowsModal] Error parsing limit info:', limitError);
+          }
           setLimitInfo({
             count: followsList.length,
             limit: null,
@@ -219,7 +221,9 @@ export default function FollowsModal({ isOpen, onClose }) {
       } catch (error) {
         if (signal?.aborted) return { status: 'aborted' };
 
-        console.error('[FollowsModal] Error loading data:', error);
+        if (import.meta.env.DEV) {
+          console.error('[FollowsModal] Error loading data:', error);
+        }
         setFollows([]);
         setLimitInfo(null);
         setMyShop(null);
@@ -239,7 +243,9 @@ export default function FollowsModal({ isOpen, onClose }) {
     loadData(controller.signal)
       .then((result) => {
         if (!controller.signal.aborted && result?.status === 'error') {
-          console.error('Failed to load follows data:', result.error);
+          if (import.meta.env.DEV) {
+            console.error('Failed to load follows data:', result.error);
+          }
         }
       })
       .finally(() => {

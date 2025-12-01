@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 import Header from '../components/Layout/Header';
 import ActionsList from '../components/Follows/ActionsList';
@@ -28,6 +28,46 @@ export default function FollowDetail() {
   const [isProductMarkupModalOpen, setIsProductMarkupModalOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
 
+  // AbortController for retry requests
+  const retryControllerRef = useRef(null);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (retryControllerRef.current) {
+        retryControllerRef.current.abort();
+      }
+    };
+  }, []);
+
+  // Handle retry with AbortController
+  const handleRetry = useCallback(() => {
+    // Cancel any in-flight retry request
+    if (retryControllerRef.current) {
+      retryControllerRef.current.abort();
+    }
+    retryControllerRef.current = new AbortController();
+
+    setIsLoading(true);
+    setError(null);
+
+    loadFollow(retryControllerRef.current.signal)
+      .then((result) => {
+        if (result?.status === 'aborted') return;
+        if (result?.status === 'error') {
+          setError(result.error);
+          setFollow(null);
+        } else if (result?.status === 'success') {
+          loadProducts(retryControllerRef.current?.signal);
+        }
+      })
+      .finally(() => {
+        if (!retryControllerRef.current?.signal?.aborted) {
+          setIsLoading(false);
+        }
+      });
+  }, [loadFollow, loadProducts]);
+
   // Back button handler
   const handleBack = useCallback(() => {
     triggerHaptic('light');
@@ -47,7 +87,9 @@ export default function FollowDetail() {
       if (signal?.aborted) return { status: 'aborted' };
 
       if (response.error) {
-        console.error('[FollowDetail] Error loading follow:', response.error);
+        if (import.meta.env.DEV) {
+          console.error('[FollowDetail] Error loading follow:', response.error);
+        }
         return { status: 'error', error: 'Failed to load subscription' };
       }
 
@@ -71,7 +113,9 @@ export default function FollowDetail() {
         const productsData = response.data?.data?.products || response.data?.products || [];
         setProducts(Array.isArray(productsData) ? productsData : []);
       } catch (err) {
-        console.error('[FollowDetail] Error loading products:', err);
+        if (import.meta.env.DEV) {
+          console.error('[FollowDetail] Error loading products:', err);
+        }
       } finally {
         if (!signal?.aborted) {
           setProductsLoading(false);
@@ -129,7 +173,9 @@ export default function FollowDetail() {
         // Reload products to update prices with new markup
         loadProducts();
       } catch (err) {
-        console.error('[FollowDetail] Error updating markup:', err);
+        if (import.meta.env.DEV) {
+          console.error('[FollowDetail] Error updating markup:', err);
+        }
         triggerHaptic('error');
       }
     },
@@ -147,7 +193,9 @@ export default function FollowDetail() {
       setFollow((prev) => ({ ...prev, mode: newMode }));
       triggerHaptic('success');
     } catch (err) {
-      console.error('[FollowDetail] Error switching mode:', err);
+      if (import.meta.env.DEV) {
+        console.error('[FollowDetail] Error switching mode:', err);
+      }
       triggerHaptic('error');
     }
   }, [followDetailId, follow, switchMode, triggerHaptic]);
@@ -161,7 +209,9 @@ export default function FollowDetail() {
       triggerHaptic('success');
       useStore.getState().setFollowDetailId(null);
     } catch (err) {
-      console.error('[FollowDetail] Error deleting follow:', err);
+      if (import.meta.env.DEV) {
+        console.error('[FollowDetail] Error deleting follow:', err);
+      }
       triggerHaptic('error');
     }
   }, [followDetailId, deleteFollow, triggerHaptic]);
@@ -186,7 +236,9 @@ export default function FollowDetail() {
         // Reload products to see updated price
         loadProducts();
       } catch (err) {
-        console.error('[FollowDetail] Error updating product markup:', err);
+        if (import.meta.env.DEV) {
+          console.error('[FollowDetail] Error updating product markup:', err);
+        }
         triggerHaptic('error');
       }
     },
@@ -205,7 +257,9 @@ export default function FollowDetail() {
       // Reload products to see updated price
       loadProducts();
     } catch (err) {
-      console.error('[FollowDetail] Error resetting product markup:', err);
+      if (import.meta.env.DEV) {
+        console.error('[FollowDetail] Error resetting product markup:', err);
+      }
       triggerHaptic('error');
     }
   }, [followDetailId, selectedProduct, resetProductMarkup, triggerHaptic, loadProducts]);
@@ -237,7 +291,7 @@ export default function FollowDetail() {
           <div className="flex flex-col items-center justify-center py-12 text-center">
             <h3 className="text-lg font-semibold text-white/50 mb-4">{error}</h3>
             <motion.button
-              onClick={() => loadFollow()}
+              onClick={handleRetry}
               className="bg-[#FF6B00] text-white font-semibold px-6 py-2 rounded-xl"
               whileTap={{ scale: 0.95 }}
             >
@@ -359,11 +413,11 @@ export default function FollowDetail() {
                             </div>
                             <div className="flex items-center gap-2 mt-1">
                               <span className="text-white/40 text-xs line-through">
-                                ${product.source_product?.price || product.original_price || product.price}
+                                ${parseFloat(product.source_product?.price || product.original_price || product.price || 0).toFixed(2)}
                               </span>
                               <span className="text-[#FF6B00] text-xs">→</span>
                               <span className="text-[#2ECC71] font-bold text-sm">
-                                ${product.synced_product?.price || product.price}
+                                ${parseFloat(product.synced_product?.price || product.price || 0).toFixed(2)}
                               </span>
                             </div>
                           </div>

@@ -77,26 +77,34 @@ export default function AnalyticsModal({ isOpen, onClose }) {
         if (signal?.aborted) return { status: 'aborted' };
 
         if (error) {
-          console.error('Analytics fetch error:', error);
+          if (import.meta.env.DEV) {
+            console.error('Analytics fetch error:', error);
+          }
           return { status: 'error', error };
         } else if (data?.success && data?.data) {
           // ✅ FIX: Validate analytics data structure
           const analyticsData = data.data;
           if (!analyticsData || typeof analyticsData !== 'object') {
-            console.error('Invalid analytics data format:', analyticsData);
+            if (import.meta.env.DEV) {
+              console.error('Invalid analytics data format:', analyticsData);
+            }
             return { status: 'error', error: 'Неверный формат данных статистики' };
           }
 
           setAnalytics(analyticsData);
           return { status: 'success' };
         } else {
-          console.error('Unexpected API response:', data);
+          if (import.meta.env.DEV) {
+            console.error('Unexpected API response:', data);
+          }
           return { status: 'error', error: 'Не удалось загрузить статистику' };
         }
       } catch (err) {
         if (signal?.aborted) return { status: 'aborted' };
 
-        console.error('[AnalyticsModal] fetch exception', err);
+        if (import.meta.env.DEV) {
+          console.error('[AnalyticsModal] fetch exception', err);
+        }
         return { status: 'error', error: err.message || 'Ошибка загрузки данных' };
       }
     },
@@ -116,7 +124,9 @@ export default function AnalyticsModal({ isOpen, onClose }) {
       .then((result) => {
         if (!controller.signal.aborted) {
           if (result?.status === 'error') {
-            console.error('Failed to fetch analytics:', result.error);
+            if (import.meta.env.DEV) {
+              console.error('Failed to fetch analytics:', result.error);
+            }
             setError(result.error);
           }
         }

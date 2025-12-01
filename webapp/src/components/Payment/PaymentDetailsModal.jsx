@@ -1,6 +1,7 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { useMemo, useState, lazy, Suspense, useEffect, useRef } from 'react';
 import { useStore } from '../../store/useStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useTelegram } from '../../hooks/useTelegram';
 import { useTranslation } from '../../i18n/useTranslation';
 import { useToast } from '../../hooks/useToast';
@@ -29,7 +30,17 @@ export default function PaymentDetailsModal() {
     cryptoAmount,
     setPaymentStep,
     isGeneratingInvoice,
-  } = useStore();
+  } = useStore(
+    useShallow((state) => ({
+      paymentStep: state.paymentStep,
+      selectedCrypto: state.selectedCrypto,
+      paymentWallet: state.paymentWallet,
+      currentOrder: state.currentOrder,
+      cryptoAmount: state.cryptoAmount,
+      setPaymentStep: state.setPaymentStep,
+      isGeneratingInvoice: state.isGeneratingInvoice,
+    }))
+  );
   const { triggerHaptic } = useTelegram();
   const { t } = useTranslation();
   const _toast = useToast(); // Reserved for future notifications
@@ -181,11 +192,13 @@ export default function PaymentDetailsModal() {
 
   // Defensive error handling for unknown crypto
   if (!cryptoInfo) {
-    console.error('🔴 [PaymentDetailsModal] Unknown cryptocurrency:', selectedCrypto);
-    console.error(
-      '🔴 [PaymentDetailsModal] Available currencies:',
-      CRYPTO_OPTIONS.map((c) => c.id)
-    );
+    if (import.meta.env.DEV) {
+      console.error('🔴 [PaymentDetailsModal] Unknown cryptocurrency:', selectedCrypto);
+      console.error(
+        '🔴 [PaymentDetailsModal] Available currencies:',
+        CRYPTO_OPTIONS.map((c) => c.id)
+      );
+    }
 
     return (
       <AnimatePresence>
@@ -246,10 +259,12 @@ export default function PaymentDetailsModal() {
   }
 
   if (!paymentWallet || !cryptoAmount || cryptoAmount <= 0) {
-    console.error('🔴 [PaymentDetailsModal] Invalid payment data:', {
-      paymentWallet,
-      cryptoAmount,
-    });
+    if (import.meta.env.DEV) {
+      console.error('🔴 [PaymentDetailsModal] Invalid payment data:', {
+        paymentWallet,
+        cryptoAmount,
+      });
+    }
     // Если данных нет - показываем error state
     return (
       <AnimatePresence>

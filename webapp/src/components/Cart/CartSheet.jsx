@@ -43,13 +43,14 @@ const getEmptyEmojiVariants = (android) => ({
 
 export default function CartSheet() {
   // State Selection
-  const { cart, isCartOpen, setCartOpen, clearCart, startCheckout } = useStore(
+  const { cart, isCartOpen, setCartOpen, clearCart, startCheckout, myShops } = useStore(
     useShallow((state) => ({
       cart: state.cart,
       isCartOpen: state.isCartOpen,
       setCartOpen: state.setCartOpen,
       clearCart: state.clearCart,
       startCheckout: state.startCheckout,
+      myShops: state.myShops,
     }))
   );
 
@@ -64,6 +65,13 @@ export default function CartSheet() {
     () => cart.reduce((sum, item) => sum + item.price * item.quantity, 0),
     [cart]
   );
+
+  // Check if cart contains items from user's own shop (cannot order own products)
+  const isOwnShopCart = useMemo(() => {
+    if (!cart.length || !myShops?.length) return false;
+    const cartShopId = cart[0]?.shopId;
+    return myShops.some((shop) => shop.id === cartShopId);
+  }, [cart, myShops]);
 
   // Styles
   const overlayStyle = useMemo(() => getSurfaceStyle('overlay', platform), [platform]);
@@ -227,25 +235,37 @@ export default function CartSheet() {
                     </span>
                   </div>
 
-                  <motion.button
-                    onClick={handleCheckout}
-                    className="w-full h-12 text-white font-bold rounded-xl overflow-hidden"
-                    style={{
-                      background: 'linear-gradient(135deg, #FF6B00 0%, #FF8F3D 100%)',
-                      boxShadow: checkoutShadow,
-                    }}
-                    whileHover={{
-                      scale: android ? 1.01 : 1.02,
-                      boxShadow: checkoutHoverShadow,
-                    }}
-                    whileTap={{
-                      scale: android ? 0.985 : 0.98,
-                      boxShadow: 'inset 0 2px 8px rgba(0, 0, 0, 0.3)',
-                    }}
-                    transition={{ ...controlSpring, boxShadow: { duration: 0.18 } }}
-                  >
-                    {t('cart.checkout')}
-                  </motion.button>
+                  {isOwnShopCart ? (
+                    /* Warning: Cannot order own products */
+                    <div className="flex items-center gap-3 p-3 rounded-xl bg-yellow-500/10 border border-yellow-500/20">
+                      <svg className="w-5 h-5 text-yellow-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                      <span className="text-yellow-500 text-sm font-medium">
+                        {t('cart.cannotOrderOwn') || 'You cannot order products from your own shop'}
+                      </span>
+                    </div>
+                  ) : (
+                    <motion.button
+                      onClick={handleCheckout}
+                      className="w-full h-12 text-white font-bold rounded-xl overflow-hidden"
+                      style={{
+                        background: 'linear-gradient(135deg, #FF6B00 0%, #FF8F3D 100%)',
+                        boxShadow: checkoutShadow,
+                      }}
+                      whileHover={{
+                        scale: android ? 1.01 : 1.02,
+                        boxShadow: checkoutHoverShadow,
+                      }}
+                      whileTap={{
+                        scale: android ? 0.985 : 0.98,
+                        boxShadow: 'inset 0 2px 8px rgba(0, 0, 0, 0.3)',
+                      }}
+                      transition={{ ...controlSpring, boxShadow: { duration: 0.18 } }}
+                    >
+                      {t('cart.checkout')}
+                    </motion.button>
+                  )}
                 </div>
               )}
             </div>

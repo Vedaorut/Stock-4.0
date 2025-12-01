@@ -38,14 +38,15 @@ const TabBar = memo(function TabBar() {
   const platform = usePlatform();
   const { triggerHaptic } = useTelegram();
   
-  const { 
-    activeTab, 
-    setActiveTab, 
-    setCartOpen, 
-    paymentStep, 
-    setPaymentStep, 
-    hasFollows, 
-    setFollowDetailId 
+  const {
+    activeTab,
+    setActiveTab,
+    setCartOpen,
+    paymentStep,
+    setPaymentStep,
+    hasFollows,
+    setFollowDetailId,
+    viewMode
   } = useStore(
     useShallow((state) => ({
       activeTab: state.activeTab,
@@ -55,25 +56,27 @@ const TabBar = memo(function TabBar() {
       setPaymentStep: state.setPaymentStep,
       hasFollows: state.hasFollows,
       setFollowDetailId: state.setFollowDetailId,
+      viewMode: state.viewMode,
     }))
   );
 
   // Tabs Configuration
-  // Order: Subscriptions → Catalog → Follows → Settings
+  // Order: Subscriptions → Catalog → Follows (seller only) → Settings
   const tabs = useMemo(() => {
     const list = [
       { id: 'subscriptions', label: t('tabs.subscriptions'), Icon: Icons.Subscriptions },
       { id: 'catalog', label: t('tabs.catalog'), Icon: Icons.Catalog },
     ];
 
-    if (hasFollows) {
+    // Follows tab only visible in seller mode AND if user has follows
+    if (viewMode === 'seller' && hasFollows) {
       list.push({ id: 'follows', label: t('tabs.follows'), Icon: Icons.Follows });
     }
 
     list.push({ id: 'settings', label: t('tabs.settings'), Icon: Icons.Settings });
 
     return list;
-  }, [t, hasFollows]);
+  }, [t, hasFollows, viewMode]);
 
   // Auto-redirect if 'follows' tab is active but user has no follows
   useEffect(() => {

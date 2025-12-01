@@ -54,4 +54,18 @@ router.patch('/role', verifyToken, authValidation.updateRole, authController.upd
  */
 router.post('/telegram-validate', verifyTelegramInitData, authController.telegramValidate);
 
+/**
+ * @route   POST /api/auth/refresh
+ * @desc    Refresh access token using refresh token
+ * @access  Public (requires valid refresh token in body)
+ */
+router.post('/refresh', authController.refreshToken);
+
+/**
+ * @route   POST /api/auth/logout
+ * @desc    Logout and revoke refresh token
+ * @access  Public (optionally authenticated)
+ */
+router.post('/logout', authController.logout);
+
 export default router;

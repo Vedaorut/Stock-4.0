@@ -35,6 +35,7 @@ export function TelegramProvider({ children }) {
   const [isReady, setIsReady] = useState(false);
   const [isValidating, setIsValidating] = useState(true);
   const [error, setError] = useState(null);
+  const [backendUser, setBackendUser] = useState(null); // User from backend (includes selected_role)
   const initializationRef = useRef(false);
   const apiLoggedRef = useRef(false);
 
@@ -82,6 +83,9 @@ export function TelegramProvider({ children }) {
       const { setUser, setToken } = useStore.getState();
       setUser(user);
       setToken(token);
+
+      // Store backend user locally for context (includes selected_role)
+      setBackendUser(user);
 
       setError(null);
     } catch (err) {
@@ -206,10 +210,19 @@ export function TelegramProvider({ children }) {
   }, []);
 
   // ✅ CRITICAL: Memoize value to prevent re-renders
+  // Merge Telegram SDK user data with backend user data (for selected_role, etc.)
+  const mergedUser = useMemo(() => {
+    if (!telegramData?.user && !backendUser) return null;
+    return {
+      ...telegramData?.user,
+      ...backendUser, // Backend data overrides (includes selected_role)
+    };
+  }, [telegramData?.user, backendUser]);
+
   const value = useMemo(
     () => ({
       // Data
-      user: telegramData?.user,
+      user: mergedUser, // Now includes selected_role from backend
       tg: telegramData?.tg,
       platform: telegramData?.platform,
       version: telegramData?.version,
@@ -229,6 +242,7 @@ export function TelegramProvider({ children }) {
       close,
     }),
     [
+      mergedUser,
       telegramData,
       isReady,
       isValidating,

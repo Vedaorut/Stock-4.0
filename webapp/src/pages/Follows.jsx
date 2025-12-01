@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { PlusIcon } from '@heroicons/react/24/outline';
 import Header from '../components/Layout/Header';
@@ -20,6 +20,18 @@ export default function Follows() {
   const [error, setError] = useState(null);
   const [follows, setFollows] = useState([]);
 
+  // AbortController for retry requests
+  const retryControllerRef = useRef(null);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (retryControllerRef.current) {
+        retryControllerRef.current.abort();
+      }
+    };
+  }, []);
+
   const loadFollows = useCallback(
     async (signal) => {
       let shop = myShop;
@@ -30,7 +42,9 @@ export default function Follows() {
         if (signal?.aborted) return { status: 'aborted' };
 
         if (shopsError) {
-          console.error('[Follows] Error loading shops:', shopsError);
+          if (import.meta.env.DEV) {
+            console.error('[Follows] Error loading shops:', shopsError);
+          }
           return { status: 'error', error: 'Не удалось загрузить данные' };
         }
 
@@ -54,7 +68,9 @@ export default function Follows() {
       if (signal?.aborted) return { status: 'aborted' };
 
       if (followsError) {
-        console.error('[Follows] Error loading follows:', followsError);
+        if (import.meta.env.DEV) {
+          console.error('[Follows] Error loading follows:', followsError);
+        }
         return { status: 'error', error: 'Не удалось загрузить подписки' };
       }
 
@@ -103,6 +119,33 @@ export default function Follows() {
     },
     [triggerHaptic]
   );
+
+  // Handle retry with AbortController
+  const handleRetry = useCallback(() => {
+    // Cancel any in-flight retry request
+    if (retryControllerRef.current) {
+      retryControllerRef.current.abort();
+    }
+    retryControllerRef.current = new AbortController();
+
+    setIsLoading(true);
+    setError(null);
+
+    loadFollows(retryControllerRef.current.signal)
+      .then((result) => {
+        if (result?.status === 'aborted') return;
+        if (result?.status === 'error') {
+          setError(result.error);
+          setFollows([]);
+          useStore.getState().setHasFollows(false);
+        }
+      })
+      .finally(() => {
+        if (!retryControllerRef.current?.signal?.aborted) {
+          setIsLoading(false);
+        }
+      });
+  }, [loadFollows]);
 
   const handleAddShop = () => {
     triggerHaptic('light');
@@ -163,7 +206,7 @@ export default function Follows() {
             </div>
             <h3 className="text-lg font-semibold text-white mb-2">{error}</h3>
             <motion.button
-              onClick={() => loadFollows()}
+              onClick={handleRetry}
               className="mt-4 px-6 py-3 bg-[#FF6B00] text-white font-semibold rounded-xl shadow-lg shadow-[#FF6B00]/20"
               whileTap={{ scale: 0.95 }}
             >

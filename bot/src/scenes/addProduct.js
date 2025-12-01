@@ -40,6 +40,7 @@ const enterPrice = async (ctx) => {
     if (!ctx.message || !ctx.message.text) {
       await smartMessage.send(ctx, {
         text: 'Пожалуйста, отправьте название товара текстом.\n\n' + sellerMessages.addProductNamePrompt,
+        keyboard: cancelButton,
       });
       return;
     }
@@ -47,7 +48,10 @@ const enterPrice = async (ctx) => {
     const productName = ctx.message.text.trim();
 
     if (productName.length < 3) {
-      await smartMessage.send(ctx, { text: sellerMessages.addProductNamePrompt });
+      await smartMessage.send(ctx, {
+        text: sellerMessages.addProductNamePrompt,
+        keyboard: cancelButton,
+      });
       return;
     }
 
@@ -64,7 +68,10 @@ const enterPrice = async (ctx) => {
       productName: productName,
     });
 
-    await smartMessage.send(ctx, { text: sellerMessages.addProductPricePrompt });
+    await smartMessage.send(ctx, {
+      text: sellerMessages.addProductPricePrompt,
+      keyboard: cancelButton,
+    });
 
     return ctx.wizard.next();
   } catch (error) {
@@ -80,6 +87,7 @@ const complete = async (ctx) => {
     if (!ctx.message || !ctx.message.text) {
       await smartMessage.send(ctx, {
         text: 'Пожалуйста, отправьте цену текстом (только число).\n\n' + sellerMessages.addProductPricePrompt,
+        keyboard: cancelButton,
       });
       return;
     }
@@ -88,7 +96,10 @@ const complete = async (ctx) => {
     const price = parseFloat(priceText);
 
     if (isNaN(price) || price <= 0) {
-      await smartMessage.send(ctx, { text: sellerMessages.addProductPriceInvalid });
+      await smartMessage.send(ctx, {
+        text: sellerMessages.addProductPriceInvalid,
+        keyboard: cancelButton,
+      });
       return;
     }
 

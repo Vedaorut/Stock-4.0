@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import PageHeader from '../common/PageHeader';
 import { useApi } from '../../hooks/useApi';
@@ -13,25 +13,25 @@ function OrderCard({ order }) {
   const statusConfig = {
     pending: {
       label: t('orders.status.pending'),
-      color: 'text-yellow-500',
+      color: '#FFCC00',
       bgColor: 'rgba(255, 204, 0, 0.1)',
       borderColor: 'rgba(255, 204, 0, 0.2)',
     },
     paid: {
       label: t('orders.status.paid'),
-      color: 'text-blue-500',
+      color: '#007AFF',
       bgColor: 'rgba(0, 122, 255, 0.1)',
       borderColor: 'rgba(0, 122, 255, 0.2)',
     },
     completed: {
       label: t('orders.status.completed'),
-      color: 'text-green-500',
+      color: '#34C759',
       bgColor: 'rgba(52, 199, 89, 0.1)',
       borderColor: 'rgba(52, 199, 89, 0.2)',
     },
     cancelled: {
       label: t('orders.status.cancelled'),
-      color: 'text-red-500',
+      color: '#FF3B30',
       bgColor: 'rgba(255, 59, 48, 0.1)',
       borderColor: 'rgba(255, 59, 48, 0.2)',
     },
@@ -65,7 +65,7 @@ function OrderCard({ order }) {
           <div
             className="px-3 py-1.5 rounded-lg text-xs font-semibold"
             style={{
-              color: status.color.replace('text-', ''),
+              color: status.color,
               background: status.bgColor,
               border: `1px solid ${status.borderColor}`,
             }}
@@ -121,6 +121,18 @@ export default function OrdersModal({ isOpen, onClose }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  // AbortController for retry requests
+  const retryControllerRef = useRef(null);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (retryControllerRef.current) {
+        retryControllerRef.current.abort();
+      }
+    };
+  }, []);
+
   // Используем Telegram BackButton API для закрытия модалки
   const handleClose = useCallback(() => {
     onClose();
@@ -146,7 +158,9 @@ export default function OrdersModal({ isOpen, onClose }) {
         // ✅ FIX: Safe array extraction with validation
         const ordersList = Array.isArray(data?.data) ? data.data : [];
         if (!Array.isArray(ordersList)) {
-          console.error('[OrdersModal] Invalid data format:', data);
+          if (import.meta.env.DEV) {
+            console.error('[OrdersModal] Invalid data format:', data);
+          }
           setError('Неверный формат данных заказов');
           setOrders([]);
           return { status: 'error' };
@@ -169,7 +183,9 @@ export default function OrdersModal({ isOpen, onClose }) {
     loadOrders(controller.signal)
       .then((result) => {
         if (!controller.signal.aborted && result?.status === 'error') {
-          console.error('[OrdersModal] Failed to load orders');
+          if (import.meta.env.DEV) {
+            console.error('[OrdersModal] Failed to load orders');
+          }
         }
       })
       .finally(() => {
@@ -180,6 +196,29 @@ export default function OrdersModal({ isOpen, onClose }) {
 
     return () => controller.abort();
   }, [isOpen, loadOrders]);
+
+  // Handle retry with AbortController
+  const handleRetry = useCallback(() => {
+    // Cancel any in-flight retry request
+    if (retryControllerRef.current) {
+      retryControllerRef.current.abort();
+    }
+    retryControllerRef.current = new AbortController();
+
+    setLoading(true);
+    setError(null);
+
+    loadOrders(retryControllerRef.current.signal)
+      .then((result) => {
+        if (result?.status === 'aborted') return;
+        // Error is already set in loadOrders
+      })
+      .finally(() => {
+        if (!retryControllerRef.current?.signal?.aborted) {
+          setLoading(false);
+        }
+      });
+  }, [loadOrders]);
 
   return (
     <AnimatePresence>
@@ -230,7 +269,7 @@ export default function OrdersModal({ isOpen, onClose }) {
                   </svg>
                   <p className="text-gray-400 text-sm mb-4">{error}</p>
                   <motion.button
-                    onClick={loadOrders}
+                    onClick={handleRetry}
                     className="px-6 py-2 rounded-xl font-medium text-white"
                     style={{
                       background: 'linear-gradient(135deg, #FF6B00 0%, #FF8533 100%)',

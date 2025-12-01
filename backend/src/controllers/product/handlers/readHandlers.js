@@ -124,6 +124,9 @@ export const search = asyncHandler(async (req, res) => {
       // Get user's shops first
       const userShops = await shopQueries.findByOwnerId(userId);
 
+      // Include user's own shops in search
+      userShops.forEach((shop) => shopIds.add(shop.id));
+
       for (const shop of userShops) {
         // Get all active follows for this shop
         const shopFollows = await shopFollowQueries.findByFollowerShopId(shop.id, 'active');

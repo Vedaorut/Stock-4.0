@@ -16,7 +16,9 @@ let tokenRefreshCallback = null;
  */
 export function setTokenRefreshCallback(callback) {
   if (typeof callback !== 'function') {
-    console.error('[tokenRefresh] Invalid callback - must be a function');
+    if (import.meta.env.DEV) {
+      console.error('[tokenRefresh] Invalid callback - must be a function');
+    }
     return;
   }
 
@@ -31,14 +33,18 @@ export function setTokenRefreshCallback(callback) {
 export async function refreshAuthToken() {
   if (!tokenRefreshCallback) {
     const error = 'Token refresh callback not initialized. Call setTokenRefreshCallback() first.';
-    console.error('[tokenRefresh]', error);
+    if (import.meta.env.DEV) {
+      console.error('[tokenRefresh]', error);
+    }
     throw new Error(error);
   }
 
   try {
     await tokenRefreshCallback();
   } catch (error) {
-    console.error('[tokenRefresh] Failed to refresh token:', error);
+    if (import.meta.env.DEV) {
+      console.error('[tokenRefresh] Failed to refresh token:', error);
+    }
     throw error;
   }
 }

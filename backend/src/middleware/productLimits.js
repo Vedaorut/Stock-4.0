@@ -126,7 +126,7 @@ export async function checkProductLimit(req, res, next) {
         limit,
         tier,
         upgradeRequired: true,
-        upgradeUrl: '/subscriptions/upgrade',
+        upgradeUrl: '/api/payments/subscription/crystalpay',
       });
     }
 

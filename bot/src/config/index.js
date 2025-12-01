@@ -58,6 +58,11 @@ const config = {
 
   // Internal API security (for bot-to-backend auth)
   internalSecret: process.env.INTERNAL_SECRET,
+
+  // Session encryption key (AES-256-GCM)
+  // Generate with: openssl rand -base64 32
+  // If not set, sessions are stored in plaintext (backward compatible)
+  sessionEncryptionKey: process.env.SESSION_ENCRYPTION_KEY,
 };
 
 export default config;

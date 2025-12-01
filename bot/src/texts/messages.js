@@ -57,8 +57,8 @@ export const buttons = {
   sendNotifications: '✅ Отправить уведомления',
   modeMonitor: '🔍 Мониторинг',
   modeResell: '💰 Перепродажа',
-  tierBasic: 'BASIC (бесплатно)',
-  tierPro: 'PRO — $1',
+  tierBasic: 'BASIC',
+  tierPro: 'PRO',
   cryptoBTC: 'Bitcoin (BTC)',
   cryptoETH: 'Ethereum (ETH)',
   cryptoUSDT: 'USDT (TRC-20)',
@@ -159,7 +159,7 @@ Telegram-маркетплейс для продажи и покупки това
 
       const formattedRevenue =
         revenue > 0
-          ? `${Number(revenue).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+          ? `$${Number(revenue).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
           : '$0';
 
       const ordersText = (() => {
@@ -411,7 +411,7 @@ ${safe(channel)}
 
       return `🔔 Управление подпиской
 
-Ваш тариф: BASIC (бесплатно)
+Ваш тариф: BASIC
 Статус: ${statusLabel}
 
 Что доступно:
@@ -427,7 +427,7 @@ ${safe(channel)}
 
       return `🔔 Управление подпиской
 
-Ваш тариф: PRO ($1/мес)
+Ваш тариф: PRO
 Статус: ${statusLabel}
 Следующее продление: ${renewDate}
 
@@ -472,7 +472,7 @@ ${safe(channel)}
         return orders
           .map((o, i) => {
             const buyer = o.buyer_username ? `@${safe(o.buyer_username)}` : 'Покупатель';
-            return `${i + 1}. ${buyer} — ${safe(o.product_name)} (${safe(o.quantity)} шт) — ${safe(o.total_price)}`;
+            return `${i + 1}. ${buyer} — ${safe(o.product_name)} (${safe(o.quantity)} шт) — $${safe(o.total_price)}`;
           })
           .join('\n');
       },
@@ -632,7 +632,7 @@ ${safe(channel)}
     createCircular: 'Взаимные подписки не поддерживаются. Удалите обратную связь и повторите.',
     createError: 'Не удалось оформить подписку. Попробуйте ещё раз.',
     createCancelled: 'Создание подписки отменено.',
-    limitReachedBasicToPro: 'Лимит подписок\n\nBASIC — до 2 магазинов\nPRO — безлимит ($1/мес)',
+    limitReachedBasicToPro: 'Лимит подписок\n\nBASIC — до 2 магазинов\nPRO — безлимит',
     createCircularDetailed:
       'Циклическая подписка\n\nЭтот магазин уже подписан на ваш магазин. Взаимные подписки не разрешены',
     cancelOperationError: 'Произошла ошибка при отмене\n\nПопробуйте позже',
@@ -646,8 +646,8 @@ ${safe(channel)}
   },
   subscription: {
     chooseTierIntro: 'Выберите тариф.',
-    tierDescriptionBasic: 'BASIC — $1/мес\nДо 4 товаров',
-    tierDescriptionPro: 'PRO — $1/мес\nБезлимит товаров, рассылки',
+    tierDescriptionBasic: 'BASIC\nДо 4 товаров',
+    tierDescriptionPro: 'PRO\nБезлимит товаров, рассылки',
     chooseCryptoIntro: (tier, amount) =>
       `Тариф ${safe(tier).toUpperCase()} — ${safe(amount)}. Выберите валюту для оплаты.`,
     paymentDetails: (tier, amount, currency, address) =>

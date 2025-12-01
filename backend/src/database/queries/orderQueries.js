@@ -96,6 +96,46 @@ export const orderQueries = {
     return result.rows;
   },
 
+  // Find orders by multiple shop IDs with optional status filter
+  // Used for worker orders aggregation (replaces N+1 query pattern)
+  findByShopIds: async (shopIds, options = {}) => {
+    if (!Array.isArray(shopIds) || shopIds.length === 0) {
+      return [];
+    }
+
+    const { limit = 50, offset = 0, statuses = [] } = options;
+
+    const params = [shopIds];
+    const conditions = ['p.shop_id = ANY($1)'];
+    let paramIndex = 2;
+
+    if (Array.isArray(statuses) && statuses.length > 0) {
+      conditions.push(`o.status = ANY($${paramIndex}::text[])`);
+      params.push(statuses);
+      paramIndex += 1;
+    }
+
+    params.push(limit, offset);
+
+    const result = await query(
+      `SELECT o.*,
+              p.name as product_name,
+              s.name as shop_name,
+              u.username as buyer_username,
+              u.first_name as buyer_first_name,
+              u.last_name as buyer_last_name
+       FROM orders o
+       JOIN products p ON o.product_id = p.id
+       JOIN shops s ON p.shop_id = s.id
+       JOIN users u ON o.buyer_id = u.id
+       WHERE ${conditions.join(' AND ')}
+       ORDER BY o.created_at DESC
+       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`,
+      params
+    );
+    return result.rows;
+  },
+
   // Find orders by shop ID with optional status filter
   findByShopId: async (shopId, options = {}) => {
     const { limit = 50, offset = 0, statuses = [] } = options;

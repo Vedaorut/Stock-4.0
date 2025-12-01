@@ -484,7 +484,7 @@ describe('Shop Follow Controller - Integration Tests', () => {
           })
           .expect(400);
 
-        expect(response.body.error).toContain('Markup must be between 0.1% and 200%');
+        expect(response.body.error).toContain('Markup must be between 0.1% and 500%');
       });
     });
   });

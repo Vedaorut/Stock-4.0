@@ -62,7 +62,9 @@ function WalletCard({ wallet, onRemove, onEdit, isEditing, onStartEdit, onCancel
       onCancelEdit();
       triggerHaptic('success');
     } catch (error) {
-      console.error('Failed to save wallet edit:', error);
+      if (import.meta.env.DEV) {
+        console.error('Failed to save wallet edit:', error);
+      }
     } finally {
       setSaving(false);
     }
@@ -307,14 +309,18 @@ export default function WalletsModal({ isOpen, onClose }) {
     loadWallets(controller.signal)
       .then((result) => {
         if (!controller.signal.aborted && result?.status === 'error') {
-          console.error('Failed to load wallets:', result.error);
+          if (import.meta.env.DEV) {
+            console.error('Failed to load wallets:', result.error);
+          }
           setErrorMessage(t('wallet.loadError'));
           syncWalletState(null);
         }
       })
       .catch((error) => {
         if (!controller.signal.aborted) {
-          console.error('Failed to load wallets', error);
+          if (import.meta.env.DEV) {
+            console.error('Failed to load wallets', error);
+          }
           setErrorMessage(t('wallet.loadError'));
           syncWalletState(null);
         }
@@ -500,7 +506,9 @@ export default function WalletsModal({ isOpen, onClose }) {
       syncWalletState(response);
       resetForm();
     } catch (err) {
-      console.error('[WalletsModal] Error saving wallets:', err);
+      if (import.meta.env.DEV) {
+        console.error('[WalletsModal] Error saving wallets:', err);
+      }
       await alert(t('wallet.saveError'));
     } finally {
       setSaving(false);

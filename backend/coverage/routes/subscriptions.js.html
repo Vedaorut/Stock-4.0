@@ -25,7 +25,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/14</span>
+                <span class='fraction'>0/17</span>
             </div>
         
             
@@ -46,7 +46,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/14</span>
+                <span class='fraction'>0/17</span>
             </div>
         
             
@@ -193,7 +193,16 @@
 <a name='L128'></a><a href='#L128'>128</a>
 <a name='L129'></a><a href='#L129'>129</a>
 <a name='L130'></a><a href='#L130'>130</a>
-<a name='L131'></a><a href='#L131'>131</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L131'></a><a href='#L131'>131</a>
+<a name='L132'></a><a href='#L132'>132</a>
+<a name='L133'></a><a href='#L133'>133</a>
+<a name='L134'></a><a href='#L134'>134</a>
+<a name='L135'></a><a href='#L135'>135</a>
+<a name='L136'></a><a href='#L136'>136</a>
+<a name='L137'></a><a href='#L137'>137</a>
+<a name='L138'></a><a href='#L138'>138</a>
+<a name='L139'></a><a href='#L139'>139</a>
+<a name='L140'></a><a href='#L140'>140</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -249,30 +258,12 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -309,6 +300,33 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -374,43 +392,25 @@ const router = <span class="cstat-no" title="statement not covered" >express.Rou
 <span class="cstat-no" title="statement not covered" >router.get('/', subscriptionController.getUserSubscriptions);</span>
 &nbsp;
 /**
+ * POST /api/subscriptions
+ * Subscribe to a shop (buyer subscribes for notifications)
+ *
+ * Body: {
+ *   shopId: number,
+ *   telegramId?: string
+ * }
+ *
+ * Returns: { success: true, data: subscription }
+ */
+<span class="cstat-no" title="statement not covered" >router.post('/', subscriptionController.createSubscription);</span>
+&nbsp;
+/**
  * GET /api/subscriptions/my-shops
  * Get shop subscriptions for current user's shops (seller view)
  *
  * Returns payment subscriptions (basic/pro tier) for shops owned by user
  */
 <span class="cstat-no" title="statement not covered" >router.get('/my-shops', subscriptionController.getMyShopSubscriptions);</span>
-&nbsp;
-/**
- * POST /api/subscriptions/pay
- * Pay for monthly subscription (renewal or new)
- *
- * Body: {
- *   shopId: number,
- *   tier: 'basic' | 'pro',
- *   txHash: string,
- *   currency: 'BTC' | 'ETH' | 'USDT' | 'LTC',
- *   paymentAddress: string
- * }
- *
- * @security Rate limited to 5 req/hour
- */
-<span class="cstat-no" title="statement not covered" >router.post('/pay', subscriptionCreationLimiter, subscriptionController.paySubscription);</span>
-&nbsp;
-/**
- * POST /api/subscriptions/upgrade
- * Upgrade shop from free to PRO tier
- *
- * Body: {
- *   shopId: number,
- *   txHash: string,
- *   currency: 'BTC' | 'ETH' | 'USDT' | 'LTC',
- *   paymentAddress: string
- * }
- *
- * @security Rate limited to 5 req/hour
- */
-<span class="cstat-no" title="statement not covered" >router.post('/upgrade', subscriptionCreationLimiter, subscriptionController.upgradeShop);</span>
 &nbsp;
 /**
  * GET /api/subscriptions/upgrade-cost/:shopId
@@ -441,16 +441,43 @@ const router = <span class="cstat-no" title="statement not covered" >express.Rou
  * Generate payment invoice for subscription
  *
  * Body: {
- *   chain: 'BTC' | 'LTC' | 'ETH' | 'USDT_ERC20' | 'USDT_TRC20'
+ *   chain: 'BTC' | 'LTC' | 'ETH' | 'USDT_TRC20'
  * }
  */
 <span class="cstat-no" title="statement not covered" >router.post('/:id/payment/generate', subscriptionController.generatePaymentInvoice);</span>
+&nbsp;
+/**
+ * POST /api/subscriptions/:id/upgrade/payment/generate
+ * Generate upgrade invoice for active subscription
+ */
+<span class="cstat-no" title="statement not covered" >router.post(</span>
+  '/:id/upgrade/payment/generate',
+  subscriptionController.generateUpgradePaymentInvoice
+);
 &nbsp;
 /**
  * GET /api/subscriptions/:id/payment/status
  * Get payment status for subscription invoice
  */
 <span class="cstat-no" title="statement not covered" >router.get('/:id/payment/status', subscriptionController.getPaymentStatus);</span>
+&nbsp;
+/**
+ * GET /api/subscriptions/:id/upgrade/payment/status
+ * Get upgrade payment status for subscription invoice
+ */
+<span class="cstat-no" title="statement not covered" >router.get('/:id/upgrade/payment/status', subscriptionController.getUpgradePaymentStatus);</span>
+&nbsp;
+/**
+ * POST /api/subscriptions/:id/payment/confirm
+ * Manually confirm payment by tx hash (on-chain verification)
+ */
+<span class="cstat-no" title="statement not covered" >router.post('/:id/payment/confirm', subscriptionController.confirmPaymentWithTxHash);</span>
+&nbsp;
+/**
+ * POST /api/subscriptions/:id/upgrade/payment/confirm
+ * Manually confirm upgrade payment by tx hash
+ */
+<span class="cstat-no" title="statement not covered" >router.post('/:id/upgrade/payment/confirm', subscriptionController.confirmUpgradePaymentWithTxHash);</span>
 &nbsp;
 export default router;
 &nbsp;</pre></td></tr></table></pre>
@@ -460,7 +487,7 @@ export default router;
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-11-08T16:48:59.527Z
+                at 2025-12-01T20:33:04.652Z
             </div>
         <script src="../prettify.js"></script>
         <script>

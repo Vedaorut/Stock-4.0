@@ -9,7 +9,7 @@ import { getSpringPreset, getSurfaceStyle, isAndroid } from '../../utils/platfor
 import { useBackButton } from '../../hooks/useBackButton';
 
 export default function OrderStatusModal() {
-  const { paymentStep, currentOrder, selectedCrypto, clearCheckout } = useStore();
+  const { paymentStep, currentOrder, selectedCrypto, clearCheckout, pendingOrders } = useStore();
   const { triggerHaptic } = useTelegram();
   const { t } = useTranslation();
   const platform = usePlatform();
@@ -36,9 +36,8 @@ export default function OrderStatusModal() {
 
   if (!currentOrder || !cryptoInfo) return null;
 
-  // Get the completed order from pending orders
-  const pendingOrders = useStore.getState().pendingOrders;
-  const completedOrder = pendingOrders[pendingOrders.length - 1];
+  // Get the completed order from pending orders (using hook for reactivity)
+  const completedOrder = pendingOrders?.[pendingOrders.length - 1];
 
   return (
     <AnimatePresence>

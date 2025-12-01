@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken';
 import { config } from '../config/env.js';
-import { shopQueries, workerQueries } from '../database/queries/index.js';
+import { shopQueries, workerQueries, userQueries } from '../database/queries/index.js';
 import logger from '../utils/logger.js';
 
 /**
@@ -37,6 +37,20 @@ export const verifyToken = async (req, res, next) => {
 
     // Verify token
     const decoded = jwt.verify(token, config.jwt.secret);
+
+    // SECURITY: Verify user exists in database (prevents stale JWT after DB reset)
+    const userExists = await userQueries.findById(decoded.id);
+    if (!userExists) {
+      logger.warn('[verifyToken] User from token not found in DB', {
+        tokenUserId: decoded.id,
+        tokenTelegramId: decoded.telegram_id,
+      });
+      return res.status(401).json({
+        success: false,
+        error: 'User not found. Please re-authenticate.',
+        code: 'USER_NOT_FOUND',
+      });
+    }
 
     // Attach user data to request
     req.user = {

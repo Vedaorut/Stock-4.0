@@ -17,6 +17,7 @@ import logger from '../utils/logger.js';
 
 const RATE_LIMIT_WINDOW = 60 * 1000; // 60 seconds
 const MAX_COMMANDS_PER_WINDOW = 10;
+const MAX_USERS_IN_CACHE = 10000; // Prevent memory exhaustion under DDoS
 
 // In-memory storage: { userId: [timestamp1, timestamp2, ...] }
 const userCommandHistory = new Map();
@@ -83,6 +84,23 @@ export const userRateLimitMiddleware = async (ctx, next) => {
 
   // Add current timestamp
   timestamps.push(now);
+
+  // Evict oldest entries if cache is full (prevent memory exhaustion)
+  if (userCommandHistory.size >= MAX_USERS_IN_CACHE && !userCommandHistory.has(userId)) {
+    // Delete first 10% of entries (oldest due to Map insertion order)
+    const toDelete = Math.ceil(MAX_USERS_IN_CACHE * 0.1);
+    let deleted = 0;
+    for (const key of userCommandHistory.keys()) {
+      if (deleted >= toDelete) break;
+      userCommandHistory.delete(key);
+      deleted++;
+    }
+    logger.warn('Rate limiter cache eviction triggered', {
+      evicted: deleted,
+      cacheSize: userCommandHistory.size,
+    });
+  }
+
   userCommandHistory.set(userId, timestamps);
 
   // Continue to next middleware

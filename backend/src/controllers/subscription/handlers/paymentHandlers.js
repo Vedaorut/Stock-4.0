@@ -11,20 +11,6 @@ import { ensurePaymentProof, validateChainSelection } from '../validators/payloa
 import { TEST_SUBSCRIPTION_PRICE } from '../constants.js';
 
 /**
- * Pay for subscription (monthly renewal or new subscription)
- * POST /api/subscriptions/pay
- *
- * DEPRECATED: Direct blockchain payments removed. Use CrystalPay via /api/payments/subscription/crystalpay
- */
-export const paySubscription = asyncHandler(async (req, res) => {
-  return res.status(410).json({
-    error: 'Прямые криптоплатежи отключены. Используйте CrystalPay.',
-    deprecated: true,
-    alternativeEndpoint: '/api/payments/subscription/crystalpay',
-  });
-});
-
-/**
  * Generate payment invoice for subscription
  * POST /api/subscriptions/:id/payment/generate
  *

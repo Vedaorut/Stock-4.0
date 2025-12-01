@@ -60,7 +60,7 @@ function ProductCard({ product, onEdit, onDelete, t }) {
             <p className="text-gray-400 text-sm mb-2">{product.description}</p>
           )}
           <div className="flex items-center gap-3 text-sm">
-            <span className="text-orange-primary font-bold">${product.price}</span>
+            <span className="text-orange-primary font-bold">${parseFloat(product.price || 0).toFixed(2)}</span>
             <span className="text-gray-500">В наличии: {product.stock || 0}</span>
           </div>
         </div>
@@ -693,7 +693,7 @@ export default function ProductsModal({ isOpen, onClose }) {
                   <motion.button
                     onClick={() => {
                       triggerHaptic('medium');
-                      alert('Создание магазина через бота ($1)');
+                      alert('Создание магазина через бота');
                     }}
                     className="h-12 px-6 rounded-xl font-semibold text-white"
                     style={{
@@ -702,7 +702,7 @@ export default function ProductsModal({ isOpen, onClose }) {
                     }}
                     whileTap={{ scale: 0.98 }}
                   >
-                    Создать магазин ($1)
+                    Создать магазин
                   </motion.button>
                 </div>
               </div>

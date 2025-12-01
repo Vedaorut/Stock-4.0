@@ -1,9 +1,0 @@
-version: "2"
-authtoken: ""
-tunnels:
-  backend:
-    proto: http
-    addr: 3000
-  webapp:
-    proto: http
-    addr: 5173

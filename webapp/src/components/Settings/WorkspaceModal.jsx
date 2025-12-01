@@ -190,7 +190,9 @@ export default function WorkspaceModal({ isOpen, onClose }) {
     loadData(controller.signal)
       .then((result) => {
         if (!controller.signal.aborted && result?.status === 'error') {
-          console.error('Failed to load workspace data:', result.error);
+          if (import.meta.env.DEV) {
+            console.error('Failed to load workspace data:', result.error);
+          }
         }
       })
       .finally(() => {
@@ -283,7 +285,9 @@ export default function WorkspaceModal({ isOpen, onClose }) {
     loadData(controller.signal)
       .then((result) => {
         if (!controller.signal.aborted && result?.status === 'error') {
-          console.error('Failed to load workspace data:', result.error);
+          if (import.meta.env.DEV) {
+            console.error('Failed to load workspace data:', result.error);
+          }
         }
       })
       .finally(() => {
@@ -472,7 +476,7 @@ export default function WorkspaceModal({ isOpen, onClose }) {
                     <div>
                       <p className="text-sm text-white font-medium mb-1">Доступно только на PRO</p>
                       <p className="text-xs text-gray-400">
-                        Апгрейд до PRO ($1/мес) откроет совместную работу: сотрудники смогут
+                        Апгрейд до PRO откроет совместную работу: сотрудники смогут
                         управлять товарами и продажами. Перейдите в раздел «Подписка», чтобы
                         обновить тариф.
                       </p>

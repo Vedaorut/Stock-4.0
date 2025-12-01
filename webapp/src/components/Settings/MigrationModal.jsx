@@ -231,7 +231,7 @@ export default function MigrationModal({ isOpen, onClose }) {
       let error = 'Неверный формат канала';
 
       if (cleaned.length < 5) {
-        error = 'Минимум 5 символов';
+        error = 'Telegram требует минимум 5 символов для канала';
       } else if (cleaned.length > 32) {
         error = 'Максимум 32 символа';
       } else {
@@ -252,15 +252,17 @@ export default function MigrationModal({ isOpen, onClose }) {
     };
   };
 
-  // Back button support
-  useBackButton(isOpen, () => {
+  // Back button support - handle multi-step navigation
+  const handleBack = useCallback(() => {
     if (step > 1 && step < 3) {
       setStep(step - 1);
       setMigrationError(null);
     } else {
       onClose();
     }
-  });
+  }, [step, onClose]);
+
+  useBackButton(isOpen ? handleBack : null);
 
   // Check eligibility function
   const checkEligibility = useCallback(async (signal) => {
@@ -316,7 +318,9 @@ export default function MigrationModal({ isOpen, onClose }) {
       return { status: 'success' };
     } catch (err) {
       if (signal?.aborted) return { status: 'aborted' };
-      console.error('Eligibility check failed:', err);
+      if (import.meta.env.DEV) {
+        console.error('Eligibility check failed:', err);
+      }
       // Show actual error message if available
       const message = err?.message || 'Ошибка проверки прав. Попробуйте позже.';
       setErrorMessage(message);
@@ -417,7 +421,9 @@ export default function MigrationModal({ isOpen, onClose }) {
       }, 1000);
     } catch (err) {
       if (err.name === 'AbortError') return;
-      console.error('Migration failed:', err);
+      if (import.meta.env.DEV) {
+        console.error('Migration failed:', err);
+      }
       setMigrationError('Ошибка миграции. Попробуйте позже.');
     } finally {
       setLoading(false);
@@ -694,7 +700,7 @@ export default function MigrationModal({ isOpen, onClose }) {
                       type="text"
                       value={newChannel}
                       onChange={handleChannelChange}
-                      placeholder="@channel"
+                      placeholder="@mychannel (мин. 5 символов)"
                       autoFocus
                       className="w-full h-14 px-4 pr-12 rounded-2xl text-white text-base placeholder-gray-500 outline-none transition-all"
                       style={{

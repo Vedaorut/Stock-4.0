@@ -131,6 +131,7 @@ describe('Follow Management - Update/Switch/Delete (P0)', () => {
               id: 20,
               mode: 'resell',
               markup_percentage: 30,
+              markup_type: 'percentage',
               source_shop_id: 777,
               source_shop_name: 'MonitorShop',
               follower_shop_id: 1,
@@ -145,18 +146,24 @@ describe('Follow Management - Update/Switch/Delete (P0)', () => {
     await testBot.handleUpdate(callbackUpdate('follow_mode:20'));
     await new Promise((resolve) => setImmediate(resolve));
 
+    // Step 1: Should show markup type selection
     const text1 = testBot.getLastReplyText();
-    expect(text1).toContain('наценку');
-    expect(text1).toContain('500');
+    expect(text1).toContain('Выберите тип наценки');
+
+    testBot.captor.reset();
+
+    // Step 2: Select percentage type
+    await testBot.handleUpdate(callbackUpdate('markup_type:percentage'));
+    await new Promise((resolve) => setImmediate(resolve));
 
     testBot.captor.reset();
 
     // Mock PUT API for mode switch
     mock.onPut('/follows/20/mode').reply(200, {
-      data: { id: 20, mode: 'resell', markup_percentage: 30 },
+      data: { id: 20, mode: 'resell', markup_percentage: 30, markup_type: 'percentage' },
     });
 
-    // Enter markup (triggers PUT /follows/20/mode with markup)
+    // Step 3: Enter markup value (triggers PUT /follows/20/mode with markup)
     await testBot.handleUpdate(textUpdate('30'));
     await new Promise((resolve) => setImmediate(resolve));
 
@@ -260,13 +267,24 @@ describe('Follow Management - Update/Switch/Delete (P0)', () => {
     await testBot.handleUpdate(callbackUpdate('follow_edit:40'));
     await new Promise((resolve) => setImmediate(resolve));
 
+    // Step 1: Verify markup type selection prompt
+    const typePrompt = testBot.getLastReplyText();
+    expect(typePrompt).toContain('Выберите тип наценки');
+
+    testBot.captor.reset();
+
+    // Step 2: Select percentage type
+    await testBot.handleUpdate(callbackUpdate('markup_type:percentage'));
+    await new Promise((resolve) => setImmediate(resolve));
+
     testBot.captor.reset();
 
     // Mock API calls for markup update
     mock.onPut('/follows/40/markup').reply(200, {
-      data: { id: 40, markup_percentage: 15 },
+      data: { id: 40, markup_percentage: 15, markup_type: 'percentage' },
     });
 
+    // Step 3: Enter markup value
     await testBot.handleUpdate(textUpdate('15'));
     await new Promise((resolve) => setImmediate(resolve));
 
@@ -299,10 +317,16 @@ describe('Follow Management - Update/Switch/Delete (P0)', () => {
     await testBot.handleUpdate(callbackUpdate('follow_edit:50'));
     await new Promise((resolve) => setImmediate(resolve));
     
-    // Verify we got the markup prompt
+    // Verify we got the markup type selection
     const promptText = testBot.getLastReplyText();
-    expect(promptText).toContain('наценку');
+    expect(promptText).toContain('Выберите тип наценки');
     
+    testBot.captor.reset();
+
+    // Select percentage type
+    await testBot.handleUpdate(callbackUpdate('markup_type:percentage'));
+    await new Promise((resolve) => setImmediate(resolve));
+
     testBot.captor.reset();
 
     // Send invalid markup
@@ -334,10 +358,16 @@ describe('Follow Management - Update/Switch/Delete (P0)', () => {
     await testBot.handleUpdate(callbackUpdate('follow_edit:60'));
     await new Promise((resolve) => setImmediate(resolve));
     
-    // Verify we got the markup prompt
+    // Verify we got the markup type selection
     const promptText = testBot.getLastReplyText();
-    expect(promptText).toContain('наценку');
+    expect(promptText).toContain('Выберите тип наценки');
     
+    testBot.captor.reset();
+
+    // Select percentage type
+    await testBot.handleUpdate(callbackUpdate('markup_type:percentage'));
+    await new Promise((resolve) => setImmediate(resolve));
+
     testBot.captor.reset();
 
     // Send invalid markup
@@ -351,10 +381,28 @@ describe('Follow Management - Update/Switch/Delete (P0)', () => {
   });
 
   it('удаление подписки → показать подтверждение → вернуться к списку', async () => {
+    // Mock follow detail for confirmation dialog
+    mock.onGet('/follows/70').reply(200, {
+      data: {
+        id: 70,
+        source_shop_id: 444,
+        source_shop_name: 'TestShop',
+        target_shop_id: 1,
+        mode: 'monitor',
+      },
+    });
     mock.onDelete('/follows/70').reply(200, { success: true });
     mock.onGet('/follows/my').reply(200, { data: [] }); // Empty after delete
 
+    // Step 1: Click delete → shows confirmation
     await testBot.handleUpdate(callbackUpdate('follow_delete:70'));
+    await new Promise((resolve) => setImmediate(resolve));
+
+    const confirmText = testBot.getLastReplyText();
+    expect(confirmText).toContain('Удалить подписку');
+
+    // Step 2: Confirm delete
+    await testBot.handleUpdate(callbackUpdate('confirm_delete_follow:70'));
     await new Promise((resolve) => setImmediate(resolve));
 
     // After delete, returns to empty follow list
@@ -405,13 +453,19 @@ describe('Follow Management - Update/Switch/Delete (P0)', () => {
       },
     });
 
-    // Clicking follow_mode:80 enters scene and asks for markup
+    // Clicking follow_mode:80 enters scene and asks for markup type
     await testBot.handleUpdate(callbackUpdate('follow_mode:80'));
     await new Promise((resolve) => setImmediate(resolve));
     
-    // Verify we got the markup prompt
+    // Verify we got the markup type selection
     const promptText = testBot.getLastReplyText();
-    expect(promptText).toContain('наценку');
+    expect(promptText).toContain('Выберите тип наценки');
+
+    testBot.captor.reset();
+
+    // Select percentage type
+    await testBot.handleUpdate(callbackUpdate('markup_type:percentage'));
+    await new Promise((resolve) => setImmediate(resolve));
 
     testBot.captor.reset();
 
@@ -431,17 +485,32 @@ describe('Follow Management - Update/Switch/Delete (P0)', () => {
   });
 
   it('API error при удалении (500) → показать ошибку', async () => {
+    // Mock follow detail for confirmation dialog
+    mock.onGet('/follows/90').reply(200, {
+      data: {
+        id: 90,
+        source_shop_id: 555,
+        source_shop_name: 'ErrorShop',
+        target_shop_id: 1,
+        mode: 'monitor',
+      },
+    });
     mock.onDelete('/follows/90').reply(500, {
       error: 'Cannot delete follow',
     });
 
+    // Step 1: Click delete → shows confirmation
     await testBot.handleUpdate(callbackUpdate('follow_delete:90'));
+    await new Promise((resolve) => setImmediate(resolve));
+
+    // Step 2: Confirm delete → API error
+    await testBot.handleUpdate(callbackUpdate('confirm_delete_follow:90'));
     await new Promise((resolve) => setImmediate(resolve));
 
     const text = testBot.getLastReplyText();
     expect(text).toContain('Не удалось удалить подписку');
 
-    // Verify DELETE was called (multiple times due to error handler retries)
+    // Verify DELETE was called
     expect(mock.history.delete.length).toBeGreaterThanOrEqual(1);
   });
 
@@ -535,6 +604,7 @@ describe('Follow Management - Update/Switch/Delete (P0)', () => {
         id: 120,
         mode: 'resell',
         markup_percentage: 1,
+        markup_type: 'percentage',
         source_shop_id: 999,
         source_shop_name: 'TestShop',
         follower_shop_id: 1,
@@ -545,11 +615,16 @@ describe('Follow Management - Update/Switch/Delete (P0)', () => {
     // Enter scene
     await testBot.handleUpdate(callbackUpdate('follow_edit:120'));
     await new Promise((resolve) => setImmediate(resolve));
+    
+    // Select percentage type
+    await testBot.handleUpdate(callbackUpdate('markup_type:percentage'));
+    await new Promise((resolve) => setImmediate(resolve));
+    
     testBot.captor.reset();
 
     // Mock PUT API
     mock.onPut('/follows/120/markup').reply(200, {
-      data: { id: 120, markup_percentage: 1 },
+      data: { id: 120, markup_percentage: 1, markup_type: 'percentage' },
     });
 
     await testBot.handleUpdate(textUpdate('1'));
@@ -569,6 +644,7 @@ describe('Follow Management - Update/Switch/Delete (P0)', () => {
         id: 130,
         mode: 'resell',
         markup_percentage: 500,
+        markup_type: 'percentage',
         source_shop_id: 888,
         source_shop_name: 'MaxMarkupShop',
         follower_shop_id: 1,
@@ -579,11 +655,16 @@ describe('Follow Management - Update/Switch/Delete (P0)', () => {
     // Enter scene
     await testBot.handleUpdate(callbackUpdate('follow_edit:130'));
     await new Promise((resolve) => setImmediate(resolve));
+    
+    // Select percentage type
+    await testBot.handleUpdate(callbackUpdate('markup_type:percentage'));
+    await new Promise((resolve) => setImmediate(resolve));
+    
     testBot.captor.reset();
 
     // Mock PUT API
     mock.onPut('/follows/130/markup').reply(200, {
-      data: { id: 130, markup_percentage: 500 },
+      data: { id: 130, markup_percentage: 500, markup_type: 'percentage' },
     });
 
     await testBot.handleUpdate(textUpdate('500'));

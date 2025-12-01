@@ -57,7 +57,9 @@ export default function PaymentHashModal() {
 
     triggerHaptic('success');
     await submitPaymentHash(cleanHash);
-    if (!verifyError) {
+    // Check store state directly after async operation (verifyError from hook is stale)
+    const hasError = useStore.getState().verifyError;
+    if (!hasError) {
       setTxHash('');
     }
   };

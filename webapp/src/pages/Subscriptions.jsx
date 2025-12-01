@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 import Header from '../components/Layout/Header';
 import { useApi } from '../hooks/useApi';
@@ -13,6 +13,18 @@ export default function Subscriptions() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const { get } = useApi();
+
+  // AbortController for retry requests
+  const retryControllerRef = useRef(null);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (retryControllerRef.current) {
+        retryControllerRef.current.abort();
+      }
+    };
+  }, []);
   const { triggerHaptic } = useTelegram();
   const { t } = useTranslation();
   const token = useStore((state) => state.token);
@@ -159,6 +171,31 @@ export default function Subscriptions() {
     setActiveTab('catalog');
   };
 
+  // Handle retry with AbortController
+  const handleRetry = useCallback(() => {
+    // Cancel any in-flight retry request
+    if (retryControllerRef.current) {
+      retryControllerRef.current.abort();
+    }
+    retryControllerRef.current = new AbortController();
+
+    setLoading(true);
+    setError(null);
+
+    loadData(retryControllerRef.current.signal)
+      .then((result) => {
+        if (result?.status === 'aborted') return;
+        if (result?.status === 'error') {
+          setError(result.error);
+        }
+      })
+      .finally(() => {
+        if (!retryControllerRef.current?.signal?.aborted) {
+          setLoading(false);
+        }
+      });
+  }, [loadData]);
+
   // Determine if we have data based on mode
   const hasData = viewMode === 'buyer'
     ? buyerSubscriptions.length > 0
@@ -201,11 +238,7 @@ export default function Subscriptions() {
             </div>
             <h3 className="text-lg font-semibold text-white mb-2">{error}</h3>
             <motion.button
-              onClick={() => {
-                setLoading(true);
-                setError(null);
-                loadData().finally(() => setLoading(false));
-              }}
+              onClick={handleRetry}
               className="mt-4 px-6 py-3 bg-[#FF6B00] text-white font-semibold rounded-xl shadow-lg shadow-[#FF6B00]/20"
               whileTap={{ scale: 0.95 }}
             >
