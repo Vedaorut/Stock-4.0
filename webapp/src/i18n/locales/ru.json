@@ -35,7 +35,46 @@
     "myOrders": "Мои заказы",
     "language": "Язык",
     "russian": "Русский",
-    "version": "Версия"
+    "version": "Версия",
+    "sections": {
+      "management": "УПРАВЛЕНИЕ",
+      "purchases": "ПОКУПКИ",
+      "settings": "НАСТРОЙКИ"
+    },
+    "items": {
+      "products": "Товары",
+      "productsDesc": "Управление каталогом товаров",
+      "shopOrders": "Заказы магазина",
+      "shopOrdersDesc": "Управление заказами и выдача",
+      "analytics": "Статистика",
+      "analyticsDesc": "Продажи и аналитика",
+      "wallets": "Платёжные кошельки",
+      "walletsDesc": "Мои крипто-кошельки",
+      "workspace": "Workspace",
+      "workspaceDesc": "Работники и доступы",
+      "workerMode": "Режим работника",
+      "workerModeDesc": "Работать в чужом магазине",
+      "follows": "Follows",
+      "followsDesc": "Отслеживайте другие магазины",
+      "migration": "Канал заблокирован?",
+      "migrationDesc": "Миграция на новый канал",
+      "myOrders": "Мои заказы",
+      "myOrdersDesc": "История покупок и статусы",
+      "subscription": "Подписка",
+      "subscriptionDesc": "Тарифы и оплата",
+      "languageDesc": "Выбор языка интерфейса",
+      "switchToSeller": "Переключить на продавца",
+      "switchToBuyer": "Переключить на покупателя",
+      "switchToSellerDesc": "Управление магазином",
+      "switchToBuyerDesc": "Режим покупок"
+    },
+    "switchMode": {
+      "becomeSeller": "Стать продавцом?",
+      "becomeBuyer": "Стать покупателем?",
+      "sellerMessage": "Вы переключитесь в режим управления магазином.",
+      "buyerMessage": "Вы переключитесь в режим покупок.",
+      "error": "Не удалось переключить режим"
+    }
   },
 
   "wallet": {
@@ -102,7 +141,16 @@
     "searchEmpty": "Ничего не найдено",
     "searchEmptyDesc": "Попробуйте изменить запрос",
     "searchMinChars": "Введите минимум 2 символа",
-    "fromShop": "из {shop}"
+    "fromShop": "из {shop}",
+    "myShop": "(Мой магазин)",
+    "inPreorder": "в предзаказе",
+    "inStock": "в наличии",
+    "tabs": {
+      "stock": "Наличие",
+      "preorder": "Предзаказ"
+    },
+    "preorderEmpty": "Нет товаров в предзаказе",
+    "preorderEmptyDesc": "Мы сообщим, как только появятся новые позиции для предзаказа"
   },
 
   "cart": {
@@ -122,7 +170,9 @@
     "empty": "Вы не подписаны на магазины",
     "emptyDesc": "Найдите магазины в каталоге",
     "unsubscribe": "Отписаться",
-    "products": "товаров"
+    "products": "товаров",
+    "loadError": "Не удалось загрузить подписки",
+    "dataLoadError": "Не удалось загрузить данные"
   },
 
   "shop": {

@@ -4,6 +4,7 @@ import Header from '../components/Layout/Header';
 import { useTelegram } from '../hooks/useTelegram';
 import { useTranslation } from '../i18n/useTranslation';
 import { useStore } from '../store/useStore';
+import { useApi } from '../hooks/useApi';
 import InteractiveListItem from '../components/common/InteractiveListItem';
 
 // Lazy load modals - only load when user opens them
@@ -37,12 +38,12 @@ const getSettingsSections = (t, lang, viewMode) => {
 
   const allSections = [
     {
-      title: 'УПРАВЛЕНИЕ',
+      title: t('settings.sections.management'),
       items: [
         {
           id: 'products',
-          label: 'Товары',
-          description: 'Управление каталогом товаров',
+          label: t('settings.items.products'),
+          description: t('settings.items.productsDesc'),
           icon: (
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -56,8 +57,8 @@ const getSettingsSections = (t, lang, viewMode) => {
         },
         {
           id: 'shop-orders',
-          label: 'Заказы магазина',
-          description: 'Управление заказами и выдача',
+          label: t('settings.items.shopOrders'),
+          description: t('settings.items.shopOrdersDesc'),
           icon: (
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -71,8 +72,8 @@ const getSettingsSections = (t, lang, viewMode) => {
         },
         {
           id: 'analytics',
-          label: 'Статистика',
-          description: 'Продажи и аналитика',
+          label: t('settings.items.analytics'),
+          description: t('settings.items.analyticsDesc'),
           icon: (
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -86,8 +87,8 @@ const getSettingsSections = (t, lang, viewMode) => {
         },
         {
           id: 'wallet',
-          label: 'Платёжные кошельки',
-          description: 'Мои крипто-кошельки',
+          label: t('settings.items.wallets'),
+          description: t('settings.items.walletsDesc'),
           icon: (
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -101,8 +102,8 @@ const getSettingsSections = (t, lang, viewMode) => {
         },
         {
           id: 'workspace',
-          label: 'Workspace',
-          description: 'Работники и доступы',
+          label: t('settings.items.workspace'),
+          description: t('settings.items.workspaceDesc'),
           icon: (
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -116,8 +117,8 @@ const getSettingsSections = (t, lang, viewMode) => {
         },
         {
           id: 'worker-mode',
-          label: 'Режим работника',
-          description: 'Работать в чужом магазине',
+          label: t('settings.items.workerMode'),
+          description: t('settings.items.workerModeDesc'),
           icon: (
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -131,8 +132,8 @@ const getSettingsSections = (t, lang, viewMode) => {
         },
         {
           id: 'follows',
-          label: 'Follows',
-          description: 'Отслеживайте другие магазины',
+          label: t('settings.items.follows'),
+          description: t('settings.items.followsDesc'),
           icon: (
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -146,8 +147,8 @@ const getSettingsSections = (t, lang, viewMode) => {
         },
         {
           id: 'migration',
-          label: 'Канал заблокирован?',
-          description: 'Миграция на новый канал',
+          label: t('settings.items.migration'),
+          description: t('settings.items.migrationDesc'),
           icon: (
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -162,12 +163,12 @@ const getSettingsSections = (t, lang, viewMode) => {
       ],
     },
     {
-      title: 'ПОКУПКИ',
+      title: t('settings.sections.purchases'),
       items: [
         {
           id: 'my-orders',
-          label: 'Мои заказы',
-          description: 'История покупок и статусы',
+          label: t('settings.items.myOrders'),
+          description: t('settings.items.myOrdersDesc'),
           icon: (
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -182,12 +183,12 @@ const getSettingsSections = (t, lang, viewMode) => {
       ],
     },
     {
-      title: 'НАСТРОЙКИ',
+      title: t('settings.sections.settings'),
       items: [
         {
           id: 'subscription',
-          label: 'Подписка',
-          description: 'Тарифы и оплата',
+          label: t('settings.items.subscription'),
+          description: t('settings.items.subscriptionDesc'),
           icon: (
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -202,7 +203,7 @@ const getSettingsSections = (t, lang, viewMode) => {
         {
           id: 'language',
           label: t('settings.language'),
-          description: 'Выбор языка интерфейса',
+          description: t('settings.items.languageDesc'),
           icon: (
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -217,8 +218,8 @@ const getSettingsSections = (t, lang, viewMode) => {
         },
         {
           id: 'switch-mode',
-          label: viewMode === 'seller' ? 'Переключить на покупателя' : 'Переключить на продавца',
-          description: viewMode === 'seller' ? 'Режим покупок' : 'Управление магазином',
+          label: viewMode === 'seller' ? t('settings.items.switchToBuyer') : t('settings.items.switchToSeller'),
+          description: viewMode === 'seller' ? t('settings.items.switchToBuyerDesc') : t('settings.items.switchToSellerDesc'),
           icon: (
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -314,10 +315,9 @@ export default function Settings() {
 
   const handleSwitchMode = async () => {
     const newMode = viewMode === 'seller' ? 'buyer' : 'seller';
-    const _title = newMode === 'seller' ? 'Стать продавцом?' : 'Стать покупателем?';
     const message = newMode === 'seller'
-      ? 'Вы переключитесь в режим управления магазином.'
-      : 'Вы переключитесь в режим покупок.';
+      ? t('settings.switchMode.sellerMessage')
+      : t('settings.switchMode.buyerMessage');
 
     const confirmed = await showConfirm(message);
 
@@ -334,7 +334,7 @@ export default function Settings() {
         // Revert on error
         setViewMode(viewMode);
         console.error('Failed to switch mode:', error);
-        alert('Не удалось переключить режим');
+        alert(t('settings.switchMode.error'));
       }
     }
   };

@@ -35,7 +35,46 @@
     "myOrders": "My Orders",
     "language": "Language",
     "russian": "Русский",
-    "version": "Version"
+    "version": "Version",
+    "sections": {
+      "management": "MANAGEMENT",
+      "purchases": "PURCHASES",
+      "settings": "SETTINGS"
+    },
+    "items": {
+      "products": "Products",
+      "productsDesc": "Manage product catalog",
+      "shopOrders": "Shop Orders",
+      "shopOrdersDesc": "Manage orders and delivery",
+      "analytics": "Analytics",
+      "analyticsDesc": "Sales and analytics",
+      "wallets": "Payment Wallets",
+      "walletsDesc": "My crypto wallets",
+      "workspace": "Workspace",
+      "workspaceDesc": "Workers and access",
+      "workerMode": "Worker Mode",
+      "workerModeDesc": "Work in another shop",
+      "follows": "Follows",
+      "followsDesc": "Track other shops",
+      "migration": "Channel blocked?",
+      "migrationDesc": "Migrate to new channel",
+      "myOrders": "My Orders",
+      "myOrdersDesc": "Purchase history and statuses",
+      "subscription": "Subscription",
+      "subscriptionDesc": "Plans and payment",
+      "languageDesc": "Interface language selection",
+      "switchToSeller": "Switch to seller",
+      "switchToBuyer": "Switch to buyer",
+      "switchToSellerDesc": "Shop management",
+      "switchToBuyerDesc": "Shopping mode"
+    },
+    "switchMode": {
+      "becomeSeller": "Become a seller?",
+      "becomeBuyer": "Become a buyer?",
+      "sellerMessage": "You will switch to shop management mode.",
+      "buyerMessage": "You will switch to shopping mode.",
+      "error": "Failed to switch mode"
+    }
   },
 
   "wallet": {
@@ -102,7 +141,16 @@
     "searchEmpty": "Nothing found",
     "searchEmptyDesc": "Try changing your search query",
     "searchMinChars": "Enter at least 2 characters",
-    "fromShop": "from {shop}"
+    "fromShop": "from {shop}",
+    "myShop": "(My Shop)",
+    "inPreorder": "in preorder",
+    "inStock": "in stock",
+    "tabs": {
+      "stock": "In Stock",
+      "preorder": "Preorder"
+    },
+    "preorderEmpty": "No preorder products",
+    "preorderEmptyDesc": "We will notify you when new preorder items become available"
   },
 
   "cart": {
@@ -122,7 +170,9 @@
     "empty": "You are not subscribed to any shops",
     "emptyDesc": "Find shops in catalog",
     "unsubscribe": "Unsubscribe",
-    "products": "products"
+    "products": "products",
+    "loadError": "Failed to load subscriptions",
+    "dataLoadError": "Failed to load data"
   },
 
   "shop": {

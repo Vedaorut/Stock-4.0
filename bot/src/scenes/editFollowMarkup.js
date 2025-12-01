@@ -2,6 +2,8 @@ import { Scenes, Markup } from 'telegraf';
 import { followApi } from '../utils/api.js';
 import { formatFollowDetail } from '../utils/minimalist.js';
 import { followDetailMenu, followsMenu } from '../keyboards/seller.js';
+import { cancelButton } from '../keyboards/common.js';
+import { reply as cleanReply } from '../utils/cleanReply.js';
 import logger from '../utils/logger.js';
 import { messages } from '../texts/messages.js';
 
@@ -44,14 +46,31 @@ const showMarkupTypeSelection = async (ctx) => {
     const existingLock = ctx.session.editingFollowId;
     const lockTimestamp = ctx.session.editingFollowTimestamp || 0;
 
-    // If same follow being edited AND lock is fresh (< 30 seconds old)
-    if (existingLock === followId && now - lockTimestamp < 30000) {
+    // Lock timeout: 5 seconds (reduced from 30s to prevent race conditions)
+    const LOCK_TIMEOUT_MS = 5000;
+
+    // If same follow being edited AND lock is fresh (< 5 seconds old)
+    if (existingLock === followId && now - lockTimestamp < LOCK_TIMEOUT_MS) {
       logger.warn('Already editing follow, ignoring duplicate request', {
         userId: ctx.from.id,
         followId,
         lockAge: now - lockTimestamp,
+        lockTimeout: LOCK_TIMEOUT_MS,
       });
+      // Notify user that operation is blocked
+      await ctx.answerCbQuery('Операция уже выполняется, подождите...').catch(() => {});
       return ctx.scene.leave();
+    }
+
+    // If different follow is being edited, clear stale lock
+    if (existingLock && existingLock !== followId && now - lockTimestamp >= LOCK_TIMEOUT_MS) {
+      logger.info('Clearing stale lock for different follow', {
+        userId: ctx.from.id,
+        staleLockFollowId: existingLock,
+        newFollowId: followId,
+      });
+      delete ctx.session.editingFollowId;
+      delete ctx.session.editingFollowTimestamp;
     }
 
     // Set lock with timestamp
@@ -79,7 +98,7 @@ const showMarkupTypeSelection = async (ctx) => {
 const waitForMarkupType = async (ctx) => {
   // This step is handled by action handlers, just wait
   if (ctx.message?.text) {
-    await ctx.reply(followMessages.markupTypeRequired, markupTypeKeyboard);
+    await cleanReply(ctx, followMessages.markupTypeRequired, cancelButton);
   }
   return;
 };
@@ -89,7 +108,7 @@ const handleMarkupInput = async (ctx) => {
   try {
     const markupType = ctx.scene.state.markupType;
     if (!markupType) {
-      await ctx.reply(followMessages.markupTypeRequired, markupTypeKeyboard);
+      await cleanReply(ctx, followMessages.markupTypeRequired, cancelButton);
       return;
     }
 
@@ -97,7 +116,7 @@ const handleMarkupInput = async (ctx) => {
       const prompt = markupType === 'fixed'
         ? followMessages.markupFixedPrompt
         : followMessages.markupPercentagePrompt;
-      await ctx.reply('Пожалуйста, отправьте наценку текстом (только число).\n\n' + prompt);
+      await cleanReply(ctx, 'Пожалуйста, отправьте наценку текстом (только число).\\n\\n' + prompt, cancelButton);
       return;
     }
 
@@ -120,7 +139,7 @@ const handleMarkupInput = async (ctx) => {
     }
 
     if (!isValid) {
-      await ctx.reply(invalidMessage);
+      await cleanReply(ctx, invalidMessage, cancelButton);
       // Delete invalid input message (M20 FIX: improved error logging)
       await ctx.deleteMessage(userMsgId).catch((err) => {
         // Log WARN for unexpected errors (not 400 Bad Request or 429 rate limit)
@@ -155,7 +174,7 @@ const handleMarkupInput = async (ctx) => {
     const token = ctx.session.token;
 
     if (!token) {
-      await ctx.reply(generalMessages.authorizationRequired);
+      await cleanReply(ctx, generalMessages.authorizationRequired, cancelButton);
       return ctx.scene.leave();
     }
 
@@ -167,7 +186,7 @@ const handleMarkupInput = async (ctx) => {
       pendingModeSwitch,
     });
 
-    await ctx.reply(followMessages.createSaving);
+    await cleanReply(ctx, followMessages.createSaving);
 
     // Build markup data object
     const markupData = {
@@ -189,7 +208,7 @@ const handleMarkupInput = async (ctx) => {
       const follow = await followApi.getFollowDetail(followId, token);
       const message = formatFollowDetail(follow);
 
-      await ctx.reply(message, followDetailMenu(followId, follow.mode));
+      await cleanReply(ctx, message, followDetailMenu(followId, follow.mode));
 
       const _successMsg = markupType === 'fixed'
         ? followMessages.markupFixedUpdated(markup)
@@ -218,12 +237,12 @@ const handleMarkupInput = async (ctx) => {
         message = followMessages.markupInvalid;
       }
 
-      await ctx.reply(message, followsMenu(Boolean(ctx.session?.hasFollows)));
+      await cleanReply(ctx, message, followsMenu(Boolean(ctx.session?.hasFollows)));
       return ctx.scene.leave();
     }
   } catch (error) {
     logger.error('Error in handleMarkupInput step:', error);
-    await ctx.reply(followMessages.switchError, followsMenu(Boolean(ctx.session?.hasFollows)));
+    await cleanReply(ctx, followMessages.switchError, followsMenu(Boolean(ctx.session?.hasFollows)));
     return ctx.scene.leave();
   }
 };
@@ -282,7 +301,7 @@ editFollowMarkupScene.action(/^markup_type:(percentage|fixed)$/, async (ctx) => 
     return ctx.wizard.next();
   } catch (error) {
     logger.error('Error in markup_type handler:', error);
-    await ctx.reply(followMessages.switchError, followsMenu(Boolean(ctx.session?.hasFollows)));
+    await cleanReply(ctx, followMessages.switchError, followsMenu(Boolean(ctx.session?.hasFollows)));
     return ctx.scene.leave();
   }
 });
@@ -293,14 +312,11 @@ editFollowMarkupScene.action('cancel_scene', async (ctx) => {
     await ctx.answerCbQuery();
     logger.info('edit_markup_cancelled', { userId: ctx.from.id });
     await ctx.scene.leave();
-    await ctx.reply(followMessages.createCancelled, followsMenu(Boolean(ctx.session?.hasFollows)));
+    await cleanReply(ctx, followMessages.createCancelled, followsMenu(Boolean(ctx.session?.hasFollows)));
   } catch (error) {
     logger.error('Error in cancel_scene handler:', error);
     try {
-      await ctx.reply(
-        followMessages.cancelOperationError,
-        followsMenu(Boolean(ctx.session?.hasFollows))
-      );
+      await cleanReply(ctx, followMessages.cancelOperationError, followsMenu(Boolean(ctx.session?.hasFollows)));
     } catch (replyError) {
       logger.error('Failed to send error message:', replyError);
     }

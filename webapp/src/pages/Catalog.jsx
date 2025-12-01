@@ -539,13 +539,13 @@ export default function Catalog() {
             <h1 className="text-white text-2xl font-bold">
               {displayShop.name}
               {isViewingOwnShop && (
-                <span className="ml-2 text-sm text-orange-primary">(Мой магазин)</span>
+                <span className="ml-2 text-sm text-orange-primary">{t('catalog.myShop')}</span>
               )}
             </h1>
             <p className="text-gray-400 text-sm">
               {activeSection === 'preorder'
-                ? `${preorderProducts.length} в предзаказе`
-                : `${stockProducts.length} в наличии`}
+                ? `${preorderProducts.length} ${t('catalog.inPreorder')}`
+                : `${stockProducts.length} ${t('catalog.inStock')}`}
             </p>
           </div>
         </div>
@@ -634,7 +634,7 @@ export default function Catalog() {
         <div className="relative flex bg-white/5 backdrop-blur rounded-2xl p-1">
           {['stock', 'preorder'].map((sectionId) => {
             const isActive = activeSection === sectionId;
-            const label = sectionId === 'stock' ? 'Наличие' : 'Предзаказ';
+            const label = sectionId === 'stock' ? t('catalog.tabs.stock') : t('catalog.tabs.preorder');
             const count = sectionId === 'stock' ? stockProducts.length : preorderProducts.length;
 
             return (
@@ -685,7 +685,7 @@ export default function Catalog() {
             className="bg-orange-primary hover:bg-orange-light text-white font-semibold px-6 py-3 rounded-xl transition-colors mt-4"
             whileTap={{ scale: 0.95 }}
           >
-            Retry
+            {t('common.retry')}
           </motion.button>
         </div>
       )}
@@ -694,10 +694,10 @@ export default function Catalog() {
         <ProductGrid
           products={displayedProducts}
           loading={loading}
-          emptyTitle={activeSection === 'preorder' ? 'Нет товаров в предзаказе' : t('catalog.empty')}
+          emptyTitle={activeSection === 'preorder' ? t('catalog.preorderEmpty') : t('catalog.empty')}
           emptyDescription={
             activeSection === 'preorder'
-              ? 'Мы сообщим, как только появятся новые позиции для предзаказа'
+              ? t('catalog.preorderEmptyDesc')
               : t('catalog.emptyDesc')
           }
           emptyIcon={activeSection === 'preorder' ? '🕒' : '📦'}
