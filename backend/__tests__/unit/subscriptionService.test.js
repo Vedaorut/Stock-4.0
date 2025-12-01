@@ -793,7 +793,7 @@ describe('Subscription Service', () => {
       expect(result).toHaveLength(2);
       expect(result[0].shop_name).toBe('Shop A');
       expect(mockPoolQuery).toHaveBeenCalledWith(
-        expect.stringContaining('FROM shop_subscriptions ss'),
+        expect.stringContaining('FROM subscriptions sub'),
         [100]
       );
     });
