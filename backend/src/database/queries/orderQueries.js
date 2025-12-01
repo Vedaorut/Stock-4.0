@@ -38,15 +38,21 @@ export const orderQueries = {
 
   // Find orders by buyer ID
   // P0-DB-3 FIX: Enforce MAX_LIMIT
+  // Returns payment verification info for "My Orders" UI
   findByBuyerId: async (buyerId, limit = 50, offset = 0) => {
     const MAX_LIMIT = 1000;
     const safeLimit = Math.min(limit, MAX_LIMIT);
 
     const result = await query(
-      `SELECT o.*, p.name as product_name, s.name as shop_name
+      `SELECT o.*,
+              p.name as product_name,
+              s.name as shop_name,
+              pay.blockchain_confirmations,
+              pay.verification_status as payment_verification_status
        FROM orders o
-       JOIN products p ON o.product_id = p.id
-       JOIN shops s ON p.shop_id = s.id
+       LEFT JOIN products p ON o.product_id = p.id
+       LEFT JOIN shops s ON p.shop_id = s.id
+       LEFT JOIN payments pay ON pay.order_id = o.id
        WHERE o.buyer_id = $1
        ORDER BY o.created_at DESC
        LIMIT $2 OFFSET $3`,
@@ -139,23 +145,11 @@ export const orderQueries = {
     return result.rows[0];
   },
 
-  // Update payment address
-  updatePaymentAddress: async (id, paymentAddress) => {
-    const result = await query(
-      `UPDATE orders
-       SET payment_address = $2,
-           updated_at = NOW()
-       WHERE id = $1
-       RETURNING *`,
-      [id, paymentAddress]
-    );
-    return result.rows[0];
-  },
-
   // Optimized query for invoice generation - replaces 4 queries with 1
+  // Supports both single-item orders (via product_id) and multi-item orders (via order_items)
   getInvoiceData: async (orderId) => {
     const result = await query(
-      `SELECT 
+      `SELECT
          o.id,
          o.total_price,
          o.buyer_id,
@@ -167,9 +161,12 @@ export const orderQueries = {
          s.wallet_usdt,
          s.wallet_ltc
        FROM orders o
-       JOIN products p ON o.product_id = p.id
-       JOIN shops s ON p.shop_id = s.id
-       WHERE o.id = $1`,
+       LEFT JOIN products p ON o.product_id = p.id
+       LEFT JOIN order_items oi ON oi.order_id = o.id
+       LEFT JOIN products pi ON oi.product_id = pi.id
+       JOIN shops s ON s.id = COALESCE(p.shop_id, pi.shop_id)
+       WHERE o.id = $1
+       LIMIT 1`,
       [orderId]
     );
     return result.rows[0];

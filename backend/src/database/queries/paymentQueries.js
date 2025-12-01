@@ -63,23 +63,6 @@ export const paymentQueries = {
     return result.rows[0];
   },
 
-  // Find pending payments for verification worker
-  findPendingForVerification: async (limit = 50) => {
-    const result = await query(
-      `SELECT p.*, o.payment_address, o.total_price, o.crypto_amount, o.crypto_currency
-       FROM payments p
-       JOIN orders o ON p.order_id = o.id
-       WHERE p.status = 'pending'
-         AND p.subscription_id IS NULL
-         AND o.status = 'pending'
-         AND p.created_at > NOW() - INTERVAL '24 hours'
-       ORDER BY p.created_at ASC
-       LIMIT $1`,
-      [limit]
-    );
-    return result.rows;
-  },
-
   // Update verification status
   updateVerificationStatus: async (id, { status, confirmations, error }) => {
     const result = await query(

@@ -86,17 +86,6 @@ export const invoiceQueries = {
     return result.rows[0];
   },
 
-  // Find expired invoices (for cleanup)
-  findExpired: async () => {
-    const result = await query(
-      `SELECT * FROM invoices
-       WHERE status = 'pending'
-       AND expires_at < NOW()`,
-      []
-    );
-    return result.rows;
-  },
-
   /**
    * Find invoice by ID with ownership information
    * Returns invoice with buyer_id (for order invoices) and owner_id (for subscription invoices)

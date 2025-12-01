@@ -616,49 +616,6 @@ export const setupSellerHandlers = (bot) => {
     }
   });
 
-  // Subscription Hub - unified entry point for all subscription actions
-  bot.action('subscription:hub', async (ctx) => {
-    try {
-      await ctx.answerCbQuery();
-
-      if (!ctx.session.shopId) {
-        await ctx.reply(generalMessages.shopRequired, sellerMenuNoShop);
-        return;
-      }
-
-      if (!ctx.session.token) {
-        const menu = await getSellerMenuKeyboard(ctx);
-        await ctx.reply(generalMessages.authorizationRequired, menu);
-        return;
-      }
-
-      // Get subscription status from backend
-      const api = await import('../../utils/api.js');
-      const response = await api.default.get(`/subscriptions/status/${ctx.session.shopId}`, {
-        headers: { Authorization: `Bearer ${ctx.session.token}` },
-      });
-
-      // Backend returns FLAT object
-      const subscriptionData = response.data;
-
-      // Update session tier if available
-      if (subscriptionData.tier) {
-        ctx.session.shopTier = subscriptionData.tier;
-      }
-
-      const message = formatSubscriptionStatus(subscriptionData);
-      const keyboard = buildSubscriptionKeyboard(subscriptionData);
-
-      await ctx.reply(message, keyboard);
-
-      logger.info(`User ${ctx.from.id} opened subscription hub (tier: ${subscriptionData.tier})`);
-    } catch (error) {
-      logger.error('Error in subscription hub handler:', error);
-      const menu = await getSellerMenuKeyboard(ctx);
-      await ctx.reply(sellerMessages.subscriptionStatusError, menu);
-    }
-  });
-
   // Back to seller menu
   bot.action('seller:main', handleSellerRole);
   bot.action('seller:menu', handleSellerRole);

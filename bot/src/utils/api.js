@@ -287,11 +287,21 @@ export const shopApi = {
   },
 
   // Get accessible shops (owner + worker)
+  // DEPRECATED: /shops/accessible endpoint doesn't exist
+  // Use getMyShop() for owned shops and getWorkerShops() for worker access
   async getAccessibleShops(token) {
-    const { data } = await api.get('/shops/accessible', {
-      headers: { Authorization: `Bearer ${token}` },
+    logger.warn('getAccessibleShops() is deprecated - use getMyShop() + getWorkerShops() instead');
+    // Combine owned shops and worker shops
+    const owned = await this.getMyShop(token);
+    const workerShops = await this.getWorkerShops(token);
+    const combined = [...(Array.isArray(owned) ? owned : []), ...(Array.isArray(workerShops) ? workerShops : [])];
+    // Remove duplicates by id
+    const seen = new Set();
+    return combined.filter(shop => {
+      if (seen.has(shop.id)) return false;
+      seen.add(shop.id);
+      return true;
     });
-    return data.data || data;
   },
 
   // Get worker shops only (not owner)
@@ -623,14 +633,11 @@ export const paymentApi = {
   },
 
   // Generate crypto address
-  async generateAddress(currency, token) {
-    const { data } = await paymentAxios.post(
-      '/payments/address',
-      { currency },
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-    // Unwrap response: return data.data (address object) instead of wrapper
-    return data.data || data;
+  // DEPRECATED: /payments/address endpoint doesn't exist
+  // Address generation is now handled through subscription invoice flow
+  async generateAddress(_currency, _token) {
+    logger.warn('paymentApi.generateAddress() is deprecated - use subscriptionApi invoice flow instead');
+    throw new Error('generateAddress is deprecated. Use subscription invoice flow for payment addresses.');
   },
 };
 
@@ -694,12 +701,12 @@ export const subscriptionApi = {
   },
 
   // Get shop subscribers (shop owner only)
-  async getShopSubscribers(shopId, token) {
-    const { data } = await api.get(`/subscriptions/shop/${shopId}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    // Unwrap response: return data.data (object with subscribers array and count) instead of wrapper
-    return data.data || data;
+  // DEPRECATED: /subscriptions/shop/:shopId endpoint doesn't exist
+  // Subscribers count is available via shop details or migration check endpoint
+  async getShopSubscribers(_shopId, _token) {
+    logger.warn('subscriptionApi.getShopSubscribers() is deprecated - endpoint does not exist');
+    // Return empty result for backward compatibility
+    return { subscribers: [], count: 0 };
   },
 
   // Generate payment invoice for subscription (blockchain query - needs 60s timeout)
@@ -814,12 +821,14 @@ export const subscriptionApi = {
 };
 
 export const notificationApi = {
+  // Migrate shop notification channel
+  // Fixed: /notifications/migrate-channel doesn't exist
+  // Use /shops/:shopId/migration instead (migrationController)
   async migrateChannel(shopId, newChannel, token) {
     const { data } = await api.post(
-      '/notifications/migrate-channel',
+      `/shops/${shopId}/migration`,
       {
-        shop_id: Number(shopId),
-        new_channel: newChannel,
+        newChannelUrl: newChannel, // migrationController expects newChannelUrl in body
       },
       {
         headers: { Authorization: `Bearer ${token}` },
@@ -904,8 +913,8 @@ export const followApi = {
       ? { markupPercentage: markupData, markupType: 'percentage' }
       : {
           markupType: markupData.markupType || 'percentage',
-          markupPercentage: markupData.markupPercentage || 0,
-          markupFixed: markupData.markupFixed || 0,
+          markupPercentage: Number(markupData.markupPercentage) || 0,
+          markupFixed: Number(markupData.markupFixed) || 0,
         };
 
     const { data } = await api.put(

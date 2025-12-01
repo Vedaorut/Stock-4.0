@@ -86,14 +86,6 @@ export const subscriptionQueries = {
     return result.rows[0];
   },
 
-  // Count subscribers for a shop
-  countByShopId: async (shopId) => {
-    const result = await query('SELECT COUNT(*) as count FROM subscriptions WHERE shop_id = $1', [
-      shopId,
-    ]);
-    return parseInt(result.rows[0].count, 10);
-  },
-
   // Find shop subscription (billing) by ID with owner info
   findShopSubscriptionById: async (id) => {
     const result = await query(
