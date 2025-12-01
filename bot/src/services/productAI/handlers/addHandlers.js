@@ -15,7 +15,7 @@ import { safeApiCall } from '../../../utils/safeApiCall.js';
  * Add product handler
  */
 export async function handleAddProduct(args, shopId, token) {
-  const { name, stock } = args;
+  const { name, stock, is_preorder } = args;
   let { price } = args;
 
   // Validate
@@ -87,6 +87,7 @@ export async function handleAddProduct(args, shopId, token) {
       currency: 'USD',
       shopId,
       stockQuantity: normalizedStock,
+      isPreorder: is_preorder || false,
     },
     token
   );
@@ -163,7 +164,7 @@ export async function handleBulkAddProducts(args, shopId, token) {
 
   // Process each product
   for (const product of products) {
-    const { name, price, stock } = product;
+    const { name, price, stock, is_preorder } = product;
     const normalizedStock = stock === undefined || stock === null ? 1 : stock;
 
     // Validate individual product
@@ -226,6 +227,7 @@ export async function handleBulkAddProducts(args, shopId, token) {
         currency: 'USD',
         shopId,
         stockQuantity: normalizedStock,
+        isPreorder: is_preorder || false,
       },
       token
     );

@@ -23,6 +23,11 @@ export const productTools = [
             description:
               'Количество на складе (опционально, по умолчанию 0). Stock quantity, optional, defaults to 0.',
           },
+          is_preorder: {
+            type: 'boolean',
+            description:
+              'Товар-предзаказ (опционально, по умолчанию false). Set to true if this is a preorder product.',
+          },
         },
         required: ['name', 'price', 'stock'],
         additionalProperties: false,
@@ -48,6 +53,7 @@ export const productTools = [
                 name: { type: 'string' },
                 price: { type: 'number' },
                 stock: { type: 'number' },
+                is_preorder: { type: 'boolean' },
               },
               required: ['name', 'price', 'stock'],
               additionalProperties: false,

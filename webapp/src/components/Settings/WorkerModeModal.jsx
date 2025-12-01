@@ -110,8 +110,7 @@ export default function WorkerModeModal({ isOpen, onClose }) {
 
   // Zustand store for worker mode
   const workspaceShopId = useStore((state) => state.workspaceShopId);
-  const setWorkspaceShopId = useStore((state) => state.setWorkspaceShopId);
-  const setIsWorkerMode = useStore((state) => state.setIsWorkerMode);
+  const switchToWorkspaceShop = useStore((state) => state.switchToWorkspaceShop);
 
   const handleClose = useCallback(() => {
     onClose();
@@ -153,7 +152,9 @@ export default function WorkerModeModal({ isOpen, onClose }) {
       } catch (err) {
         if (signal?.aborted) return { status: 'aborted' };
 
-        console.error('[WorkerModeModal] Error loading workspace shops:', err);
+        if (import.meta.env.DEV) {
+          console.error('[WorkerModeModal] Error loading workspace shops:', err);
+        }
         setError(err.message || 'Failed to load data');
         setWorkspaceShops([]);
         return { status: 'error', error: err.message };
@@ -173,7 +174,9 @@ export default function WorkerModeModal({ isOpen, onClose }) {
     loadData(controller.signal)
       .then((result) => {
         if (!controller.signal.aborted && result?.status === 'error') {
-          console.error('Failed to load workspace data:', result.error);
+          if (import.meta.env.DEV) {
+            console.error('Failed to load workspace data:', result.error);
+          }
         }
       })
       .finally(() => {
@@ -187,30 +190,29 @@ export default function WorkerModeModal({ isOpen, onClose }) {
     try {
       // If clicking on already active shop, deactivate worker mode
       if (workspaceShopId === shop.id) {
-        setWorkspaceShopId(null);
-        setIsWorkerMode(false);
+        switchToWorkspaceShop(null); // Exit worker mode
         triggerHaptic('success');
         await alert('Режим работника отключен');
         handleClose();
         return;
       }
 
-      // Activate worker mode for selected shop
-      setWorkspaceShopId(shop.id);
-      setIsWorkerMode(true);
+      // Activate worker mode for selected shop (saves full shop object)
+      switchToWorkspaceShop(shop);
       triggerHaptic('success');
       await alert(`Вы теперь работаете в "${shop.name}"`);
       handleClose();
     } catch (err) {
-      console.error('[WorkerModeModal] Error selecting shop:', err);
+      if (import.meta.env.DEV) {
+        console.error('[WorkerModeModal] Error selecting shop:', err);
+      }
       await alert('Ошибка при выборе магазина');
     }
   };
 
   const handleExitWorkerMode = async () => {
     triggerHaptic('medium');
-    setWorkspaceShopId(null);
-    setIsWorkerMode(false);
+    switchToWorkspaceShop(null); // Exit worker mode
     triggerHaptic('success');
     await alert('Режим работника отключен');
   };
@@ -223,7 +225,9 @@ export default function WorkerModeModal({ isOpen, onClose }) {
     loadData(controller.signal)
       .then((result) => {
         if (!controller.signal.aborted && result?.status === 'error') {
-          console.error('Failed to load workspace data:', result.error);
+          if (import.meta.env.DEV) {
+            console.error('Failed to load workspace data:', result.error);
+          }
         }
       })
       .finally(() => {

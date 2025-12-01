@@ -150,6 +150,12 @@ validateEnvironment();
 const app = express();
 
 /**
+ * Trust proxy - REQUIRED for Cloudflare Tunnel / ngrok / reverse proxies
+ * Without this, express-rate-limit fails with ERR_ERL_UNEXPECTED_X_FORWARDED_FOR
+ */
+app.set('trust proxy', 1);
+
+/**
  * Security middleware
  */
 app.use(
@@ -363,6 +369,7 @@ app.get('/health', async (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/shops', shopRoutes);
 app.use('/api/shops', workerRoutes); // Worker management (mounted on /api/shops)
+app.use('/api/workers', workerRoutes); // Worker self-management (mute notifications)
 app.use('/api/products', productRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/payments', paymentRoutes);

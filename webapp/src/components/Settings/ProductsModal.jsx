@@ -66,13 +66,15 @@ function ProductCard({ product, onEdit, onDelete, t }) {
         </div>
         <div className="flex gap-2">
           <motion.button
-            onClick={() => onEdit(product)}
-            className="w-9 h-9 rounded-xl flex items-center justify-center text-blue-400"
+            onClick={() => !product.is_synced && onEdit(product)}
+            disabled={product.is_synced}
+            className={`w-9 h-9 rounded-xl flex items-center justify-center text-blue-400 ${product.is_synced ? 'opacity-50 cursor-not-allowed' : ''}`}
             style={{
               background: 'rgba(59, 130, 246, 0.1)',
               border: '1px solid rgba(59, 130, 246, 0.2)',
             }}
-            whileTap={{ scale: 0.9 }}
+            whileTap={product.is_synced ? {} : { scale: 0.9 }}
+            title={product.is_synced ? t('product.syncedEditDisabled') : undefined}
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -84,13 +86,15 @@ function ProductCard({ product, onEdit, onDelete, t }) {
             </svg>
           </motion.button>
           <motion.button
-            onClick={handleDelete}
-            className="w-9 h-9 rounded-xl flex items-center justify-center text-red-400"
+            onClick={() => !product.is_synced && handleDelete()}
+            disabled={product.is_synced}
+            className={`w-9 h-9 rounded-xl flex items-center justify-center text-red-400 ${product.is_synced ? 'opacity-50 cursor-not-allowed' : ''}`}
             style={{
               background: 'rgba(255, 59, 48, 0.1)',
               border: '1px solid rgba(255, 59, 48, 0.2)',
             }}
-            whileTap={{ scale: 0.9 }}
+            whileTap={product.is_synced ? {} : { scale: 0.9 }}
+            title={product.is_synced ? t('product.syncedDeleteDisabled') : undefined}
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path

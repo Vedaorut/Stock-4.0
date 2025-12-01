@@ -18,6 +18,14 @@ export const deleteProduct = asyncHandler(async (req, res) => {
       throw new NotFoundError('Product');
     }
 
+    if (existingProduct.is_synced) {
+      return res.status(403).json({
+        success: false,
+        error: 'Cannot delete synced product. Unfollow the shop first.',
+        code: 'SYNCED_PRODUCT_PROTECTED'
+      });
+    }
+
     const isAuthorized = await isAuthorizedToManageShop(existingProduct.shop_id, req.user.id);
     if (!isAuthorized) {
       throw new UnauthorizedError(

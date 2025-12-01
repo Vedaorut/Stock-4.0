@@ -9,44 +9,70 @@ import { useTranslation } from '../i18n/useTranslation';
 export default function Subscriptions() {
   const [myShop, setMyShop] = useState(null);
   const [follows, setFollows] = useState([]);
+  const [buyerSubscriptions, setBuyerSubscriptions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const { get } = useApi();
   const { triggerHaptic } = useTelegram();
   const { t } = useTranslation();
   const token = useStore((state) => state.token);
+  const viewMode = useStore((state) => state.viewMode);
   const setMyShops = useStore((state) => state.setMyShops);
 
   const loadData = useCallback(
     async (signal) => {
       try {
+        // BUYER MODE: fetch user's subscriptions to shops
+        if (viewMode === 'buyer') {
+          const { data: subsData, error: subsError } = await get('/subscriptions', { signal });
+
+          if (signal?.aborted) return { status: 'aborted' };
+
+          if (subsError) {
+            if (import.meta.env.DEV) {
+              console.error('[Subscriptions] Error loading buyer subscriptions:', subsError);
+            }
+            return { status: 'error', error: 'Не удалось загрузить подписки' };
+          }
+
+          const subsList = Array.isArray(subsData?.data) ? subsData.data : [];
+          setBuyerSubscriptions(subsList);
+
+          return { status: 'success' };
+        }
+
+        // SELLER MODE: existing logic
         // 1. Load my shop
         const { data: shopsData, error: shopsError } = await get('/shops/my', { signal });
-        
+
         if (signal?.aborted) return { status: 'aborted' };
-        
+
         if (shopsError) {
-          console.error('[Subscriptions] Error loading shops:', shopsError);
+          if (import.meta.env.DEV) {
+            console.error('[Subscriptions] Error loading shops:', shopsError);
+          }
           return { status: 'error', error: 'Не удалось загрузить данные' };
         }
 
         const shops = Array.isArray(shopsData?.data) ? shopsData.data : [];
         const shop = shops[0] || null;
-        
+
         setMyShop(shop);
         setMyShops(shops); // Save to global store
-        
+
         // 2. Load follows (subscriptions to other shops)
         if (shop) {
           const { data: followsData, error: followsError } = await get('/follows/my', {
             params: { shopId: shop.id },
             signal,
           });
-          
+
           if (signal?.aborted) return { status: 'aborted' };
-          
+
           if (followsError) {
-            console.error('[Subscriptions] Error loading follows:', followsError);
+            if (import.meta.env.DEV) {
+              console.error('[Subscriptions] Error loading follows:', followsError);
+            }
             // Don't fail completely, just show my shop without follows
             setFollows([]);
           } else {
@@ -59,11 +85,13 @@ export default function Subscriptions() {
 
         return { status: 'success' };
       } catch (err) {
-        console.error('[Subscriptions] Unexpected error:', err);
+        if (import.meta.env.DEV) {
+          console.error('[Subscriptions] Unexpected error:', err);
+        }
         return { status: 'error', error: err.message };
       }
     },
-    [get, setMyShops]
+    [get, setMyShops, viewMode]
   );
 
   useEffect(() => {
@@ -92,7 +120,7 @@ export default function Subscriptions() {
     return () => controller.abort();
   }, [token, loadData]);
 
-  // Click on MY shop
+  // Click on MY shop (seller mode)
   const handleMyShopClick = () => {
     triggerHaptic('medium');
     const { setCurrentShop, setActiveTab } = useStore.getState();
@@ -101,7 +129,7 @@ export default function Subscriptions() {
     setActiveTab('catalog');
   };
 
-  // Click on followed shop (subscription to other shop)
+  // Click on followed shop (seller mode - subscription to other shop)
   const handleFollowClick = (follow) => {
     triggerHaptic('medium');
     const { setCurrentShop, setActiveTab } = useStore.getState();
@@ -116,11 +144,29 @@ export default function Subscriptions() {
     setActiveTab('catalog');
   };
 
-  const hasData = myShop || follows.length > 0;
+  // Click on buyer subscription (buyer mode - navigate to shop catalog)
+  const handleBuyerSubscriptionClick = (sub) => {
+    triggerHaptic('medium');
+    const { setCurrentShop, setActiveTab } = useStore.getState();
+
+    setCurrentShop({
+      id: sub.shop_id,
+      name: sub.shop_name,
+      logo: null,
+      isOwned: false,
+    });
+
+    setActiveTab('catalog');
+  };
+
+  // Determine if we have data based on mode
+  const hasData = viewMode === 'buyer'
+    ? buyerSubscriptions.length > 0
+    : (myShop || follows.length > 0);
 
   return (
     <div
-      className="h-screen overflow-y-auto"
+      className="h-screen overflow-y-auto bg-[#181818]"
       style={{
         paddingTop: 'calc(env(safe-area-inset-top) + 56px)',
         paddingBottom: 'calc(var(--tabbar-total) + 20px)',
@@ -130,52 +176,112 @@ export default function Subscriptions() {
 
       <div className="px-4 py-6">
         {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="w-8 h-8 border-4 border-orange-primary border-t-transparent rounded-full animate-spin" />
+          <div className="flex items-center justify-center py-20">
+            <div className="relative w-10 h-10">
+              <div className="absolute inset-0 border-4 border-white/10 rounded-full"></div>
+              <div className="absolute inset-0 border-4 border-[#FF6B00] border-t-transparent rounded-full animate-spin"></div>
+            </div>
           </div>
         ) : error ? (
           <div className="flex flex-col items-center justify-center py-12 text-center">
-            <svg
-              className="w-16 h-16 text-red-500 mb-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-            <h3 className="text-lg font-semibold text-gray-400 mb-2">{error}</h3>
+            <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center mb-4">
+              <svg
+                className="w-8 h-8 text-red-500"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+            </div>
+            <h3 className="text-lg font-semibold text-white mb-2">{error}</h3>
             <motion.button
-              onClick={() => loadData()}
-              className="touch-target bg-orange-primary hover:bg-orange-light text-white font-semibold px-6 rounded-xl transition-colors duration-300 mt-4"
+              onClick={() => {
+                setLoading(true);
+                setError(null);
+                loadData().finally(() => setLoading(false));
+              }}
+              className="mt-4 px-6 py-3 bg-[#FF6B00] text-white font-semibold rounded-xl shadow-lg shadow-[#FF6B00]/20"
               whileTap={{ scale: 0.95 }}
             >
-              Повторить
+              {t('common.retry')}
             </motion.button>
           </div>
         ) : !hasData ? (
-          <div className="flex flex-col items-center justify-center py-12 text-center">
-            <svg
-              className="w-16 h-16 text-gray-600 mb-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"
-              />
-            </svg>
-            <h3 className="text-lg font-semibold text-gray-400 mb-2">{t('subscriptions.empty')}</h3>
-            <p className="text-sm text-gray-500">{t('subscriptions.emptyDesc')}</p>
+          <div className="flex flex-col items-center justify-center py-20 text-center">
+            <div className="relative w-24 h-24 mb-6">
+              <div className="absolute inset-0 bg-[#FF6B00]/10 blur-xl rounded-full"></div>
+              <div className="relative w-full h-full rounded-3xl bg-white/5 border border-white/10 flex items-center justify-center backdrop-blur-sm">
+                <svg
+                  className="w-10 h-10 text-white/40"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1.5}
+                    d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"
+                  />
+                </svg>
+              </div>
+            </div>
+            <h3 className="text-xl font-bold text-white mb-2">{t('subscriptions.empty')}</h3>
+            <p className="text-white/50 text-sm max-w-[240px] leading-relaxed">{t('subscriptions.emptyDesc')}</p>
+          </div>
+        ) : viewMode === 'buyer' ? (
+          // BUYER MODE: Show subscriptions to shops
+          <div className="space-y-4">
+            {buyerSubscriptions.map((sub, index) => (
+              <motion.div
+                key={sub.id}
+                onClick={() => handleBuyerSubscriptionClick(sub)}
+                className="glass-card rounded-2xl p-6 cursor-pointer min-h-[90px]"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                whileHover={{ scale: 1.01, y: -2 }}
+                whileTap={{ scale: 0.99 }}
+                transition={{ duration: 0.2, delay: index * 0.05 }}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex-1 space-y-2">
+                    <h3
+                      className="text-xl font-bold text-white"
+                      style={{ letterSpacing: '-0.01em' }}
+                    >
+                      {sub.shop_name}
+                    </h3>
+                    {sub.shop_description && (
+                      <p className="text-sm text-gray-400 line-clamp-2">
+                        {sub.shop_description}
+                      </p>
+                    )}
+                  </div>
+                  <svg
+                    className="w-6 h-6 text-orange-primary flex-shrink-0 ml-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2.5}
+                      d="M9 5l7 7-7 7"
+                    />
+                  </svg>
+                </div>
+              </motion.div>
+            ))}
           </div>
         ) : (
+          // SELLER MODE: Show my shop + follows
           <div className="space-y-4">
             {/* MY SHOP - always on top */}
             {myShop && (

@@ -7,7 +7,8 @@
  * 3. Fetch and lock invoice
  * 4. Validate invoice activity
  * 5. Guard against TX reuse
- * 6. Return unsupported (CrystalPay removed for orders)
+ * 6. Verify payment on blockchain
+ * 7. Confirm order if verified
  *
  * CRITICAL: Money-handling code. Changes require thorough review.
  *
@@ -22,6 +23,7 @@ import { notifyOrderConfirmed } from '../notifications/index.js';
 import { ORDER_STATES } from '../constants.js';
 import { ValidationError } from '../../../utils/errors.js';
 import logger from '../../../utils/logger.js';
+import * as blockchainVerificationService from '../../blockchainVerificationService.js';
 
 /**
  * Process crypto payment for an order using invoice as single source of truth.
@@ -103,15 +105,164 @@ export async function processOrderPayment({
       return { ok: true, state: 'confirmed', idempotent: true };
     }
 
-    // 6. CrystalPay not supported for orders - return error
-    logger.error(`[InvoicePayment] Order ${orderId} - CrystalPay invoice processing removed`);
+    // 6. Get payment record for blockchain verification
+    const paymentResult = await client.query(
+      `SELECT id, tx_hash, currency, recipient_address, expected_crypto_amount, status
+       FROM payments
+       WHERE order_id = $1 AND status IN ('pending', 'processing')
+       ORDER BY created_at DESC
+       LIMIT 1
+       FOR UPDATE`,
+      [orderId]
+    );
+
+    if (paymentResult.rows.length === 0) {
+      await client.query('COMMIT');
+      return {
+        ok: false,
+        state: 'failed',
+        code: 'NO_PAYMENT_RECORD',
+        message: 'No pending payment found. Please initiate payment first.',
+      };
+    }
+
+    const payment = paymentResult.rows[0];
+
+    // Use txHash from parameter or from payment record
+    const verifyTxHash = txHash || payment.tx_hash;
+
+    if (!verifyTxHash) {
+      await client.query('COMMIT');
+      return {
+        ok: false,
+        state: 'failed',
+        code: 'NO_TX_HASH',
+        message: 'Transaction hash required for verification.',
+      };
+    }
+
+    // 7. Verify payment on blockchain
+    logger.info(`[InvoicePayment] Order ${orderId} - Starting blockchain verification`, {
+      txHash: verifyTxHash,
+      currency: payment.currency,
+      expectedAmount: payment.expected_crypto_amount,
+    });
+
+    const verificationResult = await blockchainVerificationService.verifyPayment(
+      verifyTxHash,
+      payment.currency,
+      payment.recipient_address,
+      parseFloat(payment.expected_crypto_amount)
+    );
+
+    // Update payment confirmations
+    await client.query(
+      `UPDATE payments
+       SET blockchain_confirmations = $1, last_checked_at = NOW(), updated_at = NOW()
+       WHERE id = $2`,
+      [verificationResult.confirmations || 0, payment.id]
+    );
+
+    // 8. Handle verification result
+    if (!verificationResult.verified) {
+      // Not verified yet - check if failed or just pending
+      if (verificationResult.status === 'failed' && verificationResult.error) {
+        await client.query(
+          `UPDATE payments
+           SET verification_status = 'failed', verification_error = $2, updated_at = NOW()
+           WHERE id = $1`,
+          [payment.id, verificationResult.error]
+        );
+        await client.query('COMMIT');
+
+        return {
+          ok: false,
+          state: 'failed',
+          code: 'VERIFICATION_FAILED',
+          message: verificationResult.error,
+          confirmations: verificationResult.confirmations,
+        };
+      }
+
+      // Still pending (waiting for confirmations)
+      await client.query('COMMIT');
+      return {
+        ok: false,
+        state: 'pending',
+        code: 'AWAITING_CONFIRMATIONS',
+        message: `Payment found but waiting for confirmations (${verificationResult.confirmations || 0} of required)`,
+        confirmations: verificationResult.confirmations,
+      };
+    }
+
+    // 9. Payment verified - confirm order
+    logger.info(`[InvoicePayment] Order ${orderId} - Blockchain verification successful`, {
+      confirmations: verificationResult.confirmations,
+      amount: verificationResult.amount,
+    });
+
+    // Deduct stock for all items
+    const itemsResult = await client.query(
+      `SELECT oi.product_id, oi.quantity, p.stock_quantity, p.is_preorder
+       FROM order_items oi
+       JOIN products p ON oi.product_id = p.id
+       WHERE oi.order_id = $1
+       FOR UPDATE OF p`,
+      [orderId]
+    );
+
+    for (const item of itemsResult.rows) {
+      if (!item.is_preorder) {
+        if (item.stock_quantity < item.quantity) {
+          logger.warn(`[InvoicePayment] Insufficient stock for product ${item.product_id}`);
+        }
+
+        await client.query(
+          `UPDATE products
+           SET stock_quantity = GREATEST(0, stock_quantity - $1), updated_at = NOW()
+           WHERE id = $2`,
+          [item.quantity, item.product_id]
+        );
+      }
+    }
+
+    // Update order status
+    await client.query(
+      `UPDATE orders
+       SET status = 'confirmed',
+           paid_at = NOW(),
+           updated_at = NOW()
+       WHERE id = $1`,
+      [orderId]
+    );
+
+    // Update payment status
+    await client.query(
+      `UPDATE payments
+       SET status = 'confirmed',
+           verification_status = 'confirmed',
+           tx_hash = $2,
+           updated_at = NOW()
+       WHERE id = $1`,
+      [payment.id, verifyTxHash]
+    );
+
+    // Mark invoice as paid
+    await markInvoicePaid(client, invoice.id, verifyTxHash);
+
     await client.query('COMMIT');
 
+    // Notify about confirmed order (async, outside transaction)
+    notifyOrderConfirmed(order.id).catch((err) => {
+      logger.error('[InvoicePayment] Notification error:', err);
+    });
+
     return {
-      ok: false,
-      state: 'failed',
-      code: 'UNSUPPORTED_PAYMENT_METHOD',
-      message: 'CrystalPay payment gateway not supported for orders. Use direct blockchain payments.',
+      ok: true,
+      state: 'confirmed',
+      message: 'Payment verified and order confirmed',
+      confirmations: verificationResult.confirmations,
+      amount: verificationResult.amount,
     };
   } catch (error) {
     try {

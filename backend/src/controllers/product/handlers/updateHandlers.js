@@ -24,6 +24,14 @@ export const update = asyncHandler(async (req, res) => {
       throw new NotFoundError('Product');
     }
 
+    if (existingProduct.is_synced) {
+      return res.status(403).json({
+        success: false,
+        error: 'Cannot edit synced product. Changes must be made in the source shop.',
+        code: 'SYNCED_PRODUCT_PROTECTED'
+      });
+    }
+
     const isAuthorized = await isAuthorizedToManageShop(existingProduct.shop_id, req.user.id);
     if (!isAuthorized) {
       throw new UnauthorizedError(

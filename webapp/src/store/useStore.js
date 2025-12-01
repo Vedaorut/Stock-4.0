@@ -79,6 +79,18 @@ export const useStore = create(
       cart: [],
       addToCart: (product) => {
         const { cart: currentCart, currentShop, productsShopId } = get();
+
+        // ✅ FIX: Cart isolation - prevent mixing products from different shops
+        const productShopId = currentShop?.id || product.shop_id || product.shopId || productsShopId;
+        if (currentCart.length > 0 && currentCart[0].shopId !== productShopId) {
+          const toast = useToastStore.getState().addToast;
+          toast({ type: 'warning', message: 'Очистите корзину для покупок в другом магазине', duration: 3000 });
+          if (import.meta.env.DEV) {
+            console.error('[addToCart] Cannot add product from different shop. Cart shopId:', currentCart[0].shopId, 'Product shopId:', productShopId);
+          }
+          return false;
+        }
+
         const existingItem = currentCart.find((item) => item.id === product.id);
 
         if (existingItem) {
@@ -104,7 +116,9 @@ export const useStore = create(
           const shopId = currentShop?.id || product.shop_id || product.shopId || productsShopId;
 
           if (!shopId) {
-            console.error('[addToCart] CRITICAL: Cannot add to cart - shopId missing!', product);
+            if (import.meta.env.DEV) {
+              console.error('[addToCart] CRITICAL: Cannot add to cart - shopId missing!', product);
+            }
 
             return;
           }
@@ -207,6 +221,10 @@ export const useStore = create(
       activeTab: 'subscriptions',
       setActiveTab: (tab) => set({ activeTab: tab }),
 
+      // View Mode (buyer/seller)
+      viewMode: 'buyer', // 'buyer' | 'seller'
+      setViewMode: (mode) => set({ viewMode: mode }),
+
       hasFollows: false,
       setHasFollows: (value) => set({ hasFollows: Boolean(value) }),
 
@@ -234,7 +252,9 @@ export const useStore = create(
         // ✅ FIX: Validate cart items
         const invalidItems = cart.filter((item) => item.price <= 0 || item.quantity <= 0);
         if (invalidItems.length > 0) {
-          console.error('[startCheckout] Invalid cart items:', invalidItems);
+          if (import.meta.env.DEV) {
+            console.error('[startCheckout] Invalid cart items:', invalidItems);
+          }
 
           return;
         }
@@ -242,7 +262,9 @@ export const useStore = create(
         // ✅ FIX: Validate cart total
         const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
         if (total <= 0) {
-          console.error('[startCheckout] Invalid cart total:', total);
+          if (import.meta.env.DEV) {
+            console.error('[startCheckout] Invalid cart total:', total);
+          }
 
           return;
         }
@@ -252,10 +274,12 @@ export const useStore = create(
         const uniqueShops = new Set(cartShopIds);
 
         if (uniqueShops.size > 1) {
-          console.error('[startCheckout] ❌ Multi-shop order attempt!', {
-            shops: Array.from(uniqueShops),
-            items: cart.map((i) => ({ id: i.id, name: i.name, shopId: i.shopId })),
-          });
+          if (import.meta.env.DEV) {
+            console.error('[startCheckout] ❌ Multi-shop order attempt!', {
+              shops: Array.from(uniqueShops),
+              items: cart.map((i) => ({ id: i.id, name: i.name, shopId: i.shopId })),
+            });
+          }
 
           return;
         }
@@ -264,18 +288,38 @@ export const useStore = create(
         const shopId = cart[0]?.shopId;
 
         if (!shopId) {
-          console.error('[startCheckout] CRITICAL: Cannot checkout - shopId missing!');
-          console.error('[startCheckout] Cart item:', cart[0]);
+          if (import.meta.env.DEV) {
+            console.error('[startCheckout] CRITICAL: Cannot checkout - shopId missing!');
+            console.error('[startCheckout] Cart item:', cart[0]);
+          }
 
           // Открыть обратно корзину, чтобы пользователь мог что-то сделать
           set({ isCartOpen: true });
           return;
         }
 
-        // ✅ FIX: Get shop name from currentShop or myShops
+        // ✅ FIX: Get FULL shop data (including availableCryptos) from currentShop or myShops
         const { currentShop: existingShop, myShops } = get();
-        const shopName = existingShop?.name || myShops?.find(s => s.id === shopId)?.name || 'Shop';
-        const shop = { id: shopId, name: shopName };
+
+        // Try to find full shop object - first from currentShop, then from myShops
+        let shop = null;
+
+        if (existingShop?.id === shopId) {
+          // currentShop matches cart shop - use it (has availableCryptos)
+          shop = existingShop;
+        } else {
+          // Look for shop in myShops array
+          const foundShop = myShops?.find(s => s.id === shopId);
+          if (foundShop) {
+            shop = foundShop;
+          }
+        }
+
+        // Fallback: create minimal shop object if not found
+        // NOTE: This will cause "no wallets" error - but at least won't crash
+        if (!shop) {
+          shop = { id: shopId, name: existingShop?.name || 'Shop' };
+        }
 
         // ✅ FIX: ALWAYS clear currentOrder to force fresh creation
         // This prevents stale order reuse after cart quantity changes
@@ -306,7 +350,9 @@ export const useStore = create(
 
         // Defensive re-check after set (paranoid mode)
         if (get().isCreatingOrder !== true) {
-          console.error('[createOrder] Race condition detected, aborting');
+          if (import.meta.env.DEV) {
+            console.error('[createOrder] Race condition detected, aborting');
+          }
           return null;
         }
 
@@ -336,8 +382,10 @@ export const useStore = create(
           );
 
           if (invalidItems.length > 0) {
-            console.error('❌ [createOrder] Invalid items in cart!', invalidItems);
-            console.error('Full cart state:', cart);
+            if (import.meta.env.DEV) {
+              console.error('❌ [createOrder] Invalid items in cart!', invalidItems);
+              console.error('Full cart state:', cart);
+            }
 
             return null;
           }
@@ -363,12 +411,14 @@ export const useStore = create(
 
           return order;
         } catch (error) {
-          console.error('[createOrder] Error:', error);
+          if (import.meta.env.DEV) {
+            console.error('[createOrder] Error:', error);
 
-          // Enhanced error logging for debugging 400 errors
-          if (error.response) {
-            console.error('Server Response Status:', error.response.status);
-            console.error('Server Response Data:', error.response.data);
+            // Enhanced error logging for debugging 400 errors
+            if (error.response) {
+              console.error('Server Response Status:', error.response.status);
+              console.error('Server Response Data:', error.response.data);
+            }
           }
 
           if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
@@ -376,15 +426,25 @@ export const useStore = create(
           } else if (error.response?.status === 400) {
             // ✅ FIX: Parse specific 400 error messages from backend
             const errorData = error.response.data;
+            const toast = useToastStore.getState().addToast;
 
             if (errorData?.error === 'Malformed JSON payload') {
+              toast('Ошибка данных заказа', 'error');
+            } else if (errorData?.error?.includes('cannot order your own')) {
+              // User trying to order their own products
+              toast('Нельзя заказывать свои товары', 'warning');
             } else if (errorData?.error?.includes('Insufficient stock')) {
               // Extract product name and show specific error
+              toast('Недостаточно товара на складе', 'error');
             } else if (errorData?.error) {
               // Show backend error message if available
+              toast(errorData.error, 'error');
             } else {
+              toast('Ошибка создания заказа', 'error');
             }
           } else {
+            const toast = useToastStore.getState().addToast;
+            toast('Ошибка соединения', 'error');
           }
 
           throw error;
@@ -433,7 +493,9 @@ export const useStore = create(
             if (!order) {
               order = await get().createOrder();
               if (!order) {
-                console.error('[selectCrypto] ERROR: Failed to create order');
+                if (import.meta.env.DEV) {
+                  console.error('[selectCrypto] ERROR: Failed to create order');
+                }
                 throw new Error('Failed to create order');
               }
             } else {
@@ -445,7 +507,9 @@ export const useStore = create(
                 // Re-create order with current cart data
                 order = await get().createOrder();
                 if (!order) {
-                  console.error('[selectCrypto] ERROR: Failed to re-create order');
+                  if (import.meta.env.DEV) {
+                    console.error('[selectCrypto] ERROR: Failed to re-create order');
+                  }
                   throw new Error('Failed to re-create order');
                 }
               }
@@ -472,7 +536,9 @@ export const useStore = create(
             const cryptoAmount = parseFloat(paymentInfo.amount);
 
             if (!isFinite(cryptoAmount) || cryptoAmount <= 0) {
-              console.error('[selectCrypto] Invalid amount:', { paymentInfo, cryptoAmount });
+              if (import.meta.env.DEV) {
+                console.error('[selectCrypto] Invalid amount:', { paymentInfo, cryptoAmount });
+              }
               toast({ type: 'error', message: 'Некорректная сумма от сервера', duration: 3000 });
               throw new Error('Invalid amount from API');
             }
@@ -490,12 +556,14 @@ export const useStore = create(
               verifyError: null,
             });
           } catch (error) {
-            console.error('[selectCrypto] API ERROR:', {
-              message: error.message,
-              status: error.response?.status,
-              data: error.response?.data,
-              fullError: error,
-            });
+            if (import.meta.env.DEV) {
+              console.error('[selectCrypto] API ERROR:', {
+                message: error.message,
+                status: error.response?.status,
+                data: error.response?.data,
+                fullError: error,
+              });
+            }
 
             // Handle timeout/abort
             if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
@@ -506,9 +574,15 @@ export const useStore = create(
               throw error;
             }
 
-            // ✅ FIX: Show error toast to user
+            // ✅ FIX: Show error toast to user with specific messages
             const errorMsg = error.response?.data?.error || error.message;
-            if (errorMsg?.includes('order')) {
+            if (errorMsg?.includes('price_service_error') || errorMsg?.includes('exchange rate')) {
+              toast({ type: 'error', message: 'Сервис курсов временно недоступен. Попробуйте через минуту.', duration: 4000 });
+            } else if (errorMsg?.includes('Invalid currency')) {
+              toast({ type: 'error', message: 'Неподдерживаемая валюта', duration: 3000 });
+            } else if (errorMsg?.includes('does not accept')) {
+              toast({ type: 'error', message: 'Продавец не принимает эту криптовалюту', duration: 3000 });
+            } else if (errorMsg?.includes('order')) {
               toast({ type: 'error', message: 'Ошибка создания заказа', duration: 3000 });
             } else if (errorMsg?.includes('wallet') || errorMsg?.includes('address')) {
               toast({ type: 'error', message: 'Ошибка генерации адреса', duration: 3000 });
@@ -517,7 +591,11 @@ export const useStore = create(
             } else if (errorMsg?.includes('expired')) {
               toast({ type: 'error', message: 'Invoice истёк, создайте новый', duration: 3000 });
             } else {
-              toast({ type: 'error', message: 'Ошибка генерации invoice', duration: 3000 });
+              // Log unknown errors for debugging
+              if (import.meta.env.DEV) {
+                console.error('[selectCrypto] Unknown error type:', errorMsg);
+              }
+              toast({ type: 'error', message: 'Ошибка генерации invoice. Попробуйте снова.', duration: 3000 });
             }
 
             set({
@@ -549,41 +627,47 @@ export const useStore = create(
         try {
           timeoutId = setTimeout(() => controller.abort(), 10000);
 
+          // Use direct crypto payment endpoint (not invoice-based)
+          const { token } = get();
           const response = await axios.post(
-            `${API_URL}/payments/verify`,
+            `${API_URL}/orders/${currentOrder.id}/submit-payment`,
             {
-              orderId: currentOrder.id,
-              txHash: hash,
+              tx_hash: hash,
               currency: selectedCrypto,
             },
             {
               headers: {
                 'Content-Type': 'application/json',
+                ...(token && { Authorization: `Bearer ${token}` }),
               },
               signal: controller.signal,
             }
           );
 
           if (response.data.success) {
-            // Normalize order before saving to pendingOrders
-            const completedOrder = normalizeOrder({
+            // Payment submitted - status is 'pending' until blockchain confirms
+            // Show success UI, verification happens in background
+            const submittedOrder = normalizeOrder({
               ...currentOrder,
               crypto: selectedCrypto,
               txHash: hash,
-              status: 'confirmed',
+              paymentId: response.data.data?.paymentId,
+              status: 'pending', // Will become 'confirmed' after blockchain verification
               submittedAt: new Date().toISOString(),
             });
 
             set({
-              pendingOrders: [...get().pendingOrders, completedOrder],
-              paymentStep: 'success',
+              pendingOrders: [...get().pendingOrders, submittedOrder],
+              paymentStep: 'success', // Show success - payment is being verified
             });
 
             // Clear cart
             get().clearCart();
           }
         } catch (error) {
-          console.error('Verify payment error:', error);
+          if (import.meta.env.DEV) {
+            console.error('Verify payment error:', error);
+          }
 
           // Handle timeout/abort
           if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
@@ -734,6 +818,37 @@ export const useStore = create(
       setWorkspaceShopId: (id) => set({ workspaceShopId: id }),
       isWorkerMode: false,
       setIsWorkerMode: (val) => set({ isWorkerMode: val }),
+      workspaceShop: null, // Full shop object for worker context
+      setWorkspaceShop: (shop) => set({ workspaceShop: shop }),
+
+      // Switch to workspace shop context (for workers)
+      switchToWorkspaceShop: (shop) => {
+        if (!shop || !shop.id) {
+          // Exit worker mode
+          set({
+            workspaceShopId: null,
+            workspaceShop: null,
+            isWorkerMode: false,
+          });
+          return;
+        }
+
+        // Enter worker mode for this shop
+        set({
+          workspaceShopId: shop.id,
+          workspaceShop: shop,
+          isWorkerMode: true,
+        });
+      },
+
+      // Get effective shop ID (workspace shop if worker mode, else own shop)
+      getEffectiveShopId: () => {
+        const { isWorkerMode, workspaceShopId, myShop } = get();
+        if (isWorkerMode && workspaceShopId) {
+          return workspaceShopId;
+        }
+        return myShop?.id || null;
+      },
     }),
     {
       name: 'status-stock-storage',

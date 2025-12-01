@@ -109,6 +109,48 @@ async function showQRCode(ctx, crypto) {
 // STEP 1: SHOW WALLETS
 // ==========================================
 
+/**
+ * Silent version of showWallets - used for refresh after save
+ * Doesn't show error message if fails (wallet was already saved)
+ */
+const showWalletsSilent = async (ctx) => {
+  try {
+    logger.info('wallet_manage_step:show_silent', { userId: ctx.from.id });
+
+    if (!ctx.session.shopId || !ctx.session.token) {
+      return; // Silently fail
+    }
+
+    const shop = await walletApi.getWallets(ctx.session.shopId, ctx.session.token);
+
+    const wallets = {
+      BTC: shop.wallet_btc || null,
+      ETH: shop.wallet_eth || null,
+      USDT: shop.wallet_usdt || null,
+      LTC: shop.wallet_ltc || null,
+    };
+
+    const message = sellerMessages.walletsContext;
+
+    const buttons = SUPPORTED_CRYPTOS.map((crypto) => {
+      const address = wallets[crypto];
+      const status = address
+        ? formatAddress(address) || address
+        : sellerMessages.walletsStatusEmpty;
+      const action = address ? `wallet:view:${crypto}` : `wallet:add:${crypto}`;
+      return [Markup.button.callback(`${crypto} • ${status}`, action)];
+    });
+
+    buttons.push([Markup.button.callback(buttonText.backToTools, 'seller:tools')]);
+
+    await ctx.editMessageText(message, Markup.inlineKeyboard(buttons));
+  } catch (error) {
+    // Silent fail - don't show error to user, just log it
+    logger.warn('Silent wallet refresh failed:', error.message);
+    // Don't leave scene, user can tap "Back to wallets" manually
+  }
+};
+
 const showWallets = async (ctx) => {
   try {
     logger.info('wallet_manage_step:show', { userId: ctx.from.id });
@@ -290,7 +332,7 @@ const handleInput = async (ctx) => {
           BTC: '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa',
           ETH: '0x742d35Cc6634C0532925a3b844Bc7e7595f42bE1',
           USDT: 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t',
-          LTC: 'LTC1A2B3C4D5E6F7G8H9J0K1L2M3N4P5Q6R',
+          LTC: 'LfzDoLYCJD4gYckYDqnNV1RWdY21VyPDqy',
         };
 
         await ctx.editMessageText(
@@ -463,10 +505,12 @@ ${formatted}`,
           // Check if still in scene before refreshing
           if (ctx.scene && ctx.scene.current && ctx.scene.current.id === 'manageWallets') {
             ctx.wizard.selectStep(0);
-            await showWallets(ctx);
+            // Silent refresh - don't show error if refresh fails (wallet was already saved)
+            await showWalletsSilent(ctx);
           }
         } catch (refreshError) {
-          logger.error('Error refreshing wallets view:', refreshError);
+          // Silent fail - wallet was saved successfully, just couldn't refresh UI
+          logger.warn('Silent refresh failed (wallet saved ok):', refreshError.message);
         } finally {
           // Clear timer reference after execution
           if (ctx.wizard.state) {

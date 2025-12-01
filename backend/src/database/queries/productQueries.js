@@ -202,20 +202,20 @@ export const productQueries = {
     return result.rows[0];
   },
 
-  // Bulk delete products by shop ID
+  // Bulk delete products by shop ID (excludes synced products)
   bulkDeleteByShopId: async (shopId) => {
     const result = await query(
-      'DELETE FROM products WHERE shop_id = $1 RETURNING id, shop_id, name',
+      'DELETE FROM products WHERE shop_id = $1 AND (is_synced = false OR is_synced IS NULL) RETURNING id, shop_id, name',
       [shopId]
     );
     return result.rows;
   },
 
-  // Bulk delete products by IDs (with ownership check via shopId)
+  // Bulk delete products by IDs (with ownership check via shopId, excludes synced products)
   bulkDeleteByIds: async (productIds, shopId) => {
     const result = await query(
       `DELETE FROM products
-       WHERE id = ANY($1) AND shop_id = $2
+       WHERE id = ANY($1) AND shop_id = $2 AND (is_synced = false OR is_synced IS NULL)
        RETURNING id, shop_id, name`,
       [productIds, shopId]
     );
@@ -324,6 +324,36 @@ export const productQueries = {
       [shopId]
     );
 
+    return result.rows;
+  },
+
+  /**
+   * Search products across multiple shops by name
+   * @param {string} searchQuery - Search term (ILIKE pattern)
+   * @param {number[]} shopIds - Array of shop IDs to search in
+   * @param {number} limit - Maximum results (default 20)
+   * @returns {Promise<Array>} Products with shop info
+   */
+  searchAcrossShops: async (searchQuery, shopIds, limit = 20) => {
+    if (!shopIds || shopIds.length === 0) {
+      return [];
+    }
+
+    const result = await query(
+      `SELECT p.*,
+              s.name as shop_name,
+              s.id as shop_id,
+              s.logo as shop_logo
+       FROM products p
+       JOIN shops s ON p.shop_id = s.id
+       WHERE p.shop_id = ANY($1)
+         AND p.is_active = true
+         AND s.is_active = true
+         AND p.name ILIKE $2
+       ORDER BY p.created_at DESC
+       LIMIT $3`,
+      [shopIds, `%${searchQuery}%`, limit]
+    );
     return result.rows;
   },
 };

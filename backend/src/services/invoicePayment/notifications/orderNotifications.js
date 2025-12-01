@@ -9,6 +9,7 @@ import {
   shopQueries,
   userQueries,
 } from '../../../database/queries/index.js';
+import { workerQueries } from '../../../models/workerQueries.js';
 import telegramService from '../../telegram.js';
 import logger from '../../../utils/logger.js';
 
@@ -59,6 +60,43 @@ export async function notifyOrderConfirmed(orderId) {
       });
     } catch (error) {
       logger.error('[InvoicePayment] Buyer notification error', { error: error.message });
+    }
+  }
+
+  // Notify workers (only those who haven't muted notifications)
+  if (product && shop) {
+    try {
+      const workers = await workerQueries.getWorkersForNotification(shop.id);
+
+      for (const worker of workers) {
+        try {
+          await telegramService.notifyPaymentConfirmedSeller(worker.telegram_id, {
+            orderId: order.id,
+            productName: product.name,
+            quantity: order.quantity,
+            totalPrice: order.total_price,
+            currency: order.currency,
+            buyerUsername: buyer?.username || 'Anonymous',
+            buyerTelegramId: buyer?.telegram_id,
+          });
+        } catch (workerError) {
+          logger.error('[InvoicePayment] Worker notification error', {
+            workerId: worker.id,
+            telegramId: worker.telegram_id,
+            error: workerError.message,
+          });
+        }
+      }
+
+      if (workers.length > 0) {
+        logger.info('[InvoicePayment] Workers notified', {
+          orderId: order.id,
+          shopId: shop.id,
+          workerCount: workers.length,
+        });
+      }
+    } catch (error) {
+      logger.error('[InvoicePayment] Workers notification fetch error', { error: error.message });
     }
   }
 }

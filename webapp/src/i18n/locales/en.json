@@ -16,7 +16,9 @@
 
   "product": {
     "syncedFrom": "from {shop}",
-    "synced": "Synced"
+    "synced": "Synced",
+    "syncedEditDisabled": "Synced product. Edit in source shop.",
+    "syncedDeleteDisabled": "Synced product cannot be deleted. Remove it from source shop or disable sync."
   },
 
   "tabs": {
@@ -95,7 +97,12 @@
     "inCart": "In cart",
     "empty": "No products found",
     "emptyDesc": "Try selecting another shop",
-    "price": "Price"
+    "price": "Price",
+    "searchPlaceholder": "Search products...",
+    "searchEmpty": "Nothing found",
+    "searchEmptyDesc": "Try changing your search query",
+    "searchMinChars": "Enter at least 2 characters",
+    "fromShop": "from {shop}"
   },
 
   "cart": {
@@ -106,7 +113,8 @@
     "checkout": "Checkout",
     "clear": "Clear",
     "items": "{count} items",
-    "item": "item"
+    "item": "item",
+    "cannotOrderOwn": "You cannot order products from your own shop"
   },
 
   "subscriptions": {

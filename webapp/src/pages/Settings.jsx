@@ -3,6 +3,7 @@ import { motion } from 'framer-motion'; // Used in JSX
 import Header from '../components/Layout/Header';
 import { useTelegram } from '../hooks/useTelegram';
 import { useTranslation } from '../i18n/useTranslation';
+import { useStore } from '../store/useStore';
 import InteractiveListItem from '../components/common/InteractiveListItem';
 
 // Lazy load modals - only load when user opens them
@@ -15,11 +16,26 @@ const FollowsModalLazy = lazy(() => import('../components/Settings/FollowsModal'
 const AnalyticsModalLazy = lazy(() => import('../components/Settings/AnalyticsModal'));
 const MigrationModalLazy = lazy(() => import('../components/Settings/MigrationModal'));
 const WorkerModeModalLazy = lazy(() => import('../components/Settings/WorkerModeModal'));
+const MyOrdersModalLazy = lazy(() => import('../components/Settings/MyOrdersModal'));
+const ShopOrdersModalLazy = lazy(() => import('../components/Settings/ShopOrdersModal'));
 
-const getSettingsSections = (t, lang) => {
+// Seller-only item IDs (hidden in buyer mode)
+const SELLER_ONLY_ITEMS = [
+  'products',
+  'analytics',
+  'wallet',
+  'workspace',
+  'worker-mode',
+  'follows',
+  'migration',
+  'subscription',
+  'shop-orders',
+];
+
+const getSettingsSections = (t, lang, viewMode) => {
   const languageNames = { ru: 'Русский', en: 'English' };
 
-  const sections = [
+  const allSections = [
     {
       title: 'УПРАВЛЕНИЕ',
       items: [
@@ -34,6 +50,21 @@ const getSettingsSections = (t, lang) => {
                 strokeLinejoin="round"
                 strokeWidth={2}
                 d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
+              />
+            </svg>
+          ),
+        },
+        {
+          id: 'shop-orders',
+          label: 'Заказы магазина',
+          description: 'Управление заказами и выдача',
+          icon: (
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"
               />
             </svg>
           ),
@@ -131,6 +162,26 @@ const getSettingsSections = (t, lang) => {
       ],
     },
     {
+      title: 'ПОКУПКИ',
+      items: [
+        {
+          id: 'my-orders',
+          label: 'Мои заказы',
+          description: 'История покупок и статусы',
+          icon: (
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
+              />
+            </svg>
+          ),
+        },
+      ],
+    },
+    {
       title: 'НАСТРОЙКИ',
       items: [
         {
@@ -168,12 +219,23 @@ const getSettingsSections = (t, lang) => {
     },
   ];
 
-  return sections;
+  // In buyer mode, filter out seller-only items
+  if (viewMode === 'buyer') {
+    return allSections
+      .map((section) => ({
+        ...section,
+        items: section.items.filter((item) => !SELLER_ONLY_ITEMS.includes(item.id)),
+      }))
+      .filter((section) => section.items.length > 0); // Remove empty sections
+  }
+
+  return allSections;
 };
 
 export default function Settings() {
   const { user, triggerHaptic } = useTelegram();
   const { t, lang } = useTranslation();
+  const viewMode = useStore((state) => state.viewMode);
   const [showWallets, setShowWallets] = useState(false);
   const [showLanguage, setShowLanguage] = useState(false);
   const [showProducts, setShowProducts] = useState(false);
@@ -183,8 +245,10 @@ export default function Settings() {
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [showMigration, setShowMigration] = useState(false);
   const [showWorkerMode, setShowWorkerMode] = useState(false);
+  const [showMyOrders, setShowMyOrders] = useState(false);
+  const [showShopOrders, setShowShopOrders] = useState(false);
 
-  const settingsSections = useMemo(() => getSettingsSections(t, lang), [t, lang]);
+  const settingsSections = useMemo(() => getSettingsSections(t, lang, viewMode), [t, lang, viewMode]);
 
   const handleSettingClick = (itemId) => {
     triggerHaptic('light');
@@ -216,6 +280,12 @@ export default function Settings() {
         break;
       case 'worker-mode':
         setShowWorkerMode(true);
+        break;
+      case 'my-orders':
+        setShowMyOrders(true);
+        break;
+      case 'shop-orders':
+        setShowShopOrders(true);
         break;
       default:
         break;
@@ -347,6 +417,12 @@ export default function Settings() {
         )}
         {showWorkerMode && (
           <WorkerModeModalLazy isOpen={showWorkerMode} onClose={() => setShowWorkerMode(false)} />
+        )}
+        {showMyOrders && (
+          <MyOrdersModalLazy isOpen={showMyOrders} onClose={() => setShowMyOrders(false)} />
+        )}
+        {showShopOrders && (
+          <ShopOrdersModalLazy isOpen={showShopOrders} onClose={() => setShowShopOrders(false)} />
         )}
       </Suspense>
     </div>

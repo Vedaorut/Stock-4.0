@@ -207,6 +207,57 @@ export const workerQueries = {
     );
     return parseInt(result.rows[0]?.count || 0);
   },
+
+  /**
+   * Get workers for notification (excludes muted workers)
+   * @param {number} shopId
+   * @returns {Array} Array of workers with telegram_id who should receive notifications
+   */
+  getWorkersForNotification: async (shopId) => {
+    const result = await query(
+      `SELECT sw.id, sw.worker_user_id, sw.telegram_id, u.username, u.first_name
+       FROM shop_workers sw
+       JOIN users u ON sw.worker_user_id = u.id
+       WHERE sw.shop_id = $1
+         AND sw.notification_muted = FALSE
+         AND sw.telegram_id IS NOT NULL`,
+      [shopId]
+    );
+    return result.rows;
+  },
+
+  /**
+   * Toggle notification mute status for a worker
+   * @param {number} shopId
+   * @param {number} userId - Worker's user ID
+   * @returns {Object} Updated worker record with new muted status
+   */
+  toggleNotificationMute: async (shopId, userId) => {
+    const result = await query(
+      `UPDATE shop_workers
+       SET notification_muted = NOT notification_muted
+       WHERE shop_id = $1 AND worker_user_id = $2
+       RETURNING id, shop_id, worker_user_id, notification_muted`,
+      [shopId, userId]
+    );
+    return result.rows[0];
+  },
+
+  /**
+   * Get notification mute status for a worker
+   * @param {number} shopId
+   * @param {number} userId - Worker's user ID
+   * @returns {boolean|null} Muted status or null if not found
+   */
+  getNotificationMuteStatus: async (shopId, userId) => {
+    const result = await query(
+      `SELECT notification_muted
+       FROM shop_workers
+       WHERE shop_id = $1 AND worker_user_id = $2`,
+      [shopId, userId]
+    );
+    return result.rows[0]?.notification_muted ?? null;
+  },
 };
 
 export default workerQueries;

@@ -287,6 +287,86 @@ export const workerController = {
       throw error;
     }
   }),
+
+
+  /**
+   * Toggle notification mute for worker's workspace shop
+   * PATCH /api/workers/mute
+   * Body: { shop_id: number }
+   */
+  toggleNotificationMute: asyncHandler(async (req, res) => {
+    try {
+      const { shop_id } = req.body;
+
+      if (!shop_id) {
+        throw new ValidationError('shop_id is required');
+      }
+
+      // Check if user is a worker in this shop
+      const isWorker = await workerQueries.isWorker(shop_id, req.user.id);
+      if (!isWorker) {
+        throw new UnauthorizedError('You are not a worker in this shop');
+      }
+
+      // Toggle mute status
+      const result = await workerQueries.toggleNotificationMute(shop_id, req.user.id);
+
+      if (!result) {
+        throw new NotFoundError('Worker record');
+      }
+
+      logger.info('Worker notification mute toggled', {
+        shopId: shop_id,
+        userId: req.user.id,
+        muted: result.notification_muted,
+      });
+
+      return res.status(200).json({
+        success: true,
+        data: {
+          shop_id: result.shop_id,
+          notification_muted: result.notification_muted,
+        },
+      });
+    } catch (error) {
+      logger.error('Toggle notification mute error', { error: error.message, stack: error.stack });
+      throw error;
+    }
+  }),
+
+
+  /**
+   * Get notification mute status for a specific shop
+   * GET /api/workers/mute/:shopId
+   */
+  getNotificationMuteStatus: asyncHandler(async (req, res) => {
+    try {
+      const { shopId } = req.params;
+
+      // Check if user is a worker in this shop
+      const isWorker = await workerQueries.isWorker(shopId, req.user.id);
+      if (!isWorker) {
+        throw new UnauthorizedError('You are not a worker in this shop');
+      }
+
+      const muted = await workerQueries.getNotificationMuteStatus(shopId, req.user.id);
+
+      if (muted === null) {
+        throw new NotFoundError('Worker record');
+      }
+
+      return res.status(200).json({
+        success: true,
+        data: {
+          shop_id: parseInt(shopId, 10),
+          notification_muted: muted,
+        },
+      });
+    } catch (error) {
+      logger.error('Get notification mute status error', { error: error.message, stack: error.stack });
+      throw error;
+    }
+  }),
 };
 
 export default workerController;

@@ -41,4 +41,19 @@ router.get('/:shopId/workers', verifyToken, workerController.list);
  */
 router.delete('/:shopId/workers/:workerId', verifyToken, workerController.remove);
 
+/**
+ * @route   PATCH /api/workers/mute
+ * @desc    Toggle notification mute for worker's workspace shop
+ * @access  Private (Worker only)
+ * @body    { shop_id: number }
+ */
+router.patch('/mute', verifyToken, workerController.toggleNotificationMute);
+
+/**
+ * @route   GET /api/workers/mute/:shopId
+ * @desc    Get notification mute status for a specific shop
+ * @access  Private (Worker only)
+ */
+router.get('/mute/:shopId', verifyToken, workerController.getNotificationMuteStatus);
+
 export default router;

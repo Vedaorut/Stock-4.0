@@ -46,6 +46,17 @@ router.get('/limit-status/:shopId', verifyToken, async (req, res) => {
 });
 
 /**
+ * @route   GET /api/products/search
+ * @desc    Search products across subscribed/followed shops
+ * @access  Private (Authenticated user)
+ * @query   {string} query - Search text (min 2 chars)
+ * @query   {boolean} subscriptions - Search in subscribed shops (buyer)
+ * @query   {boolean} follows - Search in followed shops (seller)
+ * @query   {number} limit - Max results (default 20, max 100)
+ */
+router.get('/search', verifyToken, productController.search);
+
+/**
  * @route   GET /api/products
  * @desc    List products with filters
  * @access  Public
