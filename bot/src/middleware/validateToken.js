@@ -59,6 +59,8 @@ const regenerateToken = async (ctx) => {
     ctx.session.token = authData.token;
     ctx.session.userId = authData.user.id;
     ctx.session.tokenCreatedAt = new Date().toISOString();
+    // P1-8 FIX: Update user object in session after regeneration
+    ctx.session.user = authData.user;
 
     logger.info('Token regenerated successfully', { userId: telegramId });
 

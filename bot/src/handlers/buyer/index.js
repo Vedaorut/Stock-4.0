@@ -243,7 +243,14 @@ const handleSubscribe = async (ctx) => {
 
     // Not subscribed - proceed with subscription (pass telegram_id for broadcast feature)
     await subscriptionApi.subscribe(shopId, ctx.session.token, ctx.from.id);
+
+    // P2-1 FIX: Handle case when shop is deleted after subscription
     const shop = await shopApi.getShop(shopId);
+    if (!shop) {
+      await ctx.answerCbQuery(buyerMessages.shopNotFound || 'Магазин не найден', { show_alert: true });
+      return;
+    }
+
     const counts = await resolveSectionCounts(shopId);
 
     await ctx.answerCbQuery(generalMessages.done);
@@ -374,6 +381,15 @@ const handleShopView = async (ctx) => {
 
     // Get shop details
     const shop = await shopApi.getShop(shopId);
+
+    // P2-2 FIX: Handle deleted shop
+    if (!shop) {
+      await smartMessage.send(ctx, {
+        text: buyerMessages.shopNotFound || 'Магазин не найден или был удалён',
+        keyboard: buyerMenu,
+      });
+      return;
+    }
 
     const products = await productApi.getShopProducts(shopId);
     const sectioned = splitProductsByAvailability(products);

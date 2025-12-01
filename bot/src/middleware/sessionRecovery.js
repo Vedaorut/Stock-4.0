@@ -104,6 +104,11 @@ async function recoverSessionData(ctx) {
           ctx.session.user.selectedRole = 'seller';
         }
 
+        // P2-11 FIX: Set tokenCreatedAt if missing (prevents unnecessary token regeneration)
+        if (!ctx.session.tokenCreatedAt) {
+          ctx.session.tokenCreatedAt = new Date().toISOString();
+        }
+
         logger.info('Shop data recovered', {
           userId: ctx.from.id,
           shopId: shop.id,

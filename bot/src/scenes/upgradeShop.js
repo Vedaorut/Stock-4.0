@@ -26,6 +26,11 @@ import {
 } from '../utils/paymentUi.js';
 const { seller: sellerMessages, general: generalMessages } = messages;
 
+// Cancel button for TX Hash input
+const cancelButtonHashInput = Markup.inlineKeyboard([
+  [Markup.button.callback(buttonText.cancel, 'seller:menu')],
+]);
+
 const CHAIN_MAPPINGS = {
   BTC: 'BTC',
   LTC: 'LTC',
@@ -319,7 +324,7 @@ const upgradeShopScene = new Scenes.WizardScene(
       if (data === 'upgrade:paid') {
         await ctx.answerCbQuery();
         ctx.wizard.state.awaitingTxHash = true;
-        await smartMessage.send(ctx, { text: sellerMessages.upgrade.sendHashPrompt });
+        await smartMessage.send(ctx, { text: sellerMessages.upgrade.sendHashPrompt, keyboard: cancelButtonHashInput });
         return;
       }
 
@@ -331,6 +336,7 @@ const upgradeShopScene = new Scenes.WizardScene(
       if (ctx.wizard.state.awaitingTxHash) {
         await smartMessage.send(ctx, {
           text: 'Пожалуйста, отправьте TX Hash текстом.\n\n' + sellerMessages.upgrade.sendHashPrompt,
+          keyboard: cancelButtonHashInput,
         });
       }
       return;
@@ -379,6 +385,9 @@ const upgradeShopScene = new Scenes.WizardScene(
             message: 'fetch status failed',
           });
         }
+
+        // P1-4 FIX: Update shopTier in session after successful upgrade
+        ctx.session.shopTier = 'pro';
 
         const successText = endDateLabel
           ? sellerMessages.upgrade.success(endDateLabel)
