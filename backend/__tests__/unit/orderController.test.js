@@ -53,9 +53,12 @@ jest.unstable_mockModule('../../src/services/telegram.js', () => ({
 }));
 
 jest.unstable_mockModule('../../src/services/cryptoPriceService.js', () => ({
-  cryptoPriceService: {
+  default: {
+    getCryptoPrice: jest.fn().mockResolvedValue(50000),
+    convertUsdToCrypto: jest.fn().mockReturnValue('0.001'),
+    roundCryptoAmount: jest.fn().mockReturnValue('0.001'),
     convertAndRound: jest.fn().mockResolvedValue({
-      cryptoAmount: 0.001,
+      cryptoAmount: '0.001',
       usdRate: 50000,
     }),
   },
@@ -179,7 +182,7 @@ describe('Order Controller', () => {
           user: { id: 1 },
         });
 
-        const { cryptoPriceService } = await import('../../src/services/cryptoPriceService.js');
+        const cryptoPriceService = (await import('../../src/services/cryptoPriceService.js')).default;
         cryptoPriceService.convertAndRound.mockResolvedValue({
           cryptoAmount: 0.5,
           usdRate: 2000,
@@ -220,7 +223,7 @@ describe('Order Controller', () => {
           user: { id: 1 },
         });
 
-        const { cryptoPriceService } = await import('../../src/services/cryptoPriceService.js');
+        const cryptoPriceService = (await import('../../src/services/cryptoPriceService.js')).default;
         cryptoPriceService.convertAndRound.mockResolvedValue({
           cryptoAmount: 0.1,
           usdRate: 100,
@@ -259,7 +262,7 @@ describe('Order Controller', () => {
           user: { id: 1 },
         });
 
-        const { cryptoPriceService } = await import('../../src/services/cryptoPriceService.js');
+        const cryptoPriceService = (await import('../../src/services/cryptoPriceService.js')).default;
         cryptoPriceService.convertAndRound.mockResolvedValue({
           cryptoAmount: 50,
           usdRate: 1,
@@ -394,7 +397,7 @@ describe('Order Controller', () => {
           user: { id: 1 },
         });
 
-        const { cryptoPriceService } = await import('../../src/services/cryptoPriceService.js');
+        const cryptoPriceService = (await import('../../src/services/cryptoPriceService.js')).default;
         cryptoPriceService.convertAndRound.mockResolvedValue({
           cryptoAmount: 0.002,
           usdRate: 50000,
