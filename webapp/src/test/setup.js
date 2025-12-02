@@ -6,6 +6,7 @@
  */
 
 import { vi } from 'vitest';
+import '@testing-library/jest-dom';
 
 // Mock window.Telegram for Telegram Mini App
 global.window = global.window || {};
@@ -59,6 +60,11 @@ global.window.Telegram = {
     viewportStableHeight: 600,
     isExpanded: true,
     platform: 'tdesktop',
+    disableVerticalSwipes: vi.fn(),
+    enableVerticalSwipes: vi.fn(),
+    showPopup: vi.fn(),
+    showConfirm: vi.fn(),
+    showAlert: vi.fn(),
   },
 };
 
