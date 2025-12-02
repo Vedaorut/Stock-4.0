@@ -3,7 +3,7 @@ import reactHooks from 'eslint-plugin-react-hooks';
 import reactRefresh from 'eslint-plugin-react-refresh';
 
 export default [
-  { ignores: ['dist', 'node_modules', 'public/mockServiceWorker.js'] },
+  { ignores: ['dist', 'node_modules', 'public/mockServiceWorker.js', 'coverage'] },
   {
     files: ['**/*.{js,jsx}'],
     languageOptions: {

@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars */
 /**
  * Comprehensive Unit Tests for useStore (Zustand Store)
  *
@@ -1718,7 +1719,7 @@ describe('Persistence', () => {
   it('should persist token, pendingOrders, and cart', () => {
     // The persist middleware partialize function should only save these fields
     // This is a documentation test - actual persistence would need localStorage mock
-    const state = useStore.getState();
+    const _state = useStore.getState();
 
     // Verify the store has the persist config
     expect(useStore.persist).toBeDefined();

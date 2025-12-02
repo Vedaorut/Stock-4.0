@@ -9,11 +9,13 @@ import { useTranslation } from '../../../i18n/useTranslation';
 // Sub-components
 import ProductForm from './ProductForm';
 import ProductList from './ProductList';
+/* eslint-disable no-unused-vars -- Components used in JSX conditionals */
 import ProductEmptyState from './ProductEmptyState';
 import ProductLoadingState from './ProductLoadingState';
 import ProductErrorState from './ProductErrorState';
 import NoShopState from './NoShopState';
 import AIChatPanel from './AIChatPanel';
+/* eslint-enable no-unused-vars */
 import AddProductButton from './AddProductButton';
 
 /**
