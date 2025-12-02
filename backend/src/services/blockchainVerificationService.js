@@ -322,7 +322,8 @@ export async function verifyBitcoinPayment(txHash, expectedAddress, expectedAmou
   // Calculate confirmations from block height
   let confirmations = 0;
   if (tx.status?.confirmed && tx.status?.block_height) {
-    // Get current block height
+    // Get current block height (fetched in parallel with tx data would be ideal,
+    // but we need tx first to check if it's confirmed)
     const currentHeightUrl = `${config.baseUrl}/blocks/tip/height`;
     const currentHeight = await fetchWithRetry(currentHeightUrl);
     confirmations = currentHeight - tx.status.block_height + 1;
@@ -493,9 +494,14 @@ export async function verifyEthereumPayment(txHash, expectedAddress, expectedAmo
     };
   }
 
-  // Get transaction receipt for status and confirmations
+  // Parallel fetch: receipt + currentBlock (optimized from sequential calls)
   const receiptUrl = `${config.baseUrl}?module=proxy&action=eth_getTransactionReceipt&txhash=${txHash}&apikey=${apiKey}`;
-  const receiptData = await fetchWithRetry(receiptUrl);
+  const currentBlockUrl = `${config.baseUrl}?module=proxy&action=eth_blockNumber&apikey=${apiKey}`;
+
+  const [receiptData, currentBlockData] = await Promise.all([
+    fetchWithRetry(receiptUrl),
+    fetchWithRetry(currentBlockUrl),
+  ]);
 
   const receipt = receiptData.result;
   if (!receipt) {
@@ -505,6 +511,7 @@ export async function verifyEthereumPayment(txHash, expectedAddress, expectedAmo
       resultStatus: VERIFICATION_STATUS.SUCCESS,
       confirmations: 0,
       amount: amountETH,
+      error: 'Transaction pending confirmation',
     };
   }
 
@@ -522,8 +529,6 @@ export async function verifyEthereumPayment(txHash, expectedAddress, expectedAmo
 
   // Calculate confirmations
   const blockNumber = parseInt(receipt.blockNumber, 16);
-  const currentBlockUrl = `${config.baseUrl}?module=proxy&action=eth_blockNumber&apikey=${apiKey}`;
-  const currentBlockData = await fetchWithRetry(currentBlockUrl);
   const currentBlock = parseInt(currentBlockData.result, 16);
 
   const confirmations = currentBlock - blockNumber;

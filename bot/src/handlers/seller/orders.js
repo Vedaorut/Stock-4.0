@@ -189,17 +189,31 @@ export const handleOrderHistory = async (ctx, page = 1) => {
 
     // Fetch orders with pagination
     const result = await orderApi.getShopOrders(shopId, token, {
-      status: 'delivered,completed',
+      status: 'confirmed,shipped,delivered',
       page: page,
       limit: PER_PAGE,
     });
 
-    // Check response format - backend might return { data: { orders: [...], total: N } }
-    const deliveredOrders = Array.isArray(result) ? result : result.data || result;
+    // Parse response correctly
+    let deliveredOrders = [];
+    let totalOrders = 0;
+    let totalPages = 1;
 
-    // Get total count from response metadata
-    const totalOrders = result.data?.total || deliveredOrders.length;
-    const totalPages = Math.ceil(totalOrders / PER_PAGE);
+    if (result.success && result.data) {
+      // New format: { success, data: [...], pagination: { total, totalPages, ... } }
+      deliveredOrders = result.data;
+      totalOrders = result.pagination?.total || deliveredOrders.length;
+      totalPages = result.pagination?.totalPages || Math.ceil(totalOrders / PER_PAGE);
+    } else if (Array.isArray(result)) {
+      // Legacy format: direct array
+      deliveredOrders = result;
+      totalOrders = deliveredOrders.length;
+    } else if (result.data) {
+      // Wrapped format: { data: [...] }
+      deliveredOrders = Array.isArray(result.data) ? result.data : [];
+      totalOrders = result.total || deliveredOrders.length;
+      totalPages = Math.ceil(totalOrders / PER_PAGE);
+    }
 
     if (!Array.isArray(deliveredOrders) || deliveredOrders.length === 0) {
       const emptyMessage = `📋 История заказов

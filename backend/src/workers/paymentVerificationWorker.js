@@ -133,7 +133,9 @@ async function processPendingPayments() {
     }
 
   } catch (error) {
-    await client.query('ROLLBACK').catch(() => { });
+    await client.query('ROLLBACK').catch((rollbackErr) => {
+      logger.error('[PaymentVerification] ROLLBACK failed:', rollbackErr);
+    });
     throw error;
   } finally {
     client.release();
@@ -317,20 +319,29 @@ async function confirmOrderPayment(orderId, paymentId, verificationResult) {
       [orderId]
     );
 
-    for (const item of itemsResult.rows) {
-      if (!item.is_preorder) {
+    // Batch update stock for all non-preorder items (fixes N+1 query issue)
+    const nonPreorderItems = itemsResult.rows.filter(item => !item.is_preorder);
+
+    if (nonPreorderItems.length > 0) {
+      // Log warnings for insufficient stock
+      for (const item of nonPreorderItems) {
         if (item.stock_quantity < item.quantity) {
-          // Insufficient stock - still confirm but log warning
           logger.warn(`[PaymentWorker] Insufficient stock for product ${item.product_id}`);
         }
-
-        await client.query(
-          `UPDATE products 
-           SET stock_quantity = GREATEST(0, stock_quantity - $1), updated_at = NOW()
-           WHERE id = $2`,
-          [item.quantity, item.product_id]
-        );
       }
+
+      // Batch UPDATE using unnest() - single query instead of N queries
+      const productIds = nonPreorderItems.map(item => item.product_id);
+      const quantities = nonPreorderItems.map(item => item.quantity);
+
+      await client.query(
+        `UPDATE products p
+         SET stock_quantity = GREATEST(0, p.stock_quantity - u.quantity),
+             updated_at = NOW()
+         FROM unnest($1::int[], $2::int[]) AS u(product_id, quantity)
+         WHERE p.id = u.product_id`,
+        [productIds, quantities]
+      );
     }
 
     // 3. Update order status
@@ -367,6 +378,13 @@ async function confirmOrderPayment(orderId, paymentId, verificationResult) {
     });
 
   } catch (error) {
+    // FIX: Update payment status to 'pending' before rollback to prevent stuck 'processing' payments
+    await query(
+      `UPDATE payments SET status = 'pending', updated_at = NOW() WHERE id = $1`,
+      [paymentId]
+    ).catch(updateErr => {
+      logger.error('[PaymentWorker] Failed to reset payment status before rollback:', updateErr);
+    });
     await client.query('ROLLBACK');
     throw error;
   } finally {

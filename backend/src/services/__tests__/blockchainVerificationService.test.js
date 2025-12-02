@@ -250,6 +250,7 @@ describe('Blockchain Verification Service', () => {
     it('should verify confirmed LTC transaction successfully', async () => {
       mockAxios.mockResolvedValueOnce({
         data: {
+          hash: 'txhash', // BlockCypher returns hash field
           confirmations: 6,
           double_spend: false,
           outputs: [
@@ -275,6 +276,7 @@ describe('Blockchain Verification Service', () => {
     it('should reject double-spend LTC transaction', async () => {
       mockAxios.mockResolvedValueOnce({
         data: {
+          hash: 'txhash', // BlockCypher returns hash field
           confirmations: 6,
           double_spend: true,
           outputs: [
@@ -365,6 +367,13 @@ describe('Blockchain Verification Service', () => {
         },
       });
 
+      // Mock eth_blockNumber (called in parallel with receipt via Promise.all)
+      mockAxios.mockResolvedValueOnce({
+        data: {
+          result: '0x10C',
+        },
+      });
+
       const result = await verifyEthereumPayment(
         'txhash',
         '0x742d35cc6634c0532925a3b844bc9e7595f0beb1',
@@ -387,10 +396,17 @@ describe('Blockchain Verification Service', () => {
         },
       });
 
-      // Mock eth_getTransactionReceipt with null result
+      // Mock eth_getTransactionReceipt with null result (pending tx)
       mockAxios.mockResolvedValueOnce({
         data: {
           result: null,
+        },
+      });
+
+      // Mock eth_blockNumber (called in parallel with receipt via Promise.all)
+      mockAxios.mockResolvedValueOnce({
+        data: {
+          result: '0x100',
         },
       });
 
