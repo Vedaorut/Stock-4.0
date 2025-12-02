@@ -3,7 +3,7 @@
  * Manages refresh tokens for JWT rotation
  */
 
-import { query } from '../db.js';
+import { query } from '../../config/database.js';
 
 const REFRESH_TOKEN_EXPIRY_DAYS = 30;
 
