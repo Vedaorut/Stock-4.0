@@ -8,6 +8,20 @@
 import { vi } from 'vitest';
 import '@testing-library/jest-dom';
 
+// Mock navigator.clipboard globally (jsdom makes it read-only)
+const mockClipboardWriteText = vi.fn().mockResolvedValue(undefined);
+Object.defineProperty(navigator, 'clipboard', {
+  value: {
+    writeText: mockClipboardWriteText,
+    readText: vi.fn().mockResolvedValue(''),
+  },
+  writable: true,
+  configurable: true,
+});
+
+// Export for tests to access
+global.mockClipboardWriteText = mockClipboardWriteText;
+
 // Mock window.Telegram for Telegram Mini App
 global.window = global.window || {};
 global.window.Telegram = {
