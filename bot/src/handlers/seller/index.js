@@ -4,6 +4,7 @@ import { manageWorkersMenu, confirmWorkerRemoval } from '../../keyboards/workspa
 import { shopApi, authApi, orderApi, workerApi, followApi } from '../../utils/api.js';
 import logger from '../../utils/logger.js';
 import { messages, buttons as buttonText } from '../../texts/messages.js';
+import { t } from '../../i18n/index.js';
 import { checkShopHealth } from '../../utils/shopHealthCheck.js';
 import { getTipForShop } from '../../utils/sellerTips.js';
 import {
@@ -88,7 +89,7 @@ const getSellerMenu = async (ctx) => {
   ctx.session.hasFollows = hasFollows;
   
   // STABILITY FIX #1: Return both menu and tokenExpired flag
-  return { menu: sellerMenu(activeCount, { hasFollows }), tokenExpired };
+  return { menu: sellerMenu(activeCount, { hasFollows }, ctx.lang), tokenExpired };
 };
 
 /**
@@ -137,7 +138,7 @@ const showWorkersList = async (ctx, options = {}) => {
       return;
     }
 
-    const lines = workers.map((worker) => `• ${getWorkerDisplayName(worker)}`).join('\n');
+    const lines = workers.map((worker) => `- ${getWorkerDisplayName(worker)}`).join('\n');
     const header = sellerMessages.workersListTitle(shopName);
     const instruction = sellerMessages.workersListInstruction;
     await ctx.reply(
@@ -151,25 +152,25 @@ const showWorkersList = async (ctx, options = {}) => {
 };
 
 const formatSubscriptionStatus = (data) => {
-  const tier = data.tier || 'basic';
+  const tier = data.tier || 'pro';
   const status = data.status || (data.currentSubscription ? 'active' : 'inactive');
 
   // Prepare expiresAt date
   const dateSource =
     data.nextPaymentDue || data.periodEnd || data.currentSubscription?.period_end || null;
 
-  // Use new detailed messages based on tier
-  if (tier === 'basic') {
-    return sellerMessages.subscriptionBasicInfo({ status });
-  }
-
+  // Use detailed messages based on tier (PRO or MAX)
   if (tier === 'pro') {
     return sellerMessages.subscriptionProInfo({ status, renewDate: dateSource });
   }
 
+  if (tier === 'max') {
+    return sellerMessages.subscriptionMaxInfo({ status, renewDate: dateSource });
+  }
+
   // Fallback for unknown tier
   const fallbackDate = dateSource ? new Date(dateSource).toLocaleDateString('ru-RU') : '—';
-  return `Тариф: ${tier}\nСтатус: ${status}\nДействителен до: ${fallbackDate}`;
+  return `Тариф: ${tier.toUpperCase()}\nСтатус: ${status}\nДействителен до: ${fallbackDate}`;
 };
 
 const buildSubscriptionKeyboard = (data) => {
@@ -180,8 +181,8 @@ const buildSubscriptionKeyboard = (data) => {
     buttons.push([Markup.button.callback(buttonText.paySubscription, 'subscription:pay')]);
   }
 
-  if (data.tier === 'basic') {
-    buttons.push([Markup.button.callback(buttonText.upgradeToPro, 'subscription:upgrade')]);
+  if (data.tier === 'pro') {
+    buttons.push([Markup.button.callback(buttonText.upgradeToMax, 'subscription:upgrade')]);
   }
 
   buttons.push([Markup.button.callback(buttonText.backToMenu, 'seller:menu')]);
@@ -197,8 +198,11 @@ export { getSellerMenu, getSellerMenuKeyboard };
 
 /**
  * Handle seller role selection
+ * @param {Object} ctx - Telegraf context
+ * @param {Object} options - Options
+ * @param {boolean} options.skipRoleUpdate - Skip PATCH /auth/role (already called by caller)
  */
-export const handleSellerRole = async (ctx) => {
+export const handleSellerRole = async (ctx, options = {}) => {
   try {
     // M12 FIX: Only answer callback query if this is actually a callback query
     if (ctx.callbackQuery) {
@@ -208,17 +212,24 @@ export const handleSellerRole = async (ctx) => {
     ctx.session.role = 'seller';
     logger.info(`User ${ctx.from.id} selected seller role`);
 
-    // Save role to database
-    try {
-      if (ctx.session.token) {
-        await authApi.updateRole('seller', ctx.session.token);
-        if (ctx.session.user) {
-          ctx.session.user.selectedRole = 'seller'; // Update session cache
+    // PERF: Skip role update if already done by caller (e.g., handleRoleSeller)
+    if (!options.skipRoleUpdate) {
+      try {
+        if (ctx.session.token) {
+          await authApi.updateRole('seller', ctx.session.token);
+          if (ctx.session.user) {
+            ctx.session.user.selectedRole = 'seller'; // Update session cache
+          }
+          logger.info(`Saved seller role for user ${ctx.from.id}`);
         }
-        logger.info(`Saved seller role for user ${ctx.from.id}`);
+      } catch (error) {
+        logger.error('Failed to save role:', error);
       }
-    } catch (error) {
-      logger.error('Failed to save role:', error);
+    } else {
+      // Just update session cache
+      if (ctx.session.user) {
+        ctx.session.user.selectedRole = 'seller';
+      }
     }
 
     if (!ctx.session.token) {
@@ -226,7 +237,7 @@ export const handleSellerRole = async (ctx) => {
       ctx.session.shopId = null;
       ctx.session.shopName = null;
       ctx.session.shopTier = null;
-      await ctx.reply(sellerMessages.noShop, sellerMenuNoShop);
+      await ctx.reply(t('seller.noShop', {}, ctx.lang), sellerMenuNoShop(ctx.lang));
       return;
     }
 
@@ -251,54 +262,44 @@ export const handleSellerRole = async (ctx) => {
           shopName: shop.name,
         });
 
-        // Получить аналитику за 7 дней
-        let weekRevenue = 0;
-        try {
-          const today = new Date();
-          const weekAgo = new Date(today);
-          weekAgo.setDate(today.getDate() - 7);
+        // PERF: Fetch all data in parallel instead of sequential calls
+        const today = new Date();
+        const weekAgo = new Date(today);
+        weekAgo.setDate(today.getDate() - 7);
 
-          const analytics = await orderApi.getAnalytics(
+        const [analyticsResult, activeCountResult, followsResult, shopHealth] = await Promise.all([
+          // Analytics for 7 days
+          orderApi.getAnalytics(
             shop.id,
             weekAgo.toISOString().split('T')[0],
             today.toISOString().split('T')[0],
             ctx.session.token
-          );
+          ).catch((error) => {
+            logger.error('Failed to get week analytics:', error);
+            return null;
+          }),
+          // Active orders count
+          orderApi.getActiveOrdersCount(shop.id, ctx.session.token).catch((error) => {
+            logger.error('Failed to get active orders count:', error);
+            return 0;
+          }),
+          // Follows list
+          followApi.getMyFollows(shop.id, ctx.session.token).catch((error) => {
+            if (error.response?.status === 401) {
+              logger.debug('Token expired or user not authenticated, showing menu without follows');
+            } else {
+              logger.error('Failed to get follows list for seller menu:', error);
+            }
+            return [];
+          }),
+          // Shop health check
+          checkShopHealth(shop.id, ctx.session.token),
+        ]);
 
-          weekRevenue = analytics.summary?.totalRevenue || 0;
-        } catch (error) {
-          logger.error('Failed to get week analytics:', error);
-          // Если ошибка - показываем 0
-        }
-
-        // Get active orders count for menu
-        let activeCount = 0;
-        try {
-          activeCount = await orderApi.getActiveOrdersCount(shop.id, ctx.session.token);
-        } catch (error) {
-          logger.error('Failed to get active orders count:', error);
-        }
-
-        // Determine follows to show dynamic menu button
-        let hasFollows = false;
-        try {
-          // Use HTTP API with JWT token
-          const follows = await followApi.getMyFollows(shop.id, ctx.session.token);
-          hasFollows = Array.isArray(follows) && follows.length > 0;
-        } catch (error) {
-          // ✅ 401 - это нормально если токен expired или юзер новый
-          if (error.response?.status === 401) {
-            logger.debug('Token expired or user not authenticated, showing menu without follows');
-            hasFollows = false;
-          } else {
-            logger.error('Failed to get follows list for seller menu:', error);
-            hasFollows = false;
-          }
-        }
+        const weekRevenue = analyticsResult?.summary?.totalRevenue || 0;
+        const activeCount = activeCountResult || 0;
+        const hasFollows = Array.isArray(followsResult) && followsResult.length > 0;
         ctx.session.hasFollows = hasFollows;
-
-        // Проверить состояние магазина для статус-бара
-        const shopHealth = await checkShopHealth(shop.id, ctx.session.token);
 
         // Получить совет или предупреждение
         const statusBar = getTipForShop(ctx, shopHealth);
@@ -308,10 +309,11 @@ export const handleSellerRole = async (ctx) => {
           shop.name,
           weekRevenue,
           activeCount,
-          statusBar
+          statusBar,
+          ctx.lang
         );
 
-        await ctx.reply(header, sellerMenu(activeCount, { hasFollows }));
+        await ctx.reply(header, sellerMenu(activeCount, { hasFollows }, ctx.lang));
         return;
       }
 
@@ -319,7 +321,7 @@ export const handleSellerRole = async (ctx) => {
       ctx.session.shopId = null;
       ctx.session.shopName = null;
       ctx.session.shopTier = null;
-      await ctx.reply(sellerMessages.noShop, sellerMenuNoShop);
+      await ctx.reply(t('seller.noShop', {}, ctx.lang), sellerMenuNoShop(ctx.lang));
     } catch (error) {
       logger.error('Error checking shop:', error);
 
@@ -332,16 +334,16 @@ export const handleSellerRole = async (ctx) => {
 
       const message =
         error.response?.status === 404 || error.response?.status === 401
-          ? sellerMessages.noShop
-          : generalMessages.actionFailed;
+          ? t('seller.noShop', {}, ctx.lang)
+          : t('general.actionFailed', {}, ctx.lang);
 
-      await ctx.reply(message, sellerMenuNoShop);
+      await ctx.reply(message, sellerMenuNoShop(ctx.lang));
     }
   } catch (error) {
     logger.error('Error in seller role handler:', error);
     // Local error handling - don't throw to avoid infinite spinner
     try {
-      await ctx.reply(generalMessages.actionFailed, sellerMenuNoShop);
+      await ctx.reply(t('general.actionFailed', {}, ctx.lang), sellerMenuNoShop(ctx.lang));
     } catch (replyError) {
       logger.error('Failed to send error message:', replyError);
     }
@@ -361,7 +363,7 @@ const handleCreateShop = async (ctx) => {
     logger.error('Error entering chooseTier scene:', error);
     // Local error handling - don't throw to avoid infinite spinner
     try {
-      await ctx.reply(generalMessages.actionFailed, sellerMenuNoShop);
+      await ctx.reply(t('general.actionFailed', {}, ctx.lang), sellerMenuNoShop(ctx.lang));
     } catch (replyError) {
       logger.error('Failed to send error message:', replyError);
     }
@@ -411,6 +413,44 @@ const handleWallets = async (ctx) => {
   } catch (error) {
     logger.error('Error entering manageWallets scene:', error);
     // Local error handling - don't throw to avoid infinite spinner
+    try {
+      const menu = await getSellerMenuKeyboard(ctx);
+      await ctx.reply(generalMessages.actionFailed, menu);
+    } catch (replyError) {
+      logger.error('Failed to send error message:', replyError);
+    }
+  }
+};
+
+/**
+ * Handle invite link - show copyable link for sharing
+ */
+const handleInviteLink = async (ctx) => {
+  try {
+    await ctx.answerCbQuery();
+
+    if (!ctx.session.shopId) {
+      await ctx.reply(generalMessages.shopRequired, sellerMenuNoShop(ctx.lang));
+      return;
+    }
+
+    const shopId = ctx.session.shopId;
+    const botUsername = process.env.BOT_USERNAME || 'SellStatusBot';
+    const lang = ctx.lang || 'ru';
+
+    // Build invite link message with copyable link
+    const title = t('inviteLink.title', {}, lang);
+    const description = t('inviteLink.description', {}, lang);
+    const copyHint = t('inviteLink.copyHint', {}, lang);
+    const link = `https://t.me/${botUsername}?start=shop_${shopId}`;
+
+    const message = `${title}\n\n${description}\n\n${copyHint}\n<code>${link}</code>`;
+
+    await ctx.replyWithHTML(message, sellerToolsMenu(ctx.session.isShopOwner ?? false, lang));
+
+    logger.info(`User ${ctx.from.id} viewed invite link for shop ${shopId}`);
+  } catch (error) {
+    logger.error('Error in invite link handler:', error);
     try {
       const menu = await getSellerMenuKeyboard(ctx);
       await ctx.reply(generalMessages.actionFailed, menu);
@@ -502,7 +542,7 @@ export const setupSellerHandlers = (bot) => {
       }
 
       if (!isOwner) {
-        await ctx.reply(sellerMessages.migration.accessDenied, sellerToolsMenu(false));
+        await ctx.reply(sellerMessages.migration.accessDenied, sellerToolsMenu(false, ctx.lang));
         return;
       }
 
@@ -511,7 +551,7 @@ export const setupSellerHandlers = (bot) => {
       logger.error('Error entering migrate_channel scene:', error);
       await ctx.reply(
         generalMessages.actionFailed,
-        sellerToolsMenu(ctx.session.isShopOwner ?? false)
+        sellerToolsMenu(ctx.session.isShopOwner ?? false, ctx.lang)
       );
     }
   });
@@ -562,7 +602,7 @@ export const setupSellerHandlers = (bot) => {
       if (!ctx.session.token) {
         await ctx.reply(
           generalMessages.authorizationRequired,
-          sellerMenu(0, { hasFollows: ctx.session?.hasFollows })
+          sellerMenu(0, { hasFollows: ctx.session?.hasFollows }, ctx.lang)
         );
         return;
       }
@@ -582,7 +622,7 @@ export const setupSellerHandlers = (bot) => {
       logger.error('Error fetching subscription status:', error);
       await ctx.reply(
         sellerMessages.subscriptionStatusError,
-        sellerMenu(0, { hasFollows: ctx.session?.hasFollows })
+        sellerMenu(0, { hasFollows: ctx.session?.hasFollows }, ctx.lang)
       );
     }
   });
@@ -615,6 +655,9 @@ export const setupSellerHandlers = (bot) => {
       await ctx.reply(sellerMessages.toolsError, menu);
     }
   });
+
+  // Invite link - show copyable link for sharing
+  bot.action('seller:invite_link', handleInviteLink);
 
   // Back to seller menu
   bot.action('seller:main', handleSellerRole);
@@ -662,9 +705,9 @@ const handleWorkers = async (ctx) => {
       }
     }
 
-    if (shopTier !== 'pro') {
+    if (shopTier !== 'max') {
       const menu = await getSellerMenuKeyboard(ctx);
-      await ctx.reply(sellerMessages.workersProOnly, menu);
+      await ctx.reply(sellerMessages.workersMaxOnly, menu);
       return;
     }
 
@@ -736,6 +779,7 @@ const handleWorkersList = async (ctx) => {
 
 /**
  * Handle remove worker action
+ * SECURITY FIX: Only shop owner can remove workers
  */
 const handleWorkerRemove = async (ctx) => {
   try {
@@ -749,6 +793,12 @@ const handleWorkerRemove = async (ctx) => {
     if (!ctx.session.token) {
       const menu = await getSellerMenuKeyboard(ctx);
       await ctx.reply(generalMessages.authorizationRequired, menu);
+      return;
+    }
+
+    // SECURITY FIX: Only shop owner can remove workers
+    if (!ctx.session.isShopOwner) {
+      await ctx.reply(sellerMessages.workersOwnerOnly, manageWorkersMenu());
       return;
     }
 
@@ -783,6 +833,7 @@ const handleWorkerRemove = async (ctx) => {
 
 /**
  * Handle confirm worker removal
+ * SECURITY FIX: Only shop owner can remove workers
  */
 const handleWorkerRemoveConfirm = async (ctx) => {
   try {
@@ -796,6 +847,12 @@ const handleWorkerRemoveConfirm = async (ctx) => {
     if (!ctx.session.token) {
       const menu = await getSellerMenuKeyboard(ctx);
       await ctx.reply(generalMessages.authorizationRequired, menu);
+      return;
+    }
+
+    // SECURITY FIX: Only shop owner can remove workers
+    if (!ctx.session.isShopOwner) {
+      await ctx.reply(sellerMessages.workersOwnerOnly, manageWorkersMenu());
       return;
     }
 

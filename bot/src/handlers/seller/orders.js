@@ -18,9 +18,8 @@ const formatPrice = (value) => {
 };
 
 const ensureShopSession = (ctx) => {
-  // PRIORITY: Use shopId (current shop from session/recovery)
-  // currentShopId may be stale from old session
-  const shopId = ctx.session.shopId ?? ctx.session.currentShopId ?? null;
+  // PRIORITY: Use shopId (current shop), then workspaceShopId (for workers), then currentShopId (legacy)
+  const shopId = ctx.session.shopId ?? ctx.session.workspaceShopId ?? ctx.session.currentShopId ?? null;
 
   // Sync currentShopId with shopId to prevent stale values
   if (shopId && ctx.session.currentShopId !== shopId) {
@@ -50,9 +49,12 @@ export const handleActiveOrders = async (ctx) => {
       return;
     }
 
-    const activeOrders = await orderApi.getShopOrders(shopId, token, { status: 'confirmed' });
+    const result = await orderApi.getShopOrders(shopId, token, { status: 'confirmed' });
 
-    if (!Array.isArray(activeOrders) || activeOrders.length === 0) {
+    // Parse response correctly - API returns { success, data, pagination }
+    const activeOrders = result.success && Array.isArray(result.data) ? result.data : [];
+
+    if (activeOrders.length === 0) {
       const message = `📦 Активные заказы
 
 Нет активных заказов.
@@ -117,8 +119,9 @@ ${ordersList}
       } else {
         await ctx.reply(errorMsg, backToMenuKeyboard);
       }
-    } catch {
+    } catch (editError) {
       // Fallback to reply if edit fails
+      logger.warn('Failed to edit message, falling back to reply:', { error: editError.message });
       try {
         await ctx.reply(errorMsg, backToMenuKeyboard);
       } catch (replyError) {
@@ -177,7 +180,23 @@ export const handleOrderHistory = async (ctx, page = 1) => {
     const shopId = ensureShopSession(ctx);
     const token = ctx.session.token;
 
+    logger.debug('handleOrderHistory called:', {
+      userId: ctx.from?.id,
+      shopId,
+      hasToken: !!token,
+      sessionKeys: Object.keys(ctx.session || {}),
+      page,
+    });
+
     if (!shopId) {
+      logger.warn('handleOrderHistory: No shopId in session', {
+        userId: ctx.from?.id,
+        session: {
+          shopId: ctx.session?.shopId,
+          workspaceShopId: ctx.session?.workspaceShopId,
+          currentShopId: ctx.session?.currentShopId,
+        },
+      });
       await ctx.reply(generalMessages.shopRequired, backToMenuKeyboard);
       return;
     }
@@ -293,8 +312,9 @@ ${ordersList}
       } else {
         await ctx.reply(errorMsg, backToMenuKeyboard);
       }
-    } catch {
+    } catch (editError) {
       // Fallback to reply if edit fails
+      logger.warn('Failed to edit message, falling back to reply:', { error: editError.message });
       try {
         await ctx.reply(errorMsg, backToMenuKeyboard);
       } catch (replyError) {
@@ -306,6 +326,7 @@ ${ordersList}
 
 /**
  * Mark order as shipped
+ * SECURITY FIX: Verify order belongs to user's shop via backend before update
  */
 export const handleMarkShipped = async (ctx) => {
   try {
@@ -315,6 +336,18 @@ export const handleMarkShipped = async (ctx) => {
     if (!token) {
       await ctx.answerCbQuery('Требуется авторизация');
       return;
+    }
+
+    // SECURITY FIX: Verify order access via backend (checks owner/worker)
+    try {
+      await orderApi.getOrder(orderId, token);
+    } catch (error) {
+      const status = error.response?.status;
+      if (status === 401 || status === 403 || status === 404) {
+        await ctx.answerCbQuery('Заказ не найден или нет доступа');
+        return;
+      }
+      throw error;
     }
 
     await orderApi.updateOrderStatus(orderId, 'shipped', token);
@@ -337,11 +370,29 @@ export const handleMarkShipped = async (ctx) => {
 
 /**
  * Mark order as delivered (complete)
+ * SECURITY FIX: Verify order belongs to user's shop via backend before update
  */
 export const handleMarkDelivered = async (ctx) => {
   try {
     const orderId = ctx.match[1];
     const token = ctx.session.token;
+
+    if (!token) {
+      await ctx.answerCbQuery('Требуется авторизация');
+      return;
+    }
+
+    // SECURITY FIX: Verify order access via backend (checks owner/worker)
+    try {
+      await orderApi.getOrder(orderId, token);
+    } catch (error) {
+      const status = error.response?.status;
+      if (status === 401 || status === 403 || status === 404) {
+        await ctx.answerCbQuery('Заказ не найден или нет доступа');
+        return;
+      }
+      throw error;
+    }
 
     await orderApi.updateOrderStatus(orderId, 'delivered', token);
 
@@ -361,11 +412,29 @@ export const handleMarkDelivered = async (ctx) => {
 
 /**
  * Cancel order
+ * SECURITY FIX: Verify order belongs to user's shop via backend before update
  */
 export const handleCancelOrder = async (ctx) => {
   try {
     const orderId = ctx.match[1];
     const token = ctx.session.token;
+
+    if (!token) {
+      await ctx.answerCbQuery('Требуется авторизация');
+      return;
+    }
+
+    // SECURITY FIX: Verify order access via backend (checks owner/worker)
+    try {
+      await orderApi.getOrder(orderId, token);
+    } catch (error) {
+      const status = error.response?.status;
+      if (status === 401 || status === 403 || status === 404) {
+        await ctx.answerCbQuery('Заказ не найден или нет доступа');
+        return;
+      }
+      throw error;
+    }
 
     await orderApi.updateOrderStatus(orderId, 'cancelled', token);
 

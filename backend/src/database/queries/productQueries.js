@@ -175,6 +175,7 @@ export const productQueries = {
   },
 
   // Reserve stock (increase reserved_quantity)
+  // SECURITY FIX: Added stock availability check to prevent overselling
   reserveStock: async (id, quantity, client = null) => {
     const queryFn = client ? client.query.bind(client) : query;
     const result = await queryFn(
@@ -182,6 +183,7 @@ export const productQueries = {
        SET reserved_quantity = reserved_quantity + $2,
            updated_at = NOW()
        WHERE id = $1
+         AND stock_quantity >= reserved_quantity + $2
        RETURNING id, stock_quantity, reserved_quantity`,
       [id, quantity]
     );

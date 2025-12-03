@@ -80,7 +80,8 @@ export const useStore = create(
     {
       name: 'status-stock-storage',
       partialize: (state) => ({
-        token: state.token, // Fix: Persist token across page refresh
+        // SECURITY FIX: Token removed from localStorage to prevent XSS theft
+        // Token is obtained from Telegram initData on each session
         pendingOrders: state.pendingOrders,
         cart: state.cart, // Fix: Persist cart across page refresh
       }),

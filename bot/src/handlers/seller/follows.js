@@ -143,7 +143,7 @@ export const handleViewFollows = async (ctx) => {
     if (!ctx.session.token) {
       await ctx.reply(
         generalMessages.authorizationRequired,
-        sellerMenu(0, { hasFollows: ctx.session?.hasFollows })
+        sellerMenu(0, { hasFollows: ctx.session?.hasFollows }, ctx.lang)
       );
       return;
     }
@@ -155,7 +155,7 @@ export const handleViewFollows = async (ctx) => {
 
     if (!hasFollows) {
       const text = `${followMessages.contextDetailed}\n\n${followMessages.emptyState}`;
-      await sendOrEdit(ctx, text, followsMenu(false));
+      await sendOrEdit(ctx, text, followsMenu(false, [], ctx.lang));
       return;
     }
 
@@ -169,11 +169,11 @@ export const handleViewFollows = async (ctx) => {
 
     const message = `${followMessages.contextDetailed}\n\n${listText}`;
 
-    await sendOrEdit(ctx, message, followsMenu(true, followButtons));
+    await sendOrEdit(ctx, message, followsMenu(true, followButtons, ctx.lang));
     logger.info(`User ${ctx.from.id} viewed follows (${follows.length} total)`);
   } catch (error) {
     logger.error('Error fetching follows:', error);
-    await sendOrEdit(ctx, followMessages.loadError, followsMenu(Boolean(ctx.session?.hasFollows)));
+    await sendOrEdit(ctx, followMessages.loadError, followsMenu(Boolean(ctx.session?.hasFollows), [], ctx.lang));
   }
 };
 
@@ -192,18 +192,25 @@ export const handleCreateFollow = async (ctx) => {
     await ctx.scene.enter('createFollow');
   } catch (error) {
     logger.error('Error entering createFollow scene:', error);
-    await ctx.reply(generalMessages.actionFailed, followsMenu(Boolean(ctx.session?.hasFollows)));
+    await ctx.reply(generalMessages.actionFailed, followsMenu(Boolean(ctx.session?.hasFollows), [], ctx.lang));
   }
 };
 
 /**
  * View follow detail
+ * SECURITY FIX: Added shopId check as defense-in-depth (backend also verifies ownership)
  */
 export const handleFollowDetail = async (ctx) => {
   try {
     await ctx.answerCbQuery();
 
     const followId = parseInt(ctx.match[1]);
+
+    // SECURITY FIX: Require shop session before accessing follows
+    if (!ctx.session.shopId) {
+      await ctx.editMessageText(generalMessages.shopRequired, followsMenu(false, [], ctx.lang));
+      return;
+    }
 
     if (!ctx.session.token) {
       await ctx.editMessageText(generalMessages.authorizationRequired);
@@ -212,22 +219,27 @@ export const handleFollowDetail = async (ctx) => {
 
     const token = ctx.session.token;
 
+    // PERF: Fetch follow detail and products in parallel
     let followDetail;
+    let productsPayload;
+
     try {
-      followDetail = await followApi.getFollowDetail(followId, token);
+      [followDetail, productsPayload] = await Promise.all([
+        followApi.getFollowDetail(followId, token),
+        followApi.getFollowProducts(followId, token, { limit: 10 }),
+      ]);
     } catch (error) {
       if (error.response?.status === 404) {
-        await ctx.editMessageText(followMessages.notFound, followsMenu(false));
+        await ctx.editMessageText(followMessages.notFound, followsMenu(false, [], ctx.lang));
         return;
       }
       if (error.response?.status === 403) {
-        await ctx.editMessageText(followMessages.accessDenied, followsMenu(false));
+        await ctx.editMessageText(followMessages.accessDenied, followsMenu(false, [], ctx.lang));
         return;
       }
       throw error;
     }
 
-    const productsPayload = await followApi.getFollowProducts(followId, token, { limit: 10 });
     const payload = productsPayload?.data || productsPayload || {};
     const mode = payload.mode || followDetail.mode;
     const products = Array.isArray(payload.products) ? payload.products : [];
@@ -246,11 +258,11 @@ export const handleFollowDetail = async (ctx) => {
     logger.error('Error viewing follow detail:', error);
     const status = error.response?.status;
     if (status === 404) {
-      await ctx.editMessageText(followMessages.notFound, followsMenu(false));
+      await ctx.editMessageText(followMessages.notFound, followsMenu(false, [], ctx.lang));
     } else if (status === 403) {
-      await ctx.editMessageText(followMessages.accessDenied, followsMenu(false));
+      await ctx.editMessageText(followMessages.accessDenied, followsMenu(false, [], ctx.lang));
     } else {
-      await ctx.editMessageText(followMessages.loadError, followsMenu(false));
+      await ctx.editMessageText(followMessages.loadError, followsMenu(false, [], ctx.lang));
     }
   }
 };
@@ -268,7 +280,7 @@ export const handleFollowSettings = async (ctx) => {
 
     const follow = await followApi.getFollowDetail(followId, ctx.session.token);
 
-    const message = formatFollowDetail(follow);
+    const message = formatFollowDetail(follow, ctx.lang);
     await ctx.editMessageText(message, followDetailMenu(followId, follow.mode));
     logger.info(`User ${ctx.from.id} viewed follow settings ${followId}`);
   } catch (error) {
@@ -276,11 +288,11 @@ export const handleFollowSettings = async (ctx) => {
 
     const status = error.response?.status;
     if (status === 404) {
-      await ctx.editMessageText(followMessages.notFound, followsMenu(false));
+      await ctx.editMessageText(followMessages.notFound, followsMenu(false, [], ctx.lang));
     } else if (status === 403) {
-      await ctx.editMessageText(followMessages.accessDenied, followsMenu(false));
+      await ctx.editMessageText(followMessages.accessDenied, followsMenu(false, [], ctx.lang));
     } else {
-      await ctx.editMessageText(followMessages.loadError, followsMenu(false));
+      await ctx.editMessageText(followMessages.loadError, followsMenu(false, [], ctx.lang));
     }
   }
 };
@@ -305,7 +317,7 @@ export const handleDeleteFollow = async (ctx) => {
       follow = await followApi.getFollowDetail(followId, ctx.session.token);
     } catch (error) {
       if (error.response?.status === 404) {
-        await ctx.editMessageText(followMessages.notFound, followsMenu(false));
+        await ctx.editMessageText(followMessages.notFound, followsMenu(false, [], ctx.lang));
         return;
       }
       throw error;
@@ -330,7 +342,7 @@ export const handleDeleteFollow = async (ctx) => {
     logger.info(`User ${ctx.from.id} requested delete confirmation for follow ${followId}`);
   } catch (error) {
     logger.error('Error showing delete confirmation:', error);
-    await ctx.editMessageText(followMessages.deleteError, followsMenu(false));
+    await ctx.editMessageText(followMessages.deleteError, followsMenu(false, [], ctx.lang));
   }
 };
 
@@ -357,7 +369,7 @@ export const handleConfirmDeleteFollow = async (ctx) => {
 
     if (!hasFollows) {
       const text = `${followMessages.contextDetailed}\n\n${followMessages.emptyState}`;
-      await ctx.editMessageText(text, followsMenu(false));
+      await ctx.editMessageText(text, followsMenu(false, [], ctx.lang));
       return;
     }
 
@@ -371,10 +383,10 @@ export const handleConfirmDeleteFollow = async (ctx) => {
 
     const message = `${followMessages.contextDetailed}\n\n${listText}`;
 
-    await ctx.editMessageText(message, followsMenu(true, followButtons));
+    await ctx.editMessageText(message, followsMenu(true, followButtons, ctx.lang));
   } catch (error) {
     logger.error('Error deleting follow:', error);
-    await ctx.editMessageText(followMessages.deleteError, followsMenu(false));
+    await ctx.editMessageText(followMessages.deleteError, followsMenu(false, [], ctx.lang));
   }
 };
 
@@ -394,16 +406,16 @@ export const handleCancelDeleteFollow = async (ctx) => {
 
     // Return to follow settings view
     const follow = await followApi.getFollowDetail(followId, ctx.session.token);
-    const message = formatFollowDetail(follow);
+    const message = formatFollowDetail(follow, ctx.lang);
     await ctx.editMessageText(message, followDetailMenu(followId, follow.mode));
     logger.info(`User ${ctx.from.id} cancelled delete for follow ${followId}`);
   } catch (error) {
     logger.error('Error cancelling delete:', error);
     // If follow not found, go back to list
     if (error.response?.status === 404) {
-      await ctx.editMessageText(followMessages.notFound, followsMenu(false));
+      await ctx.editMessageText(followMessages.notFound, followsMenu(false, [], ctx.lang));
     } else {
-      await ctx.editMessageText(followMessages.loadError, followsMenu(false));
+      await ctx.editMessageText(followMessages.loadError, followsMenu(false, [], ctx.lang));
     }
   }
 };
@@ -465,7 +477,7 @@ export const handleSwitchMode = async (ctx) => {
     await followApi.switchMode(followId, newMode, ctx.session.token);
 
     const updated = await followApi.getFollowDetail(followId, ctx.session.token);
-    const message = formatFollowDetail(updated);
+    const message = formatFollowDetail(updated, ctx.lang);
     await ctx.editMessageText(message, followDetailMenu(followId, updated.mode));
     logger.info(`User ${ctx.from.id} switched follow ${followId} to ${newMode}`);
   } catch (error) {
@@ -474,13 +486,13 @@ export const handleSwitchMode = async (ctx) => {
     const errorMsg = error.response?.data?.error;
 
     if (error.response?.status === 402) {
-      await ctx.editMessageText(followMessages.limitReached, followsMenu(false));
+      await ctx.editMessageText(followMessages.limitReached, followsMenu(false, [], ctx.lang));
     } else if (error.response?.status === 404) {
-      await ctx.editMessageText(followMessages.notFound, followsMenu(false));
+      await ctx.editMessageText(followMessages.notFound, followsMenu(false, [], ctx.lang));
     } else if (errorMsg?.toLowerCase().includes('circular')) {
-      await ctx.editMessageText(followMessages.modeLimit, followsMenu(false));
+      await ctx.editMessageText(followMessages.modeLimit, followsMenu(false, [], ctx.lang));
     } else {
-      await ctx.editMessageText(followMessages.switchError, followsMenu(false));
+      await ctx.editMessageText(followMessages.switchError, followsMenu(false, [], ctx.lang));
     }
   }
 };
@@ -503,7 +515,7 @@ export const handleConfirmSwitchToMonitor = async (ctx) => {
     await followApi.switchMode(followId, 'monitor', ctx.session.token);
 
     const updated = await followApi.getFollowDetail(followId, ctx.session.token);
-    const message = formatFollowDetail(updated);
+    const message = formatFollowDetail(updated, ctx.lang);
     await ctx.editMessageText(message, followDetailMenu(followId, updated.mode));
     logger.info(`User ${ctx.from.id} confirmed switch follow ${followId} to monitor`);
   } catch (error) {
@@ -512,11 +524,11 @@ export const handleConfirmSwitchToMonitor = async (ctx) => {
     const errorMsg = error.response?.data?.error;
 
     if (error.response?.status === 404) {
-      await ctx.editMessageText(followMessages.notFound, followsMenu(false));
+      await ctx.editMessageText(followMessages.notFound, followsMenu(false, [], ctx.lang));
     } else if (errorMsg?.toLowerCase().includes('circular')) {
-      await ctx.editMessageText(followMessages.modeLimit, followsMenu(false));
+      await ctx.editMessageText(followMessages.modeLimit, followsMenu(false, [], ctx.lang));
     } else {
-      await ctx.editMessageText(followMessages.switchError, followsMenu(false));
+      await ctx.editMessageText(followMessages.switchError, followsMenu(false, [], ctx.lang));
     }
   }
 };

@@ -52,7 +52,7 @@ export const generatePaymentInvoice = asyncHandler(async (req, res) => {
     const expectedAmount =
       (isTestEnv && Number.isFinite(testAmount)
         ? testAmount
-        : SUBSCRIPTION_PRICES[ownershipCheck.subscription.tier]) ?? SUBSCRIPTION_PRICES.basic;
+        : SUBSCRIPTION_PRICES[ownershipCheck.subscription.tier]) ?? SUBSCRIPTION_PRICES.pro;
     const expiresAt = new Date(Date.now() + INVOICE_EXPIRATION_MINUTES * 60 * 1000);
 
     const insertResult = await query(
@@ -152,6 +152,13 @@ export const getPaymentStatus = asyncHandler(async (req, res) => {
  */
 export const confirmPaymentWithTxHash = asyncHandler(async (req, res) => {
   const subscriptionId = parseInt(req.params.id, 10);
+
+  // SECURITY FIX: Add ownership verification to prevent IDOR attacks
+  const ownershipCheck = await verifySubscriptionOwnership(subscriptionId, req.user.id);
+  if (!ownershipCheck.success) {
+    return res.status(ownershipCheck.status).json({ error: ownershipCheck.error });
+  }
+
   const { proof, txHash, paymentLink } = ensurePaymentProof(req.body);
 
   if (!proof) {

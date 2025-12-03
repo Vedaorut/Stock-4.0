@@ -6,8 +6,8 @@
 
 import express from 'express';
 import * as subscriptionController from '../controllers/subscriptionController.js';
-import { verifyToken } from '../middleware/auth.js';
-import { subscriptionCreationLimiter } from '../middleware/rateLimiter.js';
+import { verifyToken, requireShopOwner } from '../middleware/auth.js';
+import { subscriptionCreationLimiter, strictPaymentLimiter } from '../middleware/rateLimiter.js';
 
 const router = express.Router();
 
@@ -72,20 +72,23 @@ router.get('/my-shops', subscriptionController.getMyShopSubscriptions);
 /**
  * GET /api/subscriptions/upgrade-cost/:shopId
  * Calculate prorated upgrade cost for shop
+ * @security Requires shop ownership
  */
-router.get('/upgrade-cost/:shopId', subscriptionController.getUpgradeCost);
+router.get('/upgrade-cost/:shopId', requireShopOwner, subscriptionController.getUpgradeCost);
 
 /**
  * GET /api/subscriptions/status/:shopId
  * Get subscription status for shop
+ * @security Requires shop ownership
  */
-router.get('/status/:shopId', subscriptionController.getStatus);
+router.get('/status/:shopId', requireShopOwner, subscriptionController.getStatus);
 
 /**
  * GET /api/subscriptions/history/:shopId?limit=10
  * Get subscription payment history for shop
+ * @security Requires shop ownership
  */
-router.get('/history/:shopId', subscriptionController.getHistory);
+router.get('/history/:shopId', requireShopOwner, subscriptionController.getHistory);
 
 /**
  * GET /api/subscriptions/pricing
@@ -101,14 +104,17 @@ router.get('/pricing', subscriptionController.getPricing);
  *   chain: 'BTC' | 'LTC' | 'ETH' | 'USDT_TRC20'
  * }
  */
-router.post('/:id/payment/generate', subscriptionController.generatePaymentInvoice);
+// SECURITY FIX: Add rate limiter to prevent invoice generation abuse
+router.post('/:id/payment/generate', strictPaymentLimiter, subscriptionController.generatePaymentInvoice);
 
 /**
  * POST /api/subscriptions/:id/upgrade/payment/generate
  * Generate upgrade invoice for active subscription
  */
+// SECURITY FIX: Add rate limiter to prevent invoice generation abuse
 router.post(
   '/:id/upgrade/payment/generate',
+  strictPaymentLimiter,
   subscriptionController.generateUpgradePaymentInvoice
 );
 
@@ -128,12 +134,14 @@ router.get('/:id/upgrade/payment/status', subscriptionController.getUpgradePayme
  * POST /api/subscriptions/:id/payment/confirm
  * Manually confirm payment by tx hash (on-chain verification)
  */
-router.post('/:id/payment/confirm', subscriptionController.confirmPaymentWithTxHash);
+// SECURITY FIX: Add rate limiter to prevent payment confirmation abuse
+router.post('/:id/payment/confirm', strictPaymentLimiter, subscriptionController.confirmPaymentWithTxHash);
 
 /**
  * POST /api/subscriptions/:id/upgrade/payment/confirm
  * Manually confirm upgrade payment by tx hash
  */
-router.post('/:id/upgrade/payment/confirm', subscriptionController.confirmUpgradePaymentWithTxHash);
+// SECURITY FIX: Add rate limiter to prevent upgrade payment confirmation abuse
+router.post('/:id/upgrade/payment/confirm', strictPaymentLimiter, subscriptionController.confirmUpgradePaymentWithTxHash);
 
 export default router;
