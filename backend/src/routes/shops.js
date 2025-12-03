@@ -1,5 +1,6 @@
 import express from 'express';
 import { shopController } from '../controllers/shopController.js';
+import { shopSubscriberController } from '../controllers/shopSubscriberController.js';
 import { workerController } from '../controllers/workerController.js';
 import { productController } from '../controllers/productController.js';
 import { orderController } from '../controllers/orderController.js';
@@ -7,6 +8,7 @@ import { shopValidation } from '../middleware/validation.js';
 import { productValidation } from '../middleware/validation.js';
 import { verifyToken, optionalAuth, requireShopOwner, requireShopAccess } from '../middleware/auth.js';
 import { shopCreationLimiter } from '../middleware/rateLimiter.js';
+import { checkProductLimit } from '../middleware/productLimits.js';
 import * as migrationController from '../controllers/migrationController.js';
 import { productQueries } from '../database/queries/index.js';
 
@@ -94,6 +96,7 @@ router.post(
   verifyToken,
   requireShopAccess,
   setShopIdInBody,
+  checkProductLimit,
   productValidation.create,
   productController.create
 );
@@ -147,6 +150,49 @@ router.get(
  * @access  Public (auth optional to include subscription flag)
  */
 router.get('/search', optionalAuth, shopController.search);
+
+// ============================================
+// Shop Subscriber Routes (Invite Links)
+// ============================================
+
+/**
+ * @route   POST /api/shops/:shopId/subscribe
+ * @desc    Subscribe to a shop (via invite link)
+ * @access  Private (Any authenticated user)
+ */
+router.post('/:shopId/subscribe', verifyToken, shopSubscriberController.subscribe);
+
+/**
+ * @route   DELETE /api/shops/:shopId/subscribe
+ * @desc    Unsubscribe from a shop
+ * @access  Private (Any authenticated user)
+ */
+router.delete('/:shopId/subscribe', verifyToken, shopSubscriberController.unsubscribe);
+
+/**
+ * @route   GET /api/shops/:shopId/subscribed
+ * @desc    Check if current user is subscribed to a shop
+ * @access  Private (Any authenticated user)
+ */
+router.get('/:shopId/subscribed', verifyToken, shopSubscriberController.checkSubscription);
+
+/**
+ * @route   GET /api/shops/:shopId/subscribers/count
+ * @desc    Get subscriber count for a shop
+ * @access  Public
+ */
+router.get('/:shopId/subscribers/count', shopSubscriberController.getCount);
+
+/**
+ * @route   GET /api/shops/:shopId/subscribers
+ * @desc    Get list of subscribers (shop owner only)
+ * @access  Private (Shop owner only)
+ */
+router.get('/:shopId/subscribers', verifyToken, shopSubscriberController.getSubscribers);
+
+// ============================================
+// End Shop Subscriber Routes
+// ============================================
 
 /**
  * @route   GET /api/shops/:id/wallets

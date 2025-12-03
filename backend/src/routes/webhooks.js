@@ -117,17 +117,30 @@ router.post('/crystalpay', async (req, res) => {
       });
     }
 
-    // 6. Verify currency matches (if stored)
-    if (invoice.currency && payload.currency && 
-        payload.currency.toUpperCase() !== invoice.currency.toUpperCase()) {
-      logger.warn('[Webhook] CrystalPay: Currency mismatch', {
-        invoiceId: invoice.id,
-        crystalPayId: payload.id,
-        expected: invoice.currency,
-        received: payload.currency
-      });
-      // Note: We log but don't reject currency mismatch as CrystalPay 
-      // may convert currencies internally. The amount check is primary.
+    // 6. SECURITY: Verify currency matches - MUST reject mismatches
+    // This prevents attacks where someone pays 25 RUB instead of 25 USD
+    if (invoice.currency && payload.currency) {
+      const expectedCurrency = invoice.currency.toUpperCase();
+      const receivedCurrency = payload.currency.toUpperCase();
+
+      if (receivedCurrency !== expectedCurrency) {
+        logger.error('[Webhook] CrystalPay: CURRENCY MISMATCH - REJECTING', {
+          invoiceId: invoice.id,
+          crystalPayId: payload.id,
+          expectedCurrency,
+          receivedCurrency,
+          expectedAmount: expectedAmount,
+          paidAmount: paidAmount,
+          securityNote: 'Possible currency exploitation attempt'
+        });
+        await client.query('COMMIT');
+        return res.status(400).json({
+          error: 'Currency mismatch',
+          message: `Expected ${expectedCurrency}, received ${receivedCurrency}`,
+          expected: expectedCurrency,
+          received: receivedCurrency
+        });
+      }
     }
 
     // 7. Process payment based on invoice type

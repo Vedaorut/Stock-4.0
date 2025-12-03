@@ -6,7 +6,7 @@
  *
  * API Providers:
  * - BTC: Blockstream Esplora (free, no key required) - https://blockstream.info/api
- * - LTC: BlockCypher (100 req/hour free) - https://api.blockcypher.com
+ * - LTC: BlockCypher (100 req/hour free, 5000 req/hour with key) - optional BLOCKCYPHER_API_KEY
  * - ETH: Etherscan (5 req/sec, free) - requires ETHERSCAN_API_KEY
  * - USDT TRC20: TronGrid (15 QPS, free) - optional TRONGRID_API_KEY
  *
@@ -19,6 +19,7 @@
  * - Smart contract event parsing (USDT TRC20)
  *
  * Env vars:
+ * - BLOCKCYPHER_API_KEY: API key for BlockCypher (optional, increases rate limit 100->5000 req/hour)
  * - ETHERSCAN_API_KEY: API key for Etherscan (required for ETH)
  * - TRONGRID_API_KEY: API key for TronGrid (optional)
  */
@@ -306,6 +307,19 @@ export async function verifyBitcoinPayment(txHash, expectedAddress, expectedAmou
   const amountBTC = (output.value / Math.pow(10, config.decimals)).toFixed(config.decimals);
   const expectedBTC = parseFloat(expectedAmount);
 
+  // P0 SECURITY: Validate expectedAmount to prevent NaN bypass
+  if (isNaN(expectedBTC) || expectedBTC <= 0) {
+    logger.error('[BlockchainVerification] Invalid expected amount for BTC', { expectedAmount });
+    return {
+      verified: false,
+      status: 'failed',
+      resultStatus: VERIFICATION_STATUS.TX_INVALID,
+      confirmations: 0,
+      amount: amountBTC,
+      error: 'Invalid expected amount',
+    };
+  }
+
   // Check amount with tolerance
   const minAmount = expectedBTC * (1 - AMOUNT_TOLERANCE);
   if (parseFloat(amountBTC) < minAmount) {
@@ -342,7 +356,7 @@ export async function verifyBitcoinPayment(txHash, expectedAddress, expectedAmou
 
 /**
  * Verify Litecoin payment using BlockCypher API
- * Rate limit: 100 req/hour (free tier)
+ * Rate limit: 100 req/hour (free tier), 5000 req/hour with API key
  *
  * @param {string} txHash - Transaction hash
  * @param {string} expectedAddress - Expected recipient address
@@ -351,7 +365,10 @@ export async function verifyBitcoinPayment(txHash, expectedAddress, expectedAmou
  */
 export async function verifyLitecoinPayment(txHash, expectedAddress, expectedAmount) {
   const config = BLOCKCHAIN_CONFIG.LTC;
-  const url = `${config.baseUrl}/txs/${txHash}`;
+  const apiKey = process.env.BLOCKCYPHER_API_KEY;
+  const url = apiKey
+    ? `${config.baseUrl}/txs/${txHash}?token=${apiKey}`
+    : `${config.baseUrl}/txs/${txHash}`;
 
   // Fetch transaction data from BlockCypher (may throw BlockchainAPIError)
   const tx = await fetchWithRetry(url);
@@ -396,6 +413,19 @@ export async function verifyLitecoinPayment(txHash, expectedAddress, expectedAmo
   // BlockCypher returns value in litoshi (smallest unit)
   const amountLTC = (output.value / Math.pow(10, config.decimals)).toFixed(config.decimals);
   const expectedLTC = parseFloat(expectedAmount);
+
+  // P0 SECURITY: Validate expectedAmount to prevent NaN bypass
+  if (isNaN(expectedLTC) || expectedLTC <= 0) {
+    logger.error('[BlockchainVerification] Invalid expected amount for LTC', { expectedAmount });
+    return {
+      verified: false,
+      status: 'failed',
+      resultStatus: VERIFICATION_STATUS.TX_INVALID,
+      confirmations: tx.confirmations || 0,
+      amount: amountLTC,
+      error: 'Invalid expected amount',
+    };
+  }
 
   // Check amount with tolerance
   const minAmount = expectedLTC * (1 - AMOUNT_TOLERANCE);
@@ -480,6 +510,19 @@ export async function verifyEthereumPayment(txHash, expectedAddress, expectedAmo
   const valueWei = parseInt(tx.value, 16);
   const amountETH = (valueWei / Math.pow(10, config.decimals)).toFixed(6); // 6 decimals for display
   const expectedETH = parseFloat(expectedAmount);
+
+  // P0 SECURITY: Validate expectedAmount to prevent NaN bypass
+  if (isNaN(expectedETH) || expectedETH <= 0) {
+    logger.error('[BlockchainVerification] Invalid expected amount for ETH', { expectedAmount });
+    return {
+      verified: false,
+      status: 'failed',
+      resultStatus: VERIFICATION_STATUS.TX_INVALID,
+      confirmations: 0,
+      amount: amountETH,
+      error: 'Invalid expected amount',
+    };
+  }
 
   // Check amount with tolerance
   const minAmount = expectedETH * (1 - AMOUNT_TOLERANCE);
@@ -653,6 +696,19 @@ export async function verifyUSDTTRC20Payment(txHash, expectedAddress, expectedAm
   const amountRaw = parseInt(amountHex, 16);
   const amountUSDT = (amountRaw / Math.pow(10, config.decimals)).toFixed(config.decimals);
   const expectedUSDT = parseFloat(expectedAmount);
+
+  // P0 SECURITY: Validate expectedAmount to prevent NaN bypass
+  if (isNaN(expectedUSDT) || expectedUSDT <= 0) {
+    logger.error('[BlockchainVerification] Invalid expected amount for USDT', { expectedAmount });
+    return {
+      verified: false,
+      status: 'failed',
+      resultStatus: VERIFICATION_STATUS.TX_INVALID,
+      confirmations: txInfo.confirmations || 0,
+      amount: amountUSDT,
+      error: 'Invalid expected amount',
+    };
+  }
 
   // Check amount with tolerance
   const minAmount = expectedUSDT * (1 - AMOUNT_TOLERANCE);

@@ -158,13 +158,13 @@ export async function createCrystalPayInvoice({ subscriptionId, purpose, amountU
 
   try {
     // 2. Create CrystalPay invoice
-    // NOTE: CrystalPay lifetime is in MINUTES, not seconds!
+    // CrystalPay lifetime is in SECONDS (see crystalPayService.js docs)
     const crystalInvoice = await crystalPayService.createInvoice({
       amount: amountUsd,
       method,
       description: `Subscription #${subscriptionId} - ${purpose}`,
       extra: String(invoice.id), // Link back to our invoice
-      lifetime: 60 // 60 minutes = 1 hour
+      lifetime: 3600 // 1 hour in seconds
     });
 
     // 3. Update our invoice with CrystalPay ID

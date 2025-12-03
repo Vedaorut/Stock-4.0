@@ -76,7 +76,7 @@ export async function createInvoice({ amount, method, description, extra, lifeti
       amount: String(amount),
       type: 'purchase',
       lifetime,
-      currency: 'RUB',
+      currency: 'USD',  // FIX: Was 'RUB' - amount is passed in USD from subscriptionInvoiceService
       required_method: method,
       callback_url: config.callbackUrl,
       description,
@@ -159,8 +159,13 @@ export async function getInvoiceInfo(invoiceId) {
  */
 export function verifySignature(payload) {
   const config = getConfig();
-  
+
   if (!config.salt) {
+    // FIX: Fail-fast in production - never allow webhooks without signature verification
+    if (process.env.NODE_ENV === 'production') {
+      logger.error('[CrystalPay] CRITICAL: Salt not configured in production! Rejecting webhook.');
+      return false;
+    }
     logger.warn('[CrystalPay] Salt not configured, allowing in dev mode');
     return process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test';
   }

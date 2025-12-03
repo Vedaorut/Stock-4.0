@@ -146,6 +146,15 @@ export const submitPayment = asyncHandler(async (req, res) => {
     throw new ValidationError(`Cannot submit payment for ${order.status} order`);
   }
 
+  // P0 SECURITY: Prevent tx_hash submission if crypto_amount is NULL
+  // Without this check, parseFloat(NULL) = NaN bypasses amount verification
+  if (!order.crypto_amount) {
+    throw new ValidationError(
+      'Payment info not initialized. Call GET /api/orders/:id/payment-info first.',
+      { code: 'PAYMENT_NOT_INITIALIZED' }
+    );
+  }
+
   const { paymentQueries } = await import('../../../database/queries/index.js');
   const existingPayment = await paymentQueries.findByTxHash(tx_hash);
   if (existingPayment && existingPayment.order_id !== parseInt(id)) {
