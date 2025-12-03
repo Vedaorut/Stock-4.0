@@ -99,7 +99,6 @@ export function TelegramProvider({ children }) {
 
       setError(null);
     } catch (err) {
-      // eslint-disable-next-line no-console
       console.error('[Auth] ❌ Validation failed:', {
         status: err.response?.status,
         error: err.response?.data?.error || err.message,

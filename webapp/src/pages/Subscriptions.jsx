@@ -171,7 +171,7 @@ export default function Subscriptions() {
       } else {
         setSearchResults([]);
       }
-    } catch (err) {
+    } catch {
       setSearchResults([]);
     } finally {
       setIsSearching(false);

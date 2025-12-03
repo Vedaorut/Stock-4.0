@@ -41,7 +41,6 @@ const CRYPTO_DECIMALS = {
 
 // Price cache (in-memory) - { chain: { price: number, timestamp: number } }
 const priceCache = {};
-let lastFetchTime = 0;
 
 /**
  * Check if cached price is stale (>15 minutes old) and log warning
@@ -147,8 +146,6 @@ export async function getCryptoPrice(chain) {
       }
     }
 
-    lastFetchTime = now;
-
     // Log prices without timestamp for readability
     const pricesForLog = Object.fromEntries(
       Object.entries(priceCache).map(([k, v]) => [k, v.price])
@@ -156,21 +153,21 @@ export async function getCryptoPrice(chain) {
     logger.info('[CryptoPriceService] Prices fetched successfully:', pricesForLog);
 
     // Return requested chain's price
-    const cached = priceCache[chain];
-    if (!cached) {
+    const result = priceCache[chain];
+    if (!result) {
       throw new Error(`Price not available for ${chain}`);
     }
 
-    return cached.price;
+    return result.price;
   } catch (error) {
     // Special handling for rate limit - use stale cache as fallback
     if (error.isRateLimit && priceCache[chain]) {
-      const cached = priceCache[chain];
-      checkAndLogStalePrice(chain, cached);
+      const cachedPrice = priceCache[chain];
+      checkAndLogStalePrice(chain, cachedPrice);
       logger.warn(
-        `[CryptoPriceService] Rate limited, using cached price for ${chain}: $${cached.price}`
+        `[CryptoPriceService] Rate limited, using cached price for ${chain}: $${cachedPrice.price}`
       );
-      return cached.price;
+      return cachedPrice.price;
     }
 
     logger.error('[CryptoPriceService] Failed to fetch crypto price:', {

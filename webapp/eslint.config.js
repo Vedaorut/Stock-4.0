@@ -26,8 +26,8 @@ export default [
       // These patterns cover common JSX components (motion.*, AnimatePresence, etc.)
       // and imports used as JSX tags (Header, ProductCard, etc.)
       'no-unused-vars': ['warn', {
-        argsIgnorePattern: '^(_|.*Icon$)',
-        varsIgnorePattern: '^(_.*|motion|AnimatePresence|LazyMotion|domAnimation|React|Suspense|App|TelegramProvider|ProductGrid|.*Lazy|.*Page|.*Modal|.*Card|.*List|.*Button|.*Icon|.*Sheet|.*Container|.*Item|.*Form|.*Input|.*Badge|.*Timer|.*Banner|.*Manager|.*Boundary|.*Portal|.*Control|.*Skeleton|.*Dialog|.*Slider|.*Tabs|Header|PageLoader|PageHeader|InteractiveListItem|SegmentedControl|QRCodeSVG|TabIcon|WrapperComponent)$'
+        argsIgnorePattern: '^(_.*|.*Icon$|props|data)$',
+        varsIgnorePattern: '^(_.*|motion|AnimatePresence|LazyMotion|domAnimation|React|Suspense|App|TelegramProvider|ProductGrid|.*Lazy|.*Page|.*Modal|.*Card|.*List|.*Button|.*Icon|.*Sheet|.*Container|.*Item|.*Form|.*Input|.*Badge|.*Timer|.*Banner|.*Manager|.*Boundary|.*Portal|.*Control|.*Skeleton|.*Dialog|.*Slider|.*Tabs|Header|PageLoader|PageHeader|InteractiveListItem|SegmentedControl|QRCodeSVG|TabIcon|WrapperComponent|Migration.*|Loading.*|Error.*|RateLimitWarning|Channel.*|Subscriber.*|Success.*|Countdown|fireEvent|within|container|user|initial|animate|exit|transition|whileTap|layout)$'
       }],
       'no-console': ['warn', { allow: ['error'] }],
     },

@@ -61,7 +61,7 @@ export default function PaymentHashModal() {
       await submitPaymentHash(cleanHash);
       // If no error was thrown, clear the input
       setTxHash('');
-    } catch (err) {
+    } catch {
       // Error is already handled by submitPaymentHash and stored in verifyError
       // Just don't clear txHash so user can retry
     }

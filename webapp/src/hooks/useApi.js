@@ -93,7 +93,6 @@ export function useApi() {
               const retryResponse = await makeRequest(newToken);
               return { data: retryResponse.data, error: null };
             } catch (refreshError) {
-              // eslint-disable-next-line no-console
               console.error('[useApi] ❌ Token refresh failed:', {
                 error: refreshError.message,
                 endpoint,
