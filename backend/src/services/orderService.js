@@ -74,6 +74,9 @@ export const returnStockForCancelledOrder = async (orderId, client) => {
   logger.debug('Found order items', { orderId, itemCount: items.length });
 
   // Return stock for non-preorder items
+  // TODO: Add stock_deducted field to order_items table to track if stock was actually deducted.
+  // Currently we only return stock for confirmed orders (checked in updateOrderStatusWithStockLogic),
+  // but ideally we should check item.stock_deducted === true before returning.
   for (const item of items) {
     if (!item.is_preorder && item.product_id) {
       // Check product still exists before returning stock

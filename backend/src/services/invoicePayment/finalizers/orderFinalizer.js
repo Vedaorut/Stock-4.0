@@ -106,7 +106,7 @@ export async function finalizeOrderPayment(client, { order, invoice, verificatio
               s.id as shop_id, s.name as shop_name
          FROM products p
          LEFT JOIN shops s ON p.shop_id = s.id
-        WHERE p.id = $1`,
+        WHERE p.id = $1 FOR UPDATE`,
       [order.product_id]
     );
 

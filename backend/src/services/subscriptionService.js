@@ -90,15 +90,16 @@ async function checkExpiredSubscriptions() {
 
     // BATCH 1: Active subscriptions expired → Start grace period
     // Single UPDATE with RETURNING instead of N+1 loop
+    // FIX H1: Use make_interval instead of string interpolation to prevent SQL injection
     const gracePeriodResult = await client.query(
       `UPDATE shops
        SET subscription_status = 'grace_period',
-           grace_period_until = next_payment_due + INTERVAL '${GRACE_PERIOD_DAYS} days',
+           grace_period_until = next_payment_due + make_interval(days => $2),
            updated_at = NOW()
        WHERE next_payment_due < $1
        AND subscription_status = 'active'
        RETURNING id, name, grace_period_until`,
-      [now]
+      [now, GRACE_PERIOD_DAYS]
     );
 
     const gracePeriod = gracePeriodResult.rowCount || 0;
@@ -231,15 +232,16 @@ async function checkExpiredTrials() {
     // BATCH UPDATE: Expire all trials in single query instead of N+1 loop
     // Keep tier as PRO but mark trial expired - shop enters grace period
     // After grace period, shop will be deactivated until subscription is paid
+    // FIX H1: Use make_interval instead of string interpolation to prevent SQL injection
     const result = await client.query(
       `UPDATE shops
        SET is_trial = false,
            subscription_status = 'grace_period',
-           grace_period_until = $1 + INTERVAL '${GRACE_PERIOD_DAYS} days',
+           grace_period_until = $1 + make_interval(days => $2),
            updated_at = NOW()
        WHERE is_trial = true AND trial_ends_at < $1
        RETURNING id, name, grace_period_until`,
-      [now]
+      [now, GRACE_PERIOD_DAYS]
     );
 
     const transitioned = result.rowCount || 0;

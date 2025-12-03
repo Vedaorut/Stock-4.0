@@ -60,12 +60,22 @@ async function getShopProductCapacity(shopId) {
  * @returns {number} Price with markup (rounded to 2 decimals)
  */
 export function calculatePriceWithMarkup(sourcePrice, markupType, markupValue) {
+  // FIX H3: Validate inputs to prevent NaN
   const price = parseFloat(sourcePrice);
+  if (isNaN(price) || price < 0) {
+    throw new Error(`Invalid source price: ${sourcePrice}`);
+  }
+
+  const markup = parseFloat(markupValue) || 0;
+  if (isNaN(markup)) {
+    throw new Error(`Invalid markup value: ${markupValue}`);
+  }
+
   if (markupType === 'fixed') {
-    return Math.round((price + parseFloat(markupValue)) * 100) / 100;
+    return Math.round((price + markup) * 100) / 100;
   }
   // percentage (default)
-  return Math.round(price * (1 + markupValue / 100) * 100) / 100;
+  return Math.round(price * (1 + markup / 100) * 100) / 100;
 }
 
 /**
@@ -450,8 +460,8 @@ export async function updateMarkupForFollow(followId, markupType, markupValue) {
       newPrice: calculatePriceWithMarkup(sync.source_product_price, markupType, markupValue),
     }));
 
-    // Lock all product rows in one query (prevents deadlocks)
-    await client.query('SELECT id FROM products WHERE id = ANY($1) FOR UPDATE', [
+    // FIX H5: Lock all product rows in one query with ORDER BY to prevent deadlocks
+    await client.query('SELECT id FROM products WHERE id = ANY($1) ORDER BY id FOR UPDATE', [
       updates.map((u) => u.productId),
     ]);
 

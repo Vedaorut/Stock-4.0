@@ -17,8 +17,8 @@ function createFakeCallbackContext(ctx) {
     editMessageText: async (text, extra) => {
       return await ctx.reply(text, extra);
     },
-    // Copy essential Telegraf.js methods
-    reply: ctx.reply.bind(ctx),
+    // H14 FIX: Copy essential Telegraf.js methods with optional chaining
+    reply: ctx.reply?.bind(ctx),
     replyWithHTML: ctx.replyWithHTML?.bind(ctx),
     replyWithMarkdown: ctx.replyWithMarkdown?.bind(ctx),
     deleteMessage: ctx.deleteMessage?.bind(ctx),
@@ -224,9 +224,10 @@ export const handleStart = async (ctx) => {
     }
 
     // Send welcome message using smartMessage (edit if exists, else send new)
+    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
     await smartMessage.send(ctx, {
       text: ctx.t('start.welcome'),
-      keyboard: mainMenu(showWorkspace, ctx.lang),
+      keyboard: mainMenu(showWorkspace, lang),
     });
   } catch (error) {
     logger.error('Error in /start handler:', error);

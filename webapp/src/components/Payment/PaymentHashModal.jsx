@@ -56,11 +56,14 @@ export default function PaymentHashModal() {
     }
 
     triggerHaptic('success');
-    await submitPaymentHash(cleanHash);
-    // Check store state directly after async operation (verifyError from hook is stale)
-    const hasError = useStore.getState().verifyError;
-    if (!hasError) {
+    // H12 FIX: Use try/catch instead of getState() after await to avoid race condition
+    try {
+      await submitPaymentHash(cleanHash);
+      // If no error was thrown, clear the input
       setTxHash('');
+    } catch (err) {
+      // Error is already handled by submitPaymentHash and stored in verifyError
+      // Just don't clear txHash so user can retry
     }
   };
 

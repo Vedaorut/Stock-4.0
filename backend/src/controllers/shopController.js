@@ -151,7 +151,7 @@ export const shopController = {
         try {
           await client.query('BEGIN');
 
-          // Check for previous trials (even on deleted shops)
+          // FIX H4: Check for previous trials INCLUDING deleted shops to prevent trial abuse
           const previousTrial = await client.query(
             `SELECT id FROM shops WHERE owner_id = $1 AND (is_trial = true OR trial_ends_at IS NOT NULL)`,
             [req.user.id]

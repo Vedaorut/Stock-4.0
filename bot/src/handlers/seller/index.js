@@ -25,6 +25,11 @@ import { validateShopBeforeScene } from '../../utils/sceneValidation.js';
 const { seller: sellerMessages, general: generalMessages } = messages;
 
 /**
+ * Get language with fallback (C5 fix: ctx.lang undefined)
+ */
+const getLangSafe = (ctx) => ctx.lang || ctx.session?.user?.language || 'ru';
+
+/**
  * Get seller menu with active orders count
  * @returns {Object} { menu, tokenExpired } - menu keyboard and token expiration flag
  */
@@ -89,7 +94,7 @@ const getSellerMenu = async (ctx) => {
   ctx.session.hasFollows = hasFollows;
   
   // STABILITY FIX #1: Return both menu and tokenExpired flag
-  return { menu: sellerMenu(activeCount, { hasFollows }, ctx.lang), tokenExpired };
+  return { menu: sellerMenu(activeCount, { hasFollows }, getLangSafe(ctx)), tokenExpired };
 };
 
 /**
@@ -237,7 +242,7 @@ export const handleSellerRole = async (ctx, options = {}) => {
       ctx.session.shopId = null;
       ctx.session.shopName = null;
       ctx.session.shopTier = null;
-      await ctx.reply(t('seller.noShop', {}, ctx.lang), sellerMenuNoShop(ctx.lang));
+      await ctx.reply(t('seller.noShop', {}, getLangSafe(ctx)), sellerMenuNoShop(getLangSafe(ctx)));
       return;
     }
 
@@ -304,8 +309,8 @@ export const handleSellerRole = async (ctx, options = {}) => {
         const hasFollows = Array.isArray(followsResult) && followsResult.length > 0;
         ctx.session.hasFollows = hasFollows;
 
-        // Получить совет или предупреждение
-        const statusBar = getTipForShop(ctx, shopHealth);
+        // H9 FIX: Получить совет или предупреждение (с проверкой на null)
+        const statusBar = shopHealth ? getTipForShop(ctx, shopHealth) : '';
 
         // Форматировать заголовок с аналитикой и статус-баром
         const header = sellerMessages.shopPanelWithStats(
@@ -313,10 +318,10 @@ export const handleSellerRole = async (ctx, options = {}) => {
           weekRevenue,
           activeCount,
           statusBar,
-          ctx.lang
+          getLangSafe(ctx)
         );
 
-        await ctx.reply(header, sellerMenu(activeCount, { hasFollows }, ctx.lang));
+        await ctx.reply(header, sellerMenu(activeCount, { hasFollows }, getLangSafe(ctx)));
         return;
       }
 
@@ -324,7 +329,7 @@ export const handleSellerRole = async (ctx, options = {}) => {
       ctx.session.shopId = null;
       ctx.session.shopName = null;
       ctx.session.shopTier = null;
-      await ctx.reply(t('seller.noShop', {}, ctx.lang), sellerMenuNoShop(ctx.lang));
+      await ctx.reply(t('seller.noShop', {}, getLangSafe(ctx)), sellerMenuNoShop(getLangSafe(ctx)));
     } catch (error) {
       logger.error('Error checking shop:', error);
 
@@ -337,16 +342,16 @@ export const handleSellerRole = async (ctx, options = {}) => {
 
       const message =
         error.response?.status === 404 || error.response?.status === 401
-          ? t('seller.noShop', {}, ctx.lang)
-          : t('general.actionFailed', {}, ctx.lang);
+          ? t('seller.noShop', {}, getLangSafe(ctx))
+          : t('general.actionFailed', {}, getLangSafe(ctx));
 
-      await ctx.reply(message, sellerMenuNoShop(ctx.lang));
+      await ctx.reply(message, sellerMenuNoShop(getLangSafe(ctx)));
     }
   } catch (error) {
     logger.error('Error in seller role handler:', error);
     // Local error handling - don't throw to avoid infinite spinner
     try {
-      await ctx.reply(t('general.actionFailed', {}, ctx.lang), sellerMenuNoShop(ctx.lang));
+      await ctx.reply(t('general.actionFailed', {}, getLangSafe(ctx)), sellerMenuNoShop(getLangSafe(ctx)));
     } catch (replyError) {
       logger.error('Failed to send error message:', replyError);
     }
@@ -366,7 +371,7 @@ const handleCreateShop = async (ctx) => {
     logger.error('Error entering chooseTier scene:', error);
     // Local error handling - don't throw to avoid infinite spinner
     try {
-      await ctx.reply(t('general.actionFailed', {}, ctx.lang), sellerMenuNoShop(ctx.lang));
+      await ctx.reply(t('general.actionFailed', {}, getLangSafe(ctx)), sellerMenuNoShop(getLangSafe(ctx)));
     } catch (replyError) {
       logger.error('Failed to send error message:', replyError);
     }
@@ -433,13 +438,13 @@ const handleInviteLink = async (ctx) => {
     await ctx.answerCbQuery();
 
     if (!ctx.session.shopId) {
-      await ctx.reply(generalMessages.shopRequired, sellerMenuNoShop(ctx.lang));
+      await ctx.reply(generalMessages.shopRequired, sellerMenuNoShop(getLangSafe(ctx)));
       return;
     }
 
     const shopId = ctx.session.shopId;
     const botUsername = process.env.BOT_USERNAME || 'SellStatusBot';
-    const lang = ctx.lang || 'ru';
+    const lang = getLangSafe(ctx);
 
     // Build invite link message with copyable link
     const title = t('inviteLink.title', {}, lang);
@@ -545,7 +550,7 @@ export const setupSellerHandlers = (bot) => {
       }
 
       if (!isOwner) {
-        await ctx.reply(sellerMessages.migration.accessDenied, sellerToolsMenu(false, ctx.lang));
+        await ctx.reply(sellerMessages.migration.accessDenied, sellerToolsMenu(false, getLangSafe(ctx)));
         return;
       }
 
@@ -554,7 +559,7 @@ export const setupSellerHandlers = (bot) => {
       logger.error('Error entering migrate_channel scene:', error);
       await ctx.reply(
         generalMessages.actionFailed,
-        sellerToolsMenu(ctx.session.isShopOwner ?? false, ctx.lang)
+        sellerToolsMenu(ctx.session.isShopOwner ?? false, getLangSafe(ctx))
       );
     }
   });
@@ -605,7 +610,7 @@ export const setupSellerHandlers = (bot) => {
       if (!ctx.session.token) {
         await ctx.reply(
           generalMessages.authorizationRequired,
-          sellerMenu(0, { hasFollows: ctx.session?.hasFollows }, ctx.lang)
+          sellerMenu(0, { hasFollows: ctx.session?.hasFollows }, getLangSafe(ctx))
         );
         return;
       }
@@ -625,7 +630,7 @@ export const setupSellerHandlers = (bot) => {
       logger.error('Error fetching subscription status:', error);
       await ctx.reply(
         sellerMessages.subscriptionStatusError,
-        sellerMenu(0, { hasFollows: ctx.session?.hasFollows }, ctx.lang)
+        sellerMenu(0, { hasFollows: ctx.session?.hasFollows }, getLangSafe(ctx))
       );
     }
   });

@@ -215,15 +215,23 @@ export async function processOrderPayment({
 
     for (const item of itemsResult.rows) {
       if (!item.is_preorder) {
-        // Check stock BEFORE deduction - prevent overselling
-        if (item.stock_quantity < item.quantity) {
+        // Atomic stock deduction with WHERE clause to prevent TOCTOU race condition
+        const deductResult = await client.query(
+          `UPDATE products
+           SET stock_quantity = stock_quantity - $1, updated_at = NOW()
+           WHERE id = $2 AND stock_quantity >= $1
+           RETURNING stock_quantity`,
+          [item.quantity, item.product_id]
+        );
+
+        if (deductResult.rowCount === 0) {
           logger.error(
-            `[InvoicePayment] Insufficient stock for product ${item.product_id}: available=${item.stock_quantity}, requested=${item.quantity}`
+            `[InvoicePayment] Insufficient stock for product ${item.product_id}: requested=${item.quantity}`
           );
           await client.query('ROLLBACK');
 
           // Alert admin about stock issue
-          alertStockDeductionFailed(orderId, item.product_id, `Insufficient stock: ${item.stock_quantity} < ${item.quantity}`);
+          alertStockDeductionFailed(orderId, item.product_id, `Insufficient stock for quantity: ${item.quantity}`);
 
           return {
             ok: false,
@@ -231,18 +239,9 @@ export async function processOrderPayment({
             code: 'INSUFFICIENT_STOCK',
             message: 'Insufficient stock for product',
             productId: item.product_id,
-            available: item.stock_quantity,
             requested: item.quantity,
           };
         }
-
-        // Safe to deduct - we verified stock exists
-        await client.query(
-          `UPDATE products
-           SET stock_quantity = stock_quantity - $1, updated_at = NOW()
-           WHERE id = $2`,
-          [item.quantity, item.product_id]
-        );
       }
     }
 

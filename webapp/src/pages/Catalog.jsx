@@ -438,14 +438,19 @@ export default function Catalog() {
     [activeSection, triggerHaptic]
   );
 
+  // H13 FIX: Use ref to store AbortController to prevent memory leak
+  const retryControllerRef = useRef(null);
+
   const handleRetry = () => {
     setError(null);
-    // Force re-run of effect by toggling loading state explicitly or rely on dep change
-    // A simple way to retry is to keep currentShop as is, the effect will fire again if we mounted/unmounted or if we trigger a refresh
-    // Here we just clear error and let the user try navigation again or re-mount
+    // Abort previous retry if still pending
+    if (retryControllerRef.current) {
+      retryControllerRef.current.abort();
+    }
+    retryControllerRef.current = new AbortController();
     setLoading(true);
     // Re-triggering load manually
-    loadMyShop(new AbortController().signal).then(() => setLoading(false));
+    loadMyShop(retryControllerRef.current.signal).then(() => setLoading(false));
   };
 
   // --- Renders ---

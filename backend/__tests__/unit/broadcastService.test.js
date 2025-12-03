@@ -52,7 +52,7 @@ jest.unstable_mockModule('../../src/i18n/index.js', () => ({
 }));
 
 // Import mocked modules after mocking
-const pool = (await import('../../src/config/database.js')).default;
+const _pool = (await import('../../src/config/database.js')).default;
 const logger = (await import('../../src/utils/logger.js')).default;
 
 const { updateMigrationStatus } = await import('../../src/services/broadcastService.js');

@@ -89,9 +89,9 @@ jest.unstable_mockModule('../../src/models/syncedProductQueries.js', () => ({
 // ============================================================================
 
 const logger = (await import('../../src/utils/logger.js')).default;
-const { productQueries } = await import('../../src/database/queries/index.js');
-const { shopFollowQueries } = await import('../../src/models/shopFollowQueries.js');
-const { syncedProductQueries } = await import('../../src/models/syncedProductQueries.js');
+const { productQueries: _productQueries } = await import('../../src/database/queries/index.js');
+const { shopFollowQueries: _shopFollowQueries } = await import('../../src/models/shopFollowQueries.js');
+const { syncedProductQueries: _syncedProductQueries } = await import('../../src/models/syncedProductQueries.js');
 
 const {
   calculatePriceWithMarkup,
@@ -1206,7 +1206,7 @@ describe('Product Sync Service', () => {
 
       mockSyncedProductQueries.findStaleProducts.mockResolvedValue(staleProducts);
 
-      mockClient.query.mockImplementation((sql, params) => {
+      mockClient.query.mockImplementation((sql, _params) => {
         if (sql === 'BEGIN' || sql === 'COMMIT') {
           return Promise.resolve();
         }
@@ -1339,9 +1339,7 @@ describe('Product Sync Service', () => {
       mockSyncedProductQueries.findStaleProducts.mockResolvedValue(staleProducts);
 
       // Throw error AFTER BEGIN but in a way that causes chunk-level rollback
-      let callCount = 0;
       mockClient.query.mockImplementation((sql) => {
-        callCount++;
         if (sql === 'BEGIN') {return Promise.resolve();}
         if (sql === 'ROLLBACK') {return Promise.resolve();}
         if (sql === 'COMMIT') {return Promise.resolve();}

@@ -257,7 +257,6 @@ export const checkFollowLimit = asyncHandler(async (req, res) => {
     }
 
     const tier = (shop.tier || 'pro').toLowerCase();
-    const isMax = tier === 'max';
     const limit = getFollowLimit(tier);
     const isUnlimited = limit === Infinity;
 

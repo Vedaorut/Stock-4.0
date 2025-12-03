@@ -119,7 +119,7 @@ const chooseTierScene = new Scenes.WizardScene(
             tier,
           });
 
-          await ctx.answerCbQuery();
+          // H6 FIX: Removed duplicate answerCbQuery - already called at line 69
 
           try {
             // Show loading

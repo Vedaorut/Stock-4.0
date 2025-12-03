@@ -120,13 +120,17 @@ const createShop = async (ctx, shopName) => {
     const subscriptionId = ctx.wizard.state.subscriptionId || null;
     const trial = ctx.wizard.state.trial || false;
 
-    // Validate tier is present (must be set by chooseTier/paySubscription scene)
+    // H10 FIX: Validate tier is present (must be set by chooseTier/paySubscription scene)
     if (!tier) {
       logger.error('Missing tier when creating shop', {
         userId: ctx.from.id,
         wizardState: ctx.wizard.state,
       });
-      throw new Error('Tier is required to create a shop. Please select a plan first.');
+      // Show user-friendly message and redirect to chooseTier
+      await cleanReply(ctx, 'Сначала выберите тариф подписки.');
+      await ctx.scene.leave();
+      await ctx.scene.enter('chooseTier');
+      return;
     }
 
     logger.info('shop_create_step:save', {

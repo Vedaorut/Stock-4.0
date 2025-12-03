@@ -95,7 +95,18 @@ export const validateShopBeforeScene = async (ctx, sceneName) => {
       return false;
     }
 
-    // Re-throw other errors (network, 500, etc.)
+    // Handle network errors gracefully
+    if (error.code === 'ECONNREFUSED' || error.code === 'ETIMEDOUT' || error.code === 'ENOTFOUND') {
+      logger.error(`[validateShop] Network error for scene ${sceneName}:`, error.message);
+      try {
+        await ctx.answerCbQuery('Сервер временно недоступен', { show_alert: true });
+      } catch (e) {
+        // Ignore answerCbQuery errors
+      }
+      return false;
+    }
+
+    // Re-throw other errors (500, etc.)
     logger.error(`[validateShop] Error validating shop for scene ${sceneName}:`, error);
     throw error;
   }

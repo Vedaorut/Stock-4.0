@@ -8,6 +8,11 @@ import { messages, formatters } from '../../texts/messages.js';
 const { buyer: buyerMessages, general: generalMessages } = messages;
 
 /**
+ * Get language with fallback (C5 fix: ctx.lang undefined)
+ */
+const getLangSafe = (ctx) => ctx.lang || ctx.session?.user?.language || 'ru';
+
+/**
  * Setup buyer-related handlers
  */
 export const setupBuyerHandlers = (bot) => {
@@ -134,7 +139,7 @@ export const handleBuyerRole = async (ctx, options = {}) => {
         // No shop - show CTA to create shop
         await smartMessage.send(ctx, {
           text: buyerMessages.panel,
-          keyboard: buyerMenuNoShop(ctx.lang),
+          keyboard: buyerMenuNoShop(getLangSafe(ctx)),
         });
         logger.info(`Buyer ${ctx.from.id} has no shop, showing CTA`);
         return;
@@ -143,7 +148,7 @@ export const handleBuyerRole = async (ctx, options = {}) => {
 
     await smartMessage.send(ctx, {
       text: buyerMessages.panel,
-      keyboard: buyerMenu(ctx.lang),
+      keyboard: buyerMenu(getLangSafe(ctx)),
     });
   } catch (error) {
     logger.error('Error in buyer role handler:', error);
@@ -151,7 +156,7 @@ export const handleBuyerRole = async (ctx, options = {}) => {
     try {
       await smartMessage.send(ctx, {
         text: generalMessages.actionFailed,
-        keyboard: buyerMenu(ctx.lang),
+        keyboard: buyerMenu(getLangSafe(ctx)),
       });
     } catch (replyError) {
       logger.error('Failed to send error message:', replyError);
@@ -174,7 +179,7 @@ const handleSearchShops = async (ctx) => {
     try {
       await smartMessage.send(ctx, {
         text: generalMessages.actionFailed,
-        keyboard: buyerMenu(ctx.lang),
+        keyboard: buyerMenu(getLangSafe(ctx)),
       });
     } catch (replyError) {
       logger.error('Failed to send error message:', replyError);
@@ -193,7 +198,7 @@ const handleSubscriptions = async (ctx) => {
     if (!ctx.session.token) {
       await smartMessage.send(ctx, {
         text: generalMessages.authorizationRequired,
-        keyboard: buyerMenu(ctx.lang),
+        keyboard: buyerMenu(getLangSafe(ctx)),
       });
       return;
     }
@@ -204,13 +209,13 @@ const handleSubscriptions = async (ctx) => {
 
     await smartMessage.send(ctx, {
       text: message,
-      keyboard: buyerMenu(ctx.lang),
+      keyboard: buyerMenu(getLangSafe(ctx)),
     });
   } catch (error) {
     logger.error('Error fetching subscriptions:', error);
     await smartMessage.send(ctx, {
       text: generalMessages.actionFailed,
-      keyboard: buyerMenu(ctx.lang),
+      keyboard: buyerMenu(getLangSafe(ctx)),
     });
   }
 };
@@ -337,7 +342,7 @@ const handleOrders = async (ctx) => {
     if (!ctx.session.token) {
       await smartMessage.send(ctx, {
         text: generalMessages.authorizationRequired,
-        keyboard: buyerMenu(ctx.lang),
+        keyboard: buyerMenu(getLangSafe(ctx)),
       });
       return;
     }
@@ -351,14 +356,14 @@ const handleOrders = async (ctx) => {
 
     await smartMessage.send(ctx, {
       text: message,
-      keyboard: buyerMenu(ctx.lang),
+      keyboard: buyerMenu(getLangSafe(ctx)),
     });
     logger.info(`User ${ctx.from.id} viewed orders (${orders.length} total)`);
   } catch (error) {
     logger.error('Error fetching orders:', error);
     await smartMessage.send(ctx, {
       text: generalMessages.actionFailed,
-      keyboard: buyerMenu(ctx.lang),
+      keyboard: buyerMenu(getLangSafe(ctx)),
     });
   }
 };
@@ -400,7 +405,7 @@ const handleShopView = async (ctx) => {
     if (!shop) {
       await smartMessage.send(ctx, {
         text: buyerMessages.shopNotFound || 'Магазин не найден или был удалён',
-        keyboard: buyerMenu(ctx.lang),
+        keyboard: buyerMenu(getLangSafe(ctx)),
       });
       return;
     }
@@ -427,7 +432,7 @@ const handleShopView = async (ctx) => {
 
     await smartMessage.send(ctx, {
       text: generalMessages.actionFailed,
-      keyboard: buyerMenu(ctx.lang),
+      keyboard: buyerMenu(getLangSafe(ctx)),
     });
   }
 };
@@ -476,7 +481,7 @@ const handleShopSection = async (ctx, section) => {
 
     await smartMessage.send(ctx, {
       text: generalMessages.actionFailed,
-      keyboard: buyerMenu(ctx.lang),
+      keyboard: buyerMenu(getLangSafe(ctx)),
     });
   }
 };

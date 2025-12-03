@@ -4,6 +4,7 @@ import PaymentMethodModal from './PaymentMethodModal';
 import PaymentDetailsModal from './PaymentDetailsModal';
 import PaymentHashModal from './PaymentHashModal';
 import OrderStatusModal from './OrderStatusModal';
+import { useStore } from '../../store/useStore';
 
 /**
  * Error Boundary для payment flow
@@ -27,7 +28,6 @@ class PaymentErrorBoundary extends React.Component {
 
   handleReset = () => {
     this.setState({ hasError: false, error: null });
-    const { useStore } = require('../../store/useStore');
     useStore.getState().setPaymentStep('idle');
   };
 
