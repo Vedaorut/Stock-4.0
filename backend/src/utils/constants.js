@@ -80,23 +80,25 @@ export const PAGINATION = {
   MAX_LIMIT: 50, // P1-PERF-005: Reduced from 100 to 50 to prevent large result sets
 };
 
-// Rate limiting
+// Rate limiting - Production-safe values (P0-SEC)
+// Use environment variable to increase for local development
+const isDev = process.env.NODE_ENV !== 'production';
 export const RATE_LIMITS = {
   AUTH: {
     WINDOW_MS: 15 * 60 * 1000, // 15 minutes
-    MAX_REQUESTS: 1000, // Increased for development testing
+    MAX_REQUESTS: isDev ? 1000 : 15, // Production: 15 login attempts per 15 min (brute force protection)
   },
   API: {
     WINDOW_MS: 15 * 60 * 1000, // 15 minutes
-    MAX_REQUESTS: 1000, // Increased for development testing
+    MAX_REQUESTS: isDev ? 1000 : 300, // Production: 300 requests per 15 min
   },
   PAYMENT: {
     WINDOW_MS: 60 * 1000, // 1 minute
-    MAX_REQUESTS: 50, // Increased for development testing
+    MAX_REQUESTS: isDev ? 50 : 10, // Production: 10 payment attempts per minute
   },
   WEBHOOK: {
     WINDOW_MS: 60 * 1000, // 1 minute
-    MAX_REQUESTS: 100,
+    MAX_REQUESTS: 100, // Webhooks need high limit (external services)
   },
   SHOP_CREATION: {
     WINDOW_MS: 60 * 60 * 1000, // 1 hour

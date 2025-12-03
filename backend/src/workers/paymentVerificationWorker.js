@@ -9,6 +9,7 @@ import { getClient, query } from '../config/database.js';
 import * as blockchainVerificationService from '../services/blockchainVerificationService.js';
 import telegramService from '../services/telegram.js';
 import logger from '../utils/logger.js';
+import { alertPaymentVerificationFailed, alertStockDeductionFailed } from '../utils/alerts.js';
 
 const POLL_INTERVAL = 30 * 1000; // 30 seconds (in milliseconds)
 // 72 hours to accommodate slow BTC/LTC confirmations during network congestion
@@ -230,6 +231,9 @@ async function verifyAndProcessPaymentSafe(payment) {
       [paymentId, result.error]
     );
     logger.warn(`[PaymentWorker] Payment ${paymentId} failed permanently: ${result.error}`);
+
+    // Alert admin about permanent payment failure
+    alertPaymentVerificationFailed(orderId, paymentId, result.error);
     return;
   }
 
@@ -337,6 +341,9 @@ async function confirmOrderPayment(orderId, paymentId, verificationResult) {
             `UPDATE payments SET status = 'pending', verification_error = $2, updated_at = NOW() WHERE id = $1`,
             [paymentId, `Insufficient stock for product ${item.product_id}`]
           );
+
+          // Alert admin about stock issue
+          alertStockDeductionFailed(orderId, item.product_id, `Insufficient stock: ${item.stock_quantity} < ${item.quantity}`);
           return; // Don't confirm the order
         }
       }

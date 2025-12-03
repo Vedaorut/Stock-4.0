@@ -37,6 +37,7 @@ import { INVOICE_PURPOSES, INVOICE_STATES } from '../../../constants/invoice.js'
 import { ValidationError } from '../../../utils/errors.js';
 import logger from '../../../utils/logger.js';
 import { broadcast } from '../../../utils/websocket.js';
+import { alertSubscriptionActivationFailed } from '../../../utils/alerts.js';
 
 /**
  * Process crypto payment for a shop subscription using invoice as single source of truth.
@@ -304,6 +305,9 @@ export async function processSubscriptionPayment({
       error: error.message,
       stack: error.stack,
     });
+
+    // Alert admin about subscription activation failure
+    alertSubscriptionActivationFailed(subscriptionId, invoiceId || 'unknown', error.message);
 
     throw error;
   } finally {

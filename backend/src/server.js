@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/node';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -9,6 +10,36 @@ import { WebSocketServer } from 'ws';
 import jwt from 'jsonwebtoken';
 import { initWebSocket } from './utils/websocket.js';
 import { config } from './config/env.js';
+
+// Initialize Sentry BEFORE any other code (captures all errors)
+if (process.env.SENTRY_DSN) {
+  Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+    environment: config.nodeEnv,
+    release: process.env.npm_package_version || '1.0.0',
+    tracesSampleRate: config.nodeEnv === 'production' ? 0.1 : 1.0, // 10% in prod, 100% in dev
+    integrations: [
+      Sentry.httpIntegration({ tracing: true }),
+      Sentry.expressIntegration(),
+    ],
+    // Don't send PII
+    beforeSend(event) {
+      // Remove sensitive data from breadcrumbs
+      if (event.breadcrumbs) {
+        event.breadcrumbs = event.breadcrumbs.map(bc => {
+          if (bc.data?.body) {
+            // Mask password, token fields
+            const body = typeof bc.data.body === 'string' ? bc.data.body : JSON.stringify(bc.data.body);
+            bc.data.body = body.replace(/"(password|token|secret|apiKey)":\s*"[^"]*"/gi, '"$1":"[REDACTED]"');
+          }
+          return bc;
+        });
+      }
+      return event;
+    },
+  });
+  console.log('✓ Sentry initialized for error tracking');
+}
 import { testConnection, closePool, warmupPool } from './config/database.js';
 import { userQueries } from './database/queries/index.js';
 
@@ -417,6 +448,14 @@ app.get('*', (req, res, next) => {
  * 404 handler
  */
 app.use(notFoundHandler);
+
+/**
+ * Sentry error handler (must be BEFORE custom error handler)
+ * Captures all errors and sends to Sentry dashboard
+ */
+if (process.env.SENTRY_DSN) {
+  Sentry.setupExpressErrorHandler(app);
+}
 
 /**
  * Global error handler

@@ -1,0 +1,203 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  # ============================================
+  # Backend Tests
+  # ============================================
+  backend:
+    name: Backend (Lint + Tests)
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: telegram_shop_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Run ESLint
+        working-directory: backend
+        run: npm run lint
+
+      - name: Run tests
+        working-directory: backend
+        env:
+          NODE_ENV: test
+          DATABASE_URL: postgres://test:test@localhost:5432/telegram_shop_test
+          REDIS_URL: redis://localhost:6379
+          JWT_SECRET: test-jwt-secret-for-ci
+          TELEGRAM_BOT_TOKEN: test-bot-token
+        run: npm test -- --coverage --forceExit
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        if: always()
+        with:
+          file: backend/coverage/lcov.info
+          flags: backend
+          fail_ci_if_error: false
+
+  # ============================================
+  # Bot Tests
+  # ============================================
+  bot:
+    name: Bot (Lint + Tests)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: bot/package-lock.json
+
+      - name: Install dependencies
+        working-directory: bot
+        run: npm ci
+
+      - name: Run ESLint
+        working-directory: bot
+        run: npm run lint
+
+      - name: Run tests
+        working-directory: bot
+        env:
+          NODE_ENV: test
+        run: npm test -- --forceExit
+
+  # ============================================
+  # WebApp Tests + Build
+  # ============================================
+  webapp:
+    name: WebApp (Lint + Build)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: webapp/package-lock.json
+
+      - name: Install dependencies
+        working-directory: webapp
+        run: npm ci
+
+      - name: Run ESLint
+        working-directory: webapp
+        run: npm run lint
+
+      - name: Run tests
+        working-directory: webapp
+        run: npm test -- --run
+
+      - name: Build
+        working-directory: webapp
+        run: npm run build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: webapp-dist
+          path: webapp/dist
+          retention-days: 7
+
+  # ============================================
+  # Security Audit
+  # ============================================
+  security:
+    name: Security Audit
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Audit backend
+        working-directory: backend
+        run: npm audit --audit-level=high
+        continue-on-error: true
+
+      - name: Audit bot
+        working-directory: bot
+        run: npm audit --audit-level=high
+        continue-on-error: true
+
+      - name: Audit webapp
+        working-directory: webapp
+        run: npm audit --audit-level=high
+        continue-on-error: true
+
+  # ============================================
+  # All Checks Pass
+  # ============================================
+  ci-success:
+    name: CI Success
+    needs: [backend, bot, webapp, security]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Check all jobs
+        run: |
+          if [[ "${{ needs.backend.result }}" != "success" ]] || \
+             [[ "${{ needs.bot.result }}" != "success" ]] || \
+             [[ "${{ needs.webapp.result }}" != "success" ]]; then
+            echo "One or more required jobs failed"
+            exit 1
+          fi
+          echo "All CI checks passed!"

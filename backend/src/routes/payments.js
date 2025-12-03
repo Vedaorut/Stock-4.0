@@ -10,6 +10,7 @@ import { getPrice } from '../config/subscriptionPricing.js';
 import logger from '../utils/logger.js';
 import { getInvoiceInfo } from '../services/crystalPayService.js';
 import { processSubscriptionPayment } from '../services/invoicePayment/index.js';
+import { alertWebhookMissed, alertSubscriptionActivationFailed } from '../utils/alerts.js';
 
 const router = express.Router();
 
@@ -181,6 +182,9 @@ router.get('/invoices/:id/status', verifyToken, async (req, res) => {
             cpState: cpStatus.state,
           });
 
+          // Alert admin about missed webhook
+          alertWebhookMissed(invoice.id, invoice.crystalpay_id);
+
           if (invoice.subscription_id) {
             try {
               await processSubscriptionPayment({
@@ -199,6 +203,9 @@ router.get('/invoices/:id/status', verifyToken, async (req, res) => {
                 crystalpayId: invoice.crystalpay_id,
                 invoiceId: invoice.id,
               });
+
+              // Alert admin about critical activation failure
+              alertSubscriptionActivationFailed(invoice.subscription_id, invoice.id, processError.message);
 
               // Return distinct status so user/frontend knows payment was received but activation failed
               status = 'paid_pending_activation';

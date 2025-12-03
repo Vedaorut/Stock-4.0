@@ -25,6 +25,7 @@ import { ValidationError } from '../../../utils/errors.js';
 import logger from '../../../utils/logger.js';
 import * as blockchainVerificationService from '../../blockchainVerificationService.js';
 import { broadcast } from '../../../utils/websocket.js';
+import { alertStockDeductionFailed } from '../../../utils/alerts.js';
 
 /**
  * Process crypto payment for an order using invoice as single source of truth.
@@ -220,6 +221,10 @@ export async function processOrderPayment({
             `[InvoicePayment] Insufficient stock for product ${item.product_id}: available=${item.stock_quantity}, requested=${item.quantity}`
           );
           await client.query('ROLLBACK');
+
+          // Alert admin about stock issue
+          alertStockDeductionFailed(orderId, item.product_id, `Insufficient stock: ${item.stock_quantity} < ${item.quantity}`);
+
           return {
             ok: false,
             state: 'failed',
