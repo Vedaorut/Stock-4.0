@@ -12,6 +12,7 @@
 import pool from '../config/database.js';
 import logger from '../utils/logger.js';
 import { config } from '../config/env.js';
+import { t, DEFAULT_LANGUAGE } from '../i18n/index.js';
 
 // Get bot token from config
 const BOT_TOKEN = config.telegram?.botToken || process.env.TELEGRAM_BOT_TOKEN;
@@ -106,17 +107,30 @@ async function sendWithRetry(sendFn, maxRetries = MAX_RETRIES) {
 }
 
 /**
- * Get all subscribers for a shop with their telegram_id
+ * Get all subscribers for a shop with their telegram_id and language preference
+ * FIX: Now queries BOTH old 'subscriptions' table AND new 'shop_subscribers' table
+ * to ensure all subscribers (legacy and new invite-based) receive broadcasts
  * @param {number} shopId - Shop ID
- * @returns {Promise<Array<{user_id: number, telegram_id: string}>>}
+ * @returns {Promise<Array<{user_id: number, telegram_id: string, language: string}>>}
  */
 async function getShopSubscribers(shopId) {
   try {
+    // UNION both tables to get all subscribers (legacy + new invite system)
+    // DISTINCT to avoid sending duplicate messages if user is in both tables
     const result = await pool.query(
-      `SELECT user_id, telegram_id
-       FROM subscriptions
-       WHERE shop_id = $1
-       AND telegram_id IS NOT NULL`,
+      `SELECT DISTINCT ON (u.telegram_id)
+         sub.user_id,
+         u.telegram_id,
+         COALESCE(u.language, 'ru') as language
+       FROM (
+         -- Legacy subscriptions table
+         SELECT user_id FROM subscriptions WHERE shop_id = $1
+         UNION
+         -- New shop_subscribers table (invite-based)
+         SELECT user_id FROM shop_subscribers WHERE shop_id = $1
+       ) sub
+       JOIN users u ON u.id = sub.user_id
+       WHERE u.telegram_id IS NOT NULL`,
       [shopId]
     );
 
@@ -153,6 +167,9 @@ async function createMigrationRecord(shopId, oldChannelUrl, newChannelUrl) {
   }
 }
 
+// Whitelist of allowed fields for migration updates (SQL injection prevention)
+const ALLOWED_MIGRATION_UPDATE_FIELDS = ['sent_count', 'failed_count', 'started_at', 'completed_at'];
+
 /**
  * Update migration status
  * @param {number} migrationId - Migration ID
@@ -173,8 +190,12 @@ async function updateMigrationStatus(migrationId, status, updates = {}) {
       fields.push('completed_at = NOW()');
     }
 
-    // Add custom updates
+    // Add custom updates with whitelist validation (SQL injection prevention)
     for (const [key, value] of Object.entries(updates)) {
+      if (!ALLOWED_MIGRATION_UPDATE_FIELDS.includes(key)) {
+        logger.warn('[Broadcast] Rejected invalid field in migration update', { field: key, migrationId });
+        continue; // Skip invalid field instead of throwing
+      }
       fields.push(`${key} = $${paramIndex}`);
       values.push(value);
       paramIndex++;
@@ -226,6 +247,7 @@ async function incrementCounter(migrationId, success) {
  * @param {string} oldChannelUrl - Old channel URL (optional)
  * @param {number} shopId - Shop ID (for cleanup on error)
  * @param {number} userId - User ID (for cleanup on error)
+ * @param {string} lang - User language preference
  * @returns {Promise<boolean>} Success status
  */
 async function sendMigrationMessage(
@@ -234,17 +256,18 @@ async function sendMigrationMessage(
   newChannelUrl,
   oldChannelUrl = null,
   shopId = null,
-  userId = null
+  userId = null,
+  lang = DEFAULT_LANGUAGE
 ) {
   try {
-    let message = `🔔 <b>Важное обновление от магазина "${shopName}"</b>\n\n`;
+    let message = `🔔 <b>${t('migration.title', { shopName }, lang)}</b>\n\n`;
 
     if (oldChannelUrl) {
-      message += `⚠️ Наш старый канал был заблокирован.\n\n`;
+      message += `⚠️ ${t('migration.oldChannelBlocked', {}, lang)}\n\n`;
     }
 
-    message += `✅ Новый канал: ${newChannelUrl}\n\n`;
-    message += `Подпишитесь, чтобы не пропустить важные обновления и новые товары!`;
+    message += `✅ ${t('migration.newChannel', { url: newChannelUrl }, lang)}\n\n`;
+    message += t('migration.subscribe', {}, lang);
 
     // Send with retry logic using Telegram HTTP API
     await sendWithRetry(async () => {
@@ -328,14 +351,15 @@ async function broadcastMigration(
     for (let i = 0; i < subscribers.length; i++) {
       const subscriber = subscribers[i];
 
-      // Send message using Telegram HTTP API
+      // Send message using Telegram HTTP API with user's language
       const success = await sendMigrationMessage(
         subscriber.telegram_id,
         shopName,
         newChannelUrl,
         oldChannelUrl,
         shopId,
-        subscriber.user_id
+        subscriber.user_id,
+        subscriber.language || DEFAULT_LANGUAGE
       );
 
       // Update counters

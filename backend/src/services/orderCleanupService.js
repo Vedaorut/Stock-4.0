@@ -33,21 +33,33 @@ async function cancelUnpaidOrders() {
     logger.info(`Found ${orders.length} unpaid orders to cancel`);
 
     // Cancel each order and unreserve stock
+    // FIX: Added atomic check in UPDATE to prevent race condition
+    // If order was paid between SELECT and UPDATE, this UPDATE will affect 0 rows
     for (const order of orders) {
       try {
-        // Unreserve stock
-        await productQueries.unreserveStock(order.product_id, order.quantity);
-
-        // Cancel order
-        await query(
+        // Atomic cancel: only if still pending AND still no payment
+        const cancelResult = await query(
           `UPDATE orders
            SET status = 'cancelled',
                updated_at = NOW()
-           WHERE id = $1`,
+           WHERE id = $1
+             AND status = 'pending'
+             AND NOT EXISTS (
+               SELECT 1 FROM payments pay
+               WHERE pay.order_id = $1
+               AND pay.tx_hash IS NOT NULL
+             )
+           RETURNING id`,
           [order.id]
         );
 
-        logger.info(`Auto-cancelled order #${order.id} (${order.product_name})`);
+        // Only unreserve stock if order was actually cancelled
+        if (cancelResult.rowCount > 0) {
+          await productQueries.unreserveStock(order.product_id, order.quantity);
+          logger.info(`Auto-cancelled order #${order.id} (${order.product_name})`);
+        } else {
+          logger.info(`Order #${order.id} was paid/changed before cancellation - skipped`);
+        }
       } catch (err) {
         logger.error(`Failed to cancel order #${order.id}:`, err);
       }
@@ -61,17 +73,18 @@ async function cancelUnpaidOrders() {
 
 /**
  * Expire unfulfilled orders after 7 days without fulfillment
- * Sets orders with status 'pending' or 'confirmed' to 'expired'
+ * Only expires 'pending' orders - confirmed orders are kept in history!
+ * FIX: Removed 'confirmed' from list - paid orders should never be expired
  */
 async function expireOldOrders() {
   try {
     const result = await query(
       `UPDATE orders
        SET status = $1, updated_at = NOW()
-       WHERE status = ANY($2)
+       WHERE status = 'pending'
          AND created_at < NOW() - INTERVAL '7 days'
        RETURNING id, status`,
-      ['expired', ['pending', 'confirmed']]
+      ['expired']
     );
 
     if (result.rowCount > 0) {

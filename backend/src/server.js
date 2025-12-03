@@ -6,9 +6,11 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { WebSocketServer } from 'ws';
+import jwt from 'jsonwebtoken';
 import { initWebSocket } from './utils/websocket.js';
 import { config } from './config/env.js';
-import { testConnection, closePool } from './config/database.js';
+import { testConnection, closePool, warmupPool } from './config/database.js';
+import { userQueries } from './database/queries/index.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -40,6 +42,7 @@ import webhookRoutes from './routes/webhooks.js';
 import internalRoutes from './routes/internal.js';
 import aiRoutes from './routes/ai.js';
 import debugRoutes from './routes/debug.js';
+import userRoutes from './routes/users.js';
 
 // Routes registration (will be added after middleware setup)
 
@@ -377,6 +380,7 @@ app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/follows', followRoutes);
 app.use('/api/shop-follows', followRoutes);
 app.use('/api/ai', aiRoutes);
+app.use('/api/users', userRoutes);
 app.use('/webhooks', webhookRoutes); // Crypto payment webhooks
 app.use('/api/internal', internalRoutes); // Internal API for bot-backend communication
 
@@ -426,7 +430,10 @@ const startServer = async () => {
   try {
     // Test database connection
     await testConnection();
-    
+
+    // Warm up connection pool to avoid cold start latency
+    await warmupPool();
+
     // ✅ REGRESSION PREVENTION: Validate database sequences before starting
     await validateDatabaseSequences();
 
@@ -478,19 +485,94 @@ const startServer = async () => {
     // Initialize WebSocket module for use in controllers
     initWebSocket(wss);
 
-    wss.on('connection', (ws, req) => {
-      logger.info('WebSocket client connected', {
-        ip: req.socket.remoteAddress,
-      });
+    /**
+     * WebSocket Authorization
+     * FIX P1: Validate JWT token on connection to prevent anonymous access
+     * Token passed via query parameter: ws://host?token=JWT_TOKEN
+     */
+    wss.on('connection', async (ws, req) => {
+      const ip = req.socket.remoteAddress;
+
+      // Extract token from URL query params
+      const url = new URL(req.url, `http://${req.headers.host}`);
+      const token = url.searchParams.get('token');
+
+      // Validate token
+      if (!token) {
+        logger.warn('[WebSocket] Connection rejected: no token', { ip });
+        ws.close(4001, 'Authentication required');
+        return;
+      }
+
+      let userId = null;
+      try {
+        // Verify JWT (same logic as auth.js verifyToken)
+        const decoded = jwt.verify(token, config.jwt.secret, { algorithms: ['HS256'] });
+
+        // Verify user exists in database
+        const userExists = await userQueries.findById(decoded.id);
+        if (!userExists) {
+          logger.warn('[WebSocket] Connection rejected: user not found', {
+            ip,
+            tokenUserId: decoded.id
+          });
+          ws.close(4002, 'User not found');
+          return;
+        }
+
+        // Store user info on the websocket client for filtering broadcasts
+        userId = decoded.id;
+        ws.userId = userId;
+        ws.telegramId = decoded.telegram_id;
+        ws.isAuthenticated = true;
+
+        logger.info('[WebSocket] Client authenticated', {
+          ip,
+          userId,
+          telegramId: decoded.telegram_id,
+        });
+      } catch (error) {
+        if (error.name === 'JsonWebTokenError') {
+          logger.warn('[WebSocket] Connection rejected: invalid token', { ip });
+          ws.close(4003, 'Invalid token');
+        } else if (error.name === 'TokenExpiredError') {
+          logger.warn('[WebSocket] Connection rejected: token expired', { ip });
+          ws.close(4004, 'Token expired');
+        } else {
+          logger.error('[WebSocket] Connection rejected: auth error', {
+            ip,
+            error: error.message
+          });
+          ws.close(4005, 'Authentication error');
+        }
+        return;
+      }
 
       ws.on('message', (message) => {
         try {
           const data = JSON.parse(message);
-          logger.debug('WebSocket message received', { data });
+          logger.debug('WebSocket message received', { data, userId });
 
           // Handle different message types
           if (data.type === 'ping') {
             ws.send(JSON.stringify({ type: 'pong', timestamp: Date.now() }));
+          }
+
+          // Subscribe to specific shop updates
+          if (data.type === 'subscribe' && data.shopId) {
+            ws.subscribedShops = ws.subscribedShops || new Set();
+            ws.subscribedShops.add(parseInt(data.shopId, 10));
+            logger.debug('[WebSocket] Client subscribed to shop', {
+              userId,
+              shopId: data.shopId
+            });
+          }
+
+          // Unsubscribe from shop
+          if (data.type === 'unsubscribe' && data.shopId) {
+            if (ws.subscribedShops) {
+              ws.subscribedShops.delete(parseInt(data.shopId, 10));
+            }
           }
         } catch (error) {
           // API-9: Enhanced error handling for WebSocket messages
@@ -498,6 +580,7 @@ const startServer = async () => {
             error: error.message,
             stack: error.stack,
             rawMessage: message?.toString().substring(0, 100), // Log first 100 chars
+            userId,
           });
 
           // Send error response to client
@@ -519,6 +602,7 @@ const startServer = async () => {
         logger.info('WebSocket client disconnected', {
           code,
           reason: reason?.toString() || 'No reason provided',
+          userId,
         });
       });
 
@@ -529,6 +613,7 @@ const startServer = async () => {
           stack: error.stack,
           code: error.code,
           errno: error.errno,
+          userId,
         });
       });
 
@@ -539,11 +624,13 @@ const startServer = async () => {
             type: 'connected',
             message: 'Connected to Telegram Shop WebSocket',
             timestamp: Date.now(),
+            userId,
           })
         );
       } catch (error) {
         logger.error('Failed to send welcome message', {
           error: error.message,
+          userId,
         });
       }
     });
