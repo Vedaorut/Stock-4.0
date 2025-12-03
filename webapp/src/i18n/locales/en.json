@@ -179,7 +179,8 @@
     "clear": "Clear",
     "items": "{count} items",
     "item": "item",
-    "cannotOrderOwn": "You cannot order products from your own shop"
+    "cannotOrderOwn": "You cannot order products from your own shop",
+    "browseCatalog": "Browse Catalog"
   },
 
   "subscriptions": {

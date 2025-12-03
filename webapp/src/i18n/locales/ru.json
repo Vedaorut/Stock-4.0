@@ -179,7 +179,8 @@
     "clear": "Очистить",
     "items": "{count} товаров",
     "item": "товар",
-    "cannotOrderOwn": "Нельзя заказать товары из своего магазина"
+    "cannotOrderOwn": "Нельзя заказать товары из своего магазина",
+    "browseCatalog": "Открыть каталог"
   },
 
   "subscriptions": {

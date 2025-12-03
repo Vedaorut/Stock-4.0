@@ -211,7 +211,7 @@ export default function CartSheet() {
                       }}
                       transition={quickSpring}
                     >
-                      Browse Catalog
+                      {t('cart.browseCatalog')}
                     </motion.button>
                   </motion.div>
                 ) : (

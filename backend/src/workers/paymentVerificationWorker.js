@@ -336,10 +336,11 @@ async function confirmOrderPayment(orderId, paymentId, verificationResult) {
           );
           await client.query('ROLLBACK');
 
-          // Return payment to pending - will be retried or manually handled
+          // Mark as failed - requires manual resolution (refund or restock)
+          // DO NOT set to 'pending' - creates infinite loop as worker retries every 30s
           await query(
-            `UPDATE payments SET status = 'pending', verification_error = $2, updated_at = NOW() WHERE id = $1`,
-            [paymentId, `Insufficient stock for product ${item.product_id}`]
+            `UPDATE payments SET status = 'failed', verification_error = $2, updated_at = NOW() WHERE id = $1`,
+            [paymentId, `Insufficient stock: ${item.stock_quantity} available < ${item.quantity} ordered. Manual resolution required.`]
           );
 
           // Alert admin about stock issue

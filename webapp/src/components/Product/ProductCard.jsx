@@ -324,7 +324,7 @@ const ProductCard = memo(function ProductCard({ product, onPreorder: _onPreorder
                     whiteSpace: 'nowrap',
                   }}
                 >
-                  ${Math.floor(parseFloat(product.price))}
+                  ${parseFloat(product.price) % 1 === 0 ? Math.floor(parseFloat(product.price)) : parseFloat(product.price).toFixed(2)}
                 </span>
               </div>
             ) : (
@@ -336,7 +336,7 @@ const ProductCard = memo(function ProductCard({ product, onPreorder: _onPreorder
                   whiteSpace: 'nowrap',
                 }}
               >
-                ${Math.floor(parseFloat(product.price))}
+                ${parseFloat(product.price) % 1 === 0 ? Math.floor(parseFloat(product.price)) : parseFloat(product.price).toFixed(2)}
               </span>
             )}
 
