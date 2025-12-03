@@ -94,14 +94,16 @@ export const invoiceQueries = {
    */
   findByIdWithOwnership: async (id) => {
     const result = await query(
-      `SELECT 
+      `SELECT
          i.*,
          -- Order invoice ownership
          o.buyer_id,
          u_buyer.telegram_id as buyer_telegram_id,
          s_order.owner_id as order_shop_owner_id,
-         -- Subscription invoice ownership  
-         s_sub.owner_id as subscription_owner_id
+         -- Subscription invoice ownership
+         -- Use COALESCE: prefer shop owner, fallback to subscription user_id (for subscriptions without shop yet)
+         COALESCE(s_sub.owner_id, ss.user_id) as subscription_owner_id,
+         ss.user_id as subscription_user_id
        FROM invoices i
        -- Join for order invoices
        LEFT JOIN orders o ON i.order_id = o.id

@@ -156,6 +156,7 @@ router.get('/invoices/:id/status', verifyToken, async (req, res) => {
         actualBuyerId: invoice.buyer_id,
         actualOrderShopOwnerId: invoice.order_shop_owner_id,
         actualSubscriptionOwnerId: invoice.subscription_owner_id,
+        actualSubscriptionUserId: invoice.subscription_user_id, // fallback user_id from shop_subscriptions
       });
       return res.status(403).json({ error: 'Access denied' });
     }
