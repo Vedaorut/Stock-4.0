@@ -1,5 +1,6 @@
 import { productQueries, shopQueries } from '../../../database/queries/index.js';
 import { asyncHandler } from '../../../middleware/errorHandler.js';
+import { invalidateProductLimitCache } from '../../../middleware/productLimits.js';
 import { NotFoundError, UnauthorizedError } from '../../../utils/errors.js';
 import logger from '../../../utils/logger.js';
 import { isAuthorizedToManageShop } from '../utils/authorization.js';
@@ -37,6 +38,9 @@ export const create = asyncHandler(async (req, res) => {
       stockQuantity,
       isPreorder: is_preorder,
     });
+
+    // Invalidate product limit cache after successful creation
+    invalidateProductLimitCache(shopId);
 
     // Emit WebSocket event for real-time updates
     broadcast('product_added', { shopId, productId: product.id });

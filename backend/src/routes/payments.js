@@ -8,6 +8,8 @@ import { createCrystalPayInvoice } from '../services/subscriptionInvoiceService.
 import { invoiceQueries, subscriptionQueries } from '../database/queries/index.js';
 import { getPrice } from '../config/subscriptionPricing.js';
 import logger from '../utils/logger.js';
+import { getInvoiceInfo } from '../services/crystalPayService.js';
+import { processSubscriptionPayment } from '../services/invoicePayment/index.js';
 
 const router = express.Router();
 
@@ -160,10 +162,67 @@ router.get('/invoices/:id/status', verifyToken, async (req, res) => {
 
     // Map invoice status to frontend-friendly status
     let status = 'pending';
-    if (invoice.status === 'paid' || invoice.status === 'confirmed') {
-      status = 'paid';
-    } else if (invoice.status === 'expired' || invoice.status === 'cancelled') {
-      status = 'expired';
+
+    // CrystalPay fallback: Check gateway if webhook might have failed
+    // Only for pending invoices with crystalpay_id (older than 30 seconds to avoid race with webhook)
+    const invoiceAge = Date.now() - new Date(invoice.created_at).getTime();
+    const MIN_AGE_FOR_FALLBACK = 30 * 1000; // 30 seconds
+
+    if (invoice.crystalpay_id && invoice.status === 'pending' && invoiceAge > MIN_AGE_FOR_FALLBACK) {
+      try {
+        const cpStatus = await getInvoiceInfo(invoice.crystalpay_id);
+
+        if (cpStatus && (cpStatus.state === 'payed' || cpStatus.state === 'payedover')) {
+          // Webhook missed - process payment now
+          logger.info(`[API] CrystalPay fallback: Invoice ${invoice.id} paid but webhook missed`, {
+            invoiceId: invoice.id,
+            crystalpayId: invoice.crystalpay_id,
+            cpState: cpStatus.state,
+          });
+
+          if (invoice.subscription_id) {
+            try {
+              await processSubscriptionPayment({
+                subscriptionId: invoice.subscription_id,
+                invoiceId: invoice.id,
+                webhookVerified: true, // We verified with CrystalPay API
+              });
+              status = 'paid';
+            } catch (processError) {
+              // CRITICAL: Payment confirmed by CrystalPay but subscription NOT activated
+              // Do NOT return 'paid' - user needs to know there's an issue
+              logger.error(`[API] CRITICAL: CrystalPay payment confirmed but activation failed for invoice ${invoice.id}`, {
+                error: processError.message,
+                stack: processError.stack,
+                subscriptionId: invoice.subscription_id,
+                crystalpayId: invoice.crystalpay_id,
+                invoiceId: invoice.id,
+              });
+
+              // Return distinct status so user/frontend knows payment was received but activation failed
+              status = 'paid_pending_activation';
+            }
+          } else {
+            // Non-subscription invoice - just mark as paid for status response
+            status = 'paid';
+          }
+        }
+      } catch (cpError) {
+        // CrystalPay API failed - continue with DB status (graceful degradation)
+        logger.warn(`[API] CrystalPay status check failed for invoice ${invoice.id}:`, {
+          error: cpError.message,
+          crystalpayId: invoice.crystalpay_id,
+        });
+      }
+    }
+
+    // If not already set by CrystalPay fallback, use DB status
+    if (status === 'pending') {
+      if (invoice.status === 'paid' || invoice.status === 'confirmed') {
+        status = 'paid';
+      } else if (invoice.status === 'expired' || invoice.status === 'cancelled') {
+        status = 'expired';
+      }
     }
 
     return res.json({ status });

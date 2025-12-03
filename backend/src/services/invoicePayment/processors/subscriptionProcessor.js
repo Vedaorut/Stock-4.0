@@ -49,6 +49,7 @@ import { broadcast } from '../../../utils/websocket.js';
  * @param {string} [params.mode] - Payment mode: 'subscription' or 'upgrade'
  * @param {number} [params.invoiceId] - Specific invoice ID to process
  * @param {string} [params.purpose] - Invoice purpose filter
+ * @param {boolean} [params.webhookVerified] - True if called from verified webhook (signature checked)
  * @returns {Promise<Object>} Payment result with ok, state, and optional message
  */
 export async function processSubscriptionPayment({
@@ -59,6 +60,7 @@ export async function processSubscriptionPayment({
   mode = null,
   invoiceId = null,
   purpose = null,
+  webhookVerified = false,
 }) {
   // =========================================================================
   // PHASE 1: VERIFICATION (Outside transaction, no locks)
@@ -114,21 +116,44 @@ export async function processSubscriptionPayment({
     };
   }
 
-  // 1.3. Skip verification for CrystalPay (external payment gateway handles verification)
+  // 1.3. CrystalPay verification: MUST come from verified webhook OR have paid status
   const isCrystalPay = invoice.chain === 'CRYSTALPAY';
   const verifiedTxHash = txHash;
   let verification;
 
   if (isCrystalPay) {
-    // CrystalPay webhook already verified payment - trust the gateway
+    // SECURITY: CrystalPay payments require verification from one of two sources:
+    // 1. webhookVerified=true - Called from webhook handler after signature verification
+    // 2. invoice.status='paid' - Already processed by webhook previously
+    //
+    // Without this guard, attacker could call manual confirmation endpoint with
+    // {"txHash": "fake"} and get free subscription activation.
+    const isWebhookCall = webhookVerified === true;
+    const isAlreadyPaid = invoice.status === INVOICE_STATES.PAID;
+
+    if (!isWebhookCall && !isAlreadyPaid) {
+      logger.warn(
+        `[InvoicePayment] SECURITY: CrystalPay invoice ${invoice.id} - blocked manual confirmation attempt. ` +
+        `webhookVerified=${webhookVerified}, status=${invoice.status}`
+      );
+      return {
+        ok: false,
+        state: 'pending',
+        code: 'PAYMENT_NOT_VERIFIED',
+        message: 'CrystalPay payment must be confirmed by webhook. Please wait or check payment status.',
+      };
+    }
+
+    // Safe to proceed - either webhook call or already paid
     logger.info(
-      `[InvoicePayment] CrystalPay invoice ${invoice.id} - skipping blockchain verification (gateway verified)`
+      `[InvoicePayment] CrystalPay invoice ${invoice.id} - verification passed ` +
+      `(webhookVerified=${isWebhookCall}, status=${invoice.status})`
     );
 
-    // Create verification object for CrystalPay (gateway already verified)
+    // Create verification object
     verification = {
       verified: true,
-      txHash: verifiedTxHash || txHash,
+      txHash: invoice.tx_hash || verifiedTxHash || txHash,
       amount: parseFloat(invoice.crypto_amount) || parseFloat(invoice.expected_amount),
       currency: invoice.currency || invoice.chain,
       status: 'confirmed',

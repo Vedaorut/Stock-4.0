@@ -11,7 +11,8 @@ import telegramService from '../services/telegram.js';
 import logger from '../utils/logger.js';
 
 const POLL_INTERVAL = 30 * 1000; // 30 seconds (in milliseconds)
-const MAX_AGE_HOURS = 24;
+// 72 hours to accommodate slow BTC/LTC confirmations during network congestion
+const MAX_AGE_HOURS = 72;
 const BATCH_SIZE = 50;
 
 let workerInterval = null;
@@ -323,20 +324,30 @@ async function confirmOrderPayment(orderId, paymentId, verificationResult) {
     const nonPreorderItems = itemsResult.rows.filter(item => !item.is_preorder);
 
     if (nonPreorderItems.length > 0) {
-      // Log warnings for insufficient stock
+      // Check stock for ALL items BEFORE any deduction - prevent overselling
       for (const item of nonPreorderItems) {
         if (item.stock_quantity < item.quantity) {
-          logger.warn(`[PaymentWorker] Insufficient stock for product ${item.product_id}`);
+          logger.error(
+            `[PaymentWorker] Insufficient stock for product ${item.product_id}: available=${item.stock_quantity}, requested=${item.quantity}`
+          );
+          await client.query('ROLLBACK');
+
+          // Return payment to pending - will be retried or manually handled
+          await query(
+            `UPDATE payments SET status = 'pending', verification_error = $2, updated_at = NOW() WHERE id = $1`,
+            [paymentId, `Insufficient stock for product ${item.product_id}`]
+          );
+          return; // Don't confirm the order
         }
       }
 
-      // Batch UPDATE using unnest() - single query instead of N queries
+      // Safe to deduct - all items have sufficient stock
       const productIds = nonPreorderItems.map(item => item.product_id);
       const quantities = nonPreorderItems.map(item => item.quantity);
 
       await client.query(
         `UPDATE products p
-         SET stock_quantity = GREATEST(0, p.stock_quantity - u.quantity),
+         SET stock_quantity = p.stock_quantity - u.quantity,
              updated_at = NOW()
          FROM unnest($1::int[], $2::int[]) AS u(product_id, quantity)
          WHERE p.id = u.product_id`,

@@ -214,13 +214,27 @@ export async function processOrderPayment({
 
     for (const item of itemsResult.rows) {
       if (!item.is_preorder) {
+        // Check stock BEFORE deduction - prevent overselling
         if (item.stock_quantity < item.quantity) {
-          logger.warn(`[InvoicePayment] Insufficient stock for product ${item.product_id}`);
+          logger.error(
+            `[InvoicePayment] Insufficient stock for product ${item.product_id}: available=${item.stock_quantity}, requested=${item.quantity}`
+          );
+          await client.query('ROLLBACK');
+          return {
+            ok: false,
+            state: 'failed',
+            code: 'INSUFFICIENT_STOCK',
+            message: 'Insufficient stock for product',
+            productId: item.product_id,
+            available: item.stock_quantity,
+            requested: item.quantity,
+          };
         }
 
+        // Safe to deduct - we verified stock exists
         await client.query(
           `UPDATE products
-           SET stock_quantity = GREATEST(0, stock_quantity - $1), updated_at = NOW()
+           SET stock_quantity = stock_quantity - $1, updated_at = NOW()
            WHERE id = $2`,
           [item.quantity, item.product_id]
         );

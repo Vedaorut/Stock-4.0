@@ -20,8 +20,15 @@ jest.unstable_mockModule('../../config/database.js', () => ({
 
 // Mock blockchain verification service
 const mockVerifyPayment = jest.fn();
+const MOCK_VERIFICATION_STATUS = {
+  SUCCESS: 'SUCCESS',
+  TX_NOT_FOUND: 'TX_NOT_FOUND',
+  TX_INVALID: 'TX_INVALID',
+  API_ERROR: 'API_ERROR',
+};
 jest.unstable_mockModule('../../services/blockchainVerificationService.js', () => ({
   verifyPayment: mockVerifyPayment,
+  VERIFICATION_STATUS: MOCK_VERIFICATION_STATUS,
 }));
 
 // Mock telegram service
@@ -172,7 +179,7 @@ describe('Payment Verification Worker', () => {
     it('should mark payment failed when verification fails', async () => {
       mockVerifyPayment.mockResolvedValue({
         verified: false,
-        status: 'failed',
+        resultStatus: MOCK_VERIFICATION_STATUS.TX_INVALID,
         error: 'Invalid transaction',
         confirmations: 0,
       });
@@ -190,7 +197,7 @@ describe('Payment Verification Worker', () => {
     it('should return payment to pending when waiting for confirmations', async () => {
       mockVerifyPayment.mockResolvedValue({
         verified: false,
-        status: 'pending',
+        resultStatus: MOCK_VERIFICATION_STATUS.SUCCESS,
         confirmations: 2,
       });
 

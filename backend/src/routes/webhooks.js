@@ -133,11 +133,14 @@ router.post('/crystalpay', async (req, res) => {
     // 7. Process payment based on invoice type
     if (invoice.subscription_id) {
       // Handle subscription payment INSIDE transaction
+      // SECURITY: webhookVerified=true indicates this call comes from verified webhook
+      // (signature already checked above), allowing processor to skip manual verification block
       const result = await invoicePaymentService.processSubscriptionPayment({
         subscriptionId: invoice.subscription_id,
         txHash: `crystalpay_${payload.id}`,
         invoiceId: invoice.id,
-        purpose: invoice.purpose
+        purpose: invoice.purpose,
+        webhookVerified: true,
       });
 
       // COMMIT only after successful payment processing
@@ -159,7 +162,9 @@ router.post('/crystalpay', async (req, res) => {
     }
 
   } catch (error) {
-    await client.query('ROLLBACK').catch(() => {});
+    await client.query('ROLLBACK').catch((rollbackErr) => {
+      logger.error('[Webhook] ROLLBACK failed:', rollbackErr);
+    });
     logger.error('[Webhook] CrystalPay error', { error: error.message });
     return res.status(500).json({ error: 'Internal error' });
   } finally {

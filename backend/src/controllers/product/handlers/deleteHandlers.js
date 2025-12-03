@@ -1,5 +1,6 @@
 import { productQueries, shopQueries } from '../../../database/queries/index.js';
 import { asyncHandler } from '../../../middleware/errorHandler.js';
+import { invalidateProductLimitCache } from '../../../middleware/productLimits.js';
 import { NotFoundError, UnauthorizedError } from '../../../utils/errors.js';
 import logger from '../../../utils/logger.js';
 import { isAuthorizedToManageShop } from '../utils/authorization.js';
@@ -36,6 +37,9 @@ export const deleteProduct = asyncHandler(async (req, res) => {
 
     const shopId = existingProduct.shop_id;
     await productQueries.delete(id);
+
+    // Invalidate product limit cache after successful deletion
+    invalidateProductLimitCache(shopId);
 
     // Emit WebSocket event for real-time updates
     broadcast('product_deleted', { shopId, productId: parseInt(id, 10) });
@@ -74,6 +78,9 @@ export const bulkDeleteAll = asyncHandler(async (req, res) => {
     }
 
     const deletedProducts = await productQueries.bulkDeleteByShopId(shopId);
+
+    // Invalidate product limit cache after successful deletion
+    invalidateProductLimitCache(shopId);
 
     // Emit WebSocket event for each deleted product
     deletedProducts.forEach(product => {
@@ -121,6 +128,9 @@ export const bulkDeleteByIds = asyncHandler(async (req, res) => {
     }
 
     const deletedProducts = await productQueries.bulkDeleteByIds(productIds, shopId);
+
+    // Invalidate product limit cache after successful deletion
+    invalidateProductLimitCache(shopId);
 
     // Emit WebSocket event for each deleted product
     deletedProducts.forEach(product => {
