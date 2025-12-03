@@ -88,56 +88,45 @@ async function checkExpiredSubscriptions() {
 
     logger.info('[Subscription] Checking for expired subscriptions...');
 
-    // Get shops with payment due
-    const shopsResult = await client.query(
-      `SELECT id, name, tier, next_payment_due, grace_period_until, subscription_status
-       FROM shops
+    // BATCH 1: Active subscriptions expired → Start grace period
+    // Single UPDATE with RETURNING instead of N+1 loop
+    const gracePeriodResult = await client.query(
+      `UPDATE shops
+       SET subscription_status = 'grace_period',
+           grace_period_until = next_payment_due + INTERVAL '${GRACE_PERIOD_DAYS} days',
+           updated_at = NOW()
        WHERE next_payment_due < $1
-       AND subscription_status != 'inactive'`,
+       AND subscription_status = 'active'
+       RETURNING id, name, grace_period_until`,
       [now]
     );
 
-    let expired = 0;
-    let gracePeriod = 0;
-    let deactivated = 0;
-
-    for (const shop of shopsResult.rows) {
-      const { id, name, next_payment_due, grace_period_until, subscription_status } = shop;
-
-      // Case 1: Active subscription expired → Start grace period
-      if (subscription_status === 'active') {
-        const gracePeriodEnd = new Date(
-          next_payment_due.getTime() + GRACE_PERIOD_DAYS * 24 * 60 * 60 * 1000
-        );
-
-        await client.query(
-          `UPDATE shops 
-           SET subscription_status = 'grace_period',
-               grace_period_until = $1,
-               updated_at = NOW()
-           WHERE id = $2`,
-          [gracePeriodEnd, id]
-        );
-
-        logger.warn(
-          `[Subscription] Shop ${id} (${name}) entered grace period until ${gracePeriodEnd.toISOString()}`
-        );
-        gracePeriod++;
-      }
-
-      // Case 2: Grace period expired → Deactivate
-      else if (
-        subscription_status === 'grace_period' &&
-        grace_period_until &&
-        grace_period_until < now
-      ) {
-        await deactivateShop(id, client);
-        logger.error(`[Subscription] Shop ${id} (${name}) deactivated after grace period expiry`);
-        deactivated++;
-      }
+    const gracePeriod = gracePeriodResult.rowCount || 0;
+    for (const shop of gracePeriodResult.rows) {
+      logger.warn(
+        `[Subscription] Shop ${shop.id} (${shop.name}) entered grace period until ${shop.grace_period_until.toISOString()}`
+      );
     }
 
-    // Mark expired subscription records
+    // BATCH 2: Grace period expired → Deactivate
+    // Single UPDATE instead of N+1 loop
+    const deactivatedResult = await client.query(
+      `UPDATE shops
+       SET is_active = false,
+           subscription_status = 'inactive',
+           updated_at = NOW()
+       WHERE subscription_status = 'grace_period'
+       AND grace_period_until < $1
+       RETURNING id, name`,
+      [now]
+    );
+
+    const deactivated = deactivatedResult.rowCount || 0;
+    for (const shop of deactivatedResult.rows) {
+      logger.error(`[Subscription] Shop ${shop.id} (${shop.name}) deactivated after grace period expiry`);
+    }
+
+    // BATCH 3: Mark expired subscription records
     const expiredSubsResult = await client.query(
       `UPDATE shop_subscriptions
        SET status = 'expired'
@@ -147,7 +136,7 @@ async function checkExpiredSubscriptions() {
       [now]
     );
 
-    expired = expiredSubsResult.rowCount || 0;
+    const expired = expiredSubsResult.rowCount || 0;
 
     logger.info(
       `[Subscription] Check complete: ${expired} subscriptions expired, ${gracePeriod} in grace period, ${deactivated} deactivated`
@@ -202,7 +191,7 @@ async function deactivateShop(shopId, client = null) {
  * @param {number} userId - User ID (shop owner)
  * @returns {Promise<{shopId: number, trialEndsAt: Date}>}
  */
-async function activateFreeTrial(shopId, userId) {
+async function activateFreeTrial(shopId, _userId) {
   const client = await pool.connect();
   try {
     const now = new Date();
@@ -237,45 +226,35 @@ async function activateFreeTrial(shopId, userId) {
 async function checkExpiredTrials() {
   const client = await pool.connect();
   try {
-    await client.query('BEGIN');
-
     const now = new Date();
 
-    const expiredTrials = await client.query(
-      `SELECT id, name, trial_ends_at FROM shops
-       WHERE is_trial = true AND trial_ends_at < $1`,
+    // BATCH UPDATE: Expire all trials in single query instead of N+1 loop
+    // Keep tier as PRO but mark trial expired - shop enters grace period
+    // After grace period, shop will be deactivated until subscription is paid
+    const result = await client.query(
+      `UPDATE shops
+       SET is_trial = false,
+           subscription_status = 'grace_period',
+           grace_period_until = $1 + INTERVAL '${GRACE_PERIOD_DAYS} days',
+           updated_at = NOW()
+       WHERE is_trial = true AND trial_ends_at < $1
+       RETURNING id, name, grace_period_until`,
       [now]
     );
 
-    let transitioned = 0;
+    const transitioned = result.rowCount || 0;
 
-    for (const shop of expiredTrials.rows) {
-      const gracePeriodEnd = addDays(now, GRACE_PERIOD_DAYS);
-
-      // Keep tier as PRO but mark trial expired - shop enters grace period
-      // After grace period, shop will be deactivated until subscription is paid
-      await client.query(
-        `UPDATE shops
-         SET is_trial = false,
-             subscription_status = 'grace_period',
-             grace_period_until = $1,
-             updated_at = NOW()
-         WHERE id = $2`,
-        [gracePeriodEnd, shop.id]
-      );
-
-      logger.warn(`[Trial] Shop ${shop.id} (${shop.name}) trial expired, entered grace period until ${gracePeriodEnd.toISOString()}`);
-      transitioned++;
+    // Log each transitioned shop
+    for (const shop of result.rows) {
+      logger.warn(`[Trial] Shop ${shop.id} (${shop.name}) trial expired, entered grace period until ${shop.grace_period_until.toISOString()}`);
     }
 
     if (transitioned > 0) {
       logger.info(`[Trial] ${transitioned} trials expired and transitioned to grace period`);
     }
 
-    await client.query('COMMIT');
     return { transitioned };
   } catch (error) {
-    await client.query('ROLLBACK');
     logger.error('[SubscriptionService] checkExpiredTrials error:', error);
     throw error;
   } finally {
