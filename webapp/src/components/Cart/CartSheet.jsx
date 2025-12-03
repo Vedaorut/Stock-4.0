@@ -70,6 +70,7 @@ export default function CartSheet() {
   const isOwnShopCart = useMemo(() => {
     if (!cart.length || !myShops?.length) return false;
     const cartShopId = cart[0]?.shopId;
+    if (!cartShopId) return false;
     return myShops.some((shop) => shop.id === cartShopId);
   }, [cart, myShops]);
 

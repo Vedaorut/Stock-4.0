@@ -217,7 +217,10 @@ const createShop = async (ctx, shopName) => {
     }
 
     // Generate invite link
-    const botUsername = process.env.BOT_USERNAME || 'SellStatusBot';
+    const botUsername = process.env.BOT_USERNAME;
+    if (!botUsername) {
+      throw new Error('BOT_USERNAME environment variable is not set');
+    }
     const inviteLink = `https://t.me/${botUsername}?start=shop_${shop.id}`;
 
     // Leave createShop and enter onboarding scene

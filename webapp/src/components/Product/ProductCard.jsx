@@ -152,8 +152,8 @@ const ProductCard = memo(function ProductCard({ product, onPreorder: _onPreorder
     priceSizeClass,
   } = useMemo(() => calculatePriceDetails(product), [product]);
 
-  // Use == for type coercion since IDs may be string or number from different sources
-  const isHighlighted = highlightProductId != null && highlightProductId == product.id;
+  // Use strict equality with explicit type conversion for safety
+  const isHighlighted = highlightProductId != null && String(highlightProductId) === String(product.id);
 
   const handleAddToCart = useCallback(
     (event) => {

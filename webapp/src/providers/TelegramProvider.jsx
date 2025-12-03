@@ -68,8 +68,10 @@ export function TelegramProvider({ children }) {
       }
 
       // Debug: Log initData info (without exposing sensitive data)
-      // eslint-disable-next-line no-console
-      console.log('[Auth] Validating initData, length:', initData?.length || 0);
+      if (import.meta.env.DEV) {
+        // eslint-disable-next-line no-console
+        console.log('[Auth] Validating initData, length:', initData?.length || 0);
+      }
 
       const response = await axios.post(
         `${API_URL}/auth/telegram-validate`,

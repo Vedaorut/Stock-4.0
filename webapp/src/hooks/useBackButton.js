@@ -42,7 +42,9 @@ export function useBackButton(onBack) {
     tg.BackButton.onClick(handler);
 
     return () => {
-      tg.BackButton.offClick(handler);
+      if (handler) {
+        tg.BackButton.offClick(handler);
+      }
       tg.BackButton.hide();
     };
   }, [tg]); // Only tg in dependencies - prevents jitter

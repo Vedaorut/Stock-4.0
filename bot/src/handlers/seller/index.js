@@ -732,9 +732,12 @@ const handleWorkers = async (ctx) => {
       await ctx.editMessageText(generalMessages.actionFailed, menu);
     } catch (editError) {
       // Fallback если edit не удался (например, сообщение удалено)
-      logger.debug('Failed to edit message, using reply fallback:', editError.message);
-      const menu = await getSellerMenuKeyboard(ctx);
-      await ctx.reply(generalMessages.actionFailed, menu);
+      // Check if callback query was already answered
+      if (!ctx.callbackQuery?.answered) {
+        logger.debug('Failed to edit message, using reply fallback:', editError.message);
+        const menu = await getSellerMenuKeyboard(ctx);
+        await ctx.reply(generalMessages.actionFailed, menu);
+      }
     }
   }
 };

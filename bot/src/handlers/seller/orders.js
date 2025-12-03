@@ -473,6 +473,13 @@ export const handleOrderHistoryPage = async (ctx) => {
     }
     ctx.session.lastHistoryClick = now;
 
+    // Auto-cleanup after 60 seconds (TTL for debounce state)
+    setTimeout(() => {
+      if (ctx.session?.lastHistoryClick === now) {
+        delete ctx.session.lastHistoryClick;
+      }
+    }, 60000);
+
     await ctx.answerCbQuery(); // Remove spinner
 
     // Reuse main handler
