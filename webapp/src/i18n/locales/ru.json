@@ -91,7 +91,10 @@
     "inviteLinkDescription": "Поделитесь с покупателями",
     "inviteLinkLabel": "Ссылка на магазин",
     "inviteLinkCopied": "Ссылка скопирована!",
-    "inviteLinkHint": "Поделитесь ссылкой в канале. Пользователи автоматически подпишутся на ваш магазин."
+    "inviteLinkHint": "Поделитесь ссылкой в канале. Пользователи автоматически подпишутся на ваш магазин.",
+    "workerModeDisabled": "Режим работника отключен",
+    "nowWorkingIn": "Вы теперь работаете в \"{name}\"",
+    "shopSelectionError": "Ошибка при выборе магазина"
   },
 
   "wallet": {
@@ -180,7 +183,8 @@
     "items": "{count} товаров",
     "item": "товар",
     "cannotOrderOwn": "Нельзя заказать товары из своего магазина",
-    "browseCatalog": "Открыть каталог"
+    "browseCatalog": "Открыть каталог",
+    "clearForOtherShop": "Очистите корзину для покупок в другом магазине"
   },
 
   "subscriptions": {
@@ -231,7 +235,22 @@
     "amount": "Сумма",
     "copyAddress": "Скопировать адрес",
     "addressCopied": "Адрес скопирован",
-    "orderDetails": "Детали заказа"
+    "orderDetails": "Детали заказа",
+    "orderDataError": "Ошибка данных заказа",
+    "insufficientStock": "Недостаточно товара на складе",
+    "createOrderError": "Не удалось создать заказ. Попробуйте снова.",
+    "connectionError": "Проблема с соединением. Проверьте интернет.",
+    "invalidAmount": "Некорректная сумма от сервера",
+    "rateServiceUnavailable": "Сервис курсов временно недоступен",
+    "cryptoNotAccepted": "Продавец не принимает эту криптовалюту",
+    "addressGenerationError": "Ошибка генерации адреса",
+    "invoiceError": "Ошибка генерации счёта. Попробуйте снова.",
+    "selectError": "Не удалось выбрать способ оплаты",
+    "generatingInvoice": "Генерация счёта...",
+    "pleaseWait": "Подождите несколько секунд",
+    "timeoutError": "Превышено время ожидания. Попробуйте снова.",
+    "noWallets": "Нет способов оплаты",
+    "noWalletsDesc": "Магазин ещё не настроил платёжные кошельки"
   },
 
   "subscription": {
@@ -318,6 +337,20 @@
     "enterIdOrUsername": "Введите Telegram ID или @username",
     "addError": "Ошибка добавления сотрудника",
     "removeError": "Ошибка удаления сотрудника"
+  },
+
+  "workerMode": {
+    "active": "Активен",
+    "work": "Работать",
+    "infoTitle": "Работа в чужом магазине",
+    "infoDesc": "Включите режим работника, чтобы управлять товарами магазина, в котором вы являетесь сотрудником.",
+    "modeActive": "Режим работника активен",
+    "exit": "Выйти",
+    "availableShops": "Доступные магазины ({count})",
+    "noShops": "Нет доступных магазинов",
+    "notWorker": "Вы не являетесь работником ни одного магазина",
+    "askOwner": "Попросите владельца магазина добавить вас в Workspace",
+    "accessSince": "Доступ с {date}"
   },
 
   "products": {
@@ -417,8 +450,11 @@
     "title": "Мои заказы",
     "noOrders": "Нет заказов",
     "purchasesWillAppear": "Ваши покупки появятся здесь",
-    "activeCount": "активных",
+    "activeOrders": "активных",
     "autoRefresh": "Автообновление каждые 30 сек",
+    "shop": "Магазин",
+    "confirmations": "Подтверждения",
+    "paymentAddress": "Адрес оплаты",
     "status": {
       "pending": "Ожидание",
       "verifying": "Проверка",
@@ -426,12 +462,6 @@
       "shipped": "Отправлен",
       "delivered": "Получен",
       "cancelled": "Отменён"
-    },
-    "labels": {
-      "product": "Товар",
-      "shop": "Магазин",
-      "confirmations": "Подтверждения",
-      "paymentAddress": "Адрес оплаты"
     }
   },
 
@@ -452,7 +482,8 @@
     "errorOccurred": "Произошла ошибка: {message}\n\nПопробуйте перезагрузить приложение.",
     "reloadApp": "Перезагрузить приложение",
     "goToMain": "Вернуться на главную",
-    "persistentError": "Если проблема повторяется, свяжитесь с поддержкой"
+    "persistentError": "Если проблема повторяется, свяжитесь с поддержкой",
+    "sessionExpired": "Сессия истекла. Перезапустите приложение из Telegram."
   },
 
   "offline": {
@@ -488,5 +519,10 @@
     "copied": "Скопировано!",
     "clickToCopy": "Нажмите для копирования",
     "stackTrace": "Stack trace"
+  },
+
+  "actions": {
+    "adding": "Добавление...",
+    "retry": "Повторить запрос"
   }
 }

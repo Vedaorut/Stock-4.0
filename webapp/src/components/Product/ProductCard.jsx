@@ -78,7 +78,7 @@ const SyncedBadge = ({ sourceName, t }) => (
   </span>
 );
 
-const StockBadge = ({ stock, lowStock }) => (
+const StockBadge = ({ stock, lowStock, pcsLabel }) => (
   <div
     className={`flex items-center gap-1 px-2 py-1 rounded-full border ${
       lowStock ? 'border-orange-400/70 bg-orange-500/12' : 'border-white/12 bg-black/35'
@@ -91,7 +91,7 @@ const StockBadge = ({ stock, lowStock }) => (
       className="text-[10px] font-semibold text-white"
       style={{ letterSpacing: '0.08em' }}
     >
-      {stock > 999 ? '999+' : stock} шт
+      {stock > 999 ? '999+' : stock} {pcsLabel}
     </span>
   </div>
 );
@@ -116,7 +116,7 @@ const ProductCard = memo(function ProductCard({ product, onPreorder: _onPreorder
   const toast = useToast();
   const platform = usePlatform();
   const android = isAndroid(platform);
-  const { t: _t } = useTranslation();
+  const { t } = useTranslation();
   const highlightProductId = useStore(state => state.highlightProductId);
   const setHighlightProductId = useStore(state => state.setHighlightProductId);
   const cardRef = useRef(null);
@@ -249,7 +249,7 @@ const ProductCard = memo(function ProductCard({ product, onPreorder: _onPreorder
         {isPreorder ? (
           <PreorderIcon />
         ) : (
-          stock > 0 && <StockBadge stock={stock} lowStock={lowStock} />
+          stock > 0 && <StockBadge stock={stock} lowStock={lowStock} pcsLabel={t('shopOrders.labels.pcs')} />
         )}
       </div>
 

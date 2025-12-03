@@ -22,8 +22,8 @@ const formatMoney = (value) => {
   return Number.isInteger(amount) ? String(amount) : amount.toFixed(2);
 };
 
-const buildFollowLabel = (follow) => {
-  const name = follow.source_shop_name || follow.sourceShopName || follow.name || 'Магазин';
+const buildFollowLabel = (follow, lang = 'ru') => {
+  const name = follow.source_shop_name || follow.sourceShopName || follow.name || (lang === 'en' ? 'Shop' : 'Магазин');
   const isResell = follow.mode === 'resell';
   const markupType = follow.markup_type || 'percentage';
   let markupSuffix = '';
@@ -40,7 +40,7 @@ const buildFollowLabel = (follow) => {
       }
     }
   }
-  const modeLabel = isResell ? 'Перепродажа' : 'Мониторинг';
+  const modeLabel = isResell ? (lang === 'en' ? 'Resell' : 'Перепродажа') : (lang === 'en' ? 'Monitor' : 'Мониторинг');
   return `🏪 ${name} (${modeLabel}${markupSuffix})`;
 };
 
@@ -52,8 +52,8 @@ const sendOrEdit = async (ctx, text, keyboard) => {
   return ctx.reply(text, replyMarkup);
 };
 
-const formatProductLine = (index, name, price, stock) =>
-  `${index + 1}. ${name} • $${formatMoney(price)} • ${Number.isFinite(stock) ? stock : 0} шт`;
+const formatProductLine = (index, name, price, stock, lang = 'ru') =>
+  `${index + 1}. ${name} • $${formatMoney(price)} • ${Number.isFinite(stock) ? stock : 0} ${lang === 'en' ? 'pcs' : 'шт'}`;
 
 const formatPriceWithMarkup = (sourcePrice, markupType, markupValue) => {
   const price = Number(sourcePrice) || 0;
@@ -73,9 +73,9 @@ const formatPriceWithMarkup = (sourcePrice, markupType, markupValue) => {
   return `$${formatMoney(price)} → $${formatMoney(finalPrice)} ${markupSuffix}`.trim();
 };
 
-const buildCatalogMessage = (followInfo, products, mode) => {
+const buildCatalogMessage = (followInfo, products, mode, lang = 'ru') => {
   const lines = [];
-  const shopName = followInfo.source_shop_name || followInfo.sourceShopName || 'Магазин';
+  const shopName = followInfo.source_shop_name || followInfo.sourceShopName || (lang === 'en' ? 'Shop' : 'Магазин');
   const isResell = mode === 'resell';
   const markupType = followInfo.markup_type || 'percentage';
   let markupSuffix = '';
@@ -92,10 +92,13 @@ const buildCatalogMessage = (followInfo, products, mode) => {
       }
     }
   }
-  const modeLabel = isResell ? `Перепродажа${markupSuffix}` : 'Мониторинг';
+  const resellLabel = lang === 'en' ? 'Resell' : 'Перепродажа';
+  const monitorLabel = lang === 'en' ? 'Monitor' : 'Мониторинг';
+  const modeLabel = isResell ? `${resellLabel}${markupSuffix}` : monitorLabel;
+  const modeCaption = lang === 'en' ? 'Mode' : 'Режим';
 
   lines.push(`🏪 ${shopName}`);
-  lines.push(`Режим: ${modeLabel}`);
+  lines.push(`${modeCaption}: ${modeLabel}`);
   lines.push('');
 
   if (!Array.isArray(products) || products.length === 0) {
@@ -107,21 +110,23 @@ const buildCatalogMessage = (followInfo, products, mode) => {
     ? (followInfo.markup_fixed ?? 0)
     : (followInfo.markup_percentage ?? followInfo.markup ?? 0);
 
+  const pcsLabel = lang === 'en' ? 'pcs' : 'шт';
+  const productLabel = lang === 'en' ? 'Product' : 'Товар';
   products.slice(0, 10).forEach((product, index) => {
     if (isResell) {
       const synced = product.synced_product || product.syncedProduct || {};
       const name =
-        synced.name || product.source_product?.name || product.name || `Товар #${product.id}`;
+        synced.name || product.source_product?.name || product.name || `${productLabel} #${product.id}`;
       const sourcePrice = product.source_product?.price ?? 0;
       const stock = synced.stock_quantity ?? product.source_product?.stock_quantity ?? 0;
       const priceStr = formatPriceWithMarkup(sourcePrice, markupType, markupValue);
       lines.push(`${index + 1}. ${name}`);
-      lines.push(`   💰 ${priceStr} • ${Number.isFinite(stock) ? stock : 0} шт`);
+      lines.push(`   💰 ${priceStr} • ${Number.isFinite(stock) ? stock : 0} ${pcsLabel}`);
     } else {
-      const name = product.name || `Товар #${product.id}`;
+      const name = product.name || `${productLabel} #${product.id}`;
       const price = product.price ?? 0;
       const stock = product.stock_quantity ?? 0;
-      lines.push(formatProductLine(index, name, price, stock));
+      lines.push(formatProductLine(index, name, price, stock, lang));
     }
   });
 
@@ -160,11 +165,11 @@ export const handleViewFollows = async (ctx) => {
     }
 
     const followButtons = follows.map((follow) => [
-      Markup.button.callback(buildFollowLabel(follow), `follow_detail:${follow.id}`),
+      Markup.button.callback(buildFollowLabel(follow, ctx.lang), `follow_detail:${follow.id}`),
     ]);
 
     const listText = follows
-      .map((follow, index) => `${index + 1}. ${buildFollowLabel(follow).slice(2)}`) // remove leading emoji for text list
+      .map((follow, index) => `${index + 1}. ${buildFollowLabel(follow, ctx.lang).slice(2)}`) // remove leading emoji for text list
       .join('\n');
 
     const message = `${followMessages.contextDetailed}\n\n${listText}`;
@@ -250,14 +255,14 @@ export const handleFollowDetail = async (ctx) => {
     const mode = payload.mode || followDetail.mode;
     const products = Array.isArray(payload.products) ? payload.products : [];
 
-    const message = buildCatalogMessage(followDetail, products, mode);
+    const message = buildCatalogMessage(followDetail, products, mode, ctx.lang);
 
     await ctx.editMessageText(message, followCatalogMenu(followId));
     logger.info(`User ${ctx.from.id} viewed follow catalog ${followId}`);
   } catch (error) {
     // Telegram error when message content unchanged - silently ignore
     if (error.message?.includes('message is not modified')) {
-      await ctx.answerCbQuery('Данные актуальны').catch(() => {});
+      await ctx.answerCbQuery(ctx.t('follows.dataActual')).catch(() => {});
       return;
     }
 
@@ -329,18 +334,18 @@ export const handleDeleteFollow = async (ctx) => {
       throw error;
     }
 
-    const shopName = follow.source_shop_name || follow.sourceShopName || 'Магазин';
+    const shopName = follow.source_shop_name || follow.sourceShopName || (ctx.lang === 'en' ? 'Shop' : 'Магазин');
     const isResell = follow.mode === 'resell';
 
-    let confirmMessage = `⚠️ Удалить подписку?\n\nМагазин: ${shopName}`;
+    let confirmMessage = ctx.t('follows.confirmDelete', { shopName });
     if (isResell) {
-      confirmMessage += '\n\n❗ Все скопированные товары будут удалены!';
+      confirmMessage += `\n\n❗ ${ctx.t('follows.confirmDeleteResell')}`;
     }
 
     const confirmKeyboard = Markup.inlineKeyboard([
       [
-        Markup.button.callback('✅ Да, удалить', `confirm_delete_follow:${followId}`),
-        Markup.button.callback('❌ Отмена', `cancel_delete_follow:${followId}`),
+        Markup.button.callback(ctx.t('follows.confirmYes'), `confirm_delete_follow:${followId}`),
+        Markup.button.callback(ctx.t('follows.confirmNo'), `cancel_delete_follow:${followId}`),
       ],
     ]);
 
@@ -357,7 +362,7 @@ export const handleDeleteFollow = async (ctx) => {
  */
 export const handleConfirmDeleteFollow = async (ctx) => {
   try {
-    await ctx.answerCbQuery('Удаляем...');
+    await ctx.answerCbQuery(ctx.t('follows.deleting'));
 
     const followId = parseInt(ctx.match[1]);
 
@@ -380,11 +385,11 @@ export const handleConfirmDeleteFollow = async (ctx) => {
     }
 
     const followButtons = follows.map((follow) => [
-      Markup.button.callback(buildFollowLabel(follow), `follow_detail:${follow.id}`),
+      Markup.button.callback(buildFollowLabel(follow, ctx.lang), `follow_detail:${follow.id}`),
     ]);
 
     const listText = follows
-      .map((follow, index) => `${index + 1}. ${buildFollowLabel(follow).slice(2)}`)
+      .map((follow, index) => `${index + 1}. ${buildFollowLabel(follow, ctx.lang).slice(2)}`)
       .join('\n');
 
     const message = `${followMessages.contextDetailed}\n\n${listText}`;
@@ -401,7 +406,7 @@ export const handleConfirmDeleteFollow = async (ctx) => {
  */
 export const handleCancelDeleteFollow = async (ctx) => {
   try {
-    await ctx.answerCbQuery('Отменено');
+    await ctx.answerCbQuery(ctx.t('follows.cancelled'));
 
     const followId = parseInt(ctx.match[1]);
 
@@ -465,14 +470,14 @@ export const handleSwitchMode = async (ctx) => {
 
     if (syncedCount > 0) {
       // Show confirmation warning
-      const warningText = `\u26a0\ufe0f Сменить режим на Мониторинг?\n\nСкопированные товары (${syncedCount} шт) будут удалены из вашего магазина.`;
+      const warningText = ctx.t('follows.switchToMonitorWarning', { count: syncedCount });
 
       await ctx.editMessageText(
         warningText,
         Markup.inlineKeyboard([
           [
-            Markup.button.callback('\u2705 Да, сменить', `follow_mode_confirm:${followId}`),
-            Markup.button.callback('\u274c Отмена', `follow_settings:${followId}`),
+            Markup.button.callback(ctx.t('follows.confirmSwitch'), `follow_mode_confirm:${followId}`),
+            Markup.button.callback(ctx.t('follows.confirmNo'), `follow_settings:${followId}`),
           ],
         ])
       );
@@ -508,7 +513,7 @@ export const handleSwitchMode = async (ctx) => {
  */
 export const handleConfirmSwitchToMonitor = async (ctx) => {
   try {
-    await ctx.answerCbQuery('Переключаем...');
+    await ctx.answerCbQuery(ctx.t('follows.switching'));
 
     const followId = parseInt(ctx.match[1]);
 

@@ -79,13 +79,13 @@ export default function PaymentMethodModal() {
       // Детальные toast сообщения
       const errorMsg = error.response?.data?.error || error.message;
       if (errorMsg?.includes('order')) {
-        toast.error('Не удалось создать заказ. Попробуйте снова.');
+        toast.error(t('payment.createOrderError'));
       } else if (errorMsg?.includes('invoice')) {
-        toast.error('Ошибка генерации счёта. Попробуйте снова.');
+        toast.error(t('payment.invoiceError'));
       } else if (errorMsg?.includes('network') || errorMsg?.includes('timeout')) {
-        toast.error('Проблема с соединением. Проверьте интернет.');
+        toast.error(t('payment.connectionError'));
       } else {
-        toast.error('Не удалось выбрать способ оплаты');
+        toast.error(t('payment.selectError'));
       }
     } finally {
       setGeneratingStartTime(null);
@@ -296,21 +296,21 @@ export default function PaymentMethodModal() {
             >
               <div className="text-center">
                 <div className="w-16 h-16 border-4 border-orange-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                <p className="text-white font-semibold text-lg">Генерация счёта...</p>
-                <p className="text-gray-400 text-sm mt-2">Подождите несколько секунд</p>
+                <p className="text-white font-semibold text-lg">{t('payment.generatingInvoice')}</p>
+                <p className="text-gray-400 text-sm mt-2">{t('payment.pleaseWait')}</p>
 
                 {generatingStartTime && Date.now() - generatingStartTime > 15000 && (
                   <motion.button
                     onClick={() => {
                       setPaymentStep('method');
                       setGeneratingStartTime(null);
-                      toast.error('Превышено время ожидания. Попробуйте снова.');
+                      toast.error(t('payment.timeoutError'));
                     }}
                     className="mt-4 px-6 py-3 rounded-xl bg-red-500 text-white font-semibold"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                   >
-                    Отменить
+                    {t('common.cancel')}
                   </motion.button>
                 )}
               </div>

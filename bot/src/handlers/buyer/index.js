@@ -229,7 +229,7 @@ const handleSubscribe = async (ctx) => {
 
     // Validate shopId
     if (!Number.isInteger(shopId) || shopId <= 0) {
-      await ctx.answerCbQuery('Некорректный ID магазина', { show_alert: true });
+      await ctx.answerCbQuery(ctx.t('errors.invalidShopId'), { show_alert: true });
       return;
     }
 
@@ -301,7 +301,7 @@ const handleUnsubscribe = async (ctx) => {
 
     // Validate shopId
     if (!Number.isInteger(shopId) || shopId <= 0) {
-      await ctx.answerCbQuery('Некорректный ID магазина', { show_alert: true });
+      await ctx.answerCbQuery(ctx.t('errors.invalidShopId'), { show_alert: true });
       return;
     }
 
@@ -388,7 +388,7 @@ const handleShopView = async (ctx) => {
 
     // Validate shopId
     if (!Number.isInteger(shopId) || shopId <= 0) {
-      await ctx.answerCbQuery('Некорректный ID магазина', { show_alert: true });
+      await ctx.answerCbQuery(ctx.t('errors.invalidShopId'), { show_alert: true });
       return;
     }
 
@@ -427,7 +427,7 @@ const handleShopView = async (ctx) => {
 
     // ✅ P2-2 FIX: Answer callback query to remove spinner
     if (ctx.callbackQuery) {
-      await ctx.answerCbQuery('Ошибка загрузки').catch(() => {});
+      await ctx.answerCbQuery(ctx.t('errors.loadError')).catch(() => {});
     }
 
     await smartMessage.send(ctx, {
@@ -446,7 +446,7 @@ const handleShopSection = async (ctx, section) => {
 
     // Validate shopId
     if (!Number.isInteger(shopId) || shopId <= 0) {
-      await ctx.answerCbQuery('Некорректный ID магазина', { show_alert: true });
+      await ctx.answerCbQuery(ctx.t('errors.invalidShopId'), { show_alert: true });
       return;
     }
 
@@ -476,7 +476,7 @@ const handleShopSection = async (ctx, section) => {
 
     // ✅ P2-2 FIX: Answer callback query to remove spinner
     if (ctx.callbackQuery) {
-      await ctx.answerCbQuery('Ошибка загрузки').catch(() => {});
+      await ctx.answerCbQuery(ctx.t('errors.loadError')).catch(() => {});
     }
 
     await smartMessage.send(ctx, {

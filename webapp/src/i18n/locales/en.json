@@ -91,7 +91,10 @@
     "inviteLinkDescription": "Share with buyers",
     "inviteLinkLabel": "Shop link",
     "inviteLinkCopied": "Link copied!",
-    "inviteLinkHint": "Share this link in your channel. Users will automatically subscribe to your shop."
+    "inviteLinkHint": "Share this link in your channel. Users will automatically subscribe to your shop.",
+    "workerModeDisabled": "Worker mode disabled",
+    "nowWorkingIn": "You are now working in \"{name}\"",
+    "shopSelectionError": "Failed to select shop"
   },
 
   "wallet": {
@@ -180,7 +183,8 @@
     "items": "{count} items",
     "item": "item",
     "cannotOrderOwn": "You cannot order products from your own shop",
-    "browseCatalog": "Browse Catalog"
+    "browseCatalog": "Browse Catalog",
+    "clearForOtherShop": "Clear cart to shop from another store"
   },
 
   "subscriptions": {
@@ -231,7 +235,22 @@
     "amount": "Amount",
     "copyAddress": "Copy address",
     "addressCopied": "Address copied",
-    "orderDetails": "Order details"
+    "orderDetails": "Order details",
+    "orderDataError": "Order data error",
+    "insufficientStock": "Insufficient stock",
+    "createOrderError": "Failed to create order. Please try again.",
+    "connectionError": "Connection issue. Check your internet.",
+    "invalidAmount": "Invalid amount from server",
+    "rateServiceUnavailable": "Rate service temporarily unavailable",
+    "cryptoNotAccepted": "Seller does not accept this cryptocurrency",
+    "addressGenerationError": "Address generation error",
+    "invoiceError": "Invoice generation error. Please try again.",
+    "selectError": "Failed to select payment method",
+    "generatingInvoice": "Generating invoice...",
+    "pleaseWait": "Please wait a few seconds",
+    "timeoutError": "Timeout exceeded. Please try again.",
+    "noWallets": "No payment methods",
+    "noWalletsDesc": "This shop hasn't configured payment wallets yet"
   },
 
   "subscription": {
@@ -318,6 +337,20 @@
     "enterIdOrUsername": "Enter Telegram ID or @username",
     "addError": "Failed to add worker",
     "removeError": "Failed to remove worker"
+  },
+
+  "workerMode": {
+    "active": "Active",
+    "work": "Work",
+    "infoTitle": "Work in another shop",
+    "infoDesc": "Enable worker mode to manage products in a shop where you are an employee.",
+    "modeActive": "Worker mode active",
+    "exit": "Exit",
+    "availableShops": "Available shops ({count})",
+    "noShops": "No available shops",
+    "notWorker": "You are not a worker in any shop",
+    "askOwner": "Ask the shop owner to add you to Workspace",
+    "accessSince": "Access since {date}"
   },
 
   "products": {
@@ -417,8 +450,11 @@
     "title": "My Orders",
     "noOrders": "No orders",
     "purchasesWillAppear": "Your purchases will appear here",
-    "activeCount": "active",
+    "activeOrders": "active",
     "autoRefresh": "Auto-refresh every 30 sec",
+    "shop": "Shop",
+    "confirmations": "Confirmations",
+    "paymentAddress": "Payment address",
     "status": {
       "pending": "Pending",
       "verifying": "Verifying",
@@ -426,12 +462,6 @@
       "shipped": "Shipped",
       "delivered": "Delivered",
       "cancelled": "Cancelled"
-    },
-    "labels": {
-      "product": "Product",
-      "shop": "Shop",
-      "confirmations": "Confirmations",
-      "paymentAddress": "Payment address"
     }
   },
 
@@ -452,7 +482,8 @@
     "errorOccurred": "An error occurred: {message}\n\nTry reloading the app.",
     "reloadApp": "Reload app",
     "goToMain": "Go to main page",
-    "persistentError": "If the problem persists, contact support"
+    "persistentError": "If the problem persists, contact support",
+    "sessionExpired": "Session expired. Restart the app from Telegram."
   },
 
   "offline": {
@@ -488,5 +519,10 @@
     "copied": "Copied!",
     "clickToCopy": "Click to copy",
     "stackTrace": "Stack trace"
+  },
+
+  "actions": {
+    "adding": "Adding...",
+    "retry": "Retry"
   }
 }

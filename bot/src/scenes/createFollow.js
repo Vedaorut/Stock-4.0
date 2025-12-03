@@ -68,7 +68,7 @@ const showSearchResults = async (ctx) => {
     // Get shop name from message
     if (!ctx.message || !ctx.message.text) {
       await smartMessage.send(ctx, {
-        text: 'Пожалуйста, отправьте название магазина текстом.\n\n' + followMessages.createEnterName,
+        text: ctx.t('scenes.sendTextMessage') + '\n\n' + followMessages.createEnterName,
       });
       return;
     }

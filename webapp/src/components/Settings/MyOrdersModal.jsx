@@ -4,15 +4,16 @@ import PageHeader from '../common/PageHeader';
 import { useApi } from '../../hooks/useApi';
 import { useTelegram } from '../../hooks/useTelegram';
 import { useBackButton } from '../../hooks/useBackButton';
+import { useTranslation } from '../../i18n/useTranslation';
 
-// Compact status config with dot indicators
-const STATUS = {
-  pending: { label: 'Ожидание', color: '#FFCC00', dot: 'bg-yellow-400' },
-  verifying: { label: 'Проверка', color: '#3B82F6', dot: 'bg-blue-500' },
-  confirmed: { label: 'Оплачен', color: '#22C55E', dot: 'bg-green-500' },
-  shipped: { label: 'Отправлен', color: '#8B5CF6', dot: 'bg-purple-500' },
-  delivered: { label: 'Получен', color: '#22C55E', dot: 'bg-green-500' },
-  cancelled: { label: 'Отменён', color: '#EF4444', dot: 'bg-red-500' },
+// Compact status config with dot indicators (labels will be replaced with t() in component)
+const STATUS_CONFIG = {
+  pending: { key: 'myOrders.status.pending', color: '#FFCC00', dot: 'bg-yellow-400' },
+  verifying: { key: 'myOrders.status.verifying', color: '#3B82F6', dot: 'bg-blue-500' },
+  confirmed: { key: 'myOrders.status.confirmed', color: '#22C55E', dot: 'bg-green-500' },
+  shipped: { key: 'myOrders.status.shipped', color: '#8B5CF6', dot: 'bg-purple-500' },
+  delivered: { key: 'myOrders.status.delivered', color: '#22C55E', dot: 'bg-green-500' },
+  cancelled: { key: 'myOrders.status.cancelled', color: '#EF4444', dot: 'bg-red-500' },
 };
 
 // Truncate hash: abc123...xyz789
@@ -29,7 +30,7 @@ const getCryptoSymbol = (currency) => {
 
 // Single expandable order row
 // eslint-disable-next-line no-unused-vars
-function OrderRow({ order, isExpanded, onToggle }) {
+function OrderRow({ order, isExpanded, onToggle, t }) {
   const { triggerHaptic } = useTelegram();
 
   // Determine status
@@ -37,7 +38,8 @@ function OrderRow({ order, isExpanded, onToggle }) {
   if (order.status === 'pending' && order.payment_hash) {
     effectiveStatus = 'verifying';
   }
-  const status = STATUS[effectiveStatus] || STATUS.pending;
+  const statusConfig = STATUS_CONFIG[effectiveStatus] || STATUS_CONFIG.pending;
+  const status = { ...statusConfig, label: t(statusConfig.key) };
 
   const orderDate = new Date(order.created_at || order.createdAt);
   const cryptoAmount = order.crypto_amount ? parseFloat(order.crypto_amount) : null;
@@ -133,13 +135,13 @@ function OrderRow({ order, isExpanded, onToggle }) {
                   <div className="flex items-start justify-between gap-2">
                     {order.product_name && (
                       <div className="flex-1 min-w-0">
-                        <p className="text-[10px] text-gray-500 uppercase tracking-wider">Товар</p>
+                        <p className="text-[10px] text-gray-500 uppercase tracking-wider">{t('shopOrders.labels.product')}</p>
                         <p className="text-white text-xs truncate">{order.product_name}</p>
                       </div>
                     )}
                     {order.shop_name && (
                       <div className="text-right flex-shrink-0">
-                        <p className="text-[10px] text-gray-500 uppercase tracking-wider">Магазин</p>
+                        <p className="text-[10px] text-gray-500 uppercase tracking-wider">{t('myOrders.shop')}</p>
                         <p className="text-white text-xs">{order.shop_name}</p>
                       </div>
                     )}
@@ -150,7 +152,7 @@ function OrderRow({ order, isExpanded, onToggle }) {
                 {effectiveStatus === 'verifying' && (
                   <div>
                     <div className="flex items-center justify-between mb-1">
-                      <p className="text-[10px] text-gray-500 uppercase tracking-wider">Подтверждения</p>
+                      <p className="text-[10px] text-gray-500 uppercase tracking-wider">{t('myOrders.confirmations')}</p>
                       <p className="text-[10px] text-blue-400 font-mono">{confirmations}/{requiredConfirmations}</p>
                     </div>
                     <div className="h-1 bg-white/5 rounded-full overflow-hidden">
@@ -191,7 +193,7 @@ function OrderRow({ order, isExpanded, onToggle }) {
                 {/* Crypto payment address (if pending) */}
                 {effectiveStatus === 'pending' && order.payment_address && (
                   <div>
-                    <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-0.5">Адрес оплаты</p>
+                    <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-0.5">{t('myOrders.paymentAddress')}</p>
                     <code className="text-[11px] text-orange-400 font-mono bg-orange-500/10 px-2 py-1 rounded block truncate">
                       {truncateHash(order.payment_address)}
                     </code>
@@ -210,6 +212,7 @@ function OrderRow({ order, isExpanded, onToggle }) {
 export default function MyOrdersModal({ isOpen, onClose }) {
   const { get } = useApi();
   const { triggerHaptic } = useTelegram();
+  const { t } = useTranslation();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -272,7 +275,7 @@ export default function MyOrdersModal({ isOpen, onClose }) {
           exit={{ x: '100%' }}
           transition={{ type: 'spring', damping: 30, stiffness: 300 }}
         >
-          <PageHeader title="Мои заказы" onBack={handleClose} variant="close" />
+          <PageHeader title={t('settings.items.myOrders')} onBack={handleClose} variant="close" />
 
           <div
             className="flex-1 overflow-y-auto"
@@ -291,12 +294,12 @@ export default function MyOrdersModal({ isOpen, onClose }) {
                   className="flex items-center justify-between mb-4 px-1"
                 >
                   <p className="text-gray-500 text-xs">
-                    Всего: <span className="text-white font-medium">{orders.length}</span>
+                    {t('common.total')}: <span className="text-white font-medium">{orders.length}</span>
                   </p>
                   {activeCount > 0 && (
                     <p className="text-xs">
                       <span className="inline-block w-1.5 h-1.5 rounded-full bg-yellow-400 mr-1.5 animate-pulse" />
-                      <span className="text-yellow-400">{activeCount} активных</span>
+                      <span className="text-yellow-400">{activeCount} {t('myOrders.activeOrders')}</span>
                     </p>
                   )}
                 </motion.div>
@@ -342,7 +345,7 @@ export default function MyOrdersModal({ isOpen, onClose }) {
                     className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-white/10 hover:bg-white/15 transition-colors"
                     whileTap={{ scale: 0.95 }}
                   >
-                    Повторить
+                    {t('common.retry')}
                   </motion.button>
                 </motion.div>
               )}
@@ -359,8 +362,8 @@ export default function MyOrdersModal({ isOpen, onClose }) {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
                     </svg>
                   </div>
-                  <p className="text-white font-medium mb-1">Нет заказов</p>
-                  <p className="text-gray-500 text-sm">Ваши покупки появятся здесь</p>
+                  <p className="text-white font-medium mb-1">{t('myOrders.noOrders')}</p>
+                  <p className="text-gray-500 text-sm">{t('myOrders.purchasesWillAppear')}</p>
                 </motion.div>
               )}
 
@@ -378,6 +381,7 @@ export default function MyOrdersModal({ isOpen, onClose }) {
                         order={order}
                         isExpanded={expandedId === order.id}
                         onToggle={() => toggleExpand(order.id)}
+                        t={t}
                       />
                     </motion.div>
                   ))}
@@ -392,7 +396,7 @@ export default function MyOrdersModal({ isOpen, onClose }) {
                   transition={{ delay: 0.5 }}
                   className="text-center text-gray-600 text-[10px] mt-6"
                 >
-                  Автообновление каждые 30 сек
+                  {t('shopOrders.autoRefresh')}
                 </motion.p>
               )}
             </div>

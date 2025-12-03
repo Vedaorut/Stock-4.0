@@ -69,15 +69,15 @@ export async function handleAIProductCommand(ctx) {
         delete ctx.session.pendingAI;
 
         await smartMessage.send(ctx, {
-          text: '⏱ Предыдущая операция устарела и отменена.\n\nМожете начать заново.',
+          text: ctx.t('ai.operationExpiredCancelled'),
           parseMode: 'HTML',
         });
       } else {
         await smartMessage.send(ctx, {
-          text: '⚠️ У вас есть незавершенная операция.\n\nВыберите действие:',
+          text: ctx.t('ai.pendingOperation'),
           keyboard: Markup.inlineKeyboard([
-            [Markup.button.callback('❌ Отменить и начать заново', 'ai_cancel')],
-            [Markup.button.callback('↩️ Вернуться к выбору', 'ai_back_to_selection')],
+            [Markup.button.callback(ctx.t('ai.cancelAndRestart'), 'ai_cancel')],
+            [Markup.button.callback(ctx.t('ai.backToSelection'), 'ai_back_to_selection')],
           ]),
         });
         return;
@@ -220,24 +220,24 @@ export async function handleAIProductCommand(ctx) {
     });
 
     // Determine error type and provide specific message
-    let userErrorMessage = '❌ Произошла ошибка';
-    let suggestion = 'Попробуйте ещё раз или используйте меню.';
+    let userErrorMessage = ctx.t('ai.errorOccurred');
+    let suggestion = ctx.t('ai.trySuggestion');
     let retryButton = null;
 
     if (error.message?.includes('timeout')) {
-      userErrorMessage = '⏱ Превышено время ожидания';
-      suggestion = 'Попробуйте упростить запрос или повторите позже.';
-      retryButton = Markup.button.callback('🔄 Повторить', 'ai_retry');
+      userErrorMessage = ctx.t('ai.timeoutError');
+      suggestion = ctx.t('ai.timeoutSuggestion');
+      retryButton = Markup.button.callback(ctx.t('ai.retry'), 'ai_retry');
     } else if (error.message?.includes('API') || error.status === 503) {
-      userErrorMessage = '🔌 Проблема с подключением к сервису';
-      suggestion = 'Повторите через несколько секунд.';
-      retryButton = Markup.button.callback('🔄 Повторить', 'ai_retry');
+      userErrorMessage = ctx.t('ai.connectionError');
+      suggestion = ctx.t('ai.connectionSuggestion');
+      retryButton = Markup.button.callback(ctx.t('ai.retry'), 'ai_retry');
     } else if (error.message?.includes('rate limit') || error.status === 429) {
-      userErrorMessage = '⚠️ Слишком много запросов';
-      suggestion = 'Подождите минуту и попробуйте снова.';
+      userErrorMessage = ctx.t('ai.rateLimitError');
+      suggestion = ctx.t('ai.rateLimitSuggestion');
     } else if (error.message?.includes('unauthorized') || error.status === 401) {
-      userErrorMessage = '🔐 Проблема с авторизацией';
-      suggestion = 'Перезапустите бота командой /start';
+      userErrorMessage = ctx.t('ai.authError');
+      suggestion = ctx.t('ai.authSuggestion');
     }
 
     // Graceful error handling
@@ -245,7 +245,7 @@ export async function handleAIProductCommand(ctx) {
       const keyboard = retryButton
         ? Markup.inlineKeyboard([
             [retryButton],
-            [Markup.button.callback('↩️ В меню', 'seller:menu')],
+            [Markup.button.callback(ctx.t('ai.toMenu'), 'seller:menu')],
           ])
         : sellerMenu(0, { hasFollows: ctx.session?.hasFollows }, ctx.lang);
 
@@ -289,7 +289,7 @@ async function handleClarification(ctx, result) {
       ]),
       [
         {
-          text: '◀️ Назад',
+          text: ctx.t('ai.backButton'),
           callback_data: 'ai_cancel',
         },
       ],
@@ -315,8 +315,8 @@ export async function handleAISelection(ctx) {
     // Check if pending operation exists
     if (!ctx.session.pendingAI) {
       await ctx.editMessageText(
-        '⏳ Операция устарела. Попробуйте снова.',
-        Markup.inlineKeyboard([[Markup.button.callback('↩️ В меню', 'seller:menu')]])
+        ctx.t('ai.operationExpired'),
+        Markup.inlineKeyboard([[Markup.button.callback(ctx.t('ai.toMenu'), 'seller:menu')]])
       );
       return;
     }
@@ -327,8 +327,8 @@ export async function handleAISelection(ctx) {
     const selectedProduct = options.find((p) => p.id === productId);
     if (!selectedProduct) {
       await ctx.editMessageText(
-        '❌ Товар не найден',
-        Markup.inlineKeyboard([[Markup.button.callback('↩️ В меню', 'seller:menu')]])
+        ctx.t('ai.productNotFound'),
+        Markup.inlineKeyboard([[Markup.button.callback(ctx.t('ai.toMenu'), 'seller:menu')]])
       );
       delete ctx.session.pendingAI;
       return;
@@ -338,7 +338,7 @@ export async function handleAISelection(ctx) {
     delete ctx.session.pendingAI;
 
     // Show processing message
-    await ctx.editMessageText('⏳ Обрабатываю...');
+    await ctx.editMessageText(ctx.t('ai.processing'));
 
     // Fetch current products for context
     const products =
@@ -347,7 +347,7 @@ export async function handleAISelection(ctx) {
         .catch(() => productApi.getShopProducts(shopId))) || [];
 
     // Re-process original command with clarified product ID
-    const result = await processProductCommand(originalCommand || 'выполнить операцию', {
+    const result = await processProductCommand(originalCommand || ctx.t('ai.executeOperation'), {
       shopId,
       shopName,
       token: ctx.session.token,
@@ -396,8 +396,8 @@ export async function handleAISelection(ctx) {
     logger.error('AI selection handler error:', error);
     try {
       await ctx.editMessageText(
-        '❌ Ошибка обработки. Попробуйте снова.',
-        Markup.inlineKeyboard([[Markup.button.callback('↩️ В меню', 'seller:menu')]])
+        ctx.t('ai.processingError'),
+        Markup.inlineKeyboard([[Markup.button.callback(ctx.t('ai.toMenu'), 'seller:menu')]])
       );
     } catch (replyError) {
       logger.error('Failed to send error message:', replyError);
@@ -423,7 +423,7 @@ export async function handleAICancel(ctx) {
     }
 
     await smartMessage.send(ctx, {
-      text: '❌ Операция отменена',
+      text: ctx.t('ai.operationCancelled'),
       keyboard: sellerMenu(0, { hasFollows: ctx.session?.hasFollows }, ctx.lang),
     });
 
@@ -451,7 +451,7 @@ export async function handleAIRetry(ctx) {
     }
 
     await smartMessage.send(ctx, {
-      text: '💬 Отправьте команду заново:',
+      text: ctx.t('ai.sendCommandAgain'),
       parseMode: 'HTML',
     });
 
@@ -474,8 +474,8 @@ export async function handleAIBackToSelection(ctx) {
     const pending = ctx.session.pendingAI;
     if (!pending || !pending.options) {
       await ctx.editMessageText(
-        '⏳ Операция устарела. Попробуйте снова.',
-        Markup.inlineKeyboard([[Markup.button.callback('↩️ В меню', 'seller:menu')]])
+        ctx.t('ai.operationExpired'),
+        Markup.inlineKeyboard([[Markup.button.callback(ctx.t('ai.toMenu'), 'seller:menu')]])
       );
       delete ctx.session.pendingAI;
       return;
@@ -492,7 +492,7 @@ export async function handleAIBackToSelection(ctx) {
         ]),
         [
           {
-            text: '◀️ Назад',
+            text: ctx.t('ai.backButton'),
             callback_data: 'ai_cancel',
           },
         ],
@@ -541,7 +541,7 @@ async function handleRandomProductSelection(ctx, userMessage, products) {
   const shopId = ctx.session.shopId || ctx.session.workspaceShopId;
 
   if (!products || products.length === 0) {
-    const replyText = 'Сейчас в магазине пусто — добавить что-нибудь?';
+    const replyText = ctx.t('ai.shopEmpty');
     await cleanReply(ctx, replyText);
     saveToConversationHistory(ctx, [
       { role: 'user', content: userMessage },
@@ -562,17 +562,17 @@ async function handleRandomProductSelection(ctx, userMessage, products) {
   const stockRaw = product.stock_quantity ?? product.stockQuantity ?? null;
   const stockInfo = Number.isFinite(stockRaw)
     ? stockRaw > 0
-      ? `, в наличии ${stockRaw}`
-      : ', сейчас нет в наличии'
+      ? `, ${ctx.t('ai.inStock', { count: stockRaw })}`
+      : `, ${ctx.t('ai.outOfStock')}`
     : '';
 
   const openers = [
-    (name) => `Поймал ${name}`,
-    (name) => `Выберу ${name}`,
-    (name) => `Давай возьмём ${name}`,
+    (name) => ctx.t('ai.randomOpener1', { name }),
+    (name) => ctx.t('ai.randomOpener2', { name }),
+    (name) => ctx.t('ai.randomOpener3', { name }),
   ];
   const opener = openers[Math.floor(Math.random() * openers.length)](product.name);
-  const replyText = `${opener}${priceText ? ` за ${priceText}` : ''}${stockInfo}. Что делаем?`;
+  const replyText = `${opener}${priceText ? ` ${ctx.lang === 'en' ? 'for' : 'за'} ${priceText}` : ''}${stockInfo}. ${ctx.t('ai.whatToDo')}`;
 
   await cleanReply(ctx, replyText);
   saveToConversationHistory(ctx, [
@@ -609,7 +609,7 @@ export async function handleBulkDeleteAllConfirm(ctx) {
 
     // Show processing message
     await smartMessage.send(ctx, {
-      text: '⏳ Удаляю все товары...',
+      text: ctx.t('ai.deletingAll'),
     });
 
     // Execute deletion via API
@@ -624,7 +624,7 @@ export async function handleBulkDeleteAllConfirm(ctx) {
 
     // Show success message
     await smartMessage.send(ctx, {
-      text: `✅ Удалено товаров: ${result.deletedCount}`,
+      text: `✅ ${ctx.t('ai.deletedCount', { count: result.deletedCount })}`,
       keyboard: sellerMenu(0, { hasFollows: ctx.session?.hasFollows }, ctx.lang),
     });
 
@@ -636,7 +636,7 @@ export async function handleBulkDeleteAllConfirm(ctx) {
   } catch (error) {
     logger.error('Bulk delete all confirmation error:', error);
     await smartMessage.send(ctx, {
-      text: '❌ Ошибка удаления товаров\n\n' + (error.message || 'Попробуйте позже'),
+      text: `❌ ${ctx.t('ai.deleteError')}\n\n${error.message || ctx.t('ai.tryLater')}`,
       keyboard: sellerMenu(0, { hasFollows: ctx.session?.hasFollows }, ctx.lang),
     });
   }

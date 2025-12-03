@@ -87,11 +87,8 @@ const handleLanguageSelection = async (ctx) => {
     }
 
     // Show confirmation and continue to main flow
-    const confirmMessage = lang === 'ru'
-      ? '✅ Язык установлен: Русский'
-      : '✅ Language set: English';
-
-    await ctx.editMessageText(confirmMessage);
+    const confirmMessage = ctx.t('settings.languageChanged');
+    await ctx.editMessageText(`✅ ${confirmMessage}`);
 
     // Small delay for UX
     await new Promise(resolve => setTimeout(resolve, 500));
@@ -145,7 +142,7 @@ const handleMainMenu = async (ctx) => {
   } catch (error) {
     logger.error('Error in main menu handler:', error);
     // H8 FIX: Answer callback query in catch to prevent infinite spinner
-    try { await ctx.answerCbQuery(); } catch (e) { /* ignore */ }
+    try { await ctx.answerCbQuery(); } catch { /* ignore */ }
     // Local error handling - don't throw to avoid infinite spinner
     try {
       await smartMessage.send(ctx, {
@@ -202,7 +199,7 @@ const handleBack = async (ctx) => {
       });
     } else if (ctx.session.role === 'worker') {
       await smartMessage.send(ctx, {
-        text: 'Меню сотрудника',
+        text: ctx.t('worker.menu'),
         keyboard: workerMenu(undefined, getLangSafe(ctx)),
       });
     } else if (ctx.session.role === 'buyer') {
@@ -219,7 +216,7 @@ const handleBack = async (ctx) => {
   } catch (error) {
     logger.error('Error in back handler:', error);
     // H7 FIX: Answer callback query in catch to prevent infinite spinner
-    try { await ctx.answerCbQuery(); } catch (e) { /* ignore */ }
+    try { await ctx.answerCbQuery(); } catch { /* ignore */ }
     // Local error handling - don't throw to avoid infinite spinner
     try {
       await smartMessage.send(ctx, {
@@ -264,13 +261,13 @@ const handleRoleToggle = async (ctx) => {
 
     // If worker - show role selection menu with 3 options
     const buttons = [
-      [Markup.button.callback('Покупаю', 'role:buyer')],
-      [Markup.button.callback('Продаю', 'role:seller')],
-      [Markup.button.callback('Сотрудник', 'role:worker')],
+      [Markup.button.callback(ctx.t('roleSelection.buying'), 'role:buyer')],
+      [Markup.button.callback(ctx.t('roleSelection.selling'), 'role:seller')],
+      [Markup.button.callback(ctx.t('roleSelection.worker'), 'role:worker')],
     ];
 
     await smartMessage.send(ctx, {
-      text: 'Выберите роль:',
+      text: ctx.t('roleSelection.chooseRole'),
       keyboard: Markup.inlineKeyboard(buttons),
     });
   } catch (error) {
@@ -382,7 +379,7 @@ const handleRoleWorker = async (ctx) => {
     // Check for workspace shops
     if (!ctx.session.token) {
       if (ctx.callbackQuery) {
-        await ctx.answerCbQuery('Требуется авторизация', { show_alert: true });
+        await ctx.answerCbQuery(ctx.t('errors.authRequired'), { show_alert: true });
       }
       return;
     }
@@ -407,21 +404,15 @@ const handleRoleWorker = async (ctx) => {
       workspaceShops = await shopApi.getWorkerShops(ctx.session.token);
     } catch (error) {
       logger.error('Failed to get workspace shops:', error);
-      await ctx.answerCbQuery('Ошибка загрузки магазинов', { show_alert: true });
+      await ctx.answerCbQuery(ctx.t('errors.loadShopsError'), { show_alert: true });
       return;
     }
 
     // No workspace shops - show informative message with user's Telegram ID
     if (!Array.isArray(workspaceShops) || workspaceShops.length === 0) {
       await smartMessage.send(ctx, {
-        text:
-          'Режим сотрудника\n\n' +
-          'Вы ещё не добавлены как сотрудник ни в один магазин.\n\n' +
-          'Как стать сотрудником:\n' +
-          '- Попросите владельца магазина добавить вас\n' +
-          '- Он должен указать ваш @username или Telegram ID\n\n' +
-          `Ваш ID: ${ctx.from.id}`,
-        keyboard: Markup.inlineKeyboard([[Markup.button.callback('Назад', 'role:toggle')]]),
+        text: ctx.t('worker.notAddedWithUsername', { telegramId: ctx.from.id }),
+        keyboard: Markup.inlineKeyboard([[Markup.button.callback(ctx.t('buttons.back'), 'role:toggle')]]),
       });
       return;
     }
@@ -440,7 +431,7 @@ const handleRoleWorker = async (ctx) => {
       ctx.session.isShopOwner = false;
 
       await smartMessage.send(ctx, {
-        text: `Вы работаете в магазине "${shop.name}"`,
+        text: ctx.t('worker.workingInShop', { shopName: shop.name }),
         keyboard: workerMenu(shop.name, getLangSafe(ctx)),
       });
       return;
@@ -452,16 +443,16 @@ const handleRoleWorker = async (ctx) => {
     ]);
 
     // Add back button
-    buttons.push([Markup.button.callback('Назад', 'role:toggle')]);
+    buttons.push([Markup.button.callback(ctx.t('buttons.back'), 'role:toggle')]);
 
     await smartMessage.send(ctx, {
-      text: 'Выберите магазин для работы:',
+      text: ctx.t('worker.selectShop'),
       keyboard: Markup.inlineKeyboard(buttons),
     });
   } catch (error) {
     logger.error('Error in role:worker handler:', error);
     try {
-      await ctx.answerCbQuery('Произошла ошибка', { show_alert: true });
+      await ctx.answerCbQuery(ctx.t('errors.genericError'), { show_alert: true });
     } catch (cbError) {
       logger.error('Failed to answer callback:', cbError);
     }
@@ -484,7 +475,7 @@ const handleSelectWorkspace = async (ctx) => {
     const shopId = parseInt(ctx.match[1], 10);
 
     if (!ctx.session.token) {
-      await ctx.answerCbQuery('Требуется авторизация', { show_alert: true });
+      await ctx.answerCbQuery(ctx.t('errors.authRequired'), { show_alert: true });
       return;
     }
 
@@ -494,13 +485,13 @@ const handleSelectWorkspace = async (ctx) => {
       workspaceShops = await shopApi.getWorkerShops(ctx.session.token);
     } catch (error) {
       logger.error('Failed to verify workspace access:', error);
-      await ctx.answerCbQuery('Ошибка проверки доступа', { show_alert: true });
+      await ctx.answerCbQuery(ctx.t('errors.accessCheckError'), { show_alert: true });
       return;
     }
 
     const shop = workspaceShops?.find((s) => s.id === shopId);
     if (!shop) {
-      await ctx.answerCbQuery('У вас нет доступа к этому магазину', { show_alert: true });
+      await ctx.answerCbQuery(ctx.t('errors.noShopAccess'), { show_alert: true });
       return;
     }
 
@@ -521,7 +512,7 @@ const handleSelectWorkspace = async (ctx) => {
   } catch (error) {
     logger.error('Error in workspace selection handler:', error);
     try {
-      await ctx.answerCbQuery('Произошла ошибка', { show_alert: true });
+      await ctx.answerCbQuery(ctx.t('errors.genericError'), { show_alert: true });
     } catch (cbError) {
       logger.error('Failed to answer callback:', cbError);
     }

@@ -100,7 +100,7 @@ export const validateShopBeforeScene = async (ctx, sceneName) => {
       logger.error(`[validateShop] Network error for scene ${sceneName}:`, error.message);
       try {
         await ctx.answerCbQuery('Сервер временно недоступен', { show_alert: true });
-      } catch (e) {
+      } catch {
         // Ignore answerCbQuery errors
       }
       return false;

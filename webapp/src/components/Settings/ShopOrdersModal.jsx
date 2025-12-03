@@ -5,25 +5,26 @@ import { useApi } from '../../hooks/useApi';
 import { useTelegram } from '../../hooks/useTelegram';
 import { useBackButton } from '../../hooks/useBackButton';
 import { useStore } from '../../store/useStore';
+import { useTranslation } from '../../i18n/useTranslation';
 
-// Compact status config with dot indicators
-const STATUS = {
-  pending: { label: 'Ожидание', color: '#FFCC00', dot: 'bg-yellow-400' },
-  verifying: { label: 'Проверка', color: '#3B82F6', dot: 'bg-blue-500' },
-  confirmed: { label: 'Оплачен', color: '#22C55E', dot: 'bg-green-500' },
-  shipped: { label: 'Выдан', color: '#8B5CF6', dot: 'bg-purple-500' },
-  delivered: { label: 'Завершён', color: '#10B981', dot: 'bg-emerald-500' },
-  cancelled: { label: 'Отменён', color: '#EF4444', dot: 'bg-red-500' },
+// Compact status config with dot indicators (labels will be replaced with t() in component)
+const STATUS_CONFIG = {
+  pending: { key: 'shopOrders.status.pending', color: '#FFCC00', dot: 'bg-yellow-400' },
+  verifying: { key: 'shopOrders.status.verifying', color: '#3B82F6', dot: 'bg-blue-500' },
+  confirmed: { key: 'shopOrders.status.confirmed', color: '#22C55E', dot: 'bg-green-500' },
+  shipped: { key: 'shopOrders.status.shipped', color: '#8B5CF6', dot: 'bg-purple-500' },
+  delivered: { key: 'shopOrders.status.delivered', color: '#10B981', dot: 'bg-emerald-500' },
+  cancelled: { key: 'shopOrders.status.cancelled', color: '#EF4444', dot: 'bg-red-500' },
 };
 
-// Status transitions for seller/worker actions
-const STATUS_ACTIONS = {
+// Status transitions for seller/worker actions (labels will be replaced with t() in component)
+const STATUS_ACTIONS_CONFIG = {
   confirmed: [
-    { status: 'shipped', label: 'Выдать товар', color: 'bg-purple-500' },
-    { status: 'cancelled', label: 'Отменить', color: 'bg-red-500/20 text-red-400' },
+    { status: 'shipped', key: 'shopOrders.actions.issue', color: 'bg-purple-500' },
+    { status: 'cancelled', key: 'shopOrders.actions.cancel', color: 'bg-red-500/20 text-red-400' },
   ],
   shipped: [
-    { status: 'delivered', label: 'Завершить', color: 'bg-emerald-500' },
+    { status: 'delivered', key: 'shopOrders.actions.complete', color: 'bg-emerald-500' },
   ],
 };
 
@@ -41,7 +42,7 @@ const getCryptoSymbol = (currency) => {
 
 // Single expandable order row with action buttons
 // eslint-disable-next-line no-unused-vars
-function OrderRow({ order, isExpanded, onToggle, onStatusUpdate, isUpdating }) {
+function OrderRow({ order, isExpanded, onToggle, onStatusUpdate, isUpdating, t }) {
   const { triggerHaptic } = useTelegram();
 
   // Determine status
@@ -49,8 +50,10 @@ function OrderRow({ order, isExpanded, onToggle, onStatusUpdate, isUpdating }) {
   if (order.status === 'pending' && order.payment_hash) {
     effectiveStatus = 'verifying';
   }
-  const status = STATUS[effectiveStatus] || STATUS.pending;
-  const actions = STATUS_ACTIONS[effectiveStatus] || [];
+  const statusConfig = STATUS_CONFIG[effectiveStatus] || STATUS_CONFIG.pending;
+  const status = { ...statusConfig, label: t(statusConfig.key) };
+  const actionsConfig = STATUS_ACTIONS_CONFIG[effectiveStatus] || [];
+  const actions = actionsConfig.map(a => ({ ...a, label: t(a.key) }));
 
   const orderDate = new Date(order.created_at || order.createdAt);
   const cryptoAmount = order.crypto_amount ? parseFloat(order.crypto_amount) : null;
@@ -148,7 +151,7 @@ function OrderRow({ order, isExpanded, onToggle, onStatusUpdate, isUpdating }) {
                 {/* Buyer info */}
                 {order.buyer_username && (
                   <div>
-                    <p className="text-[10px] text-gray-500 uppercase tracking-wider">Покупатель</p>
+                    <p className="text-[10px] text-gray-500 uppercase tracking-wider">{t('shopOrders.labels.buyer')}</p>
                     <p className="text-white text-xs">@{order.buyer_username}</p>
                   </div>
                 )}
@@ -157,13 +160,13 @@ function OrderRow({ order, isExpanded, onToggle, onStatusUpdate, isUpdating }) {
                 {order.product_name && (
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0">
-                      <p className="text-[10px] text-gray-500 uppercase tracking-wider">Товар</p>
+                      <p className="text-[10px] text-gray-500 uppercase tracking-wider">{t('shopOrders.labels.product')}</p>
                       <p className="text-white text-xs truncate">{order.product_name}</p>
                     </div>
                     {order.quantity && (
                       <div className="text-right flex-shrink-0">
-                        <p className="text-[10px] text-gray-500 uppercase tracking-wider">Кол-во</p>
-                        <p className="text-white text-xs">{order.quantity} шт</p>
+                        <p className="text-[10px] text-gray-500 uppercase tracking-wider">{t('shopOrders.labels.quantity')}</p>
+                        <p className="text-white text-xs">{order.quantity} {t('shopOrders.labels.pcs')}</p>
                       </div>
                     )}
                   </div>
@@ -229,6 +232,7 @@ function OrderRow({ order, isExpanded, onToggle, onStatusUpdate, isUpdating }) {
 export default function ShopOrdersModal({ isOpen, onClose }) {
   const { get, put } = useApi();
   const { triggerHaptic, alert } = useTelegram();
+  const { t } = useTranslation();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -253,7 +257,7 @@ export default function ShopOrdersModal({ isOpen, onClose }) {
 
   const loadOrders = useCallback(async (signal) => {
     if (!effectiveShopId) {
-      setError('Магазин не выбран');
+      setError(t('shop.notSelected'));
       return { status: 'error' };
     }
 
@@ -268,7 +272,7 @@ export default function ShopOrdersModal({ isOpen, onClose }) {
     const ordersList = Array.isArray(data?.data) ? data.data : [];
     setOrders(ordersList);
     return { status: 'success' };
-  }, [get, effectiveShopId]);
+  }, [get, effectiveShopId, t]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -296,7 +300,7 @@ export default function ShopOrdersModal({ isOpen, onClose }) {
       const { error: apiError } = await put(`/orders/${orderId}/status`, { status: newStatus });
 
       if (apiError) {
-        await alert(`Ошибка: ${apiError}`);
+        await alert(`${t('common.error')}: ${apiError}`);
       } else {
         // Update local state
         setOrders((prev) =>
@@ -307,7 +311,7 @@ export default function ShopOrdersModal({ isOpen, onClose }) {
         triggerHaptic('success');
       }
     } catch {
-      await alert('Не удалось обновить статус');
+      await alert(t('shopOrders.updateError'));
     } finally {
       setUpdatingOrderId(null);
     }
@@ -324,8 +328,8 @@ export default function ShopOrdersModal({ isOpen, onClose }) {
 
   // Modal title with shop name
   const modalTitle = effectiveShop?.name
-    ? `Заказы: ${effectiveShop.name}`
-    : 'Заказы магазина';
+    ? t('shopOrders.ordersFor', { shop: effectiveShop.name })
+    : t('shopOrders.title');
 
   return (
     <AnimatePresence>
@@ -358,7 +362,7 @@ export default function ShopOrdersModal({ isOpen, onClose }) {
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 rounded-full bg-orange-primary animate-pulse" />
                     <span className="text-sm text-orange-primary font-medium">
-                      Режим работника
+                      {t('shopOrders.workerMode')}
                     </span>
                   </div>
                 </motion.div>
@@ -372,19 +376,19 @@ export default function ShopOrdersModal({ isOpen, onClose }) {
                   className="flex items-center justify-between mb-4 px-1"
                 >
                   <p className="text-gray-500 text-xs">
-                    Всего: <span className="text-white font-medium">{orders.length}</span>
+                    {t('common.total')}: <span className="text-white font-medium">{orders.length}</span>
                   </p>
                   <div className="flex gap-3">
                     {confirmedCount > 0 && (
                       <p className="text-xs">
                         <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-500 mr-1.5" />
-                        <span className="text-green-400">{confirmedCount} к выдаче</span>
+                        <span className="text-green-400">{confirmedCount} {t('shopOrders.toIssue')}</span>
                       </p>
                     )}
                     {issuedCount > 0 && (
                       <p className="text-xs">
                         <span className="inline-block w-1.5 h-1.5 rounded-full bg-purple-500 mr-1.5" />
-                        <span className="text-purple-400">{issuedCount} выдано</span>
+                        <span className="text-purple-400">{issuedCount} {t('shopOrders.issued')}</span>
                       </p>
                     )}
                   </div>
@@ -432,7 +436,7 @@ export default function ShopOrdersModal({ isOpen, onClose }) {
                     className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-white/10 hover:bg-white/15 transition-colors"
                     whileTap={{ scale: 0.95 }}
                   >
-                    Повторить
+                    {t('common.retry')}
                   </motion.button>
                 </motion.div>
               )}
@@ -449,8 +453,8 @@ export default function ShopOrdersModal({ isOpen, onClose }) {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                     </svg>
                   </div>
-                  <p className="text-white font-medium mb-1">Нет заказов</p>
-                  <p className="text-gray-500 text-sm">Заказы магазина появятся здесь</p>
+                  <p className="text-white font-medium mb-1">{t('shopOrders.noOrders')}</p>
+                  <p className="text-gray-500 text-sm">{t('shopOrders.ordersWillAppear')}</p>
                 </motion.div>
               )}
 
@@ -470,6 +474,7 @@ export default function ShopOrdersModal({ isOpen, onClose }) {
                         onToggle={() => toggleExpand(order.id)}
                         onStatusUpdate={handleStatusUpdate}
                         isUpdating={updatingOrderId === order.id}
+                        t={t}
                       />
                     </motion.div>
                   ))}
@@ -484,7 +489,7 @@ export default function ShopOrdersModal({ isOpen, onClose }) {
                   transition={{ delay: 0.5 }}
                   className="text-center text-gray-600 text-[10px] mt-6"
                 >
-                  Автообновление каждые 30 сек
+                  {t('shopOrders.autoRefresh')}
                 </motion.p>
               )}
             </div>

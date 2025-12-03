@@ -4,9 +4,10 @@ import PageHeader from '../common/PageHeader';
 import { useTelegram } from '../../hooks/useTelegram';
 import { useApi } from '../../hooks/useApi';
 import { useBackButton } from '../../hooks/useBackButton';
+import { useTranslation } from '../../i18n/useTranslation';
 
 // Follow Card Component
-function FollowCard({ follow, onModeSwitch, onDelete }) {
+function FollowCard({ follow, onModeSwitch, onDelete, t }) {
   const { triggerHaptic, confirm } = useTelegram();
   const [switching, setSwitching] = useState(false);
 
@@ -19,7 +20,7 @@ function FollowCard({ follow, onModeSwitch, onDelete }) {
 
   const handleDelete = async () => {
     triggerHaptic('medium');
-    const confirmed = await confirm(`Отписаться от "${follow.source_shop_name || 'магазина'}"?`);
+    const confirmed = await confirm(t('follows.unsubscribeConfirm', { shop: follow.source_shop_name || t('shop.products') }));
     if (confirmed) {
       triggerHaptic('success');
       onDelete(follow.id);
@@ -73,7 +74,7 @@ function FollowCard({ follow, onModeSwitch, onDelete }) {
           <span
             className={`px-3 py-1 rounded-full text-xs font-semibold border ${modeColors[follow.mode]}`}
           >
-            {follow.mode === 'monitor' ? 'Мониторинг' : 'Реселл'}
+            {follow.mode === 'monitor' ? t('follows.monitorMode') : t('follows.resellMode')}
           </span>
           {follow.mode === 'resell' && follow.markup_percentage && (
             <span className="text-xs text-gray-400">+{follow.markup_percentage}%</span>
@@ -89,7 +90,7 @@ function FollowCard({ follow, onModeSwitch, onDelete }) {
           }}
           whileTap={!switching ? { scale: 0.95 } : {}}
         >
-          {switching ? '...' : follow.mode === 'monitor' ? '→ Реселл' : '→ Монитор'}
+          {switching ? '...' : follow.mode === 'monitor' ? t('follows.switchToResell') : t('follows.switchToMonitor')}
         </motion.button>
       </div>
     </motion.div>
@@ -100,6 +101,7 @@ function FollowCard({ follow, onModeSwitch, onDelete }) {
 export default function FollowsModal({ isOpen, onClose }) {
   const { triggerHaptic, alert } = useTelegram();
   const { fetchApi } = useApi();
+  const { t } = useTranslation();
 
   const [follows, setFollows] = useState([]);
   const [limitInfo, setLimitInfo] = useState(null);
@@ -263,7 +265,7 @@ export default function FollowsModal({ isOpen, onClose }) {
 
       if (newMode === 'resell') {
         const defaultMarkup = follow.markup_percentage || 15;
-        const input = window.prompt('Наценка для реселла (1-500%)', defaultMarkup);
+        const input = window.prompt(t('follows.markupPrompt'), defaultMarkup);
 
         if (input === null) {
           return false;
@@ -271,7 +273,7 @@ export default function FollowsModal({ isOpen, onClose }) {
 
         const parsed = Number.parseFloat(String(input).trim().replace(',', '.'));
         if (!Number.isFinite(parsed) || parsed < 1 || parsed > 500) {
-          await alert('Наценка должна быть от 1 до 500%');
+          await alert(t('follows.markupError'));
           return false;
         }
 
@@ -287,7 +289,7 @@ export default function FollowsModal({ isOpen, onClose }) {
       await loadData();
       return true;
     } catch (error) {
-      await alert(error.message || 'Ошибка смены режима');
+      await alert(error.message || t('follows.modeError'));
       return false;
     }
   };
@@ -301,13 +303,13 @@ export default function FollowsModal({ isOpen, onClose }) {
       triggerHaptic('success');
       await loadData();
     } catch (error) {
-      await alert(error.message || 'Ошибка удаления подписки');
+      await alert(error.message || t('follows.deleteError'));
     }
   };
 
   const handleSearchShop = async () => {
     if (!searchQuery.trim()) {
-      await alert('Введите название магазина или @username');
+      await alert(t('follows.enterSearch'));
       return;
     }
 
@@ -324,12 +326,12 @@ export default function FollowsModal({ isOpen, onClose }) {
       });
       setSearchResults(res.data || []);
       if (res.data.length === 0) {
-        await alert('Магазины не найдены');
+        await alert(t('follows.notFound'));
       }
     } catch (error) {
       // Ignore abort errors
       if (error.name === 'AbortError') return;
-      await alert(error.message || 'Ошибка поиска');
+      await alert(error.message || t('follows.searchError'));
     } finally {
       setSearching(false);
     }
@@ -337,7 +339,7 @@ export default function FollowsModal({ isOpen, onClose }) {
 
   const handleAddFollow = async (shopId) => {
     if (!myShop) {
-      await alert('Сначала создайте магазин');
+      await alert(t('follows.createShopFirst'));
       return;
     }
 
@@ -355,9 +357,9 @@ export default function FollowsModal({ isOpen, onClose }) {
       setSearchQuery('');
       setSearchResults([]);
       await loadData();
-      await alert('Подписка добавлена!');
+      await alert(t('follows.added'));
     } catch (error) {
-      await alert(error.message || 'Ошибка добавления подписки');
+      await alert(error.message || t('follows.addError'));
     }
   };
 
@@ -396,9 +398,9 @@ export default function FollowsModal({ isOpen, onClose }) {
                       d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
                     />
                   </svg>
-                  <h3 className="text-xl font-bold text-white mb-2">У вас ещё нет магазина</h3>
+                  <h3 className="text-xl font-bold text-white mb-2">{t('follows.noShop')}</h3>
                   <p className="text-gray-400 text-sm">
-                    Создайте магазин, чтобы управлять подписками Follows
+                    {t('follows.createShopForFollows')}
                   </p>
                 </div>
               </div>
@@ -432,14 +434,14 @@ export default function FollowsModal({ isOpen, onClose }) {
               {/* Add Follow Form - Always Visible */}
               <div className="glass-card rounded-2xl p-4 space-y-3">
                 <div>
-                  <label className="text-sm text-gray-400 mb-2 block">Поиск магазина</label>
+                  <label className="text-sm text-gray-400 mb-2 block">{t('follows.searchShop')}</label>
                   <div className="flex gap-2">
                     <input
                       type="text"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       onKeyPress={(e) => e.key === 'Enter' && handleSearchShop()}
-                      placeholder="Название или @username"
+                      placeholder={t('follows.searchPlaceholder')}
                       className="flex-1 px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:border-orange-primary transition-colors"
                     />
                     <motion.button
@@ -453,7 +455,7 @@ export default function FollowsModal({ isOpen, onClose }) {
                       }}
                       whileTap={searchQuery.trim() ? { scale: 0.95 } : {}}
                     >
-                      {searching ? '...' : 'Найти'}
+                      {searching ? '...' : t('common.find')}
                     </motion.button>
                   </div>
                 </div>
@@ -482,7 +484,7 @@ export default function FollowsModal({ isOpen, onClose }) {
                           }}
                           whileTap={{ scale: 0.95 }}
                         >
-                          Подписаться
+                          {t('follows.subscribeBtn')}
                         </motion.button>
                       </motion.div>
                     ))}
@@ -503,7 +505,7 @@ export default function FollowsModal({ isOpen, onClose }) {
                     }}
                     whileTap={{ scale: 0.98 }}
                   >
-                    Очистить результаты
+                    {t('follows.clearResults')}
                   </motion.button>
                 )}
               </div>
@@ -526,15 +528,14 @@ export default function FollowsModal({ isOpen, onClose }) {
                       />
                     </svg>
                     <div>
-                      <p className="text-sm text-white font-medium mb-1">Мониторинг магазинов</p>
+                      <p className="text-sm text-white font-medium mb-1">{t('follows.monitoringInfo')}</p>
                       <p className="text-xs text-gray-400 mb-2">
-                        • <strong>Мониторинг</strong>: Отслеживайте товары конкурентов
-                        <br />• <strong>Реселл</strong>: Автоматическое копирование товаров с
-                        наценкой
+                        • <strong>{t('follows.monitorShort')}</strong>: {t('follows.monitorDesc')}
+                        <br />• <strong>{t('follows.resellShort')}</strong>: {t('follows.resellDesc')}
                       </p>
                       {limitInfo && (
                         <p className="text-xs text-orange-primary">
-                          Лимит: {limitInfo.count ?? 0} /{' '}
+                          {t('follows.limit')}: {limitInfo.count ?? 0} /{' '}
                           {limitInfo.limit === null ? '∞' : limitInfo.limit}
                           {limitInfo.tier ? ` (${limitInfo.tier})` : ''}
                         </p>
@@ -552,7 +553,7 @@ export default function FollowsModal({ isOpen, onClose }) {
               ) : follows.length > 0 ? (
                 <div className="space-y-3">
                   <h3 className="text-sm font-semibold text-gray-400 px-2">
-                    Подписки ({follows.length})
+                    {t('follows.subscriptions', { count: follows.length })}
                   </h3>
                   <AnimatePresence mode="popLayout">
                     {follows.map((follow) => (
@@ -561,6 +562,7 @@ export default function FollowsModal({ isOpen, onClose }) {
                         follow={follow}
                         onModeSwitch={handleModeSwitch}
                         onDelete={handleDeleteFollow}
+                        t={t}
                       />
                     ))}
                   </AnimatePresence>
@@ -580,9 +582,9 @@ export default function FollowsModal({ isOpen, onClose }) {
                       d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
                     />
                   </svg>
-                  <h3 className="text-lg font-bold text-white mb-2">Нет подписок</h3>
+                  <h3 className="text-lg font-bold text-white mb-2">{t('follows.noSubscriptions')}</h3>
                   <p className="text-gray-400 text-sm mb-4">
-                    Используйте бота для подписки на магазины
+                    {t('follows.useBot')}
                   </p>
                 </div>
               )}

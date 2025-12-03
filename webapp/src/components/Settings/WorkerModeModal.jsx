@@ -5,9 +5,10 @@ import { useTelegram } from '../../hooks/useTelegram';
 import { useApi } from '../../hooks/useApi';
 import { useBackButton } from '../../hooks/useBackButton';
 import { useStore } from '../../store/useStore';
+import { useTranslation } from '../../i18n/useTranslation';
 
 // Shop Card Component for Worker Mode
-function WorkspaceShopCard({ shop, onSelect, isActive }) {
+function WorkspaceShopCard({ shop, onSelect, isActive, t }) {
   const { triggerHaptic } = useTelegram();
 
   const handleSelect = () => {
@@ -70,7 +71,7 @@ function WorkspaceShopCard({ shop, onSelect, isActive }) {
           )}
           {shop.added_at && (
             <p className="text-xs text-gray-500 mt-1">
-              Доступ с {formatAccessDate(shop.added_at)}
+              {t('workerMode.accessSince', { date: formatAccessDate(shop.added_at) })}
             </p>
           )}
         </div>
@@ -92,7 +93,7 @@ function WorkspaceShopCard({ shop, onSelect, isActive }) {
           }
           whileTap={{ scale: 0.95 }}
         >
-          {isActive ? 'Активен' : 'Работать'}
+          {isActive ? t('workerMode.active') : t('workerMode.work')}
         </motion.button>
       </div>
     </motion.div>
@@ -103,6 +104,7 @@ function WorkspaceShopCard({ shop, onSelect, isActive }) {
 export default function WorkerModeModal({ isOpen, onClose }) {
   const { triggerHaptic, alert } = useTelegram();
   const { fetchApi } = useApi();
+  const { t } = useTranslation();
 
   const [workspaceShops, setWorkspaceShops] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -192,7 +194,7 @@ export default function WorkerModeModal({ isOpen, onClose }) {
       if (workspaceShopId === shop.id) {
         switchToWorkspaceShop(null); // Exit worker mode
         triggerHaptic('success');
-        await alert('Режим работника отключен');
+        await alert(t('settings.workerModeDisabled'));
         handleClose();
         return;
       }
@@ -200,13 +202,13 @@ export default function WorkerModeModal({ isOpen, onClose }) {
       // Activate worker mode for selected shop (saves full shop object)
       switchToWorkspaceShop(shop);
       triggerHaptic('success');
-      await alert(`Вы теперь работаете в "${shop.name}"`);
+      await alert(t('settings.nowWorkingIn', { name: shop.name }));
       handleClose();
     } catch (err) {
       if (import.meta.env.DEV) {
         console.error('[WorkerModeModal] Error selecting shop:', err);
       }
-      await alert('Ошибка при выборе магазина');
+      await alert(t('settings.shopSelectionError'));
     }
   };
 
@@ -214,7 +216,7 @@ export default function WorkerModeModal({ isOpen, onClose }) {
     triggerHaptic('medium');
     switchToWorkspaceShop(null); // Exit worker mode
     triggerHaptic('success');
-    await alert('Режим работника отключен');
+    await alert(t('settings.workerModeDisabled'));
   };
 
   // Retry function for error recovery
@@ -247,7 +249,7 @@ export default function WorkerModeModal({ isOpen, onClose }) {
             exit={{ x: '100%' }}
             transition={{ type: 'spring', damping: 30, stiffness: 300 }}
           >
-            <PageHeader title="Режим работника" onBack={handleClose} variant="close" />
+            <PageHeader title={t('settings.items.workerMode')} onBack={handleClose} variant="close" />
             <div
               className="flex-1 overflow-y-auto"
               style={{
@@ -273,7 +275,7 @@ export default function WorkerModeModal({ isOpen, onClose }) {
                       d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
                     />
                   </svg>
-                  <h3 className="text-xl font-bold text-white mb-2">Ошибка загрузки</h3>
+                  <h3 className="text-xl font-bold text-white mb-2">{t('workspace.loadError')}</h3>
                   <p className="text-red-400 text-sm mb-6">{error}</p>
                   <motion.button
                     onClick={() => {
@@ -287,7 +289,7 @@ export default function WorkerModeModal({ isOpen, onClose }) {
                     }}
                     whileTap={{ scale: 0.98 }}
                   >
-                    Повторить
+                    {t('common.retry')}
                   </motion.button>
                 </div>
               </div>
@@ -337,10 +339,9 @@ export default function WorkerModeModal({ isOpen, onClose }) {
                     />
                   </svg>
                   <div>
-                    <p className="text-sm text-white font-medium mb-1">Работа в чужом магазине</p>
+                    <p className="text-sm text-white font-medium mb-1">{t('workerMode.infoTitle')}</p>
                     <p className="text-xs text-gray-400">
-                      Включите режим работника, чтобы управлять товарами магазина, в котором вы
-                      являетесь сотрудником.
+                      {t('workerMode.infoDesc')}
                     </p>
                   </div>
                 </div>
@@ -356,7 +357,7 @@ export default function WorkerModeModal({ isOpen, onClose }) {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="w-3 h-3 rounded-full bg-green-500 animate-pulse" />
-                      <span className="text-white font-medium">Режим работника активен</span>
+                      <span className="text-white font-medium">{t('workerMode.modeActive')}</span>
                     </div>
                     <motion.button
                       onClick={handleExitWorkerMode}
@@ -367,7 +368,7 @@ export default function WorkerModeModal({ isOpen, onClose }) {
                       }}
                       whileTap={{ scale: 0.95 }}
                     >
-                      Выйти
+                      {t('workerMode.exit')}
                     </motion.button>
                   </div>
                 </motion.div>
@@ -382,7 +383,7 @@ export default function WorkerModeModal({ isOpen, onClose }) {
                 /* Workspace shops list */
                 <div className="space-y-3">
                   <h3 className="text-sm font-semibold text-gray-400 px-2">
-                    Доступные магазины ({workspaceShops.length})
+                    {t('workerMode.availableShops', { count: workspaceShops.length })}
                   </h3>
                   <AnimatePresence mode="popLayout">
                     {workspaceShops.map((shop) => (
@@ -391,6 +392,7 @@ export default function WorkerModeModal({ isOpen, onClose }) {
                         shop={shop}
                         onSelect={handleSelectShop}
                         isActive={workspaceShopId === shop.id}
+                        t={t}
                       />
                     ))}
                   </AnimatePresence>
@@ -411,12 +413,12 @@ export default function WorkerModeModal({ isOpen, onClose }) {
                       d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
                     />
                   </svg>
-                  <h3 className="text-xl font-bold text-white mb-2">Нет доступных магазинов</h3>
+                  <h3 className="text-xl font-bold text-white mb-2">{t('workerMode.noShops')}</h3>
                   <p className="text-gray-400 text-sm">
-                    Вы не являетесь работником ни одного магазина
+                    {t('workerMode.notWorker')}
                   </p>
                   <p className="text-gray-500 text-xs mt-2">
-                    Попросите владельца магазина добавить вас в Workspace
+                    {t('workerMode.askOwner')}
                   </p>
                 </div>
               )}

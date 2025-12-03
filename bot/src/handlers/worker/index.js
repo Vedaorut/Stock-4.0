@@ -40,10 +40,8 @@ const ensureWorkspaceShop = async (ctx) => {
   const shops = await shopApi.getWorkerShops(ctx.session.token);
   if (!Array.isArray(shops) || shops.length === 0) {
     await smartMessage.send(ctx, {
-      text:
-        'Режим сотрудника недоступен\n\n' +
-        'Вас ещё не добавили в магазин. Попросите владельца добавить ваш @username или Telegram ID.',
-      keyboard: Markup.inlineKeyboard([[Markup.button.callback('Назад', 'role:toggle')]]),
+      text: ctx.t('worker.modeUnavailable'),
+      keyboard: Markup.inlineKeyboard([[Markup.button.callback(ctx.t('buttons.back'), 'role:toggle')]]),
     });
     return null;
   }
@@ -53,17 +51,18 @@ const ensureWorkspaceShop = async (ctx) => {
   return shop;
 };
 
-const formatProductsList = (products) => {
+const formatProductsList = (products, lang = 'ru') => {
   if (!products || products.length === 0) {
-    return 'Каталог пуст.';
+    return null; // Return null so caller can use localized string
   }
 
+  const pcsLabel = lang === 'ru' ? 'шт' : 'pcs';
   return products
     .slice(0, 20)
     .map((p, idx) => {
       const price = p.price ? Number(p.price).toString() : '—';
       const stock = p.stock_quantity ?? p.stock ?? 0;
-      return `${idx + 1}. ${p.name} — ${price} (${stock} шт)`;
+      return `${idx + 1}. ${p.name} — ${price} (${stock} ${pcsLabel})`;
     })
     .join('\n');
 };
@@ -93,13 +92,8 @@ export const handleWorkerDashboard = async (ctx) => {
 
     if (!Array.isArray(shops) || shops.length === 0) {
       await smartMessage.send(ctx, {
-        text:
-          'Режим сотрудника\n\n' +
-          'Вы ещё не добавлены как сотрудник ни в один магазин.\n\n' +
-          'Как стать сотрудником:\n' +
-          '- Попросите владельца магазина добавить вас\n' +
-          `- Ваш ID: ${ctx.from.id}`,
-        keyboard: Markup.inlineKeyboard([[Markup.button.callback('Назад', 'role:toggle')]]),
+        text: ctx.t('worker.notAddedToAnyShop', { telegramId: ctx.from.id }),
+        keyboard: Markup.inlineKeyboard([[Markup.button.callback(ctx.t('buttons.back'), 'role:toggle')]]),
       });
       return;
     }
@@ -109,13 +103,7 @@ export const handleWorkerDashboard = async (ctx) => {
     setWorkspaceSession(ctx, shop);
 
     await smartMessage.send(ctx, {
-      text:
-        `Вы работаете в магазине "${shop.name}"\n\n` +
-        `Используйте AI для управления товарами:\n` +
-        `- "добавь iPhone за 999"\n` +
-        `- "скидка 20% на MacBook"\n` +
-        `- "покажи товары"\n\n` +
-        `Кнопки ниже - для быстрого просмотра.`,
+      text: ctx.t('worker.aiInstructions', { shopName: shop.name }),
       keyboard: workerMenu(shop.name, ctx.lang),
     });
   } catch (error) {
@@ -144,10 +132,10 @@ export const handleWorkerProducts = async (ctx) => {
         .getShopProductsSecure(shop.id, ctx.session.token)
         .catch(() => productApi.getShopProducts(shop.id))) || [];
 
-    const list = formatProductsList(products);
+    const list = formatProductsList(products, ctx.lang) || ctx.t('worker.catalogEmpty');
 
     await smartMessage.send(ctx, {
-      text: `Товары магазина "${shop.name}":\n\n${list}`,
+      text: ctx.t('worker.shopProducts', { shopName: shop.name, list }),
       keyboard: workerMenu(shop.name, ctx.lang),
     });
   } catch (error) {
@@ -177,7 +165,7 @@ export const handleWorkerStats = async (ctx) => {
     const revenue = completed.reduce((sum, o) => sum + Number(o.total_price || 0), 0);
 
     await smartMessage.send(ctx, {
-      text: `Статистика (последние заказы)\n\nДоход: ${revenue}\nЗаказы: ${orders.length}`,
+      text: ctx.t('worker.stats', { revenue, ordersCount: orders.length }),
       keyboard: workerMenu(shop.name, ctx.lang),
     });
   } catch (error) {
