@@ -281,28 +281,32 @@ async function sendMigrationMessage(
     if (error.response?.error_code === 403) {
       logger.warn(`[Broadcast] User ${telegramId} blocked the bot`);
       if (shopId && userId) {
-        await pool
-          .query('DELETE FROM subscriptions WHERE shop_id = $1 AND user_id = $2', [shopId, userId])
-          .catch((cleanupErr) =>
-            logger.error('[Broadcast] Failed to cleanup blocked subscriber', {
-              shopId,
-              userId,
-              error: cleanupErr.message,
-            })
-          );
+        // Cleanup from both tables to avoid orphan records
+        await Promise.all([
+          pool.query('DELETE FROM subscriptions WHERE shop_id = $1 AND user_id = $2', [shopId, userId]),
+          pool.query('DELETE FROM shop_subscribers WHERE shop_id = $1 AND user_id = $2', [shopId, userId]),
+        ]).catch((cleanupErr) =>
+          logger.error('[Broadcast] Failed to cleanup blocked subscriber', {
+            shopId,
+            userId,
+            error: cleanupErr.message,
+          })
+        );
       }
     } else if (error.response?.error_code === 400) {
       logger.warn(`[Broadcast] User ${telegramId} not found or chat invalid`);
       if (shopId && userId) {
-        await pool
-          .query('DELETE FROM subscriptions WHERE shop_id = $1 AND user_id = $2', [shopId, userId])
-          .catch((cleanupErr) =>
-            logger.error('[Broadcast] Failed to cleanup invalid subscriber', {
-              shopId,
-              userId,
-              error: cleanupErr.message,
-            })
-          );
+        // Cleanup from both tables to avoid orphan records
+        await Promise.all([
+          pool.query('DELETE FROM subscriptions WHERE shop_id = $1 AND user_id = $2', [shopId, userId]),
+          pool.query('DELETE FROM shop_subscribers WHERE shop_id = $1 AND user_id = $2', [shopId, userId]),
+        ]).catch((cleanupErr) =>
+          logger.error('[Broadcast] Failed to cleanup invalid subscriber', {
+            shopId,
+            userId,
+            error: cleanupErr.message,
+          })
+        );
       }
     } else {
       logger.error(`[Broadcast] Error sending to ${telegramId}:`, error.message);

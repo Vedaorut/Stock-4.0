@@ -205,7 +205,7 @@ export const workerQueries = {
        WHERE shop_id = $1`,
       [shopId]
     );
-    return parseInt(result.rows[0]?.count || 0);
+    return parseInt(result.rows[0]?.count || 0, 10);
   },
 
   /**

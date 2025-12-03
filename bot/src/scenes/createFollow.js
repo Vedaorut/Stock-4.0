@@ -183,7 +183,7 @@ const selectMode = async (ctx) => {
 
     // Verify shop still exists
     try {
-      await shopApi.getShop(sourceShopId);
+      await shopApi.getShop(sourceShopId, ctx.session.token);
     } catch (error) {
       if (error.response?.status === 404) {
         await ctx.editMessageText(followMessages.createShopNotFound, successButtons);

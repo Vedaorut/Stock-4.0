@@ -38,7 +38,7 @@ export const shopFollowQueries = {
         ss.owner_id as source_owner_id,
         u.username as source_username,
         (
-          SELECT COUNT(*)
+          SELECT COUNT(*)::int
           FROM synced_products sp
           JOIN products p_synced ON sp.synced_product_id = p_synced.id
           JOIN products p_source ON sp.source_product_id = p_source.id
@@ -47,7 +47,7 @@ export const shopFollowQueries = {
             AND p_synced.is_active = true
         ) as synced_products_count,
         (
-          SELECT COUNT(*)
+          SELECT COUNT(*)::int
           FROM products p
           WHERE p.shop_id = sf.source_shop_id
             AND p.is_active = true
@@ -77,7 +77,7 @@ export const shopFollowQueries = {
         ss.owner_id as source_owner_id,
         u.username as source_username,
         (
-          SELECT COUNT(*)
+          SELECT COUNT(*)::int
           FROM synced_products sp
           JOIN products p_synced ON sp.synced_product_id = p_synced.id
           JOIN products p_source ON sp.source_product_id = p_source.id
@@ -85,7 +85,7 @@ export const shopFollowQueries = {
             AND p_source.is_active = true
             AND p_synced.is_active = true
         ) as synced_products_count,
-        (SELECT COUNT(*) FROM products p WHERE p.shop_id = sf.source_shop_id AND p.is_active = true) as source_products_count
+        (SELECT COUNT(*)::int FROM products p WHERE p.shop_id = sf.source_shop_id AND p.is_active = true) as source_products_count
       FROM shop_follows sf
       JOIN shops ss ON sf.source_shop_id = ss.id
       LEFT JOIN users u ON ss.owner_id = u.id

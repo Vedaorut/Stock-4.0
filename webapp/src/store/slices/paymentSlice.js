@@ -251,15 +251,15 @@ export const createPaymentSlice = (set, get) => ({
 
       // Set BOTH locks IMMEDIATELY (synchronous)
       invoiceInProgress = true;
-      set({
-        selectedCrypto: normalizedCrypto,
-        isGeneratingInvoice: true,
-      });
 
       let timeoutId; // Declare before try for finally access
       const controller = new AbortController();
 
       try {
+        set({
+          selectedCrypto: normalizedCrypto,
+          isGeneratingInvoice: true,
+        });
         timeoutId = setTimeout(() => controller.abort(), 8000);
 
         // FIX: Calculate current cart total for validation

@@ -366,7 +366,15 @@ const paySubscriptionScene = new Scenes.WizardScene(
 
     // Handle check payment status
     if (data === 'subscription:check_payment') {
-      await ctx.answerCbQuery('Проверяем статус оплаты...');
+      // Answer callback immediately, ignore timeout errors
+      try {
+        await ctx.answerCbQuery('Проверяем статус оплаты...');
+      } catch (cbError) {
+        // Ignore "query is too old" or timeout errors
+        if (!cbError.message?.includes('query is too old')) {
+          throw cbError;
+        }
+      }
 
       try {
         const { invoiceId, tier, createShopAfter, subscriptionId, crystalPayUrl, paymentMethod } = ctx.wizard.state;

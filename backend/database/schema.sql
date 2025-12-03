@@ -169,7 +169,8 @@ CREATE TABLE orders (
   completed_at TIMESTAMP,
   -- Direct crypto payment fields (migration 043)
   crypto_amount DECIMAL(20, 8),
-  crypto_currency VARCHAR(10)
+  crypto_currency VARCHAR(10),
+  notification_sent BOOLEAN DEFAULT false
 );
 
 COMMENT ON TABLE orders IS 'Stores customer orders';
@@ -177,6 +178,7 @@ COMMENT ON COLUMN orders.payment_hash IS 'Blockchain transaction hash';
 COMMENT ON COLUMN orders.status IS 'Order status: pending, confirmed, shipped, delivered, cancelled';
 COMMENT ON COLUMN orders.crypto_amount IS 'Amount in cryptocurrency';
 COMMENT ON COLUMN orders.crypto_currency IS 'Selected cryptocurrency (BTC, ETH, LTC, USDT_TRC20)';
+COMMENT ON COLUMN orders.notification_sent IS 'Prevents duplicate order confirmation notifications';
 
 CREATE INDEX idx_orders_crypto_payment
 ON orders(id, crypto_currency) WHERE crypto_currency IS NOT NULL;
@@ -192,11 +194,13 @@ CREATE TABLE order_items (
   quantity INT NOT NULL DEFAULT 1 CHECK (quantity > 0),
   price DECIMAL(18, 8) NOT NULL CHECK (price > 0),
   currency VARCHAR(10) NOT NULL,
+  stock_deducted BOOLEAN DEFAULT false,
   created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
 COMMENT ON TABLE order_items IS 'Stores individual items in each order';
 COMMENT ON COLUMN order_items.product_name IS 'Cached product name (in case product is deleted)';
+COMMENT ON COLUMN order_items.stock_deducted IS 'Tracks if stock was actually deducted for this item (prevents double deduction on race conditions)';
 
 -- ============================================
 -- Subscriptions table
@@ -567,6 +571,8 @@ CREATE INDEX IF NOT EXISTS idx_invoices_status_expires ON invoices(status, expir
 CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
 CREATE INDEX IF NOT EXISTS idx_orders_buyer_status ON orders(buyer_id, status);
 CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders(created_at DESC);
+-- Notification tracking index (migration 059)
+CREATE INDEX IF NOT EXISTS idx_orders_notification_pending ON orders(status, notification_sent) WHERE notification_sent = false AND status = 'confirmed';
 CREATE INDEX IF NOT EXISTS idx_order_items_order_id ON order_items(order_id);
 CREATE INDEX IF NOT EXISTS idx_order_items_product_id ON order_items(product_id);
 CREATE INDEX IF NOT EXISTS idx_shop_follows_follower_status ON shop_follows(follower_shop_id, status);

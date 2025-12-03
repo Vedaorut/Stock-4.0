@@ -194,6 +194,10 @@ const shopOnboardingScene = new Scenes.WizardScene(
       return ctx.wizard.next();
     } catch (error) {
       logger.error('Error in shopOnboarding entry:', error);
+      // Cleanup messageId to prevent memory leak
+      if (ctx.wizard?.state?.messageId) {
+        delete ctx.wizard.state.messageId;
+      }
       await ctx.scene.leave();
     }
   },

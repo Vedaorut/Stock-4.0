@@ -121,11 +121,12 @@ async function fetchPricesWithRetry(retryCount = 0) {
  */
 export async function getCryptoPrice(chain) {
   try {
-    // Check cache validity
+    // Check cache validity per chain (use chain's own timestamp, not global)
     const now = Date.now();
-    if (now - lastFetchTime < PRICE_CACHE_TTL && priceCache[chain]) {
-      logger.info(`[CryptoPriceService] Using cached price for ${chain}: $${priceCache[chain].price}`);
-      return priceCache[chain].price;
+    const cached = priceCache[chain];
+    if (cached && now - cached.timestamp < PRICE_CACHE_TTL) {
+      logger.info(`[CryptoPriceService] Using cached price for ${chain}: $${cached.price}`);
+      return cached.price;
     }
 
     // Validate chain

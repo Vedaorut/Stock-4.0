@@ -140,7 +140,7 @@ function App() {
         useStore.getState().setHasFollows(list.length > 0);
       } catch (fetchError) {
         // Ignore abort errors
-        if (fetchError.name === 'AbortError') return;
+        if (fetchError.name === 'AbortError' || fetchError.code === 'ERR_CANCELED') return;
         // Silent failure - tab will appear once user opens section manually
       } finally {
         if (!controller.signal.aborted) {

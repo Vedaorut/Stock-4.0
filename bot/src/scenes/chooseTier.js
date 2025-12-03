@@ -233,7 +233,7 @@ const chooseTierScene = new Scenes.WizardScene(
     ctx.wizard.state.userMessageIds.push(ctx.message.message_id);
 
     // Basic validation
-    if (promoCode.length < 3) {
+    if (promoCode.length < 3 || promoCode.length > 50) {
       await cleanReply(ctx, subMessages.promoInvalid);
       return;
     }

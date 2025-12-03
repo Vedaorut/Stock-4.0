@@ -28,6 +28,7 @@
   "license": "ISC",
   "dependencies": {
     "@neondatabase/serverless": "^1.0.2",
+    "@sentry/node": "^10.28.0",
     "axios": "^1.6.0",
     "bull": "^4.16.5",
     "compression": "^1.8.1",

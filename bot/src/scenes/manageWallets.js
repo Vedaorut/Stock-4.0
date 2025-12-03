@@ -503,7 +503,7 @@ ${formatted}`,
       ctx.wizard.state.refreshTimer = setTimeout(async () => {
         try {
           // Check if still in scene before refreshing
-          if (ctx.scene && ctx.scene.current && ctx.scene.current.id === 'manageWallets') {
+          if (ctx.scene?.current?.id === 'manageWallets') {
             ctx.wizard.selectStep(0);
             // Silent refresh - don't show error if refresh fails (wallet was already saved)
             await showWalletsSilent(ctx);
