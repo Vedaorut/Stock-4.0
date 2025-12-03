@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">4.54% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/65</span>
+                <span class='fraction'>3/66</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/40</span>
+                <span class='fraction'>0/45</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/4</span>
+                <span class='fraction'>0/5</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">4.54% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/65</span>
+                <span class='fraction'>3/66</span>
             </div>
         
             
@@ -299,7 +299,10 @@
 <a name='L234'></a><a href='#L234'>234</a>
 <a name='L235'></a><a href='#L235'>235</a>
 <a name='L236'></a><a href='#L236'>236</a>
-<a name='L237'></a><a href='#L237'>237</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L237'></a><a href='#L237'>237</a>
+<a name='L238'></a><a href='#L238'>238</a>
+<a name='L239'></a><a href='#L239'>239</a>
+<a name='L240'></a><a href='#L240'>240</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -308,6 +311,26 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -318,23 +341,6 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -539,8 +545,8 @@
  * Product Limits Middleware
  *
  * Enforces tier-based product limits:
- * - Basic tier: 4 products max
- * - Pro tier: unlimited products
+ * - Pro tier: 50 products max
+ * - Max tier: unlimited products
  *
  * OPTIMIZATIONS:
  * - Combined shop + count query (1 query instead of 2)
@@ -549,16 +555,17 @@
 &nbsp;
 import { pool } from '../config/database.js';
 import { workerQueries } from '../database/queries/index.js';
+import { TIER_LIMITS } from '../config/subscriptionPricing.js';
 import logger from '../utils/logger.js';
 &nbsp;
 // In-memory cache for product counts (5 min TTL)
-const productCountCache = <span class="cstat-no" title="statement not covered" >new Map();</span>
-const CACHE_TTL = <span class="cstat-no" title="statement not covered" >5 * 60 * 1000;</span> // 5 minutes
+const productCountCache = new Map();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 &nbsp;
 /**
  * Clear expired cache entries
  */
-<span class="cstat-no" title="statement not covered" >setInterval(<span class="fstat-no" title="function not covered" >()</span> =&gt; {</span>
+setInterval(<span class="fstat-no" title="function not covered" >()</span> =&gt; {
   const now = <span class="cstat-no" title="statement not covered" >Date.now();</span>
 <span class="cstat-no" title="statement not covered" >  for (const [key, value] of productCountCache.entries()) {</span>
 <span class="cstat-no" title="statement not covered" >    if (now - value.timestamp &gt; CACHE_TTL) {</span>
@@ -567,11 +574,13 @@ const CACHE_TTL = <span class="cstat-no" title="statement not covered" >5 * 60 *
   }
 }, 60 * 1000); // Clean every 1 minute
 &nbsp;
-// Product limits per tier
-const PRODUCT_LIMITS = <span class="cstat-no" title="statement not covered" >{</span>
-  basic: 4,
-  pro: Infinity,
-};
+/**
+ * Get product limit for tier
+ */
+function <span class="fstat-no" title="function not covered" >getProductLimit(</span>tier) {
+  const limits = <span class="cstat-no" title="statement not covered" >TIER_LIMITS[tier];</span>
+<span class="cstat-no" title="statement not covered" >  return limits ? limits.products : TIER_LIMITS.pro.products;</span>
+}
 &nbsp;
 /**
  * Check if shop can add more products
@@ -642,11 +651,11 @@ export async function <span class="fstat-no" title="function not covered" >check
       });
     }
 &nbsp;
-    const tier = <span class="cstat-no" title="statement not covered" >shop.tier || 'basic';</span>
-    const limit = <span class="cstat-no" title="statement not covered" >PRODUCT_LIMITS[tier];</span>
+    const tier = <span class="cstat-no" title="statement not covered" >shop.tier || 'pro';</span>
+    const limit = <span class="cstat-no" title="statement not covered" >getProductLimit(tier);</span>
 &nbsp;
-    // Pro tier has no limits
-<span class="cstat-no" title="statement not covered" >    if (tier === 'pro') {</span>
+    // Max tier has no limits
+<span class="cstat-no" title="statement not covered" >    if (tier === 'max' || limit === Infinity) {</span>
 <span class="cstat-no" title="statement not covered" >      return next();</span>
     }
 &nbsp;
@@ -658,7 +667,7 @@ export async function <span class="fstat-no" title="function not covered" >check
 &nbsp;
 <span class="cstat-no" title="statement not covered" >      return res.status(403).json({</span>
         error: 'PRODUCT_LIMIT_REACHED',
-        message: `${tier.toUpperCase()} tier allows max ${limit} products. Upgrade to PRO for unlimited.`,
+        message: `${tier.toUpperCase()} tier allows max ${limit} products. Upgrade to MAX for unlimited.`,
         currentCount,
         limit,
         tier,
@@ -738,17 +747,17 @@ export async function <span class="fstat-no" title="function not covered" >getPr
 <span class="cstat-no" title="statement not covered" >      throw new Error('Not authorized to view this shop');</span>
     }
 &nbsp;
-    const tier = <span class="cstat-no" title="statement not covered" >shop.tier || 'basic';</span>
-    const limit = <span class="cstat-no" title="statement not covered" >PRODUCT_LIMITS[tier];</span>
-    const canAdd = <span class="cstat-no" title="statement not covered" >tier === 'pro' || currentCount &lt; limit;</span>
+    const tier = <span class="cstat-no" title="statement not covered" >shop.tier || 'pro';</span>
+    const limit = <span class="cstat-no" title="statement not covered" >getProductLimit(tier);</span>
+    const canAdd = <span class="cstat-no" title="statement not covered" >tier === 'max' || limit === Infinity || currentCount &lt; limit;</span>
 &nbsp;
 <span class="cstat-no" title="statement not covered" >    return {</span>
       shopId,
       tier,
       currentCount,
-      limit: tier === 'pro' ? 'unlimited' : limit,
+      limit: limit === Infinity ? 'unlimited' : limit,
       canAdd,
-      upgradeAvailable: tier === 'basic',
+      upgradeAvailable: tier !== 'max',
     };
   } catch (error) {
 <span class="cstat-no" title="statement not covered" >    logger.error('[ProductLimit] Error getting limit status:', error);</span>
@@ -769,7 +778,7 @@ export default {
   checkProductLimit,
   getProductLimitStatus,
   invalidateProductLimitCache,
-  PRODUCT_LIMITS,
+  getProductLimit,
 };
 &nbsp;</pre></td></tr></table></pre>
 
@@ -778,7 +787,7 @@ export default {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-12-01T20:33:04.544Z
+                at 2025-12-03T16:11:54.456Z
             </div>
         <script src="../prettify.js"></script>
         <script>
