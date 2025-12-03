@@ -38,7 +38,7 @@ import logger from '../../../utils/logger.js';
  * @param {number} options.subscription.id - Subscription ID
  * @param {number|null} options.subscription.shop_id - Associated shop ID (may be null)
  * @param {number} options.subscription.user_id - Owner user ID
- * @param {string} options.subscription.tier - Subscription tier ('basic' or 'pro')
+ * @param {string} options.subscription.tier - Subscription tier ('pro' or 'max')
  * @param {string} options.subscription.status - Current status
  * @param {Object} options.invoice - Invoice record
  * @param {number} options.invoice.id - Invoice ID
@@ -54,7 +54,7 @@ import logger from '../../../utils/logger.js';
  * @example
  * // Regular subscription activation
  * const result = await finalizeSubscriptionPayment(client, {
- *   subscription: { id: 1, shop_id: 10, user_id: 5, tier: 'basic', status: 'pending' },
+ *   subscription: { id: 1, shop_id: 10, user_id: 5, tier: 'pro', status: 'pending' },
  *   invoice: { id: 100, currency: 'USDT', expected_amount: 10 },
  *   verification: { txHash: '0x...', confirmations: 6 },
  *   payment: { id: 50, status: 'pending' },
@@ -64,7 +64,7 @@ import logger from '../../../utils/logger.js';
  * @example
  * // Upgrade to pro tier
  * const result = await finalizeSubscriptionPayment(client, {
- *   subscription: { id: 1, shop_id: 10, user_id: 5, tier: 'basic', status: 'active' },
+ *   subscription: { id: 1, shop_id: 10, user_id: 5, tier: 'pro', status: 'active' },
  *   invoice: { id: 101, currency: 'USDT', expected_amount: 25 },
  *   verification: { txHash: '0x...', confirmations: 6 },
  *   payment: { id: 51, status: 'pending' },
@@ -77,7 +77,7 @@ export async function finalizeSubscriptionPayment(client, { subscription, invoic
   // =========================================================================
   // IDEMPOTENCY CHECK: Upgrade already completed
   // =========================================================================
-  if (isUpgrade && subscription.tier === 'pro') {
+  if (isUpgrade && subscription.tier === 'max') {
     await markInvoicePaid(client, invoice.id, verification.txHash);
     if (payment?.id && payment.status !== 'confirmed') {
       await paymentQueries.updateStatus(payment.id, 'confirmed', verification.confirmations, client);
@@ -103,7 +103,7 @@ export async function finalizeSubscriptionPayment(client, { subscription, invoic
   );
 
   // =========================================================================
-  // UPGRADE PATH: Upgrade existing shop to 'pro' tier
+  // UPGRADE PATH: Upgrade existing shop to 'max' tier
   // =========================================================================
   if (isUpgrade) {
     if (!subscription.shop_id) {
@@ -116,6 +116,7 @@ export async function finalizeSubscriptionPayment(client, { subscription, invoic
     }
 
     // Update shop to pro tier
+    // Also clear trial flags in case upgrading from trial
     await client.query(
       `UPDATE shops
           SET tier = 'pro',
@@ -124,6 +125,8 @@ export async function finalizeSubscriptionPayment(client, { subscription, invoic
               grace_period_until = NULL,
               registration_paid = true,
               is_active = true,
+              is_trial = false,
+              trial_ends_at = NULL,
               updated_at = NOW()
         WHERE id = $2`,
       [periodEnd, subscription.shop_id]
@@ -162,9 +165,12 @@ export async function finalizeSubscriptionPayment(client, { subscription, invoic
 
   // =========================================================================
   // REGULAR PATH: Shop exists - activate subscription
+  // (Handles both regular renewal AND trial-to-paid conversion)
   // =========================================================================
   if (subscription.shop_id) {
     // Update shop subscription status
+    // is_trial = false converts trial shop to paid
+    // trial_ends_at = NULL clears trial expiration
     await client.query(
       `UPDATE shops
           SET tier = $1,
@@ -173,6 +179,8 @@ export async function finalizeSubscriptionPayment(client, { subscription, invoic
               grace_period_until = NULL,
               registration_paid = true,
               is_active = true,
+              is_trial = false,
+              trial_ends_at = NULL,
               updated_at = NOW()
         WHERE id = $3`,
       [subscription.tier, periodEnd, subscription.shop_id]

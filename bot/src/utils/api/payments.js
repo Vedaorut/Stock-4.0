@@ -137,17 +137,22 @@ export const subscriptionApi = {
     return data.data || data;
   },
 
-  // Create pending subscription (first-time shop creation)
-  async createPending(tier, token) {
-    const { data } = await api.post(
-      '/subscriptions/pending',
-      { tier },
-      {
-        headers: { Authorization: `Bearer ${token}` },
-      }
-    );
-    // Unwrap response: return data.data instead of wrapper
-    return data.data || data;
+  // Create pending subscription (first-time shop creation or trial-to-paid conversion)
+  async createPending(tier, token, shopId = null) {
+    const payload = { tier };
+    if (shopId) {
+      payload.shopId = Number(shopId);
+    }
+    const { data } = await api.post('/subscriptions/pending', payload, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    // Backend returns { success, subscription: { id, ... } }
+    // Map to { subscriptionId, ... } for bot compatibility
+    const subscription = data.subscription || data.data?.subscription || data.data || data;
+    return {
+      subscriptionId: subscription.id,
+      ...subscription,
+    };
   },
 
   // Get subscription status for shop
@@ -174,7 +179,7 @@ export const subscriptionApi = {
 
   // Get invoice status (for CrystalPay webhooks)
   async getInvoiceStatus(invoiceId, token) {
-    const { data } = await api.get(`/invoices/${invoiceId}/status`, {
+    const { data } = await api.get(`/payments/invoices/${invoiceId}/status`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     // Unwrap response: return status data

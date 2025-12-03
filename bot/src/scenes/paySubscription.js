@@ -4,7 +4,7 @@
  * Multi-step wizard for paying monthly shop subscription via CrystalPay
  *
  * Steps:
- * 1. Show pricing and select tier (basic or pro)
+ * 1. Show pricing and select tier (pro or max)
  * 2. Select payment method (BTC or LTC)
  * 3. Create CrystalPay invoice via Backend API
  * 4. Show payment link button + check payment button
@@ -66,7 +66,7 @@ const paySubscriptionScene = new Scenes.WizardScene(
         ctx.wizard.state.createShopAfter = createShopAfter;
 
         // Skip to crypto selection (Step 3)
-        const message = `📦 <b>Подписка:</b> ${enteredWithTier === 'pro' ? 'Pro' : 'Basic'}
+        const message = `📦 <b>Подписка:</b> ${enteredWithTier === 'max' ? 'MAX' : 'PRO'}
 
 Выберите способ оплаты:`;
 
@@ -103,24 +103,25 @@ const paySubscriptionScene = new Scenes.WizardScene(
 
       const message = [
         subMessages.chooseTierIntro,
-        subMessages.tierDescriptionBasic,
         subMessages.tierDescriptionPro,
+        subMessages.tierDescriptionMax,
       ].join('\n\n');
 
       await cleanReplyHTML(
         ctx,
         message,
         Markup.inlineKeyboard([
-          [Markup.button.callback(buttonText.tierBasic, 'subscription:tier:basic')],
           [Markup.button.callback(buttonText.tierPro, 'subscription:tier:pro')],
+          [Markup.button.callback(buttonText.tierMax, 'subscription:tier:max')],
           [Markup.button.callback(buttonText.cancel, 'seller:menu')],
         ])
       );
 
       // Save shop info and subscription ID for next steps
+      // Use currentSubscription if active, or latestSubscription for renewal of expired subscription
       ctx.wizard.state.shopId = shopId;
       ctx.wizard.state.shopName = shopName;
-      ctx.wizard.state.subscriptionId = statusResponse.currentSubscription?.id;
+      ctx.wizard.state.subscriptionId = statusResponse.currentSubscription?.id || statusResponse.latestSubscription?.id;
 
       if (!ctx.session.shopName) {
         ctx.session.shopName = shopName;
@@ -164,7 +165,7 @@ const paySubscriptionScene = new Scenes.WizardScene(
     }
 
     const tier = data.replace('subscription:tier:', '');
-    if (tier !== 'basic' && tier !== 'pro') {
+    if (tier !== 'pro' && tier !== 'max') {
       await ctx.answerCbQuery(subMessages.invalidTier);
       return;
     }
@@ -173,7 +174,41 @@ const paySubscriptionScene = new Scenes.WizardScene(
 
     ctx.wizard.state.tier = tier;
 
-    const message = `📦 <b>Подписка:</b> ${tier === 'pro' ? 'Pro' : 'Basic'}
+    // For renewal: if no subscriptionId, create pending subscription
+    // This happens for Trial shops that have no shop_subscriptions record
+    if (!ctx.wizard.state.subscriptionId) {
+      try {
+        await ctx.editMessageText('⏳ Создаём подписку...', { parse_mode: 'HTML' });
+
+        const token = ctx.session.token;
+        if (!token) {
+          throw new Error('No auth token');
+        }
+
+        // Pass shopId for trial-to-paid conversion (links subscription to existing shop)
+        const shopId = ctx.wizard.state.shopId || ctx.session.shopId;
+        const pendingData = await subscriptionApi.createPending(tier, token, shopId);
+        ctx.wizard.state.subscriptionId = pendingData.subscriptionId;
+
+        logger.info('[PaySubscription] Created pending subscription for renewal', {
+          userId: ctx.from.id,
+          subscriptionId: pendingData.subscriptionId,
+          tier,
+        });
+      } catch (error) {
+        logger.error('[PaySubscription] Failed to create pending subscription:', error);
+        await ctx.editMessageText(
+          `❌ Ошибка создания подписки: ${error.message}`,
+          {
+            parse_mode: 'HTML',
+            ...Markup.inlineKeyboard([[Markup.button.callback(buttonText.back, 'subscription:back')]]),
+          }
+        );
+        return;
+      }
+    }
+
+    const message = `📦 <b>Подписка:</b> ${tier === 'max' ? 'MAX' : 'PRO'}
 
 Выберите способ оплаты:`;
 
@@ -273,7 +308,7 @@ const paySubscriptionScene = new Scenes.WizardScene(
 
       // Prepare message
       const message = [
-        `📦 <b>Подписка:</b> ${tier === 'pro' ? 'Pro' : 'Basic'}`,
+        `📦 <b>Подписка:</b> ${tier === 'max' ? 'MAX' : 'PRO'}`,
         `💳 <b>Метод:</b> ${methodLabel}`,
         '',
         '💡 <i>Поле "Email" — вводите что угодно, нам не нужен</i>',
@@ -285,7 +320,6 @@ const paySubscriptionScene = new Scenes.WizardScene(
         parse_mode: 'HTML',
         ...Markup.inlineKeyboard([
           [Markup.button.url('💳 Оплатить', invoiceResponse.paymentUrl)],
-          [Markup.button.callback('🔄 Проверить оплату', 'subscription:check_payment')],
           [Markup.button.callback(buttonText.cancel, 'seller:menu')],
         ]),
       });
@@ -424,18 +458,17 @@ const paySubscriptionScene = new Scenes.WizardScene(
 
         await ctx.editMessageText(
           [
-            `📦 <b>Подписка:</b> ${tier === 'pro' ? 'Pro' : 'Basic'}`,
+            `📦 <b>Подписка:</b> ${tier === 'max' ? 'MAX' : 'PRO'}`,
             `💳 <b>Метод:</b> ${methodLabel}`,
             '',
             '⏳ <b>Оплата пока не получена.</b>',
             '',
-            'Нажмите кнопку для оплаты или проверьте статус позже:',
+            'Нажмите кнопку для оплаты:',
           ].join('\n'),
           {
             parse_mode: 'HTML',
             ...Markup.inlineKeyboard([
               [Markup.button.url('💳 Оплатить', crystalPayUrl)],
-              [Markup.button.callback('🔄 Проверить оплату', 'subscription:check_payment')],
               [Markup.button.callback(buttonText.cancel, 'seller:menu')],
             ]),
           }
@@ -450,7 +483,6 @@ const paySubscriptionScene = new Scenes.WizardScene(
           {
             parse_mode: 'HTML',
             ...Markup.inlineKeyboard([
-              [Markup.button.callback('🔄 Проверить снова', 'subscription:check_payment')],
               [Markup.button.callback(buttonText.cancel, 'seller:menu')],
             ]),
           }
