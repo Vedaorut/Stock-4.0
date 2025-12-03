@@ -84,8 +84,11 @@ const buildProductSectionMessage = (section, shopName, products) =>
 
 /**
  * Handle buyer role selection
+ * @param {Object} ctx - Telegraf context
+ * @param {Object} options - Options
+ * @param {boolean} options.skipRoleUpdate - Skip PATCH /auth/role (already called by caller)
  */
-export const handleBuyerRole = async (ctx) => {
+export const handleBuyerRole = async (ctx, options = {}) => {
   try {
     if (ctx.callbackQuery) {
       await ctx.answerCbQuery();
@@ -94,17 +97,24 @@ export const handleBuyerRole = async (ctx) => {
     ctx.session.role = 'buyer';
     logger.info(`User ${ctx.from.id} selected buyer role`);
 
-    // Save role to database
-    try {
-      if (ctx.session.token) {
-        await authApi.updateRole('buyer', ctx.session.token);
-        if (ctx.session.user) {
-          ctx.session.user.selectedRole = 'buyer'; // Update session cache
+    // PERF: Skip role update if already done by caller (e.g., handleRoleBuyer)
+    if (!options.skipRoleUpdate) {
+      try {
+        if (ctx.session.token) {
+          await authApi.updateRole('buyer', ctx.session.token);
+          if (ctx.session.user) {
+            ctx.session.user.selectedRole = 'buyer'; // Update session cache
+          }
+          logger.info(`Saved buyer role for user ${ctx.from.id}`);
         }
-        logger.info(`Saved buyer role for user ${ctx.from.id}`);
+      } catch (error) {
+        logger.error('Failed to save role:', error);
       }
-    } catch (error) {
-      logger.error('Failed to save role:', error);
+    } else {
+      // Just update session cache
+      if (ctx.session.user) {
+        ctx.session.user.selectedRole = 'buyer';
+      }
     }
 
     // Check if buyer has shop (for CTA to create shop)
@@ -124,7 +134,7 @@ export const handleBuyerRole = async (ctx) => {
         // No shop - show CTA to create shop
         await smartMessage.send(ctx, {
           text: buyerMessages.panel,
-          keyboard: buyerMenuNoShop,
+          keyboard: buyerMenuNoShop(ctx.lang),
         });
         logger.info(`Buyer ${ctx.from.id} has no shop, showing CTA`);
         return;
@@ -133,7 +143,7 @@ export const handleBuyerRole = async (ctx) => {
 
     await smartMessage.send(ctx, {
       text: buyerMessages.panel,
-      keyboard: buyerMenu,
+      keyboard: buyerMenu(ctx.lang),
     });
   } catch (error) {
     logger.error('Error in buyer role handler:', error);
@@ -141,7 +151,7 @@ export const handleBuyerRole = async (ctx) => {
     try {
       await smartMessage.send(ctx, {
         text: generalMessages.actionFailed,
-        keyboard: buyerMenu,
+        keyboard: buyerMenu(ctx.lang),
       });
     } catch (replyError) {
       logger.error('Failed to send error message:', replyError);
@@ -164,7 +174,7 @@ const handleSearchShops = async (ctx) => {
     try {
       await smartMessage.send(ctx, {
         text: generalMessages.actionFailed,
-        keyboard: buyerMenu,
+        keyboard: buyerMenu(ctx.lang),
       });
     } catch (replyError) {
       logger.error('Failed to send error message:', replyError);
@@ -183,7 +193,7 @@ const handleSubscriptions = async (ctx) => {
     if (!ctx.session.token) {
       await smartMessage.send(ctx, {
         text: generalMessages.authorizationRequired,
-        keyboard: buyerMenu,
+        keyboard: buyerMenu(ctx.lang),
       });
       return;
     }
@@ -194,13 +204,13 @@ const handleSubscriptions = async (ctx) => {
 
     await smartMessage.send(ctx, {
       text: message,
-      keyboard: buyerMenu,
+      keyboard: buyerMenu(ctx.lang),
     });
   } catch (error) {
     logger.error('Error fetching subscriptions:', error);
     await smartMessage.send(ctx, {
       text: generalMessages.actionFailed,
-      keyboard: buyerMenu,
+      keyboard: buyerMenu(ctx.lang),
     });
   }
 };
@@ -327,7 +337,7 @@ const handleOrders = async (ctx) => {
     if (!ctx.session.token) {
       await smartMessage.send(ctx, {
         text: generalMessages.authorizationRequired,
-        keyboard: buyerMenu,
+        keyboard: buyerMenu(ctx.lang),
       });
       return;
     }
@@ -341,14 +351,14 @@ const handleOrders = async (ctx) => {
 
     await smartMessage.send(ctx, {
       text: message,
-      keyboard: buyerMenu,
+      keyboard: buyerMenu(ctx.lang),
     });
     logger.info(`User ${ctx.from.id} viewed orders (${orders.length} total)`);
   } catch (error) {
     logger.error('Error fetching orders:', error);
     await smartMessage.send(ctx, {
       text: generalMessages.actionFailed,
-      keyboard: buyerMenu,
+      keyboard: buyerMenu(ctx.lang),
     });
   }
 };
@@ -379,22 +389,24 @@ const handleShopView = async (ctx) => {
 
     await ctx.answerCbQuery();
 
-    // Get shop details
-    const shop = await shopApi.getShop(shopId);
+    // PERF: Fetch all data in parallel instead of sequential calls
+    const [shop, products, isSubscribed] = await Promise.all([
+      shopApi.getShop(shopId),
+      productApi.getShopProducts(shopId),
+      resolveSubscription(ctx, shopId),
+    ]);
 
     // P2-2 FIX: Handle deleted shop
     if (!shop) {
       await smartMessage.send(ctx, {
         text: buyerMessages.shopNotFound || 'Магазин не найден или был удалён',
-        keyboard: buyerMenu,
+        keyboard: buyerMenu(ctx.lang),
       });
       return;
     }
 
-    const products = await productApi.getShopProducts(shopId);
     const sectioned = splitProductsByAvailability(products);
     const message = buildShopInfoMessage(shop, sectioned);
-    const isSubscribed = await resolveSubscription(ctx, shopId);
 
     await smartMessage.send(ctx, {
       text: message,
@@ -415,7 +427,7 @@ const handleShopView = async (ctx) => {
 
     await smartMessage.send(ctx, {
       text: generalMessages.actionFailed,
-      keyboard: buyerMenu,
+      keyboard: buyerMenu(ctx.lang),
     });
   }
 };
@@ -464,7 +476,7 @@ const handleShopSection = async (ctx, section) => {
 
     await smartMessage.send(ctx, {
       text: generalMessages.actionFailed,
-      keyboard: buyerMenu,
+      keyboard: buyerMenu(ctx.lang),
     });
   }
 };

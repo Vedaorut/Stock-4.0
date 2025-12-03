@@ -1,7 +1,7 @@
 /**
  * Rate Limit Service for Channel Migration Feature
  *
- * Enforces limits on channel migrations for PRO shop owners:
+ * Enforces limits on channel migrations for MAX shop owners:
  * - Maximum 2 migrations per calendar month
  * - Resets on the 1st of each month
  */
@@ -71,11 +71,11 @@ async function canMigrate(shopId) {
 }
 
 /**
- * Check if shop has PRO tier
+ * Check if shop has MAX tier (migration is MAX-only feature)
  * @param {number} shopId - Shop ID
  * @returns {Promise<boolean>}
  */
-async function isProShop(shopId) {
+async function isMaxShop(shopId) {
   try {
     const result = await pool.query('SELECT tier FROM shops WHERE id = $1', [shopId]);
 
@@ -83,30 +83,33 @@ async function isProShop(shopId) {
       return false;
     }
 
-    const isPro = result.rows[0].tier === 'pro';
+    const isMax = result.rows[0].tier === 'max';
     logger.info(`[RateLimit] Shop ${shopId} tier: ${result.rows[0].tier}`);
 
-    return isPro;
+    return isMax;
   } catch (error) {
-    logger.error(`[RateLimit] Error checking PRO tier for shop ${shopId}:`, error);
+    logger.error(`[RateLimit] Error checking MAX tier for shop ${shopId}:`, error);
     throw error;
   }
 }
 
+// Legacy alias for backward compatibility
+const isProShop = isMaxShop;
+
 /**
- * Validate if shop can perform migration (PRO + within limits)
+ * Validate if shop can perform migration (MAX + within limits)
  * @param {number} shopId - Shop ID
  * @returns {Promise<{valid: boolean, error?: string, data?: object}>}
  */
 async function validateMigration(shopId) {
   try {
-    // Check PRO tier
-    const isPro = await isProShop(shopId);
-    if (!isPro) {
+    // Check MAX tier (migration is MAX-only feature)
+    const isMax = await isMaxShop(shopId);
+    if (!isMax) {
       return {
         valid: false,
         error: 'UPGRADE_REQUIRED',
-        message: 'Channel migration is a PRO feature. Upgrade to PRO to unlock this feature.',
+        message: 'Channel migration is a MAX feature. Upgrade to MAX to unlock this feature.',
       };
     }
 
@@ -162,4 +165,4 @@ async function getMigrationHistory(shopId, limit = 10) {
   }
 }
 
-export { canMigrate, isProShop, validateMigration, getMigrationHistory };
+export { canMigrate, isMaxShop, isProShop, validateMigration, getMigrationHistory };

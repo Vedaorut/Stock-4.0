@@ -48,7 +48,7 @@ export function validatePendingSubscriptionInput(body = {}) {
   const { tier, shopId: rawShopId } = body;
 
   if (!tier || !VALID_TIERS.includes(tier)) {
-    throw new ValidationError('Invalid tier. Use "basic" or "pro"');
+    throw new ValidationError('Invalid tier. Use "pro" or "max"');
   }
 
   const shopId =

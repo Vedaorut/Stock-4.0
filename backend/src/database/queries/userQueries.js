@@ -7,7 +7,7 @@ export const userQueries = {
   // Find user by Telegram ID
   findByTelegramId: async (telegramId) => {
     const result = await query(
-      'SELECT id, telegram_id, username, first_name, last_name, selected_role, created_at, updated_at FROM users WHERE telegram_id = $1',
+      'SELECT id, telegram_id, username, first_name, last_name, selected_role, language, created_at, updated_at FROM users WHERE telegram_id = $1',
       [telegramId]
     );
     return result.rows[0];
@@ -20,7 +20,7 @@ export const userQueries = {
     }
 
     const result = await query(
-      `SELECT id, telegram_id, username, first_name, last_name, selected_role, created_at, updated_at FROM users WHERE LOWER(username) = LOWER($1) LIMIT 1`,
+      `SELECT id, telegram_id, username, first_name, last_name, selected_role, language, created_at, updated_at FROM users WHERE LOWER(username) = LOWER($1) LIMIT 1`,
       [username]
     );
     return result.rows[0];
@@ -29,7 +29,7 @@ export const userQueries = {
   // Find user by ID
   findById: async (id) => {
     const result = await query(
-      'SELECT id, telegram_id, username, first_name, last_name, selected_role, created_at, updated_at FROM users WHERE id = $1',
+      'SELECT id, telegram_id, username, first_name, last_name, selected_role, language, created_at, updated_at FROM users WHERE id = $1',
       [id]
     );
     return result.rows[0];
@@ -81,6 +81,41 @@ export const userQueries = {
        WHERE id = $1
        RETURNING id, telegram_id, username, first_name, last_name, selected_role, created_at, updated_at`,
       [userId, role]
+    );
+    return result.rows[0];
+  },
+
+  // Update user language preference
+  updateLanguage: async (userId, language) => {
+    const result = await query(
+      `UPDATE users
+       SET language = $2,
+           updated_at = NOW()
+       WHERE id = $1
+       RETURNING id, telegram_id, username, first_name, last_name, selected_role, language, created_at, updated_at`,
+      [userId, language]
+    );
+    return result.rows[0];
+  },
+
+  // Get user language preference
+  getLanguage: async (userId) => {
+    const result = await query(
+      'SELECT language FROM users WHERE id = $1',
+      [userId]
+    );
+    return result.rows[0]?.language || 'ru';
+  },
+
+  // Mark onboarding as completed
+  markOnboardingCompleted: async (userId) => {
+    const result = await query(
+      `UPDATE users
+       SET onboarding_completed = true,
+           updated_at = NOW()
+       WHERE id = $1
+       RETURNING id, telegram_id, username, first_name, last_name, selected_role, language, onboarding_completed, created_at, updated_at`,
+      [userId]
     );
     return result.rows[0];
   },

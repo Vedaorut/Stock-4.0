@@ -11,7 +11,19 @@
     "error": "Ошибка",
     "success": "Успешно",
     "retry": "Попробовать снова",
-    "clear": "Очистить"
+    "clear": "Очистить",
+    "confirm": "Подтвердить",
+    "yes": "Да",
+    "no": "Нет",
+    "ok": "OK",
+    "apply": "Применить",
+    "search": "Поиск",
+    "find": "Найти",
+    "total": "Всего",
+    "active": "Активных",
+    "done": "Готово",
+    "attention": "Внимание",
+    "copy": "Скопировать"
   },
 
   "product": {
@@ -74,7 +86,12 @@
       "sellerMessage": "Вы переключитесь в режим управления магазином.",
       "buyerMessage": "Вы переключитесь в режим покупок.",
       "error": "Не удалось переключить режим"
-    }
+    },
+    "inviteLink": "Пригласительная ссылка",
+    "inviteLinkDescription": "Поделитесь с покупателями",
+    "inviteLinkLabel": "Ссылка на магазин",
+    "inviteLinkCopied": "Ссылка скопирована!",
+    "inviteLinkHint": "Поделитесь ссылкой в канале. Пользователи автоматически подпишутся на ваш магазин."
   },
 
   "wallet": {
@@ -172,13 +189,21 @@
     "unsubscribe": "Отписаться",
     "products": "товаров",
     "loadError": "Не удалось загрузить подписки",
-    "dataLoadError": "Не удалось загрузить данные"
+    "dataLoadError": "Не удалось загрузить данные",
+    "searchPlaceholder": "Поиск товаров...",
+    "searchEmpty": "Ничего не найдено",
+    "searchEmptyDesc": "Попробуйте изменить запрос",
+    "searchMinChars": "Введите минимум 2 символа"
   },
 
   "shop": {
     "products": "товаров",
     "subscribe": "Подписаться",
-    "subscribed": "Подписан"
+    "subscribed": "Подписан",
+    "notSelected": "Магазин не выбран",
+    "noShop": "У вас ещё нет магазина",
+    "createShop": "Создайте магазин для доступа",
+    "createShopForWorkers": "Создайте магазин для управления сотрудниками"
   },
 
   "payment": {
@@ -206,5 +231,261 @@
     "copyAddress": "Скопировать адрес",
     "addressCopied": "Адрес скопирован",
     "orderDetails": "Детали заказа"
+  },
+
+  "subscription": {
+    "title": "Подписка",
+    "activePlan": "Активный план",
+    "daysLeft": "дн.",
+    "paymentHistory": "История платежей",
+    "upgradeToPro": "Перейти на PRO",
+    "select": "Выбрать",
+    "perMonth": "/мес",
+    "goToBot": "Для перехода на PRO перейдите в бота",
+    "changePlanBot": "Для изменения плана перейдите в бота"
+  },
+
+  "analytics": {
+    "title": "Статистика",
+    "totalSales": "Общие продажи",
+    "ordersCount": "заказов",
+    "avgCheck": "Средний чек",
+    "period7d": "7 дней",
+    "period1m": "Месяц",
+    "periodCustom": "Период",
+    "topProducts": "Топ товары",
+    "noData": "Нет данных за выбранный период",
+    "soldCount": "шт продано",
+    "selectPeriod": "Выбор периода",
+    "from": "С",
+    "to": "До",
+    "invalidDataFormat": "Неверный формат данных статистики",
+    "loadError": "Не удалось загрузить статистику",
+    "fetchError": "Ошибка загрузки данных"
+  },
+
+  "shopOrders": {
+    "title": "Заказы магазина",
+    "ordersFor": "Заказы: {shop}",
+    "workerMode": "Режим работника",
+    "toIssue": "к выдаче",
+    "issued": "выдано",
+    "noOrders": "Нет заказов",
+    "ordersWillAppear": "Заказы магазина появятся здесь",
+    "autoRefresh": "Автообновление каждые 30 сек",
+    "status": {
+      "pending": "Ожидание",
+      "verifying": "Проверка",
+      "confirmed": "Оплачен",
+      "shipped": "Выдан",
+      "delivered": "Завершён",
+      "cancelled": "Отменён"
+    },
+    "actions": {
+      "issue": "Выдать товар",
+      "cancel": "Отменить",
+      "complete": "Завершить"
+    },
+    "labels": {
+      "buyer": "Покупатель",
+      "product": "Товар",
+      "quantity": "Кол-во",
+      "pcs": "шт"
+    },
+    "updateError": "Не удалось обновить статус"
+  },
+
+  "workspace": {
+    "title": "Workspace",
+    "workersTitle": "Сотрудники",
+    "workersCount": "Сотрудники ({count})",
+    "addWorker": "+ Добавить сотрудника",
+    "addWorkerShort": "Добавить",
+    "adding": "Добавление...",
+    "workerIdLabel": "Telegram ID сотрудника",
+    "workerIdPlaceholder": "@username или 123456789",
+    "workerIdHint": "Укажите @username или ID сотрудника (через @userinfobot)",
+    "removeWorker": "Удалить сотрудника @{username}?",
+    "noWorkers": "Пока нет сотрудников",
+    "loadError": "Ошибка загрузки",
+    "workersCan": "Сотрудники могут",
+    "workersCanDesc": "Добавлять, редактировать и удалять товары в вашем магазине. Полные права администратора.",
+    "proOnly": "Доступно только на PRO",
+    "proOnlyDesc": "Апгрейд до PRO откроет совместную работу: сотрудники смогут управлять товарами и продажами. Перейдите в раздел «Подписка», чтобы обновить тариф.",
+    "createShopFirst": "Сначала создайте магазин",
+    "workersProOnly": "Работники доступны только на тарифе PRO",
+    "enterIdOrUsername": "Введите Telegram ID или @username",
+    "addError": "Ошибка добавления сотрудника",
+    "removeError": "Ошибка удаления сотрудника"
+  },
+
+  "products": {
+    "title": "Мои товары",
+    "addProduct": "+ Добавить товар",
+    "nameLabel": "Название товара *",
+    "namePlaceholder": "Windows 11 Pro",
+    "priceLabel": "Цена ($) *",
+    "pricePlaceholder": "29.99",
+    "stockLabel": "В наличии",
+    "stockPlaceholder": "100",
+    "availabilityType": "Тип доступности",
+    "inStock": "In stock",
+    "preorder": "Preorder",
+    "preorderHint": "Товар будет доступен для предзаказа независимо от количества",
+    "saving": "Сохранение...",
+    "create": "Создать",
+    "limitReached": "Лимит достигнут! Доступно: {tier}",
+    "shopNotFound": "Не удалось определить магазин",
+    "saveError": "Ошибка сохранения товара",
+    "deleteError": "Ошибка удаления товара",
+    "createShopBot": "Создание магазина через бота",
+    "aiWelcome": "Привет! Я AI-ассистент магазина. Напишите, какие товары нужно добавить или изменить - все сделаю за вас.",
+    "aiEmptyResponse": "Пустой ответ AI-сервиса",
+    "aiError": "Не удалось обработать запрос. Попробуйте позже.",
+    "aiCommandError": "Не получилось обработать команду. Попробуйте еще раз или сформулируйте иначе."
+  },
+
+  "migration": {
+    "title": "Миграция",
+    "doneTitle": "Готово",
+    "channelBlocked": "Канал заблокирован?",
+    "notifySubscribers": "Уведомим всех подписчиков о новом канале",
+    "subscribersWillGet": "{count} подписчиков получат уведомление",
+    "channelSaved": "Новый канал будет сохранен в магазине",
+    "availableIn": "Доступно через {days} {daysLabel}",
+    "startMigration": "Начать миграцию",
+    "newChannel": "Новый канал",
+    "channelPlaceholder": "@mychannel (мин. 5 символов)",
+    "channelPreview": "Канал: {channel}",
+    "sending": "Отправка...",
+    "sendNotifications": "Отправить уведомления",
+    "migrationStarted": "Миграция запущена!",
+    "notificationsSending": "Уведомления отправляются подписчикам",
+    "newChannelLabel": "Новый канал",
+    "sentCount": "{count} уведомлений",
+    "closesIn": "Закроется через",
+    "daysOne": "день",
+    "daysFew": "дня",
+    "daysMany": "дней"
+  },
+
+  "follows": {
+    "title": "Follows",
+    "searchShop": "Поиск магазина",
+    "searchPlaceholder": "Название или @username",
+    "clearResults": "Очистить результаты",
+    "subscribeBtn": "Подписаться",
+    "subscriptions": "Подписки ({count})",
+    "noSubscriptions": "Нет подписок",
+    "useBot": "Используйте бота для подписки на магазины",
+    "noShop": "У вас ещё нет магазина",
+    "createShopForFollows": "Создайте магазин, чтобы управлять подписками Follows",
+    "monitorMode": "Мониторинг",
+    "resellMode": "Перепродажа",
+    "resellShort": "Реселл",
+    "monitorShort": "Монитор",
+    "switchToResell": "→ Реселл",
+    "switchToMonitor": "→ Монитор",
+    "products": "товаров",
+    "unsubscribeConfirm": "Отписаться от \"{shop}\"?",
+    "monitoringInfo": "Мониторинг магазинов",
+    "monitorDesc": "Отслеживайте товары конкурентов",
+    "resellDesc": "Автоматическое копирование товаров с наценкой",
+    "limit": "Лимит",
+    "markupPrompt": "Наценка для реселла (1-500%)",
+    "markupError": "Наценка должна быть от 1 до 500%",
+    "modeError": "Ошибка смены режима",
+    "deleteError": "Ошибка удаления подписки",
+    "searchError": "Ошибка поиска",
+    "notFound": "Магазины не найдены",
+    "createShopFirst": "Сначала создайте магазин",
+    "addError": "Ошибка добавления подписки",
+    "added": "Подписка добавлена!",
+    "enterSearch": "Введите название магазина или @username",
+    "settingsSection": "Настройки",
+    "editMarkup": "Изменить наценку",
+    "currentMarkup": "Текущая:",
+    "switchMode": "Переключить режим",
+    "switchTo": "На",
+    "dangerZone": "Опасная зона",
+    "deleteSubscription": "Удалить подписку",
+    "irreversible": "Действие необратимо"
+  },
+
+  "myOrders": {
+    "title": "Мои заказы",
+    "noOrders": "Нет заказов",
+    "purchasesWillAppear": "Ваши покупки появятся здесь",
+    "activeCount": "активных",
+    "autoRefresh": "Автообновление каждые 30 сек",
+    "status": {
+      "pending": "Ожидание",
+      "verifying": "Проверка",
+      "confirmed": "Оплачен",
+      "shipped": "Отправлен",
+      "delivered": "Получен",
+      "cancelled": "Отменён"
+    },
+    "labels": {
+      "product": "Товар",
+      "shop": "Магазин",
+      "confirmations": "Подтверждения",
+      "paymentAddress": "Адрес оплаты"
+    }
+  },
+
+  "confirm": {
+    "title": "Подтверждение",
+    "deleteTitle": "Удаление",
+    "warningTitle": "Внимание"
+  },
+
+  "errors": {
+    "loadFailed": "Не удалось загрузить данные",
+    "loadSubscriptionsFailed": "Не удалось загрузить подписки",
+    "unknownCrypto": "Неизвестная криптовалюта",
+    "cryptoNotSupported": "Выбранная криптовалюта ({crypto}) не поддерживается",
+    "paymentLoadFailed": "Не удалось получить данные платежа",
+    "somethingWrong": "Что-то пошло не так",
+    "unexpectedError": "Произошла непредвиденная ошибка. Не волнуйтесь, ваши данные в безопасности.",
+    "errorOccurred": "Произошла ошибка: {message}\n\nПопробуйте перезагрузить приложение.",
+    "reloadApp": "Перезагрузить приложение",
+    "goToMain": "Вернуться на главную",
+    "persistentError": "Если проблема повторяется, свяжитесь с поддержкой"
+  },
+
+  "offline": {
+    "title": "Нет подключения к интернету",
+    "description": "Проверьте соединение и попробуйте снова"
+  },
+
+  "followDetail": {
+    "title": "Детали подписки",
+    "products": "Товары",
+    "productsCount": "{count} товаров",
+    "pcs": "шт",
+    "noSyncedProducts": "Нет синхронизированных товаров",
+    "ownMarkup": "Своя",
+    "outOfStock": "Нет в наличии",
+    "tryAgain": "Попробовать снова",
+    "resale": "Перепродажа",
+    "monitor": "Мониторинг",
+    "switchModeTitle": "Переключить режим",
+    "switchToMonitorDesc": "Переключить в режим мониторинга? Ваши настройки наценки будут сохранены.",
+    "switchToResaleDesc": "Переключить в режим перепродажи? Товары будут скопированы с вашей наценкой.",
+    "deleteTitle": "Удалить подписку",
+    "deleteWarning": "Вы уверены? Все синхронизированные товары будут удалены. Это действие нельзя отменить."
+  },
+
+  "dialogs": {
+    "switchMode": "Переключить",
+    "delete": "Удалить"
+  },
+
+  "hints": {
+    "useFollowCommand": "Используйте команду /follow в боте для добавления магазинов",
+    "copied": "Скопировано!",
+    "clickToCopy": "Нажмите для копирования",
+    "stackTrace": "Stack trace"
   }
 }

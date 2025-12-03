@@ -10,6 +10,8 @@ import * as smartMessage from '../utils/smartMessage.js';
 import { messages } from '../texts/messages.js';
 import { workerMenu } from '../keyboards/worker.js';
 import { handleWorkerDashboard } from './worker/index.js';
+import { t } from '../i18n/index.js';
+import { handleStart } from './start.js';
 
 const {
   start: startMessages,
@@ -22,6 +24,9 @@ const {
  * Setup common handlers (main menu, cancel, etc.)
  */
 export const setupCommonHandlers = (bot) => {
+  // Language selection (first-time users)
+  bot.action(/^lang:(ru|en)$/, handleLanguageSelection);
+
   // Main menu action
   bot.action('main_menu', handleMainMenu);
 
@@ -47,6 +52,55 @@ export const setupCommonHandlers = (bot) => {
 
   // Workspace shop selection
   bot.action(/^workspace:(\d+)$/, handleSelectWorkspace);
+};
+
+/**
+ * Handle language selection (first-time users)
+ */
+const handleLanguageSelection = async (ctx) => {
+  try {
+    const lang = ctx.match[1]; // 'ru' or 'en'
+    await ctx.answerCbQuery();
+
+    logger.info(`User ${ctx.from.id} selected language: ${lang}`);
+
+    // Save language to session
+    if (!ctx.session.user) {
+      ctx.session.user = {};
+    }
+    ctx.session.user.language = lang;
+
+    // Save language to database via API
+    try {
+      if (ctx.session.token) {
+        await authApi.updateLanguage(lang, ctx.session.token);
+        logger.info(`Saved language ${lang} to database for user ${ctx.from.id}`);
+      }
+    } catch (error) {
+      logger.error('Failed to save language to database:', error);
+      // Continue anyway - language is set in session
+    }
+
+    // Show confirmation and continue to main flow
+    const confirmMessage = lang === 'ru'
+      ? '✅ Язык установлен: Русский'
+      : '✅ Language set: English';
+
+    await ctx.editMessageText(confirmMessage);
+
+    // Small delay for UX
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // Continue with normal start flow
+    await handleStart(ctx);
+  } catch (error) {
+    logger.error('Error in language selection handler:', error);
+    try {
+      await ctx.reply(t('general.actionFailed', {}, 'ru'));
+    } catch (replyError) {
+      logger.error('Failed to send error message:', replyError);
+    }
+  }
 };
 
 /**
@@ -81,7 +135,7 @@ const handleMainMenu = async (ctx) => {
 
     await smartMessage.send(ctx, {
       text: startMessages.welcome,
-      keyboard: mainMenu(),
+      keyboard: mainMenu(false, ctx.lang),
     });
   } catch (error) {
     logger.error('Error in main menu handler:', error);
@@ -89,7 +143,7 @@ const handleMainMenu = async (ctx) => {
     try {
       await smartMessage.send(ctx, {
         text: generalMessages.actionFailed,
-        keyboard: mainMenu(),
+        keyboard: mainMenu(false, ctx.lang),
       });
     } catch (replyError) {
       logger.error('Failed to send error message:', replyError);
@@ -110,7 +164,7 @@ const handleCancelScene = async (ctx) => {
     // Return to main menu (minimalist)
     await smartMessage.send(ctx, {
       text: startMessages.welcome,
-      keyboard: mainMenu(),
+      keyboard: mainMenu(false, ctx.lang),
     });
   } catch (error) {
     logger.error('Error canceling scene:', error);
@@ -118,7 +172,7 @@ const handleCancelScene = async (ctx) => {
     try {
       await smartMessage.send(ctx, {
         text: generalMessages.actionFailed,
-        keyboard: mainMenu(),
+        keyboard: mainMenu(false, ctx.lang),
       });
     } catch (replyError) {
       logger.error('Failed to send error message:', replyError);
@@ -142,17 +196,17 @@ const handleBack = async (ctx) => {
     } else if (ctx.session.role === 'worker') {
       await smartMessage.send(ctx, {
         text: 'Меню сотрудника',
-        keyboard: workerMenu(),
+        keyboard: workerMenu(undefined, ctx.lang),
       });
     } else if (ctx.session.role === 'buyer') {
       await smartMessage.send(ctx, {
         text: buyerMessages.panel,
-        keyboard: buyerMenu,
+        keyboard: buyerMenu(ctx.lang),
       });
     } else {
       await smartMessage.send(ctx, {
         text: startMessages.welcome,
-        keyboard: mainMenu(),
+        keyboard: mainMenu(false, ctx.lang),
       });
     }
   } catch (error) {
@@ -161,7 +215,7 @@ const handleBack = async (ctx) => {
     try {
       await smartMessage.send(ctx, {
         text: generalMessages.actionFailed,
-        keyboard: mainMenu(),
+        keyboard: mainMenu(false, ctx.lang),
       });
     } catch (replyError) {
       logger.error('Failed to send error message:', replyError);
@@ -170,7 +224,7 @@ const handleBack = async (ctx) => {
 };
 
 /**
- * Handle role toggle action - show role selection menu
+ * Handle role toggle action - auto-swap buyer↔seller or show menu if worker
  */
 const handleRoleToggle = async (ctx) => {
   try {
@@ -187,16 +241,24 @@ const handleRoleToggle = async (ctx) => {
       }
     }
 
-    // Build role selection keyboard
-    const buttons = [
-      [Markup.button.callback('\u{1F6D2} Покупаю', 'role:buyer')],
-      [Markup.button.callback('\u{1F3EA} Продаю', 'role:seller')],
-    ];
-
-    // Only show worker option if user is actually a worker
-    if (isWorker) {
-      buttons.push([Markup.button.callback('\u{1F477} Сотрудник', 'role:worker')]);
+    // If NOT worker - auto-swap buyer↔seller without showing menu
+    if (!isWorker) {
+      const currentRole = ctx.session.role || ctx.session.user?.selectedRole || 'buyer';
+      if (currentRole === 'buyer' || currentRole === null) {
+        // Switch to seller
+        return handleRoleSeller(ctx);
+      } else {
+        // Switch to buyer
+        return handleRoleBuyer(ctx);
+      }
     }
+
+    // If worker - show role selection menu with 3 options
+    const buttons = [
+      [Markup.button.callback('Покупаю', 'role:buyer')],
+      [Markup.button.callback('Продаю', 'role:seller')],
+      [Markup.button.callback('Сотрудник', 'role:worker')],
+    ];
 
     await smartMessage.send(ctx, {
       text: 'Выберите роль:',
@@ -207,7 +269,7 @@ const handleRoleToggle = async (ctx) => {
     try {
       await smartMessage.send(ctx, {
         text: generalMessages.actionFailed,
-        keyboard: mainMenu(),
+        keyboard: mainMenu(false, ctx.lang),
       });
     } catch (replyError) {
       logger.error('Failed to send error message:', replyError);
@@ -217,6 +279,7 @@ const handleRoleToggle = async (ctx) => {
 
 /**
  * Handle role:buyer action - switch to buyer role
+ * PERF: Role update done here, passed to handleBuyerRole with skipRoleUpdate
  */
 const handleRoleBuyer = async (ctx) => {
   try {
@@ -224,7 +287,7 @@ const handleRoleBuyer = async (ctx) => {
 
     logger.info(`User ${ctx.from.id} switching to buyer role`);
 
-    // Save role to database
+    // Save role to database ONCE here
     try {
       if (ctx.session.token) {
         await authApi.updateRole('buyer', ctx.session.token);
@@ -243,13 +306,14 @@ const handleRoleBuyer = async (ctx) => {
       ctx.session.role = 'buyer';
     }
 
-    await handleBuyerRole(ctx);
+    // PERF: Pass skipRoleUpdate to avoid duplicate PATCH /auth/role call
+    await handleBuyerRole(ctx, { skipRoleUpdate: true });
   } catch (error) {
     logger.error('Error in role:buyer handler:', error);
     try {
       await smartMessage.send(ctx, {
         text: generalMessages.actionFailed,
-        keyboard: mainMenu(),
+        keyboard: mainMenu(false, ctx.lang),
       });
     } catch (replyError) {
       logger.error('Failed to send error message:', replyError);
@@ -259,6 +323,7 @@ const handleRoleBuyer = async (ctx) => {
 
 /**
  * Handle role:seller action - switch to seller role
+ * PERF: Role update done here, passed to handleSellerRole with skipRoleUpdate
  */
 const handleRoleSeller = async (ctx) => {
   try {
@@ -266,7 +331,7 @@ const handleRoleSeller = async (ctx) => {
 
     logger.info(`User ${ctx.from.id} switching to seller role`);
 
-    // Save role to database
+    // Save role to database ONCE here
     try {
       if (ctx.session.token) {
         await authApi.updateRole('seller', ctx.session.token);
@@ -285,13 +350,14 @@ const handleRoleSeller = async (ctx) => {
       ctx.session.role = 'seller';
     }
 
-    await handleSellerRole(ctx);
+    // PERF: Pass skipRoleUpdate to avoid duplicate PATCH /auth/role call
+    await handleSellerRole(ctx, { skipRoleUpdate: true });
   } catch (error) {
     logger.error('Error in role:seller handler:', error);
     try {
       await smartMessage.send(ctx, {
         text: generalMessages.actionFailed,
-        keyboard: mainMenu(),
+        keyboard: mainMenu(false, ctx.lang),
       });
     } catch (replyError) {
       logger.error('Failed to send error message:', replyError);
@@ -307,7 +373,7 @@ const handleRoleWorker = async (ctx) => {
     // Check for workspace shops
     if (!ctx.session.token) {
       if (ctx.callbackQuery) {
-        await ctx.answerCbQuery('\u274C Требуется авторизация', { show_alert: true });
+        await ctx.answerCbQuery('Требуется авторизация', { show_alert: true });
       }
       return;
     }
@@ -332,7 +398,7 @@ const handleRoleWorker = async (ctx) => {
       workspaceShops = await shopApi.getWorkerShops(ctx.session.token);
     } catch (error) {
       logger.error('Failed to get workspace shops:', error);
-      await ctx.answerCbQuery('\u274C Ошибка загрузки магазинов', { show_alert: true });
+      await ctx.answerCbQuery('Ошибка загрузки магазинов', { show_alert: true });
       return;
     }
 
@@ -340,14 +406,13 @@ const handleRoleWorker = async (ctx) => {
     if (!Array.isArray(workspaceShops) || workspaceShops.length === 0) {
       await smartMessage.send(ctx, {
         text:
-          '\u{1F477} *Режим сотрудника*\n\n' +
+          'Режим сотрудника\n\n' +
           'Вы ещё не добавлены как сотрудник ни в один магазин.\n\n' +
-          '\u{1F4A1} *Как стать сотрудником:*\n' +
-          '\u2022 Попросите владельца магазина добавить вас\n' +
-          '\u2022 Он должен указать ваш @username или Telegram ID\n\n' +
-          `\u{1F4CD} _Ваш ID: \`${ctx.from.id}\`_`,
-        keyboard: Markup.inlineKeyboard([[Markup.button.callback('\u00AB Назад', 'role:toggle')]]),
-        parse_mode: 'Markdown',
+          'Как стать сотрудником:\n' +
+          '- Попросите владельца магазина добавить вас\n' +
+          '- Он должен указать ваш @username или Telegram ID\n\n' +
+          `Ваш ID: ${ctx.from.id}`,
+        keyboard: Markup.inlineKeyboard([[Markup.button.callback('Назад', 'role:toggle')]]),
       });
       return;
     }
@@ -366,19 +431,19 @@ const handleRoleWorker = async (ctx) => {
       ctx.session.isShopOwner = false;
 
       await smartMessage.send(ctx, {
-        text: `\u{1F477} Вы работаете в магазине "${shop.name}".`,
-        keyboard: workerMenu(),
+        text: `Вы работаете в магазине "${shop.name}"`,
+        keyboard: workerMenu(shop.name, ctx.lang),
       });
       return;
     }
 
     // Multiple shops - show selection
     const buttons = workspaceShops.map((shop) => [
-      Markup.button.callback(`\u{1F3EA} ${shop.name}`, `workspace:${shop.id}`),
+      Markup.button.callback(shop.name, `workspace:${shop.id}`),
     ]);
 
     // Add back button
-    buttons.push([Markup.button.callback('\u2B05 Назад', 'role:toggle')]);
+    buttons.push([Markup.button.callback('Назад', 'role:toggle')]);
 
     await smartMessage.send(ctx, {
       text: 'Выберите магазин для работы:',
@@ -387,14 +452,14 @@ const handleRoleWorker = async (ctx) => {
   } catch (error) {
     logger.error('Error in role:worker handler:', error);
     try {
-      await ctx.answerCbQuery('\u274C Произошла ошибка', { show_alert: true });
+      await ctx.answerCbQuery('Произошла ошибка', { show_alert: true });
     } catch (cbError) {
       logger.error('Failed to answer callback:', cbError);
     }
     try {
       await smartMessage.send(ctx, {
         text: generalMessages.actionFailed,
-        keyboard: mainMenu(),
+        keyboard: mainMenu(false, ctx.lang),
       });
     } catch (replyError) {
       logger.error('Failed to send error message:', replyError);
@@ -410,7 +475,7 @@ const handleSelectWorkspace = async (ctx) => {
     const shopId = parseInt(ctx.match[1], 10);
 
     if (!ctx.session.token) {
-      await ctx.answerCbQuery('\u274C Требуется авторизация', { show_alert: true });
+      await ctx.answerCbQuery('Требуется авторизация', { show_alert: true });
       return;
     }
 
@@ -420,13 +485,13 @@ const handleSelectWorkspace = async (ctx) => {
       workspaceShops = await shopApi.getWorkerShops(ctx.session.token);
     } catch (error) {
       logger.error('Failed to verify workspace access:', error);
-      await ctx.answerCbQuery('\u274C Ошибка проверки доступа', { show_alert: true });
+      await ctx.answerCbQuery('Ошибка проверки доступа', { show_alert: true });
       return;
     }
 
     const shop = workspaceShops?.find((s) => s.id === shopId);
     if (!shop) {
-      await ctx.answerCbQuery('\u274C У вас нет доступа к этому магазину', { show_alert: true });
+      await ctx.answerCbQuery('У вас нет доступа к этому магазину', { show_alert: true });
       return;
     }
 
@@ -447,14 +512,14 @@ const handleSelectWorkspace = async (ctx) => {
   } catch (error) {
     logger.error('Error in workspace selection handler:', error);
     try {
-      await ctx.answerCbQuery('\u274C Произошла ошибка', { show_alert: true });
+      await ctx.answerCbQuery('Произошла ошибка', { show_alert: true });
     } catch (cbError) {
       logger.error('Failed to answer callback:', cbError);
     }
     try {
       await smartMessage.send(ctx, {
         text: generalMessages.actionFailed,
-        keyboard: mainMenu(),
+        keyboard: mainMenu(false, ctx.lang),
       });
     } catch (replyError) {
       logger.error('Failed to send error message:', replyError);
@@ -491,8 +556,8 @@ const handleBackToMain = async (ctx) => {
       logger.error('Failed to save role:', error);
     }
 
-    // Redirect to seller dashboard
-    await handleSellerRole(ctx);
+    // PERF: Pass skipRoleUpdate since we already called updateRole above
+    await handleSellerRole(ctx, { skipRoleUpdate: true });
   } catch (error) {
     logger.error('Error in back to main handler:', error);
     try {
@@ -516,7 +581,7 @@ const handleStartCreateShop = async (ctx) => {
     // Extract tier from callback data (format: start_create_shop:{tier}) with safe fallback
     const callbackData = ctx.callbackQuery?.data || '';
     const [, tierFromCallback] = callbackData.split(':');
-    const tier = tierFromCallback || 'basic';
+    const tier = tierFromCallback || 'pro';
 
     // Set seller role
     ctx.session.role = 'seller';

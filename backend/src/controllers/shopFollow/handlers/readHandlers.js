@@ -6,7 +6,7 @@ import { NotFoundError, UnauthorizedError, ValidationError } from '../../../util
 import { getSyncStatus } from '../../../jobs/syncQueue.js';
 import logger from '../../../utils/logger.js';
 import {
-  FREE_TIER_LIMIT,
+  getFollowLimit,
   toNumber,
   formatFollowResponse,
   formatMonitorProduct,
@@ -256,17 +256,19 @@ export const checkFollowLimit = asyncHandler(async (req, res) => {
       throw new UnauthorizedError('You do not have access to this shop');
     }
 
-    const isPro = (shop.tier || '').toLowerCase() === 'pro';
-    const limit = isPro ? null : FREE_TIER_LIMIT;
+    const tier = (shop.tier || 'pro').toLowerCase();
+    const isMax = tier === 'max';
+    const limit = getFollowLimit(tier);
+    const isUnlimited = limit === Infinity;
 
     const activeCount = await shopFollowQueries.countActiveByFollowerShopId(shopId);
     const limitData = {
-      limit: limit,
+      limit: isUnlimited ? null : limit,
       count: activeCount,
-      remaining: isPro ? null : Math.max(0, FREE_TIER_LIMIT - activeCount),
-      reached: isPro ? false : activeCount >= FREE_TIER_LIMIT,
-      canFollow: isPro ? true : activeCount < FREE_TIER_LIMIT,
-      tier: isPro ? 'PRO' : 'FREE',
+      remaining: isUnlimited ? null : Math.max(0, limit - activeCount),
+      reached: isUnlimited ? false : activeCount >= limit,
+      canFollow: isUnlimited ? true : activeCount < limit,
+      tier: tier.toUpperCase(),
     };
 
     res.json({ success: true, data: limitData });

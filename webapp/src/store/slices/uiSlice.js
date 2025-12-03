@@ -16,4 +16,8 @@ export const createUISlice = (set) => ({
   // Language
   language: 'ru',
   setLanguage: (lang) => set({ language: lang }),
+
+  // Product Highlight (for search navigation)
+  highlightProductId: null,
+  setHighlightProductId: (id) => set({ highlightProductId: id }),
 });

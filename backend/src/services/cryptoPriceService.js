@@ -19,6 +19,7 @@ import {
 // CoinGecko API configuration
 const COINGECKO_API_URL = 'https://api.coingecko.com/api/v3/simple/price';
 const PRICE_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const STALE_PRICE_THRESHOLD_MS = 15 * 60 * 1000; // 15 minutes - warn if cached price is older
 const MAX_RETRIES = 2;
 const INITIAL_RETRY_DELAY = 1000; // 1 second
 
@@ -38,9 +39,30 @@ const CRYPTO_DECIMALS = {
   USDT_TRC20: 2,
 };
 
-// Price cache (in-memory)
+// Price cache (in-memory) - { chain: { price: number, timestamp: number } }
 const priceCache = {};
 let lastFetchTime = 0;
+
+/**
+ * Check if cached price is stale (>15 minutes old) and log warning
+ * @param {string} chain - Chain name
+ * @param {object} cached - Cached price object { price, timestamp }
+ * @returns {boolean} True if price is stale
+ */
+function checkAndLogStalePrice(chain, cached) {
+  const ageMs = Date.now() - cached.timestamp;
+  const isStale = ageMs > STALE_PRICE_THRESHOLD_MS;
+
+  if (isStale) {
+    logger.warn('[CryptoPriceService] Returning stale cached price', {
+      chain,
+      ageMinutes: Math.round(ageMs / 60000),
+      price: cached.price,
+    });
+  }
+
+  return isStale;
+}
 
 /**
  * Sleep utility for retry delays
@@ -102,8 +124,8 @@ export async function getCryptoPrice(chain) {
     // Check cache validity
     const now = Date.now();
     if (now - lastFetchTime < PRICE_CACHE_TTL && priceCache[chain]) {
-      logger.info(`[CryptoPriceService] Using cached price for ${chain}: $${priceCache[chain]}`);
-      return priceCache[chain];
+      logger.info(`[CryptoPriceService] Using cached price for ${chain}: $${priceCache[chain].price}`);
+      return priceCache[chain].price;
     }
 
     // Validate chain
@@ -116,32 +138,38 @@ export async function getCryptoPrice(chain) {
 
     const data = await fetchPricesWithRetry();
 
-    // Update cache with all fetched prices
+    // Update cache with all fetched prices (include timestamp for each)
     for (const [chainName, coinId] of Object.entries(COINGECKO_IDS)) {
       const price = data[coinId]?.usd;
       if (price) {
-        priceCache[chainName] = price;
+        priceCache[chainName] = { price, timestamp: now };
       }
     }
 
     lastFetchTime = now;
 
-    logger.info('[CryptoPriceService] Prices fetched successfully:', priceCache);
+    // Log prices without timestamp for readability
+    const pricesForLog = Object.fromEntries(
+      Object.entries(priceCache).map(([k, v]) => [k, v.price])
+    );
+    logger.info('[CryptoPriceService] Prices fetched successfully:', pricesForLog);
 
     // Return requested chain's price
-    const price = priceCache[chain];
-    if (!price) {
+    const cached = priceCache[chain];
+    if (!cached) {
       throw new Error(`Price not available for ${chain}`);
     }
 
-    return price;
+    return cached.price;
   } catch (error) {
     // Special handling for rate limit - use stale cache as fallback
     if (error.isRateLimit && priceCache[chain]) {
+      const cached = priceCache[chain];
+      checkAndLogStalePrice(chain, cached);
       logger.warn(
-        `[CryptoPriceService] Rate limited, using stale cached price for ${chain}: $${priceCache[chain]}`
+        `[CryptoPriceService] Rate limited, using cached price for ${chain}: $${cached.price}`
       );
-      return priceCache[chain];
+      return cached.price;
     }
 
     logger.error('[CryptoPriceService] Failed to fetch crypto price:', {
@@ -152,10 +180,12 @@ export async function getCryptoPrice(chain) {
 
     // If cache exists, return stale data as fallback
     if (priceCache[chain]) {
+      const cached = priceCache[chain];
+      checkAndLogStalePrice(chain, cached);
       logger.warn(
-        `[CryptoPriceService] API failed, using stale cached price for ${chain}: $${priceCache[chain]}`
+        `[CryptoPriceService] API failed, using cached price for ${chain}: $${cached.price}`
       );
-      return priceCache[chain];
+      return cached.price;
     }
 
     throw new Error(`Failed to fetch ${chain} price: ${error.message}`);

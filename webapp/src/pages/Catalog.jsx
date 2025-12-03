@@ -115,6 +115,9 @@ export default function Catalog() {
   const { t } = useTranslation();
   const { get } = useApi();
 
+  // Derived State (moved up to fix ReferenceError - used in searchProducts)
+  const displayShop = currentShop || myShop;
+
   // Data Loading Logic
   const loadMyShop = useCallback(
     async (signal) => {
@@ -390,8 +393,7 @@ export default function Catalog() {
     // Products will reload via useEffect when currentShop becomes null (and logic picks up myShop)
   }, [triggerHaptic, setCurrentShop]);
 
-  // Derived State
-  const displayShop = currentShop || myShop;
+  // Derived State (displayShop moved up for searchProducts dependency)
   const displayShopLogo = displayShop?.logo || displayShop?.image || null;
   const isViewingOwnShop = !currentShop && myShop;
   

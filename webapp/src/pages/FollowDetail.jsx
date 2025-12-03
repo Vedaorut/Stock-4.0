@@ -9,11 +9,13 @@ import { useFollowsApi } from '../hooks/useApi';
 import { useStore } from '../store/useStore';
 import { useTelegram } from '../hooks/useTelegram';
 import { useBackButton } from '../hooks/useBackButton';
+import { useTranslation } from '../i18n/useTranslation';
 
 export default function FollowDetail() {
   const followDetailId = useStore((state) => state.followDetailId);
   const { getDetail, updateMarkup, switchMode, deleteFollow, getProducts, updateProductMarkup, resetProductMarkup } = useFollowsApi();
   const { triggerHaptic } = useTelegram();
+  const { t } = useTranslation();
 
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -40,7 +42,55 @@ export default function FollowDetail() {
     };
   }, []);
 
-  // Handle retry with AbortController
+  // Load follow data - defined BEFORE handleRetry that uses it
+  const loadFollow = useCallback(
+    async (signal) => {
+      if (!followDetailId) return { status: 'error', error: 'No follow ID' };
+
+      const response = await getDetail(followDetailId, { signal });
+
+      if (signal?.aborted) return { status: 'aborted' };
+
+      if (response.error) {
+        if (import.meta.env.DEV) {
+          console.error('[FollowDetail] Error loading follow:', response.error);
+        }
+        return { status: 'error', error: 'Failed to load subscription' };
+      }
+
+      const followData = response.data?.data || response.data;
+      setFollow(followData);
+      return { status: 'success' };
+    },
+    [followDetailId, getDetail]
+  );
+
+  // Load products for this follow - defined BEFORE handleRetry that uses it
+  const loadProducts = useCallback(
+    async (signal) => {
+      if (!followDetailId) return;
+
+      setProductsLoading(true);
+      try {
+        const response = await getProducts(followDetailId, { signal });
+        if (signal?.aborted) return;
+
+        const productsData = response.data?.data?.products || response.data?.products || [];
+        setProducts(Array.isArray(productsData) ? productsData : []);
+      } catch (err) {
+        if (import.meta.env.DEV) {
+          console.error('[FollowDetail] Error loading products:', err);
+        }
+      } finally {
+        if (!signal?.aborted) {
+          setProductsLoading(false);
+        }
+      }
+    },
+    [followDetailId, getProducts]
+  );
+
+  // Handle retry with AbortController - uses loadFollow and loadProducts
   const handleRetry = useCallback(() => {
     // Cancel any in-flight retry request
     if (retryControllerRef.current) {
@@ -76,54 +126,6 @@ export default function FollowDetail() {
 
   // Telegram BackButton integration
   useBackButton(handleBack);
-
-  // Load follow data
-  const loadFollow = useCallback(
-    async (signal) => {
-      if (!followDetailId) return { status: 'error', error: 'No follow ID' };
-
-      const response = await getDetail(followDetailId, { signal });
-
-      if (signal?.aborted) return { status: 'aborted' };
-
-      if (response.error) {
-        if (import.meta.env.DEV) {
-          console.error('[FollowDetail] Error loading follow:', response.error);
-        }
-        return { status: 'error', error: 'Failed to load subscription' };
-      }
-
-      const followData = response.data?.data || response.data;
-      setFollow(followData);
-      return { status: 'success' };
-    },
-    [followDetailId, getDetail]
-  );
-
-  // Load products for this follow
-  const loadProducts = useCallback(
-    async (signal) => {
-      if (!followDetailId) return;
-
-      setProductsLoading(true);
-      try {
-        const response = await getProducts(followDetailId, { signal });
-        if (signal?.aborted) return;
-
-        const productsData = response.data?.data?.products || response.data?.products || [];
-        setProducts(Array.isArray(productsData) ? productsData : []);
-      } catch (err) {
-        if (import.meta.env.DEV) {
-          console.error('[FollowDetail] Error loading products:', err);
-        }
-      } finally {
-        if (!signal?.aborted) {
-          setProductsLoading(false);
-        }
-      }
-    },
-    [followDetailId, getProducts]
-  );
 
   useEffect(() => {
     if (!followDetailId) {
@@ -295,7 +297,7 @@ export default function FollowDetail() {
               className="bg-[#FF6B00] text-white font-semibold px-6 py-2 rounded-xl"
               whileTap={{ scale: 0.95 }}
             >
-              Try again
+              {t('followDetail.tryAgain')}
             </motion.button>
           </div>
         ) : follow ? (
@@ -326,7 +328,7 @@ export default function FollowDetail() {
                           : 'bg-blue-500/10 text-blue-400 border-blue-500/20'
                       }`}
                     >
-                      {mode === 'resell' ? 'Resale' : 'Monitor'}
+                      {mode === 'resell' ? t('followDetail.resale') : t('followDetail.monitor')}
                     </span>
                     {mode === 'resell' && (
                       <span className="text-[#2ECC71] text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#2ECC71]/10 border border-[#2ECC71]/20">
@@ -334,7 +336,7 @@ export default function FollowDetail() {
                       </span>
                     )}
                     <span className="text-white/40 text-xs">
-                      {products.length} товаров • с {new Date(follow.created_at).toLocaleDateString('ru', {day: 'numeric', month: 'short'})}
+                      {t('followDetail.productsCount', { count: products.length })}
                     </span>
                   </div>
                 </div>
@@ -375,8 +377,8 @@ export default function FollowDetail() {
                 className="mt-6"
               >
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-white font-bold text-lg">Товары</h3>
-                  <span className="text-white/40 text-sm">{products.length} шт</span>
+                  <h3 className="text-white font-bold text-lg">{t('followDetail.products')}</h3>
+                  <span className="text-white/40 text-sm">{products.length} {t('followDetail.pcs')}</span>
                 </div>
 
                 {productsLoading ? (
@@ -385,7 +387,7 @@ export default function FollowDetail() {
                   </div>
                 ) : products.length === 0 ? (
                   <div className="bg-white/5 rounded-2xl p-6 text-center border border-white/5">
-                    <div className="text-white/30 text-sm">Нет синхронизированных товаров</div>
+                    <div className="text-white/30 text-sm">{t('followDetail.noSyncedProducts')}</div>
                   </div>
                 ) : (
                   <div className="space-y-3">
@@ -407,28 +409,28 @@ export default function FollowDetail() {
                                   <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                                   </svg>
-                                  Своя
+                                  {t('followDetail.ownMarkup')}
                                 </span>
                               )}
                             </div>
                             <div className="flex items-center gap-2 mt-1">
                               <span className="text-white/40 text-xs line-through">
-                                ${parseFloat(product.source_product?.price || product.original_price || product.price || 0).toFixed(2)}
+                                ${Math.floor(parseFloat(product.source_product?.price || product.original_price || product.price || 0))}
                               </span>
                               <span className="text-[#FF6B00] text-xs">→</span>
                               <span className="text-[#2ECC71] font-bold text-sm">
-                                ${parseFloat(product.synced_product?.price || product.price || 0).toFixed(2)}
+                                ${Math.floor(parseFloat(product.synced_product?.price || product.price || 0))}
                               </span>
                             </div>
                           </div>
                           <div className="flex items-center gap-2">
                             {(product.synced_product?.stock_quantity ?? product.stock_quantity) > 0 ? (
                               <span className="px-2 py-1 rounded-full text-[10px] font-medium bg-[#2ECC71]/10 text-[#2ECC71] border border-[#2ECC71]/20">
-                                {product.synced_product?.stock_quantity ?? product.stock_quantity} шт
+                                {product.synced_product?.stock_quantity ?? product.stock_quantity} {t('followDetail.pcs')}
                               </span>
                             ) : (
                               <span className="px-2 py-1 rounded-full text-[10px] font-medium bg-red-500/10 text-red-400 border border-red-500/20">
-                                Нет в наличии
+                                {t('followDetail.outOfStock')}
                               </span>
                             )}
                             <svg className="w-4 h-4 text-white/30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -460,24 +462,24 @@ export default function FollowDetail() {
         isOpen={isSwitchModeDialogOpen}
         onClose={() => setIsSwitchModeDialogOpen(false)}
         onConfirm={handleSwitchMode}
-        title="Switch Mode"
+        title={t('followDetail.switchModeTitle')}
         message={
           mode === 'monitor'
-            ? 'Switch to Resale mode? Products will be added to your catalog with your markup.'
-            : 'Switch to Monitoring mode? Products will only be tracked.'
+            ? t('followDetail.switchToResaleDesc')
+            : t('followDetail.switchToMonitorDesc')
         }
-        confirmText="Switch"
-        cancelText="Cancel"
+        confirmText={t('dialogs.switchMode')}
+        cancelText={t('common.cancel')}
       />
 
       <ConfirmDialog
         isOpen={isDeleteDialogOpen}
         onClose={() => setIsDeleteDialogOpen(false)}
         onConfirm={handleDelete}
-        title="Delete Subscription"
-        message="Are you sure? All synced products will be removed. This cannot be undone."
-        confirmText="Delete"
-        cancelText="Cancel"
+        title={t('followDetail.deleteTitle')}
+        message={t('followDetail.deleteWarning')}
+        confirmText={t('dialogs.delete')}
+        cancelText={t('common.cancel')}
         danger
       />
 

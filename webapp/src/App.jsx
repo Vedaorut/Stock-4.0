@@ -47,15 +47,20 @@ function App() {
   const { get } = useApi();
   const [followsChecked, setFollowsChecked] = useState(false);
 
-  // Инициализация i18n
+  // Инициализация i18n - используем язык из backend (синхронизирован с ботом)
   useEffect(() => {
     const loadLanguage = async () => {
-      const lang = getLanguage();
-      await initI18n();
+      // Приоритет: user.language из backend > Telegram SDK
+      const backendLang = user?.language;
+      await initI18n(backendLang);
+      const lang = backendLang || getLanguage();
       useStore.getState().setLanguage(lang);
     };
-    loadLanguage();
-  }, []);
+    // Ждём пока user загрузится из backend
+    if (isReady) {
+      loadLanguage();
+    }
+  }, [isReady, user?.language]);
 
   // Set view mode from user's selected_role (from backend)
   // NOTE: selected_role can be null for new users - default to 'buyer'
@@ -64,8 +69,11 @@ function App() {
       // If selected_role is explicitly 'seller', use seller mode
       // Otherwise (null, undefined, 'buyer') use buyer mode
       const mode = user.selected_role === 'seller' ? 'seller' : 'buyer';
-      // Debug log removed - viewMode is set correctly
       useStore.getState().setViewMode(mode);
+      // Buyer по умолчанию видит Catalog (не пустые Subscriptions)
+      if (mode === 'buyer') {
+        useStore.getState().setActiveTab('catalog');
+      }
     }
   }, [isReady, user]);
 

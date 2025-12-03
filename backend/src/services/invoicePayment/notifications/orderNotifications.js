@@ -12,6 +12,44 @@ import {
 import { workerQueries } from '../../../models/workerQueries.js';
 import telegramService from '../../telegram.js';
 import logger from '../../../utils/logger.js';
+import { DEFAULT_LANGUAGE } from '../../../i18n/index.js';
+import { sleep } from '../../../utils/helpers.js';
+
+const MAX_NOTIFICATION_RETRIES = 3;
+const RETRY_DELAYS = [1000, 3000, 9000]; // exponential backoff
+
+/**
+ * Send notification with retry mechanism
+ * @param {Function} sendFn - Async function to send notification
+ * @param {Object} context - Context for logging
+ * @returns {Promise<{success: boolean, error?: Error}>}
+ */
+async function sendNotificationWithRetry(sendFn, context) {
+  let lastError;
+  for (let attempt = 0; attempt < MAX_NOTIFICATION_RETRIES; attempt++) {
+    try {
+      await sendFn();
+      return { success: true };
+    } catch (error) {
+      lastError = error;
+      logger.warn(`[InvoicePayment] Notification attempt ${attempt + 1}/${MAX_NOTIFICATION_RETRIES} failed`, {
+        error: error.message,
+        ...context,
+      });
+      if (attempt < MAX_NOTIFICATION_RETRIES - 1) {
+        await sleep(RETRY_DELAYS[attempt]);
+      }
+    }
+  }
+
+  logger.error('[InvoicePayment] All notification attempts failed', {
+    error: lastError?.message,
+    ...context,
+    action: 'MANUAL_INTERVENTION_REQUIRED',
+  });
+
+  return { success: false, error: lastError };
+}
 
 /**
  * Notify seller and buyer about confirmed order payment
@@ -31,35 +69,55 @@ export async function notifyOrderConfirmed(orderId) {
 
   // Notify seller
   if (seller?.telegram_id && product && shop) {
-    try {
-      await telegramService.notifyPaymentConfirmedSeller(seller.telegram_id, {
+    const sellerLang = seller.language || DEFAULT_LANGUAGE;
+    const result = await sendNotificationWithRetry(
+      async () => {
+        await telegramService.notifyPaymentConfirmedSeller(seller.telegram_id, {
+          orderId: order.id,
+          productName: product.name,
+          quantity: order.quantity,
+          totalPrice: order.total_price,
+          currency: order.currency,
+          buyerUsername: buyer?.username || 'Anonymous',
+          buyerTelegramId: buyer?.telegram_id,
+        }, sellerLang);
+      },
+      { type: 'order_confirmed_seller', orderId: order.id, sellerTelegramId: seller.telegram_id }
+    );
+
+    if (!result.success) {
+      logger.error('[InvoicePayment] Failed to notify seller after retries', {
         orderId: order.id,
-        productName: product.name,
-        quantity: order.quantity,
-        totalPrice: order.total_price,
-        currency: order.currency,
-        buyerUsername: buyer?.username || 'Anonymous',
-        buyerTelegramId: buyer?.telegram_id,
+        sellerTelegramId: seller.telegram_id,
+        error: result.error?.message,
       });
-    } catch (error) {
-      logger.error('[InvoicePayment] Seller notification error', { error: error.message });
     }
   }
 
   // Notify buyer
   if (order.buyer_telegram_id && product && shop && seller) {
-    try {
-      await telegramService.notifyPaymentConfirmed(order.buyer_telegram_id, {
-        id: order.id,
-        product_name: product.name,
-        quantity: order.quantity,
-        total_price: order.total_price,
-        currency: order.currency,
-        seller_username: seller.username,
-        shop_name: shop.name,
+    const buyerLang = buyer?.language || DEFAULT_LANGUAGE;
+    const result = await sendNotificationWithRetry(
+      async () => {
+        await telegramService.notifyPaymentConfirmed(order.buyer_telegram_id, {
+          id: order.id,
+          product_name: product.name,
+          quantity: order.quantity,
+          total_price: order.total_price,
+          currency: order.currency,
+          seller_username: seller.username,
+          shop_name: shop.name,
+        }, buyerLang);
+      },
+      { type: 'order_confirmed_buyer', orderId: order.id, buyerTelegramId: order.buyer_telegram_id }
+    );
+
+    if (!result.success) {
+      logger.error('[InvoicePayment] Failed to notify buyer after retries', {
+        orderId: order.id,
+        buyerTelegramId: order.buyer_telegram_id,
+        error: result.error?.message,
       });
-    } catch (error) {
-      logger.error('[InvoicePayment] Buyer notification error', { error: error.message });
     }
   }
 
@@ -67,23 +125,33 @@ export async function notifyOrderConfirmed(orderId) {
   if (product && shop) {
     try {
       const workers = await workerQueries.getWorkersForNotification(shop.id);
+      const workerLang = seller?.language || DEFAULT_LANGUAGE;
+      let successCount = 0;
 
       for (const worker of workers) {
-        try {
-          await telegramService.notifyPaymentConfirmedSeller(worker.telegram_id, {
+        const result = await sendNotificationWithRetry(
+          async () => {
+            await telegramService.notifyPaymentConfirmedSeller(worker.telegram_id, {
+              orderId: order.id,
+              productName: product.name,
+              quantity: order.quantity,
+              totalPrice: order.total_price,
+              currency: order.currency,
+              buyerUsername: buyer?.username || 'Anonymous',
+              buyerTelegramId: buyer?.telegram_id,
+            }, workerLang);
+          },
+          { type: 'order_confirmed_worker', orderId: order.id, workerId: worker.id, workerTelegramId: worker.telegram_id }
+        );
+
+        if (result.success) {
+          successCount++;
+        } else {
+          logger.error('[InvoicePayment] Failed to notify worker after retries', {
             orderId: order.id,
-            productName: product.name,
-            quantity: order.quantity,
-            totalPrice: order.total_price,
-            currency: order.currency,
-            buyerUsername: buyer?.username || 'Anonymous',
-            buyerTelegramId: buyer?.telegram_id,
-          });
-        } catch (workerError) {
-          logger.error('[InvoicePayment] Worker notification error', {
             workerId: worker.id,
-            telegramId: worker.telegram_id,
-            error: workerError.message,
+            workerTelegramId: worker.telegram_id,
+            error: result.error?.message,
           });
         }
       }
@@ -93,6 +161,7 @@ export async function notifyOrderConfirmed(orderId) {
           orderId: order.id,
           shopId: shop.id,
           workerCount: workers.length,
+          successCount,
         });
       }
     } catch (error) {

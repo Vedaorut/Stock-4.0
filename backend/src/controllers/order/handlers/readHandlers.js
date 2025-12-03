@@ -74,6 +74,20 @@ export const getMyOrders = asyncHandler(async (req, res) => {
       offset,
       statuses: statusFilter,
     });
+
+    const total = await orderQueries.countByShopId(shopId, statusFilter);
+
+    return res.json({
+      success: true,
+      data: orders,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+        hasMore: orders.length === limit,
+      },
+    });
   } else if (type === 'seller') {
     const shops = await shopQueries.findByOwnerId(req.user.id);
     const workerShops = await workerQueries.getWorkerShops(req.user.id);

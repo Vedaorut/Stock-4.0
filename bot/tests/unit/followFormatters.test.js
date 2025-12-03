@@ -30,7 +30,7 @@ describe('Follow Formatters', () => {
       const result = formatFollowsList(follows);
 
       expect(result).toContain(followMessages.listHeader(1));
-      expect(result).toContain('1. 🏪 SourceShop (🔍 Мониторинг');
+      expect(result).toContain('1. SourceShop (Мониторинг)');
       expect(result).toContain(followMessages.listManageHint);
     });
 
@@ -48,7 +48,7 @@ describe('Follow Formatters', () => {
       const result = formatFollowsList(follows);
 
       expect(result).toContain(followMessages.listHeader(1));
-      expect(result).toContain('1. 🏪 ResellShop (💰 Перепродажа, +25%)');
+      expect(result).toContain('1. ResellShop (Перепродажа, +25%)');
     });
 
     it('отображает несколько подписок с корректными маркерами', () => {
@@ -72,8 +72,8 @@ describe('Follow Formatters', () => {
       const result = formatFollowsList(follows);
 
       expect(result).toContain(followMessages.listHeader(2));
-      expect(result).toContain('1. 🏪 Shop1 (🔍 Мониторинг)');
-      expect(result).toContain('2. 🏪 Shop2 (💰 Перепродажа, +15%)');
+      expect(result).toContain('1. Shop1 (Мониторинг)');
+      expect(result).toContain('2. Shop2 (Перепродажа, +15%)');
     });
   });
 
@@ -91,11 +91,11 @@ describe('Follow Formatters', () => {
       const result = formatFollowDetail(follow);
 
       expect(result).toContain('Магазин: SourceShop');
-      expect(result).toContain('Режим: 🔍 Мониторинг');
-      expect(result).toContain('Наценка: —');
-      expect(result).toContain('Товаров в их каталоге: 3');
+      expect(result).toContain('Режим: Мониторинг');
+      expect(result).toContain('Наценка: -');
+      expect(result).toContain('Товаров: 3');
       // syncedProducts fallbacks to sourceProducts if not provided
-      expect(result).toContain('Скопировано к вам: 3');
+      expect(result).toContain('Скопировано: 3');
     });
 
     it('для перепродажи показывает наценку в процентах', () => {
@@ -111,10 +111,10 @@ describe('Follow Formatters', () => {
       const result = formatFollowDetail(follow);
 
       expect(result).toContain('Магазин: ResellShop');
-      expect(result).toContain('Режим: 💰 Перепродажа');
+      expect(result).toContain('Режим: Перепродажа');
       expect(result).toContain('Наценка: 30%');
-      expect(result).toContain('Товаров в их каталоге: 12');
-      expect(result).toContain('Скопировано к вам: 12');
+      expect(result).toContain('Товаров: 12');
+      expect(result).toContain('Скопировано: 12');
     });
 
     it('gracefully обрабатывает отсутствующие поля', () => {
@@ -126,7 +126,7 @@ describe('Follow Formatters', () => {
       const result = formatFollowDetail(follow);
 
       expect(result).toContain('Магазин: Магазин');
-      expect(result).toContain('Режим: 💰 Перепродажа');
+      expect(result).toContain('Режим: Перепродажа');
     });
   });
 });

@@ -5,6 +5,6 @@ export const CHAIN_MAP = {
   USDT_TRC20: { currency: 'USDT', envVar: 'TEST_TRON_ADDRESS' },
 };
 
-export const VALID_TIERS = ['basic', 'pro'];
+export const VALID_TIERS = ['pro', 'max'];
 
 export const TEST_SUBSCRIPTION_PRICE = 1.0;

@@ -551,6 +551,12 @@ manageWalletsScene.leave(async (ctx) => {
 
   // Clean up wizard state
   ctx.wizard.state = {};
+
+  // Очистить __scenes из Redis сессии для предотвращения застревания
+  if (ctx.session && ctx.session.__scenes) {
+    delete ctx.session.__scenes;
+  }
+
   logger.info(`User ${ctx.from?.id} left manageWallets scene`);
 });
 

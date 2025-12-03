@@ -27,7 +27,7 @@ const ensureWorkspaceShop = async (ctx) => {
   if (!ctx.session.token) {
     await smartMessage.send(ctx, {
       text: generalMessages.authorizationRequired,
-      keyboard: mainMenu(),
+      keyboard: mainMenu(false, ctx.lang),
     });
     return null;
   }
@@ -41,9 +41,9 @@ const ensureWorkspaceShop = async (ctx) => {
   if (!Array.isArray(shops) || shops.length === 0) {
     await smartMessage.send(ctx, {
       text:
-        '👷 Режим сотрудника недоступен.\n\n' +
+        'Режим сотрудника недоступен\n\n' +
         'Вас ещё не добавили в магазин. Попросите владельца добавить ваш @username или Telegram ID.',
-      keyboard: Markup.inlineKeyboard([[Markup.button.callback('⟵ Назад', 'role:toggle')]]),
+      keyboard: Markup.inlineKeyboard([[Markup.button.callback('Назад', 'role:toggle')]]),
     });
     return null;
   }
@@ -84,7 +84,7 @@ export const handleWorkerDashboard = async (ctx) => {
     if (!ctx.session.token) {
       await smartMessage.send(ctx, {
         text: generalMessages.authorizationRequired,
-        keyboard: mainMenu(),
+        keyboard: mainMenu(false, ctx.lang),
       });
       return;
     }
@@ -94,12 +94,12 @@ export const handleWorkerDashboard = async (ctx) => {
     if (!Array.isArray(shops) || shops.length === 0) {
       await smartMessage.send(ctx, {
         text:
-          '👷 *Режим сотрудника*\n\n' +
-          'Вас ещё не добавили ни в один магазин.\n\n' +
-          'Попросите владельца добавить ваш @username или Telegram ID.\n' +
-          `Ваш ID: \`${ctx.from.id}\``,
-        keyboard: Markup.inlineKeyboard([[Markup.button.callback('⟵ Назад', 'role:toggle')]]),
-        parse_mode: 'Markdown',
+          'Режим сотрудника\n\n' +
+          'Вы ещё не добавлены как сотрудник ни в один магазин.\n\n' +
+          'Как стать сотрудником:\n' +
+          '- Попросите владельца магазина добавить вас\n' +
+          `- Ваш ID: ${ctx.from.id}`,
+        keyboard: Markup.inlineKeyboard([[Markup.button.callback('Назад', 'role:toggle')]]),
       });
       return;
     }
@@ -110,19 +110,19 @@ export const handleWorkerDashboard = async (ctx) => {
 
     await smartMessage.send(ctx, {
       text:
-        `👷 Вы работаете в магазине «${shop.name}»\n\n` +
-        `🤖 Используйте AI для управления товарами:\n` +
-        `• «добавь iPhone за 999»\n` +
-        `• «скидка 20% на MacBook»\n` +
-        `• «покажи товары»\n\n` +
-        `📌 Кнопки ниже — для быстрого просмотра.`,
-      keyboard: workerMenu(shop.name),
+        `Вы работаете в магазине "${shop.name}"\n\n` +
+        `Используйте AI для управления товарами:\n` +
+        `- "добавь iPhone за 999"\n` +
+        `- "скидка 20% на MacBook"\n` +
+        `- "покажи товары"\n\n` +
+        `Кнопки ниже - для быстрого просмотра.`,
+      keyboard: workerMenu(shop.name, ctx.lang),
     });
   } catch (error) {
     logger.error('handleWorkerDashboard error:', error);
     await smartMessage.send(ctx, {
       text: generalMessages.actionFailed,
-      keyboard: mainMenu(),
+      keyboard: mainMenu(false, ctx.lang),
     });
   }
 };
@@ -147,14 +147,14 @@ export const handleWorkerProducts = async (ctx) => {
     const list = formatProductsList(products);
 
     await smartMessage.send(ctx, {
-      text: `📦 Товары магазина "${shop.name}":\n\n${list}`,
-      keyboard: workerMenu(),
+      text: `Товары магазина "${shop.name}":\n\n${list}`,
+      keyboard: workerMenu(shop.name, ctx.lang),
     });
   } catch (error) {
     logger.error('handleWorkerProducts error:', error);
     await smartMessage.send(ctx, {
       text: generalMessages.actionFailed,
-      keyboard: workerMenu(),
+      keyboard: workerMenu(undefined, ctx.lang),
     });
   }
 };
@@ -177,14 +177,14 @@ export const handleWorkerStats = async (ctx) => {
     const revenue = completed.reduce((sum, o) => sum + Number(o.total_price || 0), 0);
 
     await smartMessage.send(ctx, {
-      text: `📊 Статистика (последние заказы)\n\nДоход: $${revenue}\nЗаказы: ${orders.length}`,
-      keyboard: workerMenu(),
+      text: `Статистика (последние заказы)\n\nДоход: ${revenue}\nЗаказы: ${orders.length}`,
+      keyboard: workerMenu(shop.name, ctx.lang),
     });
   } catch (error) {
     logger.error('handleWorkerStats error:', error);
     await smartMessage.send(ctx, {
       text: generalMessages.actionFailed,
-      keyboard: workerMenu(),
+      keyboard: workerMenu(undefined, ctx.lang),
     });
   }
 };

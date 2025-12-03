@@ -1,29 +1,42 @@
 import { Markup } from 'telegraf';
-import { buttons as buttonText } from '../texts/messages.js';
+import { t } from '../i18n/index.js';
+
+/**
+ * Language selection keyboard (shown once on first start)
+ */
+export const languageMenu = () =>
+  Markup.inlineKeyboard([
+    [
+      Markup.button.callback('🇷🇺 Русский', 'lang:ru'),
+      Markup.button.callback('🇬🇧 English', 'lang:en'),
+    ],
+  ]);
 
 /**
  * Main menu - role selection
  * @param {boolean} showWorkspace - Show workspace button if user is worker
+ * @param {string} lang - Language code
  */
-export const mainMenu = (showWorkspace = false) => {
+export const mainMenu = (showWorkspace = false, lang = 'ru') => {
   const rows = [
     [
-      Markup.button.callback(buttonText.buyerRole, 'role:buyer'),
-      Markup.button.callback(buttonText.sellerRole, 'role:seller'),
+      Markup.button.callback(t('buttons.buyerRole', {}, lang), 'role:buyer'),
+      Markup.button.callback(t('buttons.sellerRole', {}, lang), 'role:seller'),
     ],
   ];
 
   if (showWorkspace) {
-    rows.push([Markup.button.callback(buttonText.workspace, 'role:workspace')]);
+    rows.push([Markup.button.callback(t('buttons.workspace', {}, lang), 'role:workspace')]);
   }
 
   return Markup.inlineKeyboard(rows);
 };
 
 // Default main menu (backward compatible)
-export const mainMenuDefault = Markup.inlineKeyboard([
-  [
-    Markup.button.callback(buttonText.buyerRole, 'role:buyer'),
-    Markup.button.callback(buttonText.sellerRole, 'role:seller'),
-  ],
-]);
+export const mainMenuDefault = (lang = 'ru') =>
+  Markup.inlineKeyboard([
+    [
+      Markup.button.callback(t('buttons.buyerRole', {}, lang), 'role:buyer'),
+      Markup.button.callback(t('buttons.sellerRole', {}, lang), 'role:seller'),
+    ],
+  ]);

@@ -4,6 +4,7 @@ import PageHeader from '../common/PageHeader';
 import { useTelegram } from '../../hooks/useTelegram';
 import { useBackButton } from '../../hooks/useBackButton';
 import { useTranslation } from '../../i18n/useTranslation';
+import { useApi } from '../../hooks/useApi';
 
 const LANGUAGES = [
   {
@@ -23,6 +24,7 @@ const LANGUAGES = [
 export default function LanguageModal({ isOpen, onClose }) {
   const { triggerHaptic } = useTelegram();
   const { t, lang, setLanguage } = useTranslation();
+  const { fetchApi } = useApi();
 
   // Используем Telegram BackButton API для закрытия модалки
   const handleClose = useCallback(() => {
@@ -39,8 +41,19 @@ export default function LanguageModal({ isOpen, onClose }) {
       return;
     }
 
-    // Применить новый язык и закрыть модальное окно
+    // Применить новый язык локально
     await setLanguage(languageId);
+
+    // Сохранить выбор языка на сервере
+    try {
+      await fetchApi('/auth/language', {
+        method: 'PATCH',
+        body: JSON.stringify({ language: languageId }),
+      });
+    } catch {
+      // Ignore error - language is already set locally
+    }
+
     onClose();
   };
 

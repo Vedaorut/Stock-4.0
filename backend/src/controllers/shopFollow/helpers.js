@@ -3,7 +3,20 @@
  * Shared utilities and formatters
  */
 
-export const FREE_TIER_LIMIT = 2;
+import { TIER_LIMITS } from '../../config/subscriptionPricing.js';
+
+/**
+ * Get follow limit for tier
+ * @param {string} tier - 'pro' or 'max'
+ * @returns {number} Follow limit (Infinity for max)
+ */
+export const getFollowLimit = (tier) => {
+  const limits = TIER_LIMITS[tier];
+  return limits ? limits.follows : TIER_LIMITS.pro.follows;
+};
+
+// Legacy constant for backward compatibility
+export const FREE_TIER_LIMIT = TIER_LIMITS.pro.follows;
 
 /**
  * Normalize numeric values from PostgreSQL

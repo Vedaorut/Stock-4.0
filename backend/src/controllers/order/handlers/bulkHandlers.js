@@ -102,29 +102,31 @@ export const bulkUpdateStatus = async (req, res) => {
     });
 
     // Emit WebSocket events and send notifications for each updated order
-    foundOrders.forEach(async (order) => {
-      // Emit WebSocket event for real-time UI updates
-      broadcast('order_status', {
-        orderId: order.id,
-        status,
-        shopId: order.shop_id,
-      });
-
-      try {
-        if (order.buyer_telegram_id) {
-          await telegramService.notifyOrderStatusUpdate(order.buyer_telegram_id, {
-            id: order.id,
+    await Promise.allSettled(
+      foundOrders.map(async (order) => {
+        try {
+          // Emit WebSocket event for real-time UI updates
+          broadcast('order_status', {
+            orderId: order.id,
             status,
-            product_name: order.product_name,
+            shopId: order.shop_id,
+          });
+
+          if (order.buyer_telegram_id) {
+            await telegramService.notifyOrderStatusUpdate(order.buyer_telegram_id, {
+              id: order.id,
+              status,
+              product_name: order.product_name,
+            });
+          }
+        } catch (notifError) {
+          logger.error('Bulk notification error', {
+            orderId: order.id,
+            error: notifError.message,
           });
         }
-      } catch (notifError) {
-        logger.error('Bulk notification error', {
-          orderId: order.id,
-          error: notifError.message,
-        });
-      }
-    });
+      })
+    );
 
     return res.status(200).json({
       success: true,

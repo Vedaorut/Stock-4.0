@@ -206,7 +206,7 @@ const handleMarkupInput = async (ctx) => {
 
       // Fetch updated follow detail
       const follow = await followApi.getFollowDetail(followId, token);
-      const message = formatFollowDetail(follow);
+      const message = formatFollowDetail(follow, ctx.lang);
 
       await cleanReply(ctx, message, followDetailMenu(followId, follow.mode));
 
@@ -260,16 +260,21 @@ const editFollowMarkupScene = new Scenes.WizardScene(
 
 // Handle scene leave - cleanup
 editFollowMarkupScene.leave(async (ctx) => {
-  // ✅ Clear lock with timestamp
+  // Clear lock with timestamp
   delete ctx.session.editingFollowId;
   delete ctx.session.editingFollowTimestamp;
   delete ctx.session.pendingModeSwitch;
 
-  // ✅ Clear wizard state (P1-2 fix)
+  // Clear wizard state (P1-2 fix)
   if (ctx.wizard) {
     delete ctx.wizard.state;
   }
   ctx.scene.state = {};
+
+  // Очистить __scenes из Redis сессии для предотвращения застревания
+  if (ctx.session && ctx.session.__scenes) {
+    delete ctx.session.__scenes;
+  }
 
   logger.info(`User ${ctx.from?.id} left editFollowMarkup scene`);
 });

@@ -1,0 +1,101 @@
+{
+  "order": {
+    "new": {
+      "title": "New Order!",
+      "product": "Product: {productName}",
+      "quantity": "Quantity: {quantity} pcs",
+      "amount": "Amount: ${amount}",
+      "payment": "Payment: {currency}",
+      "buyer": "Buyer: @{username}",
+      "markDelivered": "Mark as Delivered"
+    },
+    "confirmed": {
+      "title": "Order Confirmed!",
+      "product": "Product: {productName}",
+      "quantity": "Quantity: {quantity} pcs",
+      "amount": "Amount: ${amount}",
+      "seller": "Seller: @{username}",
+      "shop": "Shop: {shopName}",
+      "contactSeller": "Contact the seller to receive your product."
+    },
+    "status": {
+      "title": "Order Status Update",
+      "orderId": "Order #{orderId}",
+      "status": "Status: {status}",
+      "pending": "Pending Payment",
+      "confirmed": "Confirmed",
+      "shipped": "Shipped",
+      "delivered": "Delivered",
+      "cancelled": "Cancelled"
+    }
+  },
+  "subscription": {
+    "activated": {
+      "title": "Shop Activated",
+      "shopName": "{shopName}",
+      "tier": "Plan: {tier}",
+      "validUntil": "Valid until: {date}",
+      "goToMenu": "Go to Menu"
+    },
+    "pendingSetup": {
+      "title": "Payment Received",
+      "tier": "Plan: {tier}",
+      "createShop": "Create a shop to activate your subscription.",
+      "createShopButton": "Create Shop",
+      "menuButton": "Menu"
+    },
+    "expired": {
+      "title": "Subscription Expired",
+      "shopName": "{shopName}",
+      "message": "Renew your subscription to continue using your shop.",
+      "renewButton": "Renew Subscription"
+    },
+    "gracePeriod": {
+      "title": "Subscription Expiring",
+      "shopName": "{shopName}",
+      "daysLeft": "Days left: {days}",
+      "message": "Renew your subscription to avoid shop suspension.",
+      "renewButton": "Renew Subscription"
+    }
+  },
+  "migration": {
+    "title": "Important update from \"{shopName}\"",
+    "oldChannelBlocked": "Our old channel was blocked.",
+    "newChannel": "New channel: {url}",
+    "subscribe": "Subscribe to stay updated with new products and announcements!"
+  },
+  "errors": {
+    "validation": {
+      "invalidLanguage": "Invalid language",
+      "required": "Field is required",
+      "invalidFormat": "Invalid format"
+    },
+    "auth": {
+      "unauthorized": "Authorization required",
+      "invalidToken": "Invalid token",
+      "tokenExpired": "Token expired"
+    },
+    "notFound": {
+      "user": "User not found",
+      "shop": "Shop not found",
+      "product": "Product not found",
+      "order": "Order not found"
+    },
+    "server": {
+      "internal": "Internal server error"
+    }
+  },
+  "common": {
+    "yes": "Yes",
+    "no": "No",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "save": "Save",
+    "delete": "Delete",
+    "edit": "Edit",
+    "back": "Back",
+    "next": "Next",
+    "done": "Done",
+    "notSpecified": "not specified"
+  }
+}

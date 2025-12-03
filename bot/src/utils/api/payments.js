@@ -22,8 +22,8 @@ export const subscriptionApi = {
       logger.error('Failed to fetch subscription pricing:', error);
       // Fallback prices if API fails
       return {
-        basic: { price: 25, currency: 'USD', period: '30 days' },
-        pro: { price: 35, currency: 'USD', period: '30 days' },
+        pro: { price: 25, currency: 'USD', period: '30 days' },
+        max: { price: 35, currency: 'USD', period: '30 days' },
       };
     }
   },

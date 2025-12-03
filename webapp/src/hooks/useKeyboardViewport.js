@@ -158,12 +158,14 @@ export function useKeyboardViewport() {
       }
 
       if (isKeyboardTarget(target)) {
+        // Don't set kb-open immediately - wait for actual keyboard
+        // This prevents TabBar from hiding before keyboard appears
         forceOpenRef.current = true;
-        setKB(true);
         if (focusTimeoutRef.current) {
           clearTimeout(focusTimeoutRef.current);
           focusTimeoutRef.current = null;
         }
+        // Only call compute which will check height delta
         requestAnimationFrame(compute);
       }
     };

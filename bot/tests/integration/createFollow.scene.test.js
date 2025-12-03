@@ -322,7 +322,7 @@ describe('Create Follow Scene - Wizard Validation (P0)', () => {
     await new Promise((resolve) => setImmediate(resolve));
 
     const text2 = testBot.getLastReplyText();
-    expect(text2).toContain('🔧 Инструменты'); // Cancel returns to seller tools menu
+    expect(text2).toContain('Инструменты'); // Cancel returns to seller tools menu
 
     // Verify no unexpected API calls
     expect(mock.history.post.length).toBe(0);

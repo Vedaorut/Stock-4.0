@@ -177,7 +177,7 @@ export async function handleAIProductCommand(ctx) {
       // AI unavailable - show menu
       await smartMessage.send(ctx, {
         text: result.message,
-        keyboard: sellerMenu(0, { hasFollows: ctx.session?.hasFollows }),
+        keyboard: sellerMenu(0, { hasFollows: ctx.session?.hasFollows }, ctx.lang),
       });
       return;
     }
@@ -247,7 +247,7 @@ export async function handleAIProductCommand(ctx) {
             [retryButton],
             [Markup.button.callback('↩️ В меню', 'seller:menu')],
           ])
-        : sellerMenu(0, { hasFollows: ctx.session?.hasFollows });
+        : sellerMenu(0, { hasFollows: ctx.session?.hasFollows }, ctx.lang);
 
       await smartMessage.send(ctx, {
         text: `${userErrorMessage}\n\n${suggestion}`,
@@ -378,7 +378,7 @@ export async function handleAISelection(ctx) {
     } else if (result.fallbackToMenu) {
       await smartMessage.send(ctx, {
         text: result.message,
-        keyboard: sellerMenu(0, { hasFollows: ctx.session?.hasFollows }),
+        keyboard: sellerMenu(0, { hasFollows: ctx.session?.hasFollows }, ctx.lang),
       });
     } else {
       await cleanReply(ctx, result.message);
@@ -424,7 +424,7 @@ export async function handleAICancel(ctx) {
 
     await smartMessage.send(ctx, {
       text: '❌ Операция отменена',
-      keyboard: sellerMenu(0, { hasFollows: ctx.session?.hasFollows }),
+      keyboard: sellerMenu(0, { hasFollows: ctx.session?.hasFollows }, ctx.lang),
     });
 
     logger.info('ai_operation_cancelled', {
@@ -625,7 +625,7 @@ export async function handleBulkDeleteAllConfirm(ctx) {
     // Show success message
     await smartMessage.send(ctx, {
       text: `✅ Удалено товаров: ${result.deletedCount}`,
-      keyboard: sellerMenu(0, { hasFollows: ctx.session?.hasFollows }),
+      keyboard: sellerMenu(0, { hasFollows: ctx.session?.hasFollows }, ctx.lang),
     });
 
   logger.info('bulk_delete_all_confirmed', {
@@ -637,7 +637,7 @@ export async function handleBulkDeleteAllConfirm(ctx) {
     logger.error('Bulk delete all confirmation error:', error);
     await smartMessage.send(ctx, {
       text: '❌ Ошибка удаления товаров\n\n' + (error.message || 'Попробуйте позже'),
-      keyboard: sellerMenu(0, { hasFollows: ctx.session?.hasFollows }),
+      keyboard: sellerMenu(0, { hasFollows: ctx.session?.hasFollows }, ctx.lang),
     });
   }
 }

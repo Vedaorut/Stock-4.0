@@ -2,18 +2,38 @@ import pg from 'pg';
 import { config } from './env.js';
 import logger from '../utils/logger.js';
 
-const { Pool } = pg;
-
 /**
  * PostgreSQL connection pool
- * Optimized for high-concurrency workloads
+ *
+ * For Neon DB in long-running Node.js servers:
+ * - Use standard pg driver with -pooler endpoint (PgBouncer)
+ * - PgBouncer on Neon side manages connection pooling
+ * - TCP connections stay alive (no WebSocket handshake overhead)
+ *
+ * @neondatabase/serverless is only needed for:
+ * - Edge functions (Cloudflare Workers, Vercel Edge)
+ * - Serverless functions with short-lived execution
+ *
+ * Performance comparison:
+ * - @neondatabase/serverless Pool: ~1400ms first query (WebSocket handshake)
+ * - pg + -pooler endpoint: ~50-100ms (TCP + PgBouncer)
  */
+const isNeonDb = config.databaseUrl?.includes('neon.tech');
+
+// Use standard pg Pool for all environments
+// For Neon: keep -pooler suffix for PgBouncer connection pooling
+const Pool = pg.Pool;
+
+logger.info(`Database driver: pg (${isNeonDb ? 'Neon with PgBouncer' : 'local PostgreSQL'})`);
+
 export const pool = new Pool({
-  connectionString: config.databaseUrl,
-  max: 35, // Increased from 20 to handle more concurrent requests
-  idleTimeoutMillis: 20000, // Reduced from 30s to 20s (prevent stale connections)
-  connectionTimeoutMillis: 2000, // Return an error after 2 seconds if connection cannot be established
-  statement_timeout: 30000, // 30 second timeout for long-running queries (prevent deadlocks)
+  connectionString: config.databaseUrl, // Keep -pooler suffix for Neon!
+  max: isNeonDb ? 20 : 35, // Neon PgBouncer can handle more than serverless driver
+  min: isNeonDb ? 5 : 5, // Keep minimum connections alive
+  idleTimeoutMillis: isNeonDb ? 300000 : 30000, // 5 min for Neon (long-lived connections)
+  connectionTimeoutMillis: isNeonDb ? 10000 : 5000, // Neon needs more time for SSL
+  statement_timeout: 30000, // 30 second timeout for long-running queries
+  ssl: isNeonDb ? { rejectUnauthorized: false } : false, // SSL required for Neon
 });
 
 // Clear cached prepared statements on connect (fixes schema changes after migrations)
@@ -85,6 +105,37 @@ export const testConnection = async () => {
 };
 
 /**
+ * Warm up connection pool
+ * Creates minimum connections at startup to avoid cold start latency
+ */
+export const warmupPool = async () => {
+  const minConnections = 5; // Same for both Neon and local with pg driver
+  const clients = [];
+
+  logger.info(`Warming up connection pool (${minConnections} connections)...`);
+  const start = Date.now();
+
+  try {
+    // Acquire minimum connections in parallel
+    for (let i = 0; i < minConnections; i++) {
+      clients.push(pool.connect());
+    }
+    const connected = await Promise.all(clients);
+
+    // Release all connections back to pool
+    connected.forEach(client => client.release());
+
+    logger.info(`Pool warmed up in ${Date.now() - start}ms`, {
+      total: pool.totalCount,
+      idle: pool.idleCount,
+    });
+  } catch (error) {
+    logger.error('Pool warmup failed:', { error: error.message });
+    // Don't throw - server can still work with cold pool
+  }
+};
+
+/**
  * Execute a query
  * P1-DB-008: Slow Query Logging (queries > 1000ms)
  */
@@ -150,5 +201,6 @@ export default {
   query,
   getClient,
   testConnection,
+  warmupPool,
   closePool,
 };

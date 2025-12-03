@@ -1,56 +1,22 @@
 /**
  * Seller Tips System - умные советы и предупреждения для продавцов
  */
+import { t } from '../i18n/index.js';
 
-// База советов (5 штук)
-const TIPS = {
-  follow: {
-    id: 'tip_follow',
-    text: '👀 Следите за другими магазинами\nМониторьте наличие их товаров.',
-  },
-  resell: {
-    id: 'tip_resell',
-    text: '💰 Перепродавайте с наценкой\nКопируйте товары других магазинов с автонаценкой.',
-  },
-  ai: {
-    id: 'tip_ai',
-    text: '🤖 AI добавит товары за вас\nОпишите товар - AI создаст карточку автоматически.',
-  },
-  stats: {
-    id: 'tip_stats',
-    text: '📊 Смотрите что продается\nАнализируйте статистику для роста продаж.',
-  },
-  workers: {
-    id: 'tip_workers',
-    text: '👥 Добавьте помощников\nДайте доступ сотрудникам для управления.',
-  },
-};
-
-// Предупреждения (приоритет 1)
-const WARNINGS = {
-  no_wallets: {
-    id: 'warning_no_wallets',
-    text: '⚠️ У вас не настроены кошельки\nПокупатели не смогут оплатить товары.',
-  },
-  no_products: {
-    id: 'warning_no_products',
-    text: '📦 В магазине пока нет товаров\nДобавьте товары чтобы начать продажи.',
-  },
-};
+// Tips keys for rotation
+const TIP_KEYS = ['follow', 'resell', 'ai', 'stats', 'workers'];
 
 /**
  * Получить следующий совет (избегая последнего показанного)
  */
-function getNextTip(lastTipId) {
-  const tipsArray = Object.values(TIPS);
-
-  // Если советов мало или lastTipId не задан, выбираем случайный
-  if (tipsArray.length <= 1 || !lastTipId) {
-    return tipsArray[Math.floor(Math.random() * tipsArray.length)];
+function getNextTipKey(lastTipKey) {
+  // Если советов мало или lastTipKey не задан, выбираем случайный
+  if (TIP_KEYS.length <= 1 || !lastTipKey) {
+    return TIP_KEYS[Math.floor(Math.random() * TIP_KEYS.length)];
   }
 
   // Фильтруем последний показанный совет
-  const availableTips = tipsArray.filter((tip) => tip.id !== lastTipId);
+  const availableTips = TIP_KEYS.filter((key) => key !== lastTipKey);
 
   // Выбираем случайный из оставшихся
   return availableTips[Math.floor(Math.random() * availableTips.length)];
@@ -63,27 +29,29 @@ function getNextTip(lastTipId) {
  * @returns {string|null} - Текст для показа или null
  */
 function getTipForShop(ctx, shopHealth) {
+  const lang = ctx.lang || 'ru';
+
   // Приоритет 1: Критичные предупреждения
 
   // Проверка кошельков
   if (!shopHealth.hasWallets) {
-    return WARNINGS.no_wallets.text;
+    return t('warnings.noWallets', {}, lang);
   }
 
   // Проверка товаров
   if (shopHealth.productsCount === 0) {
-    return WARNINGS.no_products.text;
+    return t('warnings.noProducts', {}, lang);
   }
 
   // Приоритет 2: Полезные советы (ротация)
-  const lastTipId = ctx.session.lastTipShown || null;
-  const nextTip = getNextTip(lastTipId);
+  const lastTipKey = ctx.session.lastTipShown || null;
+  const nextTipKey = getNextTipKey(lastTipKey);
 
-  // Сохраняем ID показанного совета в session
-  ctx.session.lastTipShown = nextTip.id;
+  // Сохраняем key показанного совета в session
+  ctx.session.lastTipShown = nextTipKey;
   ctx.session.lastTipTimestamp = Date.now();
 
-  return nextTip.text;
+  return t(`tips.${nextTipKey}`, {}, lang);
 }
 
-export { getTipForShop, getNextTip, TIPS, WARNINGS };
+export { getTipForShop, getNextTipKey, TIP_KEYS };

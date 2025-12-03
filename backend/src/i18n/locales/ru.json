@@ -1,0 +1,101 @@
+{
+  "order": {
+    "new": {
+      "title": "Новый заказ!",
+      "product": "Товар: {productName}",
+      "quantity": "Количество: {quantity} шт",
+      "amount": "Сумма: ${amount}",
+      "payment": "Оплата: {currency}",
+      "buyer": "Покупатель: @{username}",
+      "markDelivered": "Отметить выдачу"
+    },
+    "confirmed": {
+      "title": "Заказ оформлен!",
+      "product": "Товар: {productName}",
+      "quantity": "Количество: {quantity} шт",
+      "amount": "Сумма: ${amount}",
+      "seller": "Продавец: @{username}",
+      "shop": "Магазин: {shopName}",
+      "contactSeller": "Свяжитесь с продавцом для получения товара."
+    },
+    "status": {
+      "title": "Обновление статуса заказа",
+      "orderId": "Заказ #{orderId}",
+      "status": "Статус: {status}",
+      "pending": "Ожидание оплаты",
+      "confirmed": "Подтверждён",
+      "shipped": "Отправлен",
+      "delivered": "Доставлен",
+      "cancelled": "Отменён"
+    }
+  },
+  "subscription": {
+    "activated": {
+      "title": "Магазин активирован",
+      "shopName": "{shopName}",
+      "tier": "Тариф: {tier}",
+      "validUntil": "Действует до: {date}",
+      "goToMenu": "Перейти в меню"
+    },
+    "pendingSetup": {
+      "title": "Оплата получена",
+      "tier": "Тариф: {tier}",
+      "createShop": "Создайте магазин, чтобы активировать подписку.",
+      "createShopButton": "Создать магазин",
+      "menuButton": "В меню"
+    },
+    "expired": {
+      "title": "Подписка истекла",
+      "shopName": "{shopName}",
+      "message": "Продлите подписку, чтобы продолжить использование магазина.",
+      "renewButton": "Продлить подписку"
+    },
+    "gracePeriod": {
+      "title": "Подписка истекает",
+      "shopName": "{shopName}",
+      "daysLeft": "Осталось дней: {days}",
+      "message": "Продлите подписку, чтобы избежать приостановки магазина.",
+      "renewButton": "Продлить подписку"
+    }
+  },
+  "migration": {
+    "title": "Важное обновление от магазина \"{shopName}\"",
+    "oldChannelBlocked": "Наш старый канал был заблокирован.",
+    "newChannel": "Новый канал: {url}",
+    "subscribe": "Подпишитесь, чтобы не пропустить важные обновления и новые товары!"
+  },
+  "errors": {
+    "validation": {
+      "invalidLanguage": "Неверный язык",
+      "required": "Поле обязательно",
+      "invalidFormat": "Неверный формат"
+    },
+    "auth": {
+      "unauthorized": "Необходима авторизация",
+      "invalidToken": "Неверный токен",
+      "tokenExpired": "Токен истёк"
+    },
+    "notFound": {
+      "user": "Пользователь не найден",
+      "shop": "Магазин не найден",
+      "product": "Товар не найден",
+      "order": "Заказ не найден"
+    },
+    "server": {
+      "internal": "Внутренняя ошибка сервера"
+    }
+  },
+  "common": {
+    "yes": "Да",
+    "no": "Нет",
+    "cancel": "Отмена",
+    "confirm": "Подтвердить",
+    "save": "Сохранить",
+    "delete": "Удалить",
+    "edit": "Редактировать",
+    "back": "Назад",
+    "next": "Далее",
+    "done": "Готово",
+    "notSpecified": "не указана"
+  }
+}

@@ -1,12 +1,13 @@
 import { motion } from 'framer-motion';
 import { WarningIcon, LoadingSpinner, InfoItem } from './MigrationIcons';
 import { getDaysLabel } from './useMigration';
+import { useTranslation } from '../../../i18n/useTranslation';
 
 /**
  * Error display with retry button
- * @param {{ message: string, onRetry: function }} props
+ * @param {{ message: string, onRetry: function, t: function }} props
  */
-function ErrorDisplay({ message, onRetry }) {
+function ErrorDisplay({ message, onRetry, t }) {
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.95 }}
@@ -29,7 +30,7 @@ function ErrorDisplay({ message, onRetry }) {
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
-            Попробовать снова
+            {t('common.retry')}
           </motion.button>
         </div>
       </div>
@@ -39,9 +40,9 @@ function ErrorDisplay({ message, onRetry }) {
 
 /**
  * Rate limit warning with progress bar
- * @param {{ daysUntilNext: number }} props
+ * @param {{ daysUntilNext: number, t: function }} props
  */
-function RateLimitWarning({ daysUntilNext }) {
+function RateLimitWarning({ daysUntilNext, t }) {
   return (
     <motion.div
       className="mt-4 p-4 rounded-2xl"
@@ -61,7 +62,7 @@ function RateLimitWarning({ daysUntilNext }) {
         </div>
         <div className="flex-1">
           <p className="text-orange-400 text-sm font-medium">
-            Доступно через {daysUntilNext} {getDaysLabel(daysUntilNext)}
+            {t('migration.availableIn', { days: daysUntilNext, daysLabel: getDaysLabel(daysUntilNext) })}
           </p>
           <div className="mt-2 w-full h-1.5 bg-gray-800 rounded-full overflow-hidden">
             <motion.div
@@ -100,6 +101,8 @@ export function MigrationHero({
   onRetry,
   onContinue,
 }) {
+  const { t } = useTranslation();
+
   return (
     <motion.div
       key="step1"
@@ -124,7 +127,7 @@ export function MigrationHero({
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
             >
-              Канал заблокирован?
+              {t('migration.channelBlocked')}
             </motion.h1>
 
             <motion.p
@@ -133,13 +136,13 @@ export function MigrationHero({
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
             >
-              Уведомим всех подписчиков о новом канале
+              {t('migration.notifySubscribers')}
             </motion.p>
           </div>
 
           {/* Error Message */}
           {errorMessage && (
-            <ErrorDisplay message={errorMessage} onRetry={onRetry} />
+            <ErrorDisplay message={errorMessage} onRetry={onRetry} t={t} />
           )}
 
           {/* Info Card */}
@@ -156,12 +159,12 @@ export function MigrationHero({
             >
               <InfoItem
                 icon="&#10003;"
-                text={`${subscriberCount} подписчиков получат уведомление`}
+                text={t('migration.subscribersWillGet', { count: subscriberCount })}
                 variant="success"
               />
               <InfoItem
                 icon="&#10003;"
-                text="Новый канал будет сохранен в магазине"
+                text={t('migration.channelSaved')}
                 variant="success"
               />
             </motion.div>
@@ -169,7 +172,7 @@ export function MigrationHero({
 
           {/* Rate Limit Warning */}
           {daysUntilNext > 0 && (
-            <RateLimitWarning daysUntilNext={daysUntilNext} />
+            <RateLimitWarning daysUntilNext={daysUntilNext} t={t} />
           )}
 
           {/* CTA Button */}
@@ -189,8 +192,8 @@ export function MigrationHero({
             transition={{ delay: 0.5 }}
           >
             {daysUntilNext > 0
-              ? `Доступно через ${daysUntilNext} ${getDaysLabel(daysUntilNext)}`
-              : 'Начать миграцию'}
+              ? t('migration.availableIn', { days: daysUntilNext, daysLabel: getDaysLabel(daysUntilNext) })
+              : t('migration.startMigration')}
           </motion.button>
         </>
       )}

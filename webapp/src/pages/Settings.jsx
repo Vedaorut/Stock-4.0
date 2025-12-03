@@ -16,7 +16,8 @@ const WorkspaceModalLazy = lazy(() => import('../components/Settings/WorkspaceMo
 const FollowsModalLazy = lazy(() => import('../components/Settings/FollowsModal'));
 const AnalyticsModalLazy = lazy(() => import('../components/Settings/AnalyticsModal'));
 const MigrationModalLazy = lazy(() => import('../components/Settings/MigrationModal'));
-const WorkerModeModalLazy = lazy(() => import('../components/Settings/WorkerModeModal'));
+const InviteLinkModalLazy = lazy(() => import('../components/Settings/InviteLinkModal'));
+
 const MyOrdersModalLazy = lazy(() => import('../components/Settings/MyOrdersModal'));
 const ShopOrdersModalLazy = lazy(() => import('../components/Settings/ShopOrdersModal'));
 
@@ -26,11 +27,11 @@ const SELLER_ONLY_ITEMS = [
   'analytics',
   'wallet',
   'workspace',
-  'worker-mode',
   'follows',
   'migration',
   'subscription',
   'shop-orders',
+  'invite-link',
 ];
 
 const getSettingsSections = (t, lang, viewMode) => {
@@ -86,6 +87,21 @@ const getSettingsSections = (t, lang, viewMode) => {
           ),
         },
         {
+          id: 'invite-link',
+          label: t('settings.inviteLink'),
+          description: t('settings.inviteLinkDescription'),
+          icon: (
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"
+              />
+            </svg>
+          ),
+        },
+        {
           id: 'wallet',
           label: t('settings.items.wallets'),
           description: t('settings.items.walletsDesc'),
@@ -115,21 +131,7 @@ const getSettingsSections = (t, lang, viewMode) => {
             </svg>
           ),
         },
-        {
-          id: 'worker-mode',
-          label: t('settings.items.workerMode'),
-          description: t('settings.items.workerModeDesc'),
-          icon: (
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-              />
-            </svg>
-          ),
-        },
+
         {
           id: 'follows',
           label: t('settings.items.follows'),
@@ -262,7 +264,8 @@ export default function Settings() {
   const [showFollows, setShowFollows] = useState(false);
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [showMigration, setShowMigration] = useState(false);
-  const [showWorkerMode, setShowWorkerMode] = useState(false);
+  const [showInviteLink, setShowInviteLink] = useState(false);
+
   const [showMyOrders, setShowMyOrders] = useState(false);
   const [showShopOrders, setShowShopOrders] = useState(false);
 
@@ -296,9 +299,10 @@ export default function Settings() {
       case 'migration':
         setShowMigration(true);
         break;
-      case 'worker-mode':
-        setShowWorkerMode(true);
+      case 'invite-link':
+        setShowInviteLink(true);
         break;
+
       case 'my-orders':
         setShowMyOrders(true);
         break;
@@ -461,9 +465,10 @@ export default function Settings() {
         {showMigration && (
           <MigrationModalLazy isOpen={showMigration} onClose={() => setShowMigration(false)} />
         )}
-        {showWorkerMode && (
-          <WorkerModeModalLazy isOpen={showWorkerMode} onClose={() => setShowWorkerMode(false)} />
+        {showInviteLink && (
+          <InviteLinkModalLazy isOpen={showInviteLink} onClose={() => setShowInviteLink(false)} />
         )}
+
         {showMyOrders && (
           <MyOrdersModalLazy isOpen={showMyOrders} onClose={() => setShowMyOrders(false)} />
         )}

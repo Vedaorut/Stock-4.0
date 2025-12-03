@@ -498,11 +498,17 @@ createFollowScene.leave(async (ctx) => {
     }
   }
 
-  // ✅ P1-2 FIX: Clear wizard state to prevent memory leak
+  // P1-2 FIX: Clear wizard state to prevent memory leak
   if (ctx.wizard) {
     delete ctx.wizard.state;
   }
   ctx.scene.state = {};
+
+  // Очистить __scenes из Redis сессии для предотвращения застревания
+  if (ctx.session && ctx.session.__scenes) {
+    delete ctx.session.__scenes;
+  }
+
   logger.info(`User ${ctx.from?.id} left createFollow scene`);
 });
 
@@ -542,6 +548,25 @@ createFollowScene.action('cancel_scene', async (ctx) => {
   } catch (error) {
     logger.error('Error in cancel_scene handler:', error);
     // Local error handling
+    try {
+      await ctx.reply(generalMessages.actionFailed);
+    } catch (replyError) {
+      logger.error('Failed to send error message:', replyError);
+    }
+  }
+});
+
+// Handle "Back" button that returns to seller menu
+createFollowScene.action('seller:menu', async (ctx) => {
+  try {
+    await ctx.answerCbQuery();
+    logger.info('follow_create_back_to_menu', { userId: ctx.from.id });
+    await ctx.scene.leave();
+
+    const { showSellerMainMenu } = await import('../utils/sellerNavigation.js');
+    await showSellerMainMenu(ctx);
+  } catch (error) {
+    logger.error('Error in seller:menu handler:', error);
     try {
       await ctx.reply(generalMessages.actionFailed);
     } catch (replyError) {

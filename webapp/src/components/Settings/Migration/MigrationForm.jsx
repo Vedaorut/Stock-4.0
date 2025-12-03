@@ -1,11 +1,12 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { parseChannelInput } from './useMigration';
+import { useTranslation } from '../../../i18n/useTranslation';
 
 /**
  * Migration Error display with retry
  * @param {{ error: string, onRetry: function, loading: boolean, disabled: boolean }} props
  */
-function MigrationError({ error, onRetry, loading, disabled }) {
+function MigrationError({ error, onRetry, loading, disabled, t }) {
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.95 }}
@@ -29,7 +30,7 @@ function MigrationError({ error, onRetry, loading, disabled }) {
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
-            Попробовать снова
+            {t('common.retry')}
           </motion.button>
         </div>
       </div>
@@ -39,9 +40,9 @@ function MigrationError({ error, onRetry, loading, disabled }) {
 
 /**
  * Channel Input Field with validation
- * @param {{ value: string, onChange: function, channelError: string|null, isValid: boolean }} props
+ * @param {{ value: string, onChange: function, channelError: string|null, isValid: boolean, t: function }} props
  */
-function ChannelInput({ value, onChange, channelError, isValid }) {
+function ChannelInput({ value, onChange, channelError, isValid, t }) {
   return (
     <motion.div
       className="relative"
@@ -53,7 +54,7 @@ function ChannelInput({ value, onChange, channelError, isValid }) {
         type="text"
         value={value}
         onChange={onChange}
-        placeholder="@mychannel (мин. 5 символов)"
+        placeholder={t('migration.channelPlaceholder')}
         autoFocus
         className="w-full h-14 px-4 pr-12 rounded-2xl text-white text-base placeholder-gray-500 outline-none transition-all"
         style={{
@@ -105,11 +106,11 @@ function ChannelInput({ value, onChange, channelError, isValid }) {
 
 /**
  * Valid channel preview
- * @param {{ value: string }} props
+ * @param {{ value: string, t: function }} props
  */
-function ChannelPreview({ value }) {
+function ChannelPreview({ value, t }) {
   const { cleaned } = parseChannelInput(value);
-  
+
   return (
     <motion.div
       className="mt-3 p-3 rounded-xl"
@@ -122,7 +123,7 @@ function ChannelPreview({ value }) {
       exit={{ opacity: 0, y: -5, height: 0 }}
     >
       <p className="text-green-400 text-sm">
-        Канал: <span className="font-semibold">{cleaned}</span>
+        {t('migration.channelPreview', { channel: cleaned })}
       </p>
     </motion.div>
   );
@@ -130,9 +131,9 @@ function ChannelPreview({ value }) {
 
 /**
  * Subscriber count info card
- * @param {{ count: number }} props
+ * @param {{ count: number, t: function }} props
  */
-function SubscriberInfo({ count }) {
+function SubscriberInfo({ count, t }) {
   return (
     <motion.div
       className="mt-4 p-4 rounded-2xl flex items-center gap-3"
@@ -150,7 +151,7 @@ function SubscriberInfo({ count }) {
         </svg>
       </div>
       <p className="text-gray-300 text-sm">
-        <span className="text-white font-semibold">{count}</span> подписчиков получат уведомление
+        {t('migration.subscribersWillGet', { count })}
       </p>
     </motion.div>
   );
@@ -158,9 +159,9 @@ function SubscriberInfo({ count }) {
 
 /**
  * Submit button with loading state
- * @param {{ loading: boolean, disabled: boolean, isValid: boolean, onClick: function }} props
+ * @param {{ loading: boolean, disabled: boolean, isValid: boolean, onClick: function, t: function }} props
  */
-function SubmitButton({ loading, disabled, isValid, onClick }) {
+function SubmitButton({ loading, disabled, isValid, onClick, t }) {
   return (
     <motion.button
       onClick={onClick}
@@ -184,10 +185,10 @@ function SubmitButton({ loading, disabled, isValid, onClick }) {
             animate={{ rotate: 360 }}
             transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
           />
-          Отправка...
+          {t('migration.sending')}
         </>
       ) : (
-        'Отправить уведомления'
+        t('migration.sendNotifications')
       )}
     </motion.button>
   );
@@ -215,6 +216,7 @@ export function MigrationForm({
   subscriberCount,
   onSubmit,
 }) {
+  const { t } = useTranslation();
   const isDisabled = loading || !newChannel.trim() || channelError !== null;
 
   return (
@@ -233,7 +235,7 @@ export function MigrationForm({
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
       >
-        Новый канал
+        {t('migration.newChannel')}
       </motion.h2>
 
       {/* Migration Error */}
@@ -243,6 +245,7 @@ export function MigrationForm({
           onRetry={onSubmit}
           loading={loading}
           disabled={!newChannel.trim() || channelError !== null}
+          t={t}
         />
       )}
 
@@ -252,6 +255,7 @@ export function MigrationForm({
         onChange={onChannelChange}
         channelError={channelError}
         isValid={isChannelValid}
+        t={t}
       />
 
       {/* Error Message */}
@@ -271,12 +275,12 @@ export function MigrationForm({
       {/* Valid Channel Preview */}
       <AnimatePresence>
         {isChannelValid && (
-          <ChannelPreview value={newChannel} />
+          <ChannelPreview value={newChannel} t={t} />
         )}
       </AnimatePresence>
 
       {/* Subscriber Count Info */}
-      <SubscriberInfo count={subscriberCount} />
+      <SubscriberInfo count={subscriberCount} t={t} />
 
       {/* CTA Button */}
       <SubmitButton
@@ -284,6 +288,7 @@ export function MigrationForm({
         disabled={isDisabled}
         isValid={isChannelValid}
         onClick={onSubmit}
+        t={t}
       />
     </motion.div>
   );

@@ -1,10 +1,46 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import Header from '../components/Layout/Header';
 import { useApi } from '../hooks/useApi';
 import { useStore } from '../store/useStore';
 import { useTelegram } from '../hooks/useTelegram';
 import { useTranslation } from '../i18n/useTranslation';
+
+function SearchResultItem({ product, onClick }) {
+  const price = typeof product.price === 'number' ? product.price : parseFloat(product.price) || 0;
+  
+  return (
+    <motion.button
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -10 }}
+      onClick={onClick}
+      className="w-full flex items-center gap-3 p-3 bg-white/5 hover:bg-white/10 rounded-xl transition-colors text-left"
+    >
+      <div className="w-12 h-12 rounded-lg bg-dark-elevated overflow-hidden flex-shrink-0">
+        {product.image ? (
+          <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-gray-500">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+            </svg>
+          </div>
+        )}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-white font-medium truncate">{product.name}</p>
+        <p className="text-xs text-gray-400 truncate">{product.shop_name || 'Shop'}</p>
+      </div>
+      <div className="flex-shrink-0 text-right">
+        <p className="text-orange-primary font-semibold">${Math.floor(price)}</p>
+      </div>
+      <svg className="w-5 h-5 text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+      </svg>
+    </motion.button>
+  );
+}
 
 export default function Subscriptions() {
   const [myShop, setMyShop] = useState(null);
@@ -30,6 +66,14 @@ export default function Subscriptions() {
   const token = useStore((state) => state.token);
   const viewMode = useStore((state) => state.viewMode);
   const setMyShops = useStore((state) => state.setMyShops);
+
+  // Search state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [isSearchActive, setIsSearchActive] = useState(false);
+  const searchContainerRef = useRef(null);
+  const debounceTimerRef = useRef(null);
 
   const loadData = useCallback(
     async (signal) => {
@@ -105,6 +149,71 @@ export default function Subscriptions() {
     },
     [get, setMyShops, viewMode]
   );
+
+  // Search products across subscriptions
+  const searchProducts = useCallback(async (query) => {
+    if (!query || query.trim().length < 2) {
+      setSearchResults([]);
+      return;
+    }
+    setIsSearching(true);
+    try {
+      const { data, error } = await get('/products/search', {
+        params: { 
+          query: query.trim(),
+          subscriptions: viewMode === 'buyer' ? 'true' : 'false',
+          follows: viewMode === 'seller' ? 'true' : 'false',
+          limit: 20
+        }
+      });
+      if (!error && data?.data) {
+        setSearchResults(data.data);
+      } else {
+        setSearchResults([]);
+      }
+    } catch (err) {
+      setSearchResults([]);
+    } finally {
+      setIsSearching(false);
+    }
+  }, [get, viewMode]);
+
+  const handleSearchChange = useCallback((e) => {
+    const query = e.target.value;
+    setSearchQuery(query);
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    if (!query.trim()) {
+      setSearchResults([]);
+      setIsSearchActive(false);
+      return;
+    }
+    setIsSearchActive(true);
+    debounceTimerRef.current = setTimeout(() => searchProducts(query), 300);
+  }, [searchProducts]);
+
+  const clearSearch = useCallback(() => {
+    setSearchQuery('');
+    setSearchResults([]);
+    setIsSearchActive(false);
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    triggerHaptic('light');
+  }, [triggerHaptic]);
+
+  const handleSearchResultClick = useCallback((product) => {
+    triggerHaptic('medium');
+    const { setCurrentShop, setActiveTab, setHighlightProductId } = useStore.getState();
+    setCurrentShop({
+      id: product.shop_id,
+      name: product.shop_name,
+      logo: null,
+      isOwned: false,
+    });
+    // Ensure product.id is a number for consistent comparison in ProductCard
+    const productId = typeof product.id === 'string' ? parseInt(product.id, 10) : product.id;
+    setHighlightProductId(productId);
+    setActiveTab('catalog');
+    clearSearch();
+  }, [triggerHaptic, clearSearch]);
 
   useEffect(() => {
     if (!token) {
@@ -196,6 +305,28 @@ export default function Subscriptions() {
       });
   }, [loadData]);
 
+  // Cleanup debounce timer
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    };
+  }, []);
+
+  // Outside click handler
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(event.target) && isSearchActive) {
+        setIsSearchActive(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
+  }, [isSearchActive]);
+
   // Determine if we have data based on mode
   const hasData = viewMode === 'buyer'
     ? buyerSubscriptions.length > 0
@@ -210,6 +341,78 @@ export default function Subscriptions() {
       }}
     >
       <Header title={t('subscriptions.title')} />
+
+      {/* Search Bar */}
+      {!loading && !error && hasData && (
+        <div className="px-4 pt-4 pb-2">
+          <div className="relative" ref={searchContainerRef}>
+            <div className="relative">
+              <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={handleSearchChange}
+                placeholder={t('subscriptions.searchPlaceholder')}
+                className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 pl-10 pr-10 text-white placeholder-gray-500 focus:outline-none focus:border-orange-primary/50 focus:ring-1 focus:ring-orange-primary/30 transition-all"
+              />
+              {searchQuery && (
+                <motion.button
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  onClick={clearSearch}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-white/10 rounded-full transition-colors"
+                >
+                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </motion.button>
+              )}
+            </div>
+            <AnimatePresence>
+              {isSearchActive && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="absolute top-full left-0 right-0 mt-2 bg-dark-card/95 backdrop-blur-lg rounded-xl border border-white/10 shadow-xl z-50 max-h-80 overflow-y-auto"
+                >
+                  {isSearching ? (
+                    <div className="flex items-center justify-center py-8">
+                      <div className="w-6 h-6 border-2 border-orange-primary border-t-transparent rounded-full animate-spin" />
+                    </div>
+                  ) : searchResults.length > 0 ? (
+                    <div className="p-2 space-y-1">
+                      {searchResults.map((product) => (
+                        <SearchResultItem
+                          key={`${product.shop_id}-${product.id}`}
+                          product={product}
+                          onClick={() => handleSearchResultClick(product)}
+                        />
+                      ))}
+                    </div>
+                  ) : searchQuery.trim().length >= 2 ? (
+                    <div className="flex flex-col items-center justify-center py-8 text-center px-4">
+                      <svg className="w-12 h-12 text-gray-600 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <p className="text-gray-400 font-medium">{t('subscriptions.searchEmpty')}</p>
+                      <p className="text-gray-500 text-sm mt-1">{t('subscriptions.searchEmptyDesc')}</p>
+                    </div>
+                  ) : (
+                    <div className="py-4 px-4 text-center text-gray-500 text-sm">
+                      {t('subscriptions.searchMinChars')}
+                    </div>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
+      )}
 
       <div className="px-4 py-6">
         {loading ? (

@@ -360,9 +360,10 @@ export function formatFollowsList(follows) {
  * Format follow detail (minimalist)
  *
  * @param {Object} follow - Follow object
+ * @param {string} lang - Language code ('ru' or 'en')
  * @returns {string} Formatted message
  */
-export function formatFollowDetail(follow) {
+export function formatFollowDetail(follow, lang = 'ru') {
   const markupType = follow.markup_type || 'percentage';
   const markupPercentage = follow.markup_percentage ?? follow.markup ?? 0;
   const markupFixed = follow.markup_fixed ?? 0;
@@ -379,5 +380,5 @@ export function formatFollowDetail(follow) {
     markupFixed: Number.isFinite(Number(markupFixed)) ? Number(markupFixed) : 0,
     sourceProducts,
     syncedProducts,
-  });
+  }, lang);
 }

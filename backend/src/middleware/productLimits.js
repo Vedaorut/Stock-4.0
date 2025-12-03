@@ -2,8 +2,8 @@
  * Product Limits Middleware
  *
  * Enforces tier-based product limits:
- * - Basic tier: 4 products max
- * - Pro tier: unlimited products
+ * - Pro tier: 50 products max
+ * - Max tier: unlimited products
  *
  * OPTIMIZATIONS:
  * - Combined shop + count query (1 query instead of 2)
@@ -12,6 +12,7 @@
 
 import { pool } from '../config/database.js';
 import { workerQueries } from '../database/queries/index.js';
+import { TIER_LIMITS } from '../config/subscriptionPricing.js';
 import logger from '../utils/logger.js';
 
 // In-memory cache for product counts (5 min TTL)
@@ -30,11 +31,13 @@ setInterval(() => {
   }
 }, 60 * 1000); // Clean every 1 minute
 
-// Product limits per tier
-const PRODUCT_LIMITS = {
-  basic: 4,
-  pro: Infinity,
-};
+/**
+ * Get product limit for tier
+ */
+function getProductLimit(tier) {
+  const limits = TIER_LIMITS[tier];
+  return limits ? limits.products : TIER_LIMITS.pro.products;
+}
 
 /**
  * Check if shop can add more products
@@ -105,11 +108,11 @@ export async function checkProductLimit(req, res, next) {
       });
     }
 
-    const tier = shop.tier || 'basic';
-    const limit = PRODUCT_LIMITS[tier];
+    const tier = shop.tier || 'pro';
+    const limit = getProductLimit(tier);
 
-    // Pro tier has no limits
-    if (tier === 'pro') {
+    // Max tier has no limits
+    if (tier === 'max' || limit === Infinity) {
       return next();
     }
 
@@ -121,7 +124,7 @@ export async function checkProductLimit(req, res, next) {
 
       return res.status(403).json({
         error: 'PRODUCT_LIMIT_REACHED',
-        message: `${tier.toUpperCase()} tier allows max ${limit} products. Upgrade to PRO for unlimited.`,
+        message: `${tier.toUpperCase()} tier allows max ${limit} products. Upgrade to MAX for unlimited.`,
         currentCount,
         limit,
         tier,
@@ -201,17 +204,17 @@ export async function getProductLimitStatus(shopId, userId) {
       throw new Error('Not authorized to view this shop');
     }
 
-    const tier = shop.tier || 'basic';
-    const limit = PRODUCT_LIMITS[tier];
-    const canAdd = tier === 'pro' || currentCount < limit;
+    const tier = shop.tier || 'pro';
+    const limit = getProductLimit(tier);
+    const canAdd = tier === 'max' || limit === Infinity || currentCount < limit;
 
     return {
       shopId,
       tier,
       currentCount,
-      limit: tier === 'pro' ? 'unlimited' : limit,
+      limit: limit === Infinity ? 'unlimited' : limit,
       canAdd,
-      upgradeAvailable: tier === 'basic',
+      upgradeAvailable: tier !== 'max',
     };
   } catch (error) {
     logger.error('[ProductLimit] Error getting limit status:', error);
@@ -232,5 +235,5 @@ export default {
   checkProductLimit,
   getProductLimitStatus,
   invalidateProductLimitCache,
-  PRODUCT_LIMITS,
+  getProductLimit,
 };

@@ -35,8 +35,8 @@ export const verifyToken = async (req, res, next) => {
       });
     }
 
-    // Verify token
-    const decoded = jwt.verify(token, config.jwt.secret);
+    // Verify token (explicit algorithm to prevent algorithm confusion attacks)
+    const decoded = jwt.verify(token, config.jwt.secret, { algorithms: ['HS256'] });
 
     // SECURITY: Verify user exists in database (prevents stale JWT after DB reset)
     const userExists = await userQueries.findById(decoded.id);
@@ -105,8 +105,14 @@ export const optionalAuth = async (req, res, next) => {
       return next();
     }
 
-    // Verify token
-    const decoded = jwt.verify(token, config.jwt.secret);
+    // Verify token (explicit algorithm to prevent algorithm confusion attacks)
+    const decoded = jwt.verify(token, config.jwt.secret, { algorithms: ['HS256'] });
+
+    // SECURITY: Verify user exists in database (prevents stale JWT after DB reset)
+    const userExists = await userQueries.findById(decoded.id);
+    if (!userExists) {
+      return next(); // For optional auth, continue without user
+    }
 
     // Attach user data to request
     req.user = {

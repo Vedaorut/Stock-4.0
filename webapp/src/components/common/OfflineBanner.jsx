@@ -1,8 +1,10 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus';
+import { useTranslation } from '../../i18n/useTranslation';
 
 export default function OfflineBanner() {
   const isOnline = useOnlineStatus();
+  const { t } = useTranslation();
 
   return (
     <AnimatePresence>
@@ -48,8 +50,8 @@ export default function OfflineBanner() {
 
             {/* Message */}
             <div className="flex flex-col">
-              <span className="text-white font-semibold text-sm">Нет подключения к интернету</span>
-              <span className="text-white/80 text-xs">Проверьте соединение и попробуйте снова</span>
+              <span className="text-white font-semibold text-sm">{t('offline.title')}</span>
+              <span className="text-white/80 text-xs">{t('offline.description')}</span>
             </div>
           </div>
 

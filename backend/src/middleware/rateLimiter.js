@@ -6,7 +6,8 @@ import { RATE_LIMITS, ERROR_MESSAGES } from '../utils/constants.js';
  * Create rate limiter middleware
  */
 const createRateLimiter = (windowMs, maxRequests, message) => {
-  if (process.env.NODE_ENV === 'test') {
+  // FIX: Require explicit flag to disable rate limiting, and never in production
+  if (process.env.DISABLE_RATE_LIMIT === 'true' && process.env.NODE_ENV !== 'production') {
     return (_req, _res, next) => next();
   }
 
@@ -119,6 +120,79 @@ export const aiRequestLimiter = createRateLimiter(
 );
 
 /**
+ * Rate limiter for order payment endpoints
+ * 10 requests per minute per user
+ * Protects: GET /:id/payment-info, POST /:id/submit-payment, GET /:id/payment-status
+ */
+export const orderPaymentLimiter = (() => {
+  if (process.env.DISABLE_RATE_LIMIT === 'true' && process.env.NODE_ENV !== 'production') {
+    return (_req, _res, next) => next();
+  }
+
+  return rateLimit({
+    windowMs: 60 * 1000, // 1 minute
+    max: 10, // 10 requests per minute per user
+    message: {
+      success: false,
+      error: 'Too many payment requests. Please try again in a minute.',
+    },
+    keyGenerator: (req) => req.user?.id || req.ip,
+    standardHeaders: true,
+    legacyHeaders: false,
+    handler: (req, res) => {
+      logger.warn('Order payment rate limit exceeded', {
+        ip: req.ip,
+        path: req.path,
+        method: req.method,
+        userId: req.user?.id,
+      });
+
+      res.status(429).json({
+        success: false,
+        error: 'Too many payment requests. Please try again in a minute.',
+        retryAfter: req.rateLimit.resetTime,
+      });
+    },
+  });
+})();
+
+/**
+ * Rate limiter for worker management endpoints
+ * 20 requests per 5 minutes per user
+ */
+export const workerLimiter = (() => {
+  if (process.env.DISABLE_RATE_LIMIT === 'true' && process.env.NODE_ENV !== 'production') {
+    return (_req, _res, next) => next();
+  }
+
+  return rateLimit({
+    windowMs: 5 * 60 * 1000, // 5 minutes
+    max: 20,
+    message: {
+      success: false,
+      error: 'Too many worker management requests. Please try again later.',
+    },
+    keyGenerator: (req) => req.user?.id || req.ip,
+    standardHeaders: true,
+    legacyHeaders: false,
+    handler: (req, res) => {
+      logger.warn('Worker rate limit exceeded', {
+        ip: req.ip,
+        path: req.path,
+        method: req.method,
+        userId: req.user?.id,
+      });
+
+      res.status(429).json({
+        success: false,
+        error: 'Too many worker management requests. Please try again later.',
+        retryAfter: req.rateLimit.resetTime,
+      });
+    },
+  });
+})();
+
+/**
  * Custom rate limiter factory
  */
 export const customLimiter = (options = {}) => {
@@ -141,5 +215,7 @@ export default {
   productCreationLimiter,
   subscriptionCreationLimiter,
   aiRequestLimiter,
+  orderPaymentLimiter,
+  workerLimiter,
   customLimiter,
 };

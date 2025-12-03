@@ -25,10 +25,12 @@ describe('/start Flow', () => {
     mock.reset();
   });
 
-  it('/start shows welcome message', async () => {
+  it('/start shows language selection for new user', async () => {
     await testBot.handleUpdate(commandUpdate('start'));
 
     const lastText = testBot.getLastReplyText();
-    expect(lastText).toContain('Status Stock');
+    // New users see language selection first
+    expect(lastText).toContain('Choose your language');
+    expect(lastText).toContain('Выберите язык');
   });
 });

@@ -1,16 +1,19 @@
 /**
  * Debug Routes
- * 
+ *
  * Development endpoints for debugging invoice and subscription issues.
  * Protected by authentication middleware AND ownership verification.
- * 
+ *
  * Endpoints:
  * - GET /api/debug/invoice/:id - Detailed invoice inspection (owner only)
  * - GET /api/debug/subscription/:id/invoices - All invoices for a subscription (owner only)
  * - GET /api/debug/shop/:id/subscription - Shop subscription status (owner only)
- * 
+ *
  * SECURITY:
- * - Disabled in production environment
+ * - Requires BOTH conditions to be true:
+ *   1. NODE_ENV !== 'production'
+ *   2. DEBUG_ENDPOINTS_ENABLED === 'true' (explicit opt-in)
+ * - If either condition is false, returns 404 for all requests
  * - Requires authentication (JWT token)
  * - Requires ownership verification (user must own the shop)
  */
@@ -28,20 +31,33 @@ import { shopQueries } from '../database/queries/shopQueries.js';
 const router = express.Router();
 
 // ============================================
-// PRODUCTION PROTECTION - Disable all debug endpoints
+// STRICT DEBUG PROTECTION
+// Debug endpoints are ONLY available when:
+// 1. NODE_ENV is NOT 'production'
+// 2. DEBUG_ENDPOINTS_ENABLED is explicitly set to 'true'
 // ============================================
-if (process.env.NODE_ENV === 'production') {
+const isDebugEnabled = process.env.NODE_ENV !== 'production' &&
+                       process.env.DEBUG_ENDPOINTS_ENABLED === 'true';
+
+if (!isDebugEnabled) {
   router.all('*', (req, res) => {
-    logger.warn('[Debug] Attempt to access debug endpoints in production', {
-      path: req.path,
-      method: req.method,
-      ip: req.ip,
-      userAgent: req.get('User-Agent'),
-    });
-    return res.status(404).json({ 
-      success: false,
-      error: 'Not found' 
-    });
+    // Log attempts in non-production environments for debugging
+    if (process.env.NODE_ENV !== 'production') {
+      logger.warn('[Debug] Debug endpoints disabled. Set DEBUG_ENDPOINTS_ENABLED=true to enable.', {
+        path: req.path,
+        method: req.method,
+        nodeEnv: process.env.NODE_ENV,
+        debugEnabled: process.env.DEBUG_ENDPOINTS_ENABLED,
+      });
+    } else {
+      logger.warn('[Debug] Attempt to access debug endpoints in production', {
+        path: req.path,
+        method: req.method,
+        ip: req.ip,
+        userAgent: req.get('User-Agent'),
+      });
+    }
+    return res.status(404).json({ error: 'Not Found' });
   });
 }
 

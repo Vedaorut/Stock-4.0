@@ -1,5 +1,6 @@
 import { Component } from 'react';
 import { motion } from 'framer-motion'; // Used in JSX
+import { t } from '../i18n';
 
 class ErrorBoundary extends Component {
   constructor(props) {
@@ -28,7 +29,7 @@ class ErrorBoundary extends Component {
     // Send error to monitoring service (e.g., Sentry)
     if (window.Telegram?.WebApp) {
       window.Telegram.WebApp.showAlert(
-        `Произошла ошибка: ${error.message}\n\nПопробуйте перезагрузить приложение.`
+        t('errors.errorOccurred', { message: error.message })
       );
     }
   }
@@ -87,12 +88,12 @@ class ErrorBoundary extends Component {
 
             {/* Error Title */}
             <h1 className="text-2xl font-bold text-white mb-3" style={{ letterSpacing: '-0.02em' }}>
-              Что-то пошло не так
+              {t('errors.somethingWrong')}
             </h1>
 
             {/* Error Description */}
             <p className="text-gray-400 text-sm mb-2">
-              Произошла непредвиденная ошибка. Не волнуйтесь, ваши данные в безопасности.
+              {t('errors.unexpectedError')}
             </p>
 
             {/* Error Message (Development only) */}
@@ -111,7 +112,7 @@ class ErrorBoundary extends Component {
                 </p>
                 {this.state.errorInfo && (
                   <details className="mt-2">
-                    <summary className="text-gray-400 text-xs cursor-pointer">Stack trace</summary>
+                    <summary className="text-gray-400 text-xs cursor-pointer">{t('hints.stackTrace')}</summary>
                     <pre className="text-gray-500 text-[10px] mt-2 overflow-auto max-h-32 font-mono">
                       {this.state.errorInfo.componentStack}
                     </pre>
@@ -132,7 +133,7 @@ class ErrorBoundary extends Component {
                 }}
                 whileTap={{ scale: 0.98 }}
               >
-                Перезагрузить приложение
+                {t('errors.reloadApp')}
               </motion.button>
 
               <motion.button
@@ -144,13 +145,13 @@ class ErrorBoundary extends Component {
                 }}
                 whileTap={{ scale: 0.98 }}
               >
-                Вернуться на главную
+                {t('errors.goToMain')}
               </motion.button>
             </div>
 
             {/* Help Text */}
             <p className="text-gray-500 text-xs mt-6">
-              Если проблема повторяется, свяжитесь с поддержкой
+              {t('errors.persistentError')}
             </p>
           </motion.div>
         </div>

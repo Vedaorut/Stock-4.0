@@ -203,11 +203,17 @@ addProductScene.leave(async (ctx) => {
     }
   }
 
-  // ✅ P1-2 FIX: Clear wizard state to prevent memory leak
+  // P1-2 FIX: Clear wizard state to prevent memory leak
   if (ctx.wizard) {
     delete ctx.wizard.state;
   }
   ctx.scene.state = {};
+
+  // Очистить __scenes из Redis сессии для предотвращения застревания
+  if (ctx.session && ctx.session.__scenes) {
+    delete ctx.session.__scenes;
+  }
+
   logger.info(`User ${ctx.from?.id} left addProduct scene`);
 });
 

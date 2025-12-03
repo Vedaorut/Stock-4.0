@@ -234,6 +234,12 @@ export const handleFollowDetail = async (ctx) => {
         return;
       }
       if (error.response?.status === 403) {
+        // SECURITY: Log 403 access denied for audit trail
+        logger.warn('SECURITY: 403 access denied for follow detail', {
+          userId: ctx.from?.id,
+          followId,
+          shopId: ctx.session?.shopId,
+        });
         await ctx.editMessageText(followMessages.accessDenied, followsMenu(false, [], ctx.lang));
         return;
       }

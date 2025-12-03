@@ -55,4 +55,28 @@ export const authApi = {
     );
     return data.data || data;
   },
+
+  // Update user language
+  async updateLanguage(language, token) {
+    const { data } = await api.patch(
+      '/auth/language',
+      { language },
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    );
+    return data.data || data;
+  },
+
+  // Mark onboarding as completed
+  async markOnboardingCompleted(token) {
+    const { data } = await api.put(
+      '/users/onboarding-completed',
+      {},
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    );
+    return data.data || data;
+  },
 };

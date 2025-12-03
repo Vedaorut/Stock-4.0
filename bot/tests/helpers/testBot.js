@@ -11,6 +11,7 @@ import { jest } from '@jest/globals';
 // Middleware
 import authMiddleware from '../../src/middleware/auth.js';
 import errorMiddleware from '../../src/middleware/error.js';
+import { i18nMiddleware } from '../../src/middleware/i18n.js';
 
 // Scenes
 import createShopScene from '../../src/scenes/createShop.js';
@@ -122,6 +123,9 @@ export function createTestBot(options = {}) {
 
     return next();
   });
+
+  // i18n middleware (must be after session)
+  bot.use(i18nMiddleware());
 
   // ✅ FIX #3-5: lastContext middleware ДОЛЖЕН быть ПЕРЕД captor!
   // Иначе он добавляется ПОСЛЕ handlers и никогда не выполняется

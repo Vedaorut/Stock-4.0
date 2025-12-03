@@ -15,7 +15,7 @@ import MockAdapter from 'axios-mock-adapter';
 import { createTestBot } from '../helpers/testBot.js';
 import { callbackUpdate, textUpdate } from '../helpers/updateFactories.js';
 import { api } from '../../src/utils/api.js';
-import { mockShopValidation } from '../helpers/commonMocks.js';
+import { mockShopValidation, mockShopOrders, mockShopOrdersError } from '../helpers/commonMocks.js';
 
 describe('Seller Orders Management (P0)', () => {
   let testBot;
@@ -48,33 +48,29 @@ describe('Seller Orders Management (P0)', () => {
 
   describe('Active Orders', () => {
     it('должен показать список confirmed заказов с итоговой суммой', async () => {
-      // Mock GET /orders?shop_id=1&status=confirmed
-      mock.onGet('/orders').reply(200, {
-        data: {
-          orders: [
-            {
-              id: 1,
-              buyer_username: 'buyer1',
-              buyer_first_name: 'John',
-              product_name: 'iPhone 13',
-              quantity: 2,
-              total_price: '1000.00',
-              currency: 'USD',
-              status: 'confirmed',
-            },
-            {
-              id: 2,
-              buyer_username: 'buyer2',
-              buyer_first_name: 'Jane',
-              product_name: 'MacBook Pro',
-              quantity: 1,
-              total_price: '2500.50',
-              currency: 'USD',
-              status: 'confirmed',
-            },
-          ],
+      // Mock GET /shops/1/orders with new API format
+      mockShopOrders(mock, 1, [
+        {
+          id: 1,
+          buyer_username: 'buyer1',
+          buyer_first_name: 'John',
+          product_name: 'iPhone 13',
+          quantity: 2,
+          total_price: '1000.00',
+          currency: 'USD',
+          status: 'confirmed',
         },
-      });
+        {
+          id: 2,
+          buyer_username: 'buyer2',
+          buyer_first_name: 'Jane',
+          product_name: 'MacBook Pro',
+          quantity: 1,
+          total_price: '2500.50',
+          currency: 'USD',
+          status: 'confirmed',
+        },
+      ]);
 
       await testBot.handleUpdate(callbackUpdate('seller:active_orders'));
 
@@ -109,9 +105,7 @@ describe('Seller Orders Management (P0)', () => {
     });
 
     it('пустой список → показать сообщение "Нет активных заказов"', async () => {
-      mock.onGet('/orders').reply(200, {
-        data: { orders: [] },
-      });
+      mockShopOrders(mock, 1, []);
 
       await testBot.handleUpdate(callbackUpdate('seller:active_orders'));
 
@@ -122,21 +116,17 @@ describe('Seller Orders Management (P0)', () => {
     });
 
     it('заказы без buyer_username → показать buyer_first_name', async () => {
-      mock.onGet('/orders').reply(200, {
-        data: {
-          orders: [
-            {
-              id: 1,
-              buyer_username: null,
-              buyer_first_name: 'Anonymous',
-              product_name: 'Product',
-              quantity: 1,
-              total_price: '50.00',
-              status: 'confirmed',
-            },
-          ],
+      mockShopOrders(mock, 1, [
+        {
+          id: 1,
+          buyer_username: null,
+          buyer_first_name: 'Anonymous',
+          product_name: 'Product',
+          quantity: 1,
+          total_price: '50.00',
+          status: 'confirmed',
         },
-      });
+      ]);
 
       await testBot.handleUpdate(callbackUpdate('seller:active_orders'));
 
@@ -145,9 +135,7 @@ describe('Seller Orders Management (P0)', () => {
     });
 
     it('API error → показать ошибку и кнопку "Назад в меню"', async () => {
-      mock.onGet('/orders').reply(500, {
-        error: 'Internal server error',
-      });
+      mockShopOrdersError(mock, 1, 500, 'Internal server error');
 
       await testBot.handleUpdate(callbackUpdate('seller:active_orders'));
 
@@ -267,8 +255,8 @@ describe('Seller Orders Management (P0)', () => {
 
   describe('Order History', () => {
     it('должен показать список delivered заказов с датами', async () => {
-      // Mock GET /orders with status=delivered,completed
-      const historyOrders = [
+      // Mock GET /shops/1/orders with new API format
+      mockShopOrders(mock, 1, [
         {
           id: 3,
           buyer_username: 'buyer3',
@@ -284,22 +272,10 @@ describe('Seller Orders Management (P0)', () => {
           product_name: 'iPad Air',
           quantity: 1,
           total_price: '600.00',
-          status: 'completed',
+          status: 'shipped',
           delivered_at: '2025-01-10T14:20:00Z',
         },
-      ];
-
-      // Use onAny to catch all requests and check params
-      mock.onAny().reply((config) => {
-        // Check if this is GET /orders with delivered status
-        if (config.method === 'get' && config.url === '/orders') {
-          if (config.params?.status?.includes('delivered')) {
-            return [200, { data: historyOrders }];
-          }
-        }
-        // Default 404 for unmatched requests
-        return [404, { error: 'Not mocked' }];
-      });
+      ]);
 
       await testBot.handleUpdate(callbackUpdate('seller:order_history'));
       await new Promise((resolve) => setImmediate(resolve));
@@ -319,13 +295,7 @@ describe('Seller Orders Management (P0)', () => {
     });
 
     it('пустая история → показать сообщение "Нет завершённых заказов"', async () => {
-      mock.onGet('/orders').reply((config) => {
-        const status = config.params?.status || '';
-        if (status.includes('delivered') || status.includes('completed')) {
-          return [200, { data: [] }];
-        }
-        return [200, { data: [] }];
-      });
+      mockShopOrders(mock, 1, []);
 
       await testBot.handleUpdate(callbackUpdate('seller:order_history'));
 
@@ -345,15 +315,7 @@ describe('Seller Orders Management (P0)', () => {
         updated_at: '2025-01-15T10:30:00Z',
       }));
 
-      // Use onAny to catch all requests
-      mock.onAny().reply((config) => {
-        if (config.method === 'get' && config.url === '/orders') {
-          if (config.params?.status?.includes('delivered')) {
-            return [200, { data: orders }];
-          }
-        }
-        return [404, { error: 'Not mocked' }];
-      });
+      mockShopOrders(mock, 1, orders, { total: 15, totalPages: 3, page: 1, limit: 5, hasMore: true });
 
       await testBot.handleUpdate(callbackUpdate('seller:order_history'));
       await new Promise((resolve) => setImmediate(resolve));
@@ -364,9 +326,7 @@ describe('Seller Orders Management (P0)', () => {
     });
 
     it('API error → показать ошибку', async () => {
-      mock.onGet('/orders').reply(500, {
-        error: 'Internal server error',
-      });
+      mockShopOrdersError(mock, 1, 500, 'Internal server error');
 
       await testBot.handleUpdate(callbackUpdate('seller:order_history'));
 
@@ -416,36 +376,32 @@ describe('Seller Orders Management (P0)', () => {
   describe('Bulk Mark Shipped', () => {
     it('должен отметить несколько заказов через scene', async () => {
       // Step 1: Enter scene
-      mock.onGet('/orders').reply(200, {
-        data: {
-          orders: [
-            {
-              id: 1,
-              buyer_username: 'buyer1',
-              product_name: 'iPhone 13',
-              quantity: 1,
-              total_price: '1000.00',
-              status: 'confirmed',
-            },
-            {
-              id: 2,
-              buyer_username: 'buyer2',
-              product_name: 'MacBook Pro',
-              quantity: 1,
-              total_price: '2500.00',
-              status: 'confirmed',
-            },
-            {
-              id: 3,
-              buyer_username: 'buyer3',
-              product_name: 'AirPods',
-              quantity: 2,
-              total_price: '400.00',
-              status: 'confirmed',
-            },
-          ],
+      mockShopOrders(mock, 1, [
+        {
+          id: 1,
+          buyer_username: 'buyer1',
+          product_name: 'iPhone 13',
+          quantity: 1,
+          total_price: '1000.00',
+          status: 'confirmed',
         },
-      });
+        {
+          id: 2,
+          buyer_username: 'buyer2',
+          product_name: 'MacBook Pro',
+          quantity: 1,
+          total_price: '2500.00',
+          status: 'confirmed',
+        },
+        {
+          id: 3,
+          buyer_username: 'buyer3',
+          product_name: 'AirPods',
+          quantity: 2,
+          total_price: '400.00',
+          status: 'confirmed',
+        },
+      ]);
 
       await testBot.handleUpdate(callbackUpdate('seller:mark_shipped'));
 
@@ -492,15 +448,11 @@ describe('Seller Orders Management (P0)', () => {
     });
 
     it('range формат (1-3) → парсить корректно', async () => {
-      mock.onGet('/orders').reply(200, {
-        data: {
-          orders: [
-            { id: 1, product_name: 'P1', status: 'confirmed', quantity: 1, total_price: '100' },
-            { id: 2, product_name: 'P2', status: 'confirmed', quantity: 1, total_price: '100' },
-            { id: 3, product_name: 'P3', status: 'confirmed', quantity: 1, total_price: '100' },
-          ],
-        },
-      });
+      mockShopOrders(mock, 1, [
+        { id: 1, product_name: 'P1', status: 'confirmed', quantity: 1, total_price: '100' },
+        { id: 2, product_name: 'P2', status: 'confirmed', quantity: 1, total_price: '100' },
+        { id: 3, product_name: 'P3', status: 'confirmed', quantity: 1, total_price: '100' },
+      ]);
 
       await testBot.handleUpdate(callbackUpdate('seller:mark_shipped'));
       testBot.captor.reset();
@@ -517,17 +469,13 @@ describe('Seller Orders Management (P0)', () => {
     });
 
     it('mixed формат (1 3-5 7) → парсить корректно', async () => {
-      mock.onGet('/orders').reply(200, {
-        data: {
-          orders: Array.from({ length: 7 }, (_, i) => ({
-            id: i + 1,
-            product_name: `P${i + 1}`,
-            status: 'confirmed',
-            quantity: 1,
-            total_price: '100',
-          })),
-        },
-      });
+      mockShopOrders(mock, 1, Array.from({ length: 7 }, (_, i) => ({
+        id: i + 1,
+        product_name: `P${i + 1}`,
+        status: 'confirmed',
+        quantity: 1,
+        total_price: '100',
+      })));
 
       await testBot.handleUpdate(callbackUpdate('seller:mark_shipped'));
       testBot.captor.reset();
@@ -546,13 +494,9 @@ describe('Seller Orders Management (P0)', () => {
     });
 
     it('invalid input → показать ошибку', async () => {
-      mock.onGet('/orders').reply(200, {
-        data: {
-          orders: [
-            { id: 1, product_name: 'P1', status: 'confirmed', quantity: 1, total_price: '100' },
-          ],
-        },
-      });
+      mockShopOrders(mock, 1, [
+        { id: 1, product_name: 'P1', status: 'confirmed', quantity: 1, total_price: '100' },
+      ]);
 
       await testBot.handleUpdate(callbackUpdate('seller:mark_shipped'));
       testBot.captor.reset();
@@ -564,14 +508,10 @@ describe('Seller Orders Management (P0)', () => {
     });
 
     it('номера вне диапазона → показать ошибку', async () => {
-      mock.onGet('/orders').reply(200, {
-        data: {
-          orders: [
-            { id: 1, product_name: 'P1', status: 'confirmed', quantity: 1, total_price: '100' },
-            { id: 2, product_name: 'P2', status: 'confirmed', quantity: 1, total_price: '100' },
-          ],
-        },
-      });
+      mockShopOrders(mock, 1, [
+        { id: 1, product_name: 'P1', status: 'confirmed', quantity: 1, total_price: '100' },
+        { id: 2, product_name: 'P2', status: 'confirmed', quantity: 1, total_price: '100' },
+      ]);
 
       await testBot.handleUpdate(callbackUpdate('seller:mark_shipped'));
       testBot.captor.reset();
@@ -583,13 +523,9 @@ describe('Seller Orders Management (P0)', () => {
     });
 
     it('cancel scene → показать сообщение об отмене', async () => {
-      mock.onGet('/orders').reply(200, {
-        data: {
-          orders: [
-            { id: 1, product_name: 'P1', status: 'confirmed', quantity: 1, total_price: '100' },
-          ],
-        },
-      });
+      mockShopOrders(mock, 1, [
+        { id: 1, product_name: 'P1', status: 'confirmed', quantity: 1, total_price: '100' },
+      ]);
 
       await testBot.handleUpdate(callbackUpdate('seller:mark_shipped'));
       testBot.captor.reset();
@@ -601,13 +537,9 @@ describe('Seller Orders Management (P0)', () => {
     });
 
     it('cancel confirmation → показать сообщение об отмене', async () => {
-      mock.onGet('/orders').reply(200, {
-        data: {
-          orders: [
-            { id: 1, product_name: 'P1', status: 'confirmed', quantity: 1, total_price: '100' },
-          ],
-        },
-      });
+      mockShopOrders(mock, 1, [
+        { id: 1, product_name: 'P1', status: 'confirmed', quantity: 1, total_price: '100' },
+      ]);
 
       await testBot.handleUpdate(callbackUpdate('seller:mark_shipped'));
       testBot.captor.reset();
@@ -622,13 +554,9 @@ describe('Seller Orders Management (P0)', () => {
     });
 
     it('API error при bulk update → показать ошибку', async () => {
-      mock.onGet('/orders').reply(200, {
-        data: {
-          orders: [
-            { id: 1, product_name: 'P1', status: 'confirmed', quantity: 1, total_price: '100' },
-          ],
-        },
-      });
+      mockShopOrders(mock, 1, [
+        { id: 1, product_name: 'P1', status: 'confirmed', quantity: 1, total_price: '100' },
+      ]);
 
       await testBot.handleUpdate(callbackUpdate('seller:mark_shipped'));
       testBot.captor.reset();
@@ -649,9 +577,7 @@ describe('Seller Orders Management (P0)', () => {
     });
 
     it('нет активных заказов → показать сообщение', async () => {
-      mock.onGet('/orders').reply(200, {
-        data: { orders: [] },
-      });
+      mockShopOrders(mock, 1, []);
 
       await testBot.handleUpdate(callbackUpdate('seller:mark_shipped'));
 
@@ -662,20 +588,16 @@ describe('Seller Orders Management (P0)', () => {
 
   describe('Edge Cases', () => {
     it('заказы с дробными ценами → форматировать корректно', async () => {
-      mock.onGet('/orders').reply(200, {
-        data: {
-          orders: [
-            {
-              id: 1,
-              buyer_username: 'buyer1',
-              product_name: 'Product',
-              quantity: 1,
-              total_price: '99.99',
-              status: 'confirmed',
-            },
-          ],
+      mockShopOrders(mock, 1, [
+        {
+          id: 1,
+          buyer_username: 'buyer1',
+          product_name: 'Product',
+          quantity: 1,
+          total_price: '99.99',
+          status: 'confirmed',
         },
-      });
+      ]);
 
       await testBot.handleUpdate(callbackUpdate('seller:active_orders'));
 
@@ -684,20 +606,16 @@ describe('Seller Orders Management (P0)', () => {
     });
 
     it('заказы с целыми ценами → форматировать без дробной части', async () => {
-      mock.onGet('/orders').reply(200, {
-        data: {
-          orders: [
-            {
-              id: 1,
-              buyer_username: 'buyer1',
-              product_name: 'Product',
-              quantity: 1,
-              total_price: '100.00',
-              status: 'confirmed',
-            },
-          ],
+      mockShopOrders(mock, 1, [
+        {
+          id: 1,
+          buyer_username: 'buyer1',
+          product_name: 'Product',
+          quantity: 1,
+          total_price: '100.00',
+          status: 'confirmed',
         },
-      });
+      ]);
 
       await testBot.handleUpdate(callbackUpdate('seller:active_orders'));
 
@@ -706,21 +624,17 @@ describe('Seller Orders Management (P0)', () => {
     });
 
     it('заказы без buyer_username и buyer_first_name → показать "Покупатель"', async () => {
-      mock.onGet('/orders').reply(200, {
-        data: {
-          orders: [
-            {
-              id: 1,
-              buyer_username: null,
-              buyer_first_name: null,
-              product_name: 'Product',
-              quantity: 1,
-              total_price: '50.00',
-              status: 'confirmed',
-            },
-          ],
+      mockShopOrders(mock, 1, [
+        {
+          id: 1,
+          buyer_username: null,
+          buyer_first_name: null,
+          product_name: 'Product',
+          quantity: 1,
+          total_price: '50.00',
+          status: 'confirmed',
         },
-      });
+      ]);
 
       await testBot.handleUpdate(callbackUpdate('seller:active_orders'));
 
@@ -729,7 +643,7 @@ describe('Seller Orders Management (P0)', () => {
     });
 
     it('orders API возвращает массив напрямую → обработать корректно', async () => {
-      mock.onGet('/orders').reply(200, [
+      mockShopOrders(mock, 1, [
         {
           id: 1,
           buyer_username: 'buyer1',

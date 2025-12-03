@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import axios from 'axios';
 import { config } from '../config/env.js';
 import logger from '../utils/logger.js';
+import { t, DEFAULT_LANGUAGE } from '../i18n/index.js';
 
 /**
  * Telegram API service
@@ -140,20 +141,23 @@ Status: Pending Payment
    * Send payment confirmation notification to buyer
    * @param {number} buyerTelegramId - Buyer's Telegram ID
    * @param {object} orderData - Order information
+   * @param {string} lang - User language preference
    */
-  async notifyPaymentConfirmed(buyerTelegramId, orderData) {
-    const quantityStr = orderData.quantity > 1 ? `\nКоличество: ${orderData.quantity} шт` : '';
+  async notifyPaymentConfirmed(buyerTelegramId, orderData, lang = DEFAULT_LANGUAGE) {
+    const quantityStr = orderData.quantity > 1
+      ? `\n${t('order.confirmed.quantity', { quantity: orderData.quantity }, lang)}`
+      : '';
 
     const message = `
-✅ Заказ оформлен!
+✅ ${t('order.confirmed.title', {}, lang)}
 
-Товар: ${orderData.product_name}${quantityStr}
-Сумма: $${orderData.total_price}
+${t('order.confirmed.product', { productName: orderData.product_name }, lang)}${quantityStr}
+${t('order.confirmed.amount', { amount: orderData.total_price }, lang)}
 
-Продавец: @${orderData.seller_username}
-Магазин: ${orderData.shop_name}
+${t('order.confirmed.seller', { username: orderData.seller_username }, lang)}
+${t('order.confirmed.shop', { shopName: orderData.shop_name }, lang)}
 
-Свяжитесь с продавцом для получения товара.
+${t('order.confirmed.contactSeller', {}, lang)}
     `.trim();
 
     return this.sendMessage(buyerTelegramId, message);
@@ -163,24 +167,27 @@ Status: Pending Payment
    * Send payment confirmation notification to seller
    * @param {number} sellerTelegramId - Seller's Telegram ID
    * @param {object} orderData - Order information
+   * @param {string} lang - User language preference
    */
-  async notifyPaymentConfirmedSeller(sellerTelegramId, orderData) {
-    const quantityStr = orderData.quantity > 1 ? `\nКоличество: ${orderData.quantity} шт` : '';
+  async notifyPaymentConfirmedSeller(sellerTelegramId, orderData, lang = DEFAULT_LANGUAGE) {
+    const quantityStr = orderData.quantity > 1
+      ? `\n${t('order.new.quantity', { quantity: orderData.quantity }, lang)}`
+      : '';
 
     const message = `
-🛍 Новый заказ!
+🛍 ${t('order.new.title', {}, lang)}
 
-Товар: ${orderData.productName}${quantityStr}
-Сумма: $${orderData.totalPrice}
-Оплата: ${orderData.currency}
+${t('order.new.product', { productName: orderData.productName }, lang)}${quantityStr}
+${t('order.new.amount', { amount: orderData.totalPrice }, lang)}
+${t('order.new.payment', { currency: orderData.currency }, lang)}
 
-Покупатель: @${orderData.buyerUsername}
+${t('order.new.buyer', { username: orderData.buyerUsername }, lang)}
     `.trim();
 
     return this.sendMessage(sellerTelegramId, message, {
       reply_markup: {
         inline_keyboard: [
-          [{ text: 'Отметить выдачу', callback_data: `order:deliver:${orderData.orderId}` }],
+          [{ text: t('order.new.markDelivered', {}, lang), callback_data: `order:deliver:${orderData.orderId}` }],
         ],
       },
     });
@@ -190,8 +197,9 @@ Status: Pending Payment
    * Send order status update notification
    * @param {number} buyerTelegramId - Buyer's Telegram ID
    * @param {object} orderData - Order information
+   * @param {string} lang - User language preference
    */
-  async notifyOrderStatusUpdate(buyerTelegramId, orderData) {
+  async notifyOrderStatusUpdate(buyerTelegramId, orderData, lang = DEFAULT_LANGUAGE) {
     const statusEmoji = {
       pending: '⏳',
       confirmed: '✅',
@@ -200,22 +208,15 @@ Status: Pending Payment
       cancelled: '❌',
     };
 
-    const statusText = {
-      pending: 'Ожидание оплаты',
-      confirmed: 'Подтверждён',
-      shipped: 'Отправлен',
-      delivered: 'Доставлен',
-      cancelled: 'Отменён',
-    };
-
     const emoji = statusEmoji[orderData.status] || '📋';
-    const status = statusText[orderData.status] || orderData.status;
+    const statusKey = `order.status.${orderData.status}`;
+    const status = t(statusKey, {}, lang);
 
     const message = `
-${emoji} Обновление статуса заказа
+${emoji} ${t('order.status.title', {}, lang)}
 
-Заказ #${orderData.id}
-Статус: ${status}
+${t('order.status.orderId', { orderId: orderData.id }, lang)}
+${t('order.status.status', { status }, lang)}
 📦 ${orderData.product_name}
     `.trim();
 
@@ -226,33 +227,35 @@ ${emoji} Обновление статуса заказа
    * Notify shop owner about successful subscription activation
    * @param {number} telegramId - Owner Telegram ID
    * @param {object} payload - { shopName, tier, nextPaymentDue }
+   * @param {string} lang - User language preference
    */
-  async notifySubscriptionActivated(telegramId, payload = {}) {
+  async notifySubscriptionActivated(telegramId, payload = {}, lang = DEFAULT_LANGUAGE) {
     if (!telegramId) {
       return null;
     }
 
-    const tierEmoji = payload.tier === 'pro' ? '⭐' : '✨';
-    const tierLabel = (payload.tier || 'basic').toUpperCase();
+    const tierEmoji = payload.tier === 'max' ? '👑' : '⭐';
+    const tierLabel = (payload.tier || 'pro').toUpperCase();
+    const dateLocale = lang === 'en' ? 'en-US' : 'ru-RU';
     const nextDue = payload.nextPaymentDue
-      ? new Date(payload.nextPaymentDue).toLocaleDateString('ru-RU', {
+      ? new Date(payload.nextPaymentDue).toLocaleDateString(dateLocale, {
           day: 'numeric',
           month: 'short',
           year: 'numeric'
         })
-      : 'не указана';
+      : t('common.notSpecified', {}, lang);
 
-    const message = `${tierEmoji} <b>Магазин активирован</b>
+    const message = `${tierEmoji} <b>${t('subscription.activated.title', {}, lang)}</b>
 
-<b>${payload.shopName || 'Ваш магазин'}</b>
-Тариф: ${tierLabel}
-Действует до: ${nextDue}`;
+<b>${payload.shopName || t('subscription.activated.shopName', { shopName: '' }, lang)}</b>
+${t('subscription.activated.tier', { tier: tierLabel }, lang)}
+${t('subscription.activated.validUntil', { date: nextDue }, lang)}`;
 
     return this.sendMessage(telegramId, message.trim(), {
       parse_mode: 'HTML',
       reply_markup: {
         inline_keyboard: [
-          [{ text: '📋 Перейти в меню', callback_data: 'back_to_main' }],
+          [{ text: `📋 ${t('subscription.activated.goToMenu', {}, lang)}`, callback_data: 'back_to_main' }],
         ],
       },
     });
@@ -262,20 +265,21 @@ ${emoji} Обновление статуса заказа
    * Notify user that subscription оплачена, но магазин ещё не создан
    * @param {number} telegramId - User Telegram ID
    * @param {object} payload - { tier }
+   * @param {string} lang - User language preference
    */
-  async notifySubscriptionPendingSetup(telegramId, payload = {}) {
+  async notifySubscriptionPendingSetup(telegramId, payload = {}, lang = DEFAULT_LANGUAGE) {
     if (!telegramId) {
       return null;
     }
 
-    const tierEmoji = payload.tier === 'pro' ? '⭐' : '✨';
-    const tierLabel = (payload.tier || 'basic').toUpperCase();
+    const tierEmoji = payload.tier === 'max' ? '👑' : '⭐';
+    const tierLabel = (payload.tier || 'pro').toUpperCase();
 
-    const message = `${tierEmoji} <b>Оплата получена</b>
+    const message = `${tierEmoji} <b>${t('subscription.pendingSetup.title', {}, lang)}</b>
 
-Тариф: ${tierLabel}
+${t('subscription.pendingSetup.tier', { tier: tierLabel }, lang)}
 
-Создайте магазин, чтобы активировать подписку.`;
+${t('subscription.pendingSetup.createShop', {}, lang)}`;
 
     return this.sendMessage(telegramId, message.trim(), {
       parse_mode: 'HTML',
@@ -283,11 +287,11 @@ ${emoji} Обновление статуса заказа
         inline_keyboard: [
           [
             {
-              text: '🏪 Создать магазин',
-              callback_data: `start_create_shop:${(payload.tier || 'basic').toLowerCase()}`,
+              text: `🏪 ${t('subscription.pendingSetup.createShopButton', {}, lang)}`,
+              callback_data: `start_create_shop:${(payload.tier || 'pro').toLowerCase()}`,
             },
           ],
-          [{ text: '📋 В меню', callback_data: 'back_to_main' }],
+          [{ text: `📋 ${t('subscription.pendingSetup.menuButton', {}, lang)}`, callback_data: 'back_to_main' }],
         ],
       },
     });

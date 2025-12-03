@@ -1,7 +1,7 @@
 /**
  * Migration Controller
  *
- * Handles channel migration API endpoints for PRO shop owners
+ * Handles channel migration API endpoints for MAX shop owners
  */
 
 import pool from '../config/database.js';
@@ -12,7 +12,7 @@ import * as rateLimit from '../services/rateLimit.js';
 import * as broadcastService from '../services/broadcastService.js';
 
 /**
- * Check migration eligibility (PRO tier + rate limits)
+ * Check migration eligibility (MAX tier + rate limits)
  * GET /api/shops/:shopId/migration/check
  */
 const checkMigrationEligibility = asyncHandler(async (req, res) => {

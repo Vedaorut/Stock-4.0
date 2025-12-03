@@ -104,16 +104,42 @@ export function stopSubscriptionJobs() {
 }
 
 /**
+ * Check and process expired trials
+ */
+async function checkExpiredTrials() {
+  try {
+    const result = await subscriptionService.checkExpiredTrials();
+
+    if (result.transitioned > 0) {
+      logger.info('[SubscriptionChecker] Trial check completed', {
+        transitioned: result.transitioned,
+      });
+    }
+
+    return result;
+  } catch (error) {
+    logger.error('[SubscriptionChecker] Error checking expired trials:', error);
+    throw error;
+  }
+}
+
+/**
  * Check and process expired subscriptions
  */
 async function checkExpiredSubscriptions() {
   try {
+    // First check expired trials
+    await checkExpiredTrials();
+
+    // Then check expired subscriptions
     const result = await subscriptionService.checkExpiredSubscriptions();
+    const totalExpired = result.totalExpired ?? result.expired ?? 0;
+    const movedToGrace = result.movedToGrace ?? result.gracePeriod ?? 0;
 
     logger.info('[SubscriptionChecker] Expiration check completed', {
-      totalExpired: result.totalExpired,
-      movedToGrace: result.movedToGrace,
-      deactivated: result.deactivated,
+      totalExpired,
+      movedToGrace,
+      deactivated: result.deactivated ?? 0,
     });
 
     return result;
@@ -137,8 +163,8 @@ async function sendExpirationReminders() {
     const result = await subscriptionService.sendExpirationReminders(global.botInstance);
 
     logger.info('[SubscriptionChecker] Reminders sent', {
-      sent: result.sent,
-      failed: result.failed,
+      sent: result.sent ?? result.reminded ?? 0,
+      failed: result.failed ?? 0,
     });
 
     return result;

@@ -188,7 +188,7 @@ export default function FollowsModal({ isOpen, onClose }) {
               count: Number(limitData.count) || 0,
               limit: limitData.limit === null ? null : Number(limitData.limit) || 0,
               remaining: limitData.remaining === null ? null : Number(limitData.remaining) || 0,
-              tier: limitData.tier || shop.tier || 'BASIC',
+              tier: limitData.tier || shop.tier || 'PRO',
               canFollow: limitData.canFollow !== false,
               reached: limitData.reached === true,
             });
@@ -198,7 +198,7 @@ export default function FollowsModal({ isOpen, onClose }) {
               count: followsList.length,
               limit: null,
               remaining: null,
-              tier: shop.tier || 'BASIC',
+              tier: shop.tier || 'PRO',
               canFollow: true,
               reached: false,
             });

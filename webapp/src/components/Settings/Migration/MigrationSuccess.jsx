@@ -1,11 +1,12 @@
 import { motion } from 'framer-motion';
 import { SuccessCheckmark } from './MigrationIcons';
+import { useTranslation } from '../../../i18n/useTranslation';
 
 /**
  * Migration result card
- * @param {{ newChannelUrl: string, notificationsSent: number }} props
+ * @param {{ newChannelUrl: string, notificationsSent: number, t: function }} props
  */
-function ResultCard({ newChannelUrl, notificationsSent }) {
+function ResultCard({ newChannelUrl, notificationsSent, t }) {
   return (
     <motion.div
       className="mt-6 w-full p-4 rounded-2xl space-y-3"
@@ -18,12 +19,12 @@ function ResultCard({ newChannelUrl, notificationsSent }) {
       transition={{ delay: 0.5 }}
     >
       <div className="flex items-center justify-between py-2 border-b border-white/5">
-        <span className="text-gray-400 text-sm">Новый канал</span>
+        <span className="text-gray-400 text-sm">{t('migration.newChannelLabel')}</span>
         <span className="text-white font-semibold">{newChannelUrl}</span>
       </div>
       <div className="flex items-center justify-between py-2">
-        <span className="text-gray-400 text-sm">Отправлено</span>
-        <span className="text-green-400 font-semibold">{notificationsSent || 0} уведомлений</span>
+        <span className="text-gray-400 text-sm">{t('shopOrders.status.shipped')}</span>
+        <span className="text-green-400 font-semibold">{t('migration.sentCount', { count: notificationsSent || 0 })}</span>
       </div>
     </motion.div>
   );
@@ -31,9 +32,9 @@ function ResultCard({ newChannelUrl, notificationsSent }) {
 
 /**
  * Countdown display
- * @param {{ value: number }} props
+ * @param {{ value: number, t: function }} props
  */
-function Countdown({ value }) {
+function Countdown({ value, t }) {
   return (
     <motion.div
       className="mt-6 flex items-center gap-2 text-gray-500 text-sm"
@@ -41,7 +42,7 @@ function Countdown({ value }) {
       animate={{ opacity: 1 }}
       transition={{ delay: 0.6 }}
     >
-      <span>Закроется через</span>
+      <span>{t('migration.closesIn')}</span>
       <motion.span
         key={value}
         className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center text-white font-semibold text-xs"
@@ -63,6 +64,8 @@ function Countdown({ value }) {
  * @param {function} props.onClose - Close handler
  */
 export function MigrationSuccess({ migrationResult, countdown, onClose }) {
+  const { t } = useTranslation();
+
   return (
     <motion.div
       key="step3"
@@ -82,7 +85,7 @@ export function MigrationSuccess({ migrationResult, countdown, onClose }) {
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.3 }}
       >
-        Миграция запущена!
+        {t('migration.migrationStarted')}
       </motion.h1>
 
       <motion.p
@@ -91,7 +94,7 @@ export function MigrationSuccess({ migrationResult, countdown, onClose }) {
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.4 }}
       >
-        Уведомления отправляются подписчикам
+        {t('migration.notificationsSending')}
       </motion.p>
 
       {/* Result Card */}
@@ -99,12 +102,13 @@ export function MigrationSuccess({ migrationResult, countdown, onClose }) {
         <ResultCard
           newChannelUrl={migrationResult.newChannelUrl}
           notificationsSent={migrationResult.notificationsSent}
+          t={t}
         />
       )}
 
       {/* Countdown */}
       {countdown !== null && (
-        <Countdown value={countdown} />
+        <Countdown value={countdown} t={t} />
       )}
 
       {/* Close Button */}
@@ -120,7 +124,7 @@ export function MigrationSuccess({ migrationResult, countdown, onClose }) {
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.7 }}
       >
-        Закрыть
+        {t('common.close')}
       </motion.button>
     </motion.div>
   );

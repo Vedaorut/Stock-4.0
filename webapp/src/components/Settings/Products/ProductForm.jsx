@@ -1,9 +1,11 @@
 import { motion } from 'framer-motion';
+import { useTranslation } from '../../../i18n/useTranslation';
 
 /**
  * ProductForm - Add/Edit product form
  */
 function ProductForm({ formData, setFormData, onSubmit, saving, editingProduct }) {
+  const { t } = useTranslation();
   return (
     <motion.div
       className="glass-card rounded-2xl p-4 space-y-3"
@@ -12,35 +14,35 @@ function ProductForm({ formData, setFormData, onSubmit, saving, editingProduct }
       exit={{ opacity: 0, height: 0 }}
     >
       <div>
-        <label className="text-sm text-gray-400 mb-2 block">Название товара *</label>
+        <label className="text-sm text-gray-400 mb-2 block">{t('products.nameLabel')}</label>
         <input
           type="text"
           value={formData.name}
           onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-          placeholder="Windows 11 Pro"
+          placeholder={t('products.namePlaceholder')}
           className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:border-orange-primary transition-colors"
         />
       </div>
 
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="text-sm text-gray-400 mb-2 block">Цена ($) *</label>
+          <label className="text-sm text-gray-400 mb-2 block">{t('products.priceLabel')}</label>
           <input
             type="number"
             value={formData.price}
             onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-            placeholder="29.99"
+            placeholder={t('products.pricePlaceholder')}
             step="0.01"
             className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:border-orange-primary transition-colors"
           />
         </div>
         <div>
-          <label className="text-sm text-gray-400 mb-2 block">В наличии</label>
+          <label className="text-sm text-gray-400 mb-2 block">{t('products.stockLabel')}</label>
           <input
             type="number"
             value={formData.stock}
             onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
-            placeholder="100"
+            placeholder={t('products.stockPlaceholder')}
             className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:border-orange-primary transition-colors"
           />
         </div>
@@ -48,7 +50,7 @@ function ProductForm({ formData, setFormData, onSubmit, saving, editingProduct }
 
       {/* Availability Type Toggle */}
       <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-400 mb-2">Тип доступности</label>
+        <label className="block text-sm font-medium text-gray-400 mb-2">{t('products.availabilityType')}</label>
         <div className="grid grid-cols-2 gap-3">
           <motion.button
             type="button"
@@ -60,7 +62,7 @@ function ProductForm({ formData, setFormData, onSubmit, saving, editingProduct }
                 : 'bg-white/5 text-gray-400 hover:bg-white/10'
             }`}
           >
-            In stock
+            {t('products.inStock')}
           </motion.button>
           <motion.button
             type="button"
@@ -72,12 +74,12 @@ function ProductForm({ formData, setFormData, onSubmit, saving, editingProduct }
                 : 'bg-white/5 text-gray-400 hover:bg-white/10'
             }`}
           >
-            Preorder
+            {t('products.preorder')}
           </motion.button>
         </div>
         {formData.is_preorder && (
           <p className="text-xs text-blue-400 mt-2">
-            Товар будет доступен для предзаказа независимо от количества
+            {t('products.preorderHint')}
           </p>
         )}
       </div>
@@ -95,7 +97,7 @@ function ProductForm({ formData, setFormData, onSubmit, saving, editingProduct }
         }}
         whileTap={formData.name && formData.price ? { scale: 0.98 } : {}}
       >
-        {saving ? 'Сохранение...' : editingProduct ? 'Сохранить' : 'Создать'}
+        {saving ? t('products.saving') : editingProduct ? t('common.save') : t('products.create')}
       </motion.button>
     </motion.div>
   );

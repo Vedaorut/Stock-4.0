@@ -146,7 +146,7 @@ const CartItem = memo(function CartItem({ item }) {
           <div className="flex-1 flex flex-col justify-between">
             <div>
               <h4 className="text-sm font-semibold text-white line-clamp-2">{item.name}</h4>
-              <p className="text-lg font-bold text-orange-primary mt-1">${parseFloat(item.price).toFixed(2)}</p>
+              <p className="text-lg font-bold text-orange-primary mt-1">${Math.floor(parseFloat(item.price))}</p>
             </div>
 
             <div className="flex items-center justify-between">

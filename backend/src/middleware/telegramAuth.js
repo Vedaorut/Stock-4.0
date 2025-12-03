@@ -98,8 +98,17 @@ export const verifyTelegramInitData = (req, res, next) => {
     // Check auth_date to prevent replay attacks (recommended)
     const authDate = parseInt(params.get('auth_date'));
     const currentTime = Math.floor(Date.now() / 1000);
-    const maxAge = 15 * 60; // 15 minutes (security: shorter window reduces replay attack risk)
+    const maxAge = 24 * 60 * 60; // 24 hours - Telegram Mini Apps stay open for long sessions
     const maxClockSkew = 60; // 60 seconds tolerance for clock skew
+
+    // Debug logging for auth_date issues
+    logger.info('initData auth_date check', {
+      authDate,
+      currentTime,
+      age: currentTime - authDate,
+      maxAge,
+      willExpireIn: maxAge - (currentTime - authDate),
+    });
 
     // B2 FIX: Protect against future timestamps (clock skew attack)
     if (authDate > currentTime + maxClockSkew) {

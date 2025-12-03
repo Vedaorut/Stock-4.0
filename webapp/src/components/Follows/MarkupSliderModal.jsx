@@ -18,8 +18,8 @@ const MarkupSliderModal = ({
 
   const calculatedPrice =
     markupType === 'percentage'
-      ? (examplePrice * (1 + markup / 100)).toFixed(2)
-      : (examplePrice + markupFixed).toFixed(2);
+      ? Math.floor(examplePrice * (1 + markup / 100))
+      : Math.floor(examplePrice + markupFixed);
 
   useBackButton(isOpen ? onClose : null);
 

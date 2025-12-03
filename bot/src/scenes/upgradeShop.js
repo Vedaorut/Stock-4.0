@@ -1,7 +1,7 @@
 /**
  * Upgrade Shop Scene
  *
- * Multi-step wizard for upgrading from BASIC to PRO tier
+ * Multi-step wizard for upgrading from PRO to MAX tier
  *
  * Steps:
  * 1. Show current subscription and upgrade cost (prorated)
@@ -62,20 +62,20 @@ const upgradeShopScene = new Scenes.WizardScene(
       const currentSubscription = statusResponse.currentSubscription;
       const shopTier = statusResponse.tier;
 
-      // Check if already PRO
-      if (shopTier === 'pro' || currentSubscription?.tier === 'pro') {
+      // Check if already MAX
+      if (shopTier === 'max' || currentSubscription?.tier === 'max') {
         await cleanReply(
           ctx,
-          sellerMessages.upgrade.alreadyPro,
+          sellerMessages.upgrade.alreadyMax,
           Markup.inlineKeyboard([[Markup.button.callback(buttonText.backToMenu, 'seller:menu')]])
         );
         return ctx.scene.leave();
       }
 
-      // Check if has active BASIC subscription
+      // Check if has active PRO subscription
       if (
         !currentSubscription ||
-        currentSubscription.tier !== 'basic' ||
+        currentSubscription.tier !== 'pro' ||
         currentSubscription.status !== 'active'
       ) {
         await cleanReply(
@@ -99,15 +99,16 @@ const upgradeShopScene = new Scenes.WizardScene(
         throw new Error('Upgrade cost unavailable');
       }
 
-      const message = `Улучшить до PRO
+      const message = `👑 Улучшить до MAX
 
-Сейчас: BASIC
+Сейчас: PRO
 Доплата: $${upgradeCost.toFixed(2)}
 
 Получите:
-• Безлимит товаров (сейчас до 4)
-• Автозакуп из других магазинов
-• Уведомления подписчикам при смене канала`;
+• Безлимит товаров и фолловов
+• До 5 сотрудников (Workspace)
+• Миграция канала с подписчиками
+• 365 дней аналитики`;
 
       await cleanReplyHTML(
         ctx,
@@ -389,11 +390,11 @@ const upgradeShopScene = new Scenes.WizardScene(
         }
 
         // P1-4 FIX: Update shopTier in session after successful upgrade
-        ctx.session.shopTier = 'pro';
+        ctx.session.shopTier = 'max';
 
         const successText = endDateLabel
           ? sellerMessages.upgrade.success(endDateLabel)
-          : '✅ Апгрейд на PRO подтверждён.';
+          : '✅ Апгрейд на MAX подтверждён.';
 
         await cleanReplyHTML(
           ctx,
@@ -453,6 +454,12 @@ const upgradeShopScene = new Scenes.WizardScene(
 // Leave handler
 upgradeShopScene.leave(async (ctx) => {
   ctx.wizard.state = {};
+
+  // Очистить __scenes из Redis сессии для предотвращения застревания
+  if (ctx.session && ctx.session.__scenes) {
+    delete ctx.session.__scenes;
+  }
+
   logger.info('[UpgradeShop] Scene left');
 });
 
@@ -499,7 +506,7 @@ async function createUpgradeInvoiceAndShow(ctx, currency) {
     ? new Date(invoice.expiresAt).toLocaleString('ru-RU')
     : '30 минут';
 
-  const message = `Апгрейд до PRO
+  const message = `👑 Апгрейд до MAX
 
 Сумма: $${upgradeCost.toFixed(2)} (~${ctx.wizard.state.cryptoAmount} ${currency})
 Адрес: ${invoice.address}

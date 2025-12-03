@@ -22,9 +22,11 @@ function getTelegramLanguage() {
   return userLang.startsWith('ru') ? 'ru' : 'en';
 }
 
-// Установить язык (вызывается из LanguageModal)
+// Установить язык (вызывается из LanguageModal или App.jsx)
 export async function setLanguage(lang) {
-  currentLang = lang || getTelegramLanguage();
+  // Валидируем язык - только ru или en
+  const validLang = ['ru', 'en'].includes(lang) ? lang : 'ru';
+  currentLang = validLang;
   // NO localStorage.setItem
 
   // Загрузить переводы для нового языка
@@ -42,13 +44,29 @@ export function getLanguage() {
 }
 
 // Инициализация i18n (вызывается в App.jsx)
-export async function initI18n() {
-  currentLang = getTelegramLanguage(); // Use Telegram language
+// Принимает опциональный язык из backend (приоритет над Telegram SDK)
+export async function initI18n(backendLang = null) {
+  // Приоритет: backend язык > Telegram SDK
+  if (backendLang && ['ru', 'en'].includes(backendLang)) {
+    currentLang = backendLang;
+  } else {
+    currentLang = getTelegramLanguage();
+  }
   await loadTranslations(currentLang);
 }
 
 // Функция перевода
 export function t(key, params = {}, lang = currentLang) {
+  // Check if translations are loaded
+  if (!translations[lang]) {
+    // Fallback to Russian if target lang not loaded
+    if (lang !== 'ru' && translations.ru) {
+      return t(key, params, 'ru');
+    }
+    // Return key if no translations available
+    return key;
+  }
+
   const keys = key.split('.');
   let value = translations[lang];
 

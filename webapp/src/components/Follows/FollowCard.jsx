@@ -1,9 +1,11 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { EyeIcon, ArrowPathIcon, BuildingStorefrontIcon } from '@heroicons/react/24/outline';
+import { useTranslation } from '../../i18n/useTranslation';
 
 const FollowCard = ({ follow, onClick }) => {
-  const modeLabel = follow.mode === 'monitor' ? 'Мониторинг' : 'Перепродажа';
+  const { t } = useTranslation();
+  const modeLabel = follow.mode === 'monitor' ? t('follows.monitorMode') : t('follows.resellMode');
   const ModeIcon = follow.mode === 'monitor' ? EyeIcon : ArrowPathIcon;
 
   return (
@@ -54,7 +56,7 @@ const FollowCard = ({ follow, onClick }) => {
 
               <div className="text-white/40 ml-auto">
                 <span className="font-semibold text-white/80">{follow.source_products_count || 0}</span>
-                <span className="ml-1">товаров</span>
+                <span className="ml-1">{t('follows.products')}</span>
               </div>
             </div>
           </div>

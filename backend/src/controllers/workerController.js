@@ -1,6 +1,7 @@
 import { workerQueries, shopQueries, userQueries } from '../database/queries/index.js';
 import { dbErrorHandler, asyncHandler } from '../middleware/errorHandler.js';
 import { NotFoundError, UnauthorizedError, ValidationError, ConflictError } from '../utils/errors.js';
+import { TIER_LIMITS } from '../config/subscriptionPricing.js';
 import logger from '../utils/logger.js';
 
 /**
@@ -37,9 +38,16 @@ export const workerController = {
         throw new UnauthorizedError('Only shop owner can add workers');
       }
 
-      // Check PRO tier (Workspace is PRO-only feature)
-      if (shop.tier !== 'pro') {
-        throw new UnauthorizedError('Workspace feature requires PRO subscription. Upgrade your shop to add workers.');
+      // Check MAX tier (Workspace is MAX-only feature)
+      if (shop.tier !== 'max') {
+        throw new UnauthorizedError('Workspace feature requires MAX subscription. Upgrade your shop to add workers.');
+      }
+
+      // Check worker limit for MAX tier (5 workers max)
+      const currentWorkers = await workerQueries.listByShop(shopId);
+      const workerLimit = TIER_LIMITS.max.workers;
+      if (currentWorkers.length >= workerLimit) {
+        throw new ValidationError(`Worker limit reached. MAX tier allows up to ${workerLimit} workers.`);
       }
 
       // Find user by telegram_id or username

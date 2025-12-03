@@ -55,6 +55,11 @@ const sessionRecoveryMiddleware = async (ctx, next) => {
  * @returns {boolean} Needs recovery?
  */
 function checkIfRecoveryNeeded(ctx) {
+  // Skip if already checked and no shop was found (prevents repeated API calls)
+  if (ctx.session.shopChecked && !ctx.session.shopId) {
+    return false;
+  }
+
   // Has token but missing user data
   if (ctx.session.token && !ctx.session.user) {
     return true;
@@ -65,14 +70,8 @@ function checkIfRecoveryNeeded(ctx) {
     return true;
   }
 
-  // NEW: If role is 'seller' but shopId missing, also try recovery
+  // If role is 'seller' but shopId missing, also try recovery
   if (ctx.session.role === 'seller' && !ctx.session.shopId) {
-    return true;
-  }
-
-  // NEW: If token exists but no shopId, check if user has shop
-  // (removed role check - it was blocking recovery for sellers)
-  if (ctx.session.token && !ctx.session.shopId) {
     return true;
   }
 
@@ -89,17 +88,20 @@ async function recoverSessionData(ctx) {
     if (ctx.session.token && !ctx.session.shopId) {
       const shops = await shopApi.getMyShop(ctx.session.token);
 
+      // Mark as checked to prevent repeated API calls
+      ctx.session.shopChecked = true;
+
       if (shops && Array.isArray(shops) && shops.length > 0) {
         const shop = shops[0];
         ctx.session.shopId = shop.id;
         ctx.session.shopName = shop.name;
 
-        // NEW: If user has shop, set role to 'seller'
+        // If user has shop, set role to 'seller'
         if (!ctx.session.role) {
           ctx.session.role = 'seller';
         }
 
-        // NEW: Also update user.selectedRole if user object exists
+        // Also update user.selectedRole if user object exists
         if (ctx.session.user) {
           ctx.session.user.selectedRole = 'seller';
         }

@@ -235,6 +235,27 @@ export const orderQueries = {
     );
     return result.rows[0];
   },
+
+  // Count orders by shop ID with optional status filter
+  countByShopId: async (shopId, statuses = null) => {
+    const params = [shopId];
+    let statusFilter = '';
+
+    if (Array.isArray(statuses) && statuses.length > 0) {
+      statusFilter = ` AND o.status = ANY($2::text[])`;
+      params.push(statuses);
+    }
+
+    const result = await query(
+      `SELECT COUNT(*) as total 
+       FROM orders o
+       JOIN products p ON o.product_id = p.id
+       WHERE p.shop_id = $1${statusFilter}`,
+      params
+    );
+
+    return parseInt(result.rows[0]?.total || 0, 10);
+  },
 };
 
 export default orderQueries;

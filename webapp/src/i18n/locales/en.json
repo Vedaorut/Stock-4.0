@@ -11,7 +11,19 @@
     "error": "Error",
     "success": "Success",
     "retry": "Try again",
-    "clear": "Clear"
+    "clear": "Clear",
+    "confirm": "Confirm",
+    "yes": "Yes",
+    "no": "No",
+    "ok": "OK",
+    "apply": "Apply",
+    "search": "Search",
+    "find": "Find",
+    "total": "Total",
+    "active": "Active",
+    "done": "Done",
+    "attention": "Attention",
+    "copy": "Copy"
   },
 
   "product": {
@@ -34,7 +46,7 @@
     "myWallet": "My Wallet",
     "myOrders": "My Orders",
     "language": "Language",
-    "russian": "Русский",
+    "russian": "Russian",
     "version": "Version",
     "sections": {
       "management": "MANAGEMENT",
@@ -74,7 +86,12 @@
       "sellerMessage": "You will switch to shop management mode.",
       "buyerMessage": "You will switch to shopping mode.",
       "error": "Failed to switch mode"
-    }
+    },
+    "inviteLink": "Invite Link",
+    "inviteLinkDescription": "Share with buyers",
+    "inviteLinkLabel": "Shop link",
+    "inviteLinkCopied": "Link copied!",
+    "inviteLinkHint": "Share this link in your channel. Users will automatically subscribe to your shop."
   },
 
   "wallet": {
@@ -118,7 +135,7 @@
 
   "language": {
     "title": "Language",
-    "russian": "Русский",
+    "russian": "Russian",
     "english": "English",
     "comingSoon": "Coming soon",
     "info": "Currently only Russian language is available. English version will be available soon."
@@ -172,13 +189,21 @@
     "unsubscribe": "Unsubscribe",
     "products": "products",
     "loadError": "Failed to load subscriptions",
-    "dataLoadError": "Failed to load data"
+    "dataLoadError": "Failed to load data",
+    "searchPlaceholder": "Search products...",
+    "searchEmpty": "Nothing found",
+    "searchEmptyDesc": "Try changing your search query",
+    "searchMinChars": "Enter at least 2 characters"
   },
 
   "shop": {
     "products": "products",
     "subscribe": "Subscribe",
-    "subscribed": "Subscribed"
+    "subscribed": "Subscribed",
+    "notSelected": "Shop not selected",
+    "noShop": "You don't have a shop yet",
+    "createShop": "Create a shop to access",
+    "createShopForWorkers": "Create a shop to manage workers"
   },
 
   "payment": {
@@ -206,5 +231,261 @@
     "copyAddress": "Copy address",
     "addressCopied": "Address copied",
     "orderDetails": "Order details"
+  },
+
+  "subscription": {
+    "title": "Subscription",
+    "activePlan": "Active plan",
+    "daysLeft": "days left",
+    "paymentHistory": "Payment history",
+    "upgradeToPro": "Upgrade to PRO",
+    "select": "Select",
+    "perMonth": "/mo",
+    "goToBot": "To upgrade to PRO, go to the bot",
+    "changePlanBot": "To change your plan, go to the bot"
+  },
+
+  "analytics": {
+    "title": "Analytics",
+    "totalSales": "Total sales",
+    "ordersCount": "orders",
+    "avgCheck": "Avg. order",
+    "period7d": "7 days",
+    "period1m": "Month",
+    "periodCustom": "Custom",
+    "topProducts": "Top products",
+    "noData": "No data for selected period",
+    "soldCount": "pcs sold",
+    "selectPeriod": "Select period",
+    "from": "From",
+    "to": "To",
+    "invalidDataFormat": "Invalid analytics data format",
+    "loadError": "Failed to load analytics",
+    "fetchError": "Error loading data"
+  },
+
+  "shopOrders": {
+    "title": "Shop Orders",
+    "ordersFor": "Orders: {shop}",
+    "workerMode": "Worker mode",
+    "toIssue": "to issue",
+    "issued": "issued",
+    "noOrders": "No orders",
+    "ordersWillAppear": "Shop orders will appear here",
+    "autoRefresh": "Auto-refresh every 30 sec",
+    "status": {
+      "pending": "Pending",
+      "verifying": "Verifying",
+      "confirmed": "Paid",
+      "shipped": "Issued",
+      "delivered": "Completed",
+      "cancelled": "Cancelled"
+    },
+    "actions": {
+      "issue": "Issue product",
+      "cancel": "Cancel",
+      "complete": "Complete"
+    },
+    "labels": {
+      "buyer": "Buyer",
+      "product": "Product",
+      "quantity": "Qty",
+      "pcs": "pcs"
+    },
+    "updateError": "Failed to update status"
+  },
+
+  "workspace": {
+    "title": "Workspace",
+    "workersTitle": "Workers",
+    "workersCount": "Workers ({count})",
+    "addWorker": "+ Add worker",
+    "addWorkerShort": "Add",
+    "adding": "Adding...",
+    "workerIdLabel": "Worker Telegram ID",
+    "workerIdPlaceholder": "@username or 123456789",
+    "workerIdHint": "Enter @username or worker ID (via @userinfobot)",
+    "removeWorker": "Remove worker @{username}?",
+    "noWorkers": "No workers yet",
+    "loadError": "Loading error",
+    "workersCan": "Workers can",
+    "workersCanDesc": "Add, edit and delete products in your shop. Full admin rights.",
+    "proOnly": "Available only on PRO",
+    "proOnlyDesc": "Upgrade to PRO to unlock collaboration: workers will be able to manage products and sales. Go to \"Subscription\" to upgrade.",
+    "createShopFirst": "Create a shop first",
+    "workersProOnly": "Workers are only available on PRO tier",
+    "enterIdOrUsername": "Enter Telegram ID or @username",
+    "addError": "Failed to add worker",
+    "removeError": "Failed to remove worker"
+  },
+
+  "products": {
+    "title": "My Products",
+    "addProduct": "+ Add product",
+    "nameLabel": "Product name *",
+    "namePlaceholder": "Windows 11 Pro",
+    "priceLabel": "Price ($) *",
+    "pricePlaceholder": "29.99",
+    "stockLabel": "In stock",
+    "stockPlaceholder": "100",
+    "availabilityType": "Availability type",
+    "inStock": "In stock",
+    "preorder": "Preorder",
+    "preorderHint": "Product will be available for preorder regardless of quantity",
+    "saving": "Saving...",
+    "create": "Create",
+    "limitReached": "Limit reached! Available: {tier}",
+    "shopNotFound": "Could not determine shop",
+    "saveError": "Failed to save product",
+    "deleteError": "Failed to delete product",
+    "createShopBot": "Create shop via bot",
+    "aiWelcome": "Hi! I'm your shop AI assistant. Tell me what products to add or change - I'll take care of it.",
+    "aiEmptyResponse": "Empty AI service response",
+    "aiError": "Failed to process request. Try again later.",
+    "aiCommandError": "Could not process command. Try again or rephrase."
+  },
+
+  "migration": {
+    "title": "Migration",
+    "doneTitle": "Done",
+    "channelBlocked": "Channel blocked?",
+    "notifySubscribers": "Notify all subscribers about new channel",
+    "subscribersWillGet": "{count} subscribers will receive notification",
+    "channelSaved": "New channel will be saved in shop",
+    "availableIn": "Available in {days} {daysLabel}",
+    "startMigration": "Start migration",
+    "newChannel": "New channel",
+    "channelPlaceholder": "@mychannel (min 5 chars)",
+    "channelPreview": "Channel: {channel}",
+    "sending": "Sending...",
+    "sendNotifications": "Send notifications",
+    "migrationStarted": "Migration started!",
+    "notificationsSending": "Notifications are being sent to subscribers",
+    "newChannelLabel": "New channel",
+    "sentCount": "{count} notifications",
+    "closesIn": "Closes in",
+    "daysOne": "day",
+    "daysFew": "days",
+    "daysMany": "days"
+  },
+
+  "follows": {
+    "title": "Follows",
+    "searchShop": "Search shop",
+    "searchPlaceholder": "Name or @username",
+    "clearResults": "Clear results",
+    "subscribeBtn": "Subscribe",
+    "subscriptions": "Subscriptions ({count})",
+    "noSubscriptions": "No subscriptions",
+    "useBot": "Use bot to subscribe to shops",
+    "noShop": "You don't have a shop yet",
+    "createShopForFollows": "Create a shop to manage Follows subscriptions",
+    "monitorMode": "Monitor",
+    "resellMode": "Resell",
+    "resellShort": "Resell",
+    "monitorShort": "Monitor",
+    "switchToResell": "-> Resell",
+    "switchToMonitor": "-> Monitor",
+    "products": "products",
+    "unsubscribeConfirm": "Unsubscribe from \"{shop}\"?",
+    "monitoringInfo": "Shop monitoring",
+    "monitorDesc": "Track competitor products",
+    "resellDesc": "Auto-copy products with markup",
+    "limit": "Limit",
+    "markupPrompt": "Resell markup (1-500%)",
+    "markupError": "Markup must be between 1 and 500%",
+    "modeError": "Failed to switch mode",
+    "deleteError": "Failed to delete subscription",
+    "searchError": "Search error",
+    "notFound": "No shops found",
+    "createShopFirst": "Create a shop first",
+    "addError": "Failed to add subscription",
+    "added": "Subscription added!",
+    "enterSearch": "Enter shop name or @username",
+    "settingsSection": "Settings",
+    "editMarkup": "Edit markup",
+    "currentMarkup": "Current:",
+    "switchMode": "Switch mode",
+    "switchTo": "To",
+    "dangerZone": "Danger zone",
+    "deleteSubscription": "Delete subscription",
+    "irreversible": "This action is irreversible"
+  },
+
+  "myOrders": {
+    "title": "My Orders",
+    "noOrders": "No orders",
+    "purchasesWillAppear": "Your purchases will appear here",
+    "activeCount": "active",
+    "autoRefresh": "Auto-refresh every 30 sec",
+    "status": {
+      "pending": "Pending",
+      "verifying": "Verifying",
+      "confirmed": "Paid",
+      "shipped": "Shipped",
+      "delivered": "Delivered",
+      "cancelled": "Cancelled"
+    },
+    "labels": {
+      "product": "Product",
+      "shop": "Shop",
+      "confirmations": "Confirmations",
+      "paymentAddress": "Payment address"
+    }
+  },
+
+  "confirm": {
+    "title": "Confirmation",
+    "deleteTitle": "Delete",
+    "warningTitle": "Warning"
+  },
+
+  "errors": {
+    "loadFailed": "Failed to load data",
+    "loadSubscriptionsFailed": "Failed to load subscriptions",
+    "unknownCrypto": "Unknown cryptocurrency",
+    "cryptoNotSupported": "Selected cryptocurrency ({crypto}) is not supported",
+    "paymentLoadFailed": "Failed to load payment details",
+    "somethingWrong": "Something went wrong",
+    "unexpectedError": "An unexpected error occurred. Don't worry, your data is safe.",
+    "errorOccurred": "An error occurred: {message}\n\nTry reloading the app.",
+    "reloadApp": "Reload app",
+    "goToMain": "Go to main page",
+    "persistentError": "If the problem persists, contact support"
+  },
+
+  "offline": {
+    "title": "No internet connection",
+    "description": "Check your connection and try again"
+  },
+
+  "followDetail": {
+    "title": "Subscription Details",
+    "products": "Products",
+    "productsCount": "{count} products",
+    "pcs": "pcs",
+    "noSyncedProducts": "No synced products",
+    "ownMarkup": "Custom",
+    "outOfStock": "Out of stock",
+    "tryAgain": "Try again",
+    "resale": "Resale",
+    "monitor": "Monitor",
+    "switchModeTitle": "Switch Mode",
+    "switchToMonitorDesc": "Switch to monitor mode? Your markup settings will be saved.",
+    "switchToResaleDesc": "Switch to resale mode? Products will be copied with your markup.",
+    "deleteTitle": "Delete Subscription",
+    "deleteWarning": "Are you sure? All synced products will be removed. This cannot be undone."
+  },
+
+  "dialogs": {
+    "switchMode": "Switch",
+    "delete": "Delete"
+  },
+
+  "hints": {
+    "useFollowCommand": "Use /follow command in bot to add shops",
+    "copied": "Copied!",
+    "clickToCopy": "Click to copy",
+    "stackTrace": "Stack trace"
   }
 }

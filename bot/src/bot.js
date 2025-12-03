@@ -5,11 +5,11 @@ import config from './config/index.js';
 import logger from './utils/logger.js';
 import { reply as cleanReply } from './utils/cleanReply.js';
 import { logWebAppConfig, getWebAppUrl } from './utils/webappUrl.js';
-import { messages } from './texts/messages.js';
-const { general: generalMessages } = messages;
+import { t } from './i18n/index.js';
 
 // Middleware
 import authMiddleware from './middleware/auth.js';
+import { i18nMiddleware } from './middleware/i18n.js';
 import errorMiddleware from './middleware/error.js';
 import debounceMiddleware from './middleware/debounce.js';
 import sessionRecoveryMiddleware from './middleware/sessionRecovery.js';
@@ -30,6 +30,7 @@ import paySubscriptionScene from './scenes/paySubscription.js';
 import upgradeShopScene from './scenes/upgradeShop.js';
 import manageWorkersScene from './scenes/manageWorkers.js';
 import markOrdersShippedScene from './scenes/markOrdersShipped.js';
+import shopOnboardingScene from './scenes/shopOnboarding.js';
 
 // Handlers
 import { handleStart } from './handlers/start.js';
@@ -40,6 +41,7 @@ import { setupAIProductHandlers } from './handlers/seller/aiProducts.js';
 import { setupWorkspaceHandlers } from './handlers/workspace/index.js';
 import { setupWorkerHandlers } from './handlers/worker/index.js';
 import { handleHealthCommand } from './commands/health.js'; // P1-BOT-015
+import { setupSettingsHandlers } from './handlers/settings.js';
 
 // Override is needed when system env already has vars (e.g., from shell)
 dotenv.config({ override: true });
@@ -89,6 +91,7 @@ const stage = new Scenes.Stage([
   upgradeShopScene,
   manageWorkersScene,
   markOrdersShippedScene,
+  shopOnboardingScene,
 ]);
 
 // Configure session middleware with Redis store
@@ -121,6 +124,7 @@ bot.use(debounceMiddleware); // Prevent rapid clicks
 // sessionRecoveryMiddleware then uses token to restore shopId
 bot.use(authMiddleware); // FIRST: Authenticate user (creates token if needed)
 bot.use(sessionRecoveryMiddleware); // THEN: Recover shopId using valid token
+bot.use(i18nMiddleware()); // i18n: adds ctx.t() and ctx.lang
 
 // Error handling
 
@@ -131,6 +135,7 @@ bot.start(handleStart);
 bot.command('health', handleHealthCommand); // P1-BOT-015: Health check
 
 // Register handlers
+setupSettingsHandlers(bot);
 setupSellerHandlers(bot);
 setupFollowHandlers(bot);
 setupBuyerHandlers(bot);
@@ -182,10 +187,19 @@ bot.catch((err, ctx) => {
     }
   }
 
+  // Принудительно очистить __scenes из Redis сессии при любой ошибке
+  // ctx.scene.leave() может не удалить __scenes при crash сценария
+  if (ctx.session && ctx.session.__scenes) {
+    delete ctx.session.__scenes;
+    logger.info('Cleared __scenes from session after error', {
+      userId: ctx.from?.id,
+    });
+  }
+
   // DON'T clear session - preserve shopId, token, role, etc.
   // Only wizard state (ctx.wizard.state) should be cleared, which happens in scene.leave()
 
-  cleanReply(ctx, generalMessages.restartRequired).catch(() => {});
+  cleanReply(ctx, t('general.restartRequired', {}, ctx.lang || 'ru')).catch(() => {});
 });
 
 // Export bot instance and redis for backend integration
@@ -235,13 +249,8 @@ export async function startBot() {
 }
 
 // Auto-start when run directly (not imported)
-// Check if this file is being run directly (not imported as a module)
-const isMainModule =
-  process.argv[1] && import.meta.url.endsWith(process.argv[1].replace(/\\/g, '/'));
-
-if (isMainModule || process.argv[1]?.includes('bot.js')) {
-  startBot().catch((error) => {
-    logger.error('Bot startup failed:', error);
-    process.exit(1);
-  });
-}
+// Always start bot - this file should only be run directly, not imported
+startBot().catch((error) => {
+  logger.error('Bot startup failed:', error);
+  process.exit(1);
+});

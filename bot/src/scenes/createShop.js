@@ -5,6 +5,7 @@ import logger from '../utils/logger.js';
 import * as smartMessage from '../utils/smartMessage.js';
 import { reply as cleanReply } from '../utils/cleanReply.js';
 import { messages } from '../texts/messages.js';
+import { t } from '../i18n/index.js';
 
 const { seller: sellerMessages, general: generalMessages, start: startMessages } = messages;
 
@@ -24,12 +25,14 @@ const enterShopName = async (ctx) => {
     const subscriptionId = sceneState?.subscriptionId;
     const tier = sceneState?.tier;
     const promoCode = sceneState?.promoCode;
+    const trial = sceneState?.trial || false;
 
     // Save to wizard state
     if (tier) ctx.wizard.state.tier = tier;
     if (promoCode) ctx.wizard.state.promoCode = promoCode;
     if (subscriptionId) ctx.wizard.state.subscriptionId = subscriptionId;
     if (paidSubscription) ctx.wizard.state.paidSubscription = paidSubscription;
+    if (trial) ctx.wizard.state.trial = trial;
 
     logger.info('shop_create_step:name', {
       userId: ctx.from.id,
@@ -45,9 +48,8 @@ const enterShopName = async (ctx) => {
       return ctx.wizard.next();
     }
 
-    const message = `${sellerMessages.createShopNamePrompt}\n${sellerMessages.createShopNameHint}`;
-
-    await cleanReply(ctx, message, cancelButton);
+    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    await cleanReply(ctx, t('createShop.enterName', {}, lang), cancelButton);
 
     return ctx.wizard.next();
   } catch (error) {
@@ -85,7 +87,7 @@ const handleShopNameAndCreate = async (ctx) => {
       return;
     }
 
-    const validNamePattern = /^[a-zA-Z0-9_]+$/u;
+    const validNamePattern = /^[0-9A-Za-zА-Яа-яЁё _-]+$/u;
     if (!validNamePattern.test(shopName)) {
       await cleanReply(
         ctx,
@@ -112,10 +114,11 @@ const handleShopNameAndCreate = async (ctx) => {
 const createShop = async (ctx, shopName) => {
   let loadingMsg = null;
   try {
-    // Get tier, promo, and subscriptionId from wizard state
+    // Get tier, promo, subscriptionId, and trial from wizard state
     const tier = ctx.wizard.state.tier;
     const promoCode = ctx.wizard.state.promoCode || '';
     const subscriptionId = ctx.wizard.state.subscriptionId || null;
+    const trial = ctx.wizard.state.trial || false;
 
     // Validate tier is present (must be set by chooseTier/paySubscription scene)
     if (!tier) {
@@ -130,6 +133,7 @@ const createShop = async (ctx, shopName) => {
       userId: ctx.from.id,
       shopName,
       tier,
+      trial: Boolean(trial),
       promoProvided: Boolean(promoCode),
       subscriptionId: subscriptionId,
     });
@@ -151,6 +155,11 @@ const createShop = async (ctx, shopName) => {
       description: `Магазин ${shopName}`,
       tier: tier,
     };
+
+    // Add trial flag if present (free trial flow)
+    if (trial) {
+      payload.trial = true;
+    }
 
     // Add subscriptionId if present (paid subscription flow)
     if (subscriptionId) {
@@ -203,17 +212,19 @@ const createShop = async (ctx, shopName) => {
       logger.debug(`Could not delete loading message:`, error.message);
     }
 
-    const tierLabel = shop.tier?.toUpperCase?.() || shop.tier || 'BASIC';
-    const successText = promoCode
-      ? sellerMessages.createShopPromoSuccess(shop.name)
-      : sellerMessages.createShopSuccess(shop.name, tierLabel);
+    // Generate invite link
+    const botUsername = process.env.BOT_USERNAME || 'SellStatusBot';
+    const inviteLink = `https://t.me/${botUsername}?start=shop_${shop.id}`;
 
-    await smartMessage.send(ctx, {
-      text: successText,
-      keyboard: successButtons,
+    // Leave createShop and enter onboarding scene
+    await ctx.scene.leave();
+
+    // Enter shopOnboarding with shop data
+    return await ctx.scene.enter('shopOnboarding', {
+      shopId: shop.id,
+      shopName: shop.name,
+      inviteLink: inviteLink,
     });
-
-    return await ctx.scene.leave();
   } catch (error) {
     logger.error('Error creating shop:', error);
 
@@ -294,11 +305,17 @@ createShopScene.leave(async (ctx) => {
     }
   }
 
-  // ✅ P1-2 FIX: Clear wizard state to prevent memory leak
+  // P1-2 FIX: Clear wizard state to prevent memory leak
   if (ctx.wizard) {
     delete ctx.wizard.state;
   }
   ctx.scene.state = {};
+
+  // Очистить __scenes из Redis сессии для предотвращения застревания
+  if (ctx.session && ctx.session.__scenes) {
+    delete ctx.session.__scenes;
+  }
+
   logger.info(`User ${ctx.from?.id} left createShop scene`);
 });
 

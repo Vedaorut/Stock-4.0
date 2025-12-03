@@ -61,7 +61,7 @@ export const validateShopBeforeScene = async (ctx, sceneName) => {
 
     // Update session with fresh shop data
     ctx.session.shopName = shop.name;
-    ctx.session.shopTier = shop.tier || 'basic';
+    ctx.session.shopTier = shop.tier || 'pro';
 
     logger.info(`[validateShop] ✅ Shop ${shop.id} validated for scene ${sceneName}`);
     return true; // ✅ Valid

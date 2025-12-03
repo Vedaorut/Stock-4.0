@@ -117,6 +117,9 @@ const ProductCard = memo(function ProductCard({ product, onPreorder: _onPreorder
   const platform = usePlatform();
   const android = isAndroid(platform);
   const { t: _t } = useTranslation();
+  const highlightProductId = useStore(state => state.highlightProductId);
+  const setHighlightProductId = useStore(state => state.setHighlightProductId);
+  const cardRef = useRef(null);
 
   const { cardSurface, quickSpring, pressSpring } = useMemo(
     () => getSurfaceStyles(platform),
@@ -149,6 +152,9 @@ const ProductCard = memo(function ProductCard({ product, onPreorder: _onPreorder
     priceSizeClass,
   } = useMemo(() => calculatePriceDetails(product), [product]);
 
+  // Use == for type coercion since IDs may be string or number from different sources
+  const isHighlighted = highlightProductId != null && highlightProductId == product.id;
+
   const handleAddToCart = useCallback(
     (event) => {
       event.stopPropagation();
@@ -165,6 +171,25 @@ const ProductCard = memo(function ProductCard({ product, onPreorder: _onPreorder
     },
     [isDisabled, toast, triggerHaptic, addToCart, product]
   );
+
+  // Scroll to highlighted product + auto-clear after 3s
+  useEffect(() => {
+    if (isHighlighted && cardRef.current) {
+      setTimeout(() => {
+        cardRef.current?.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'center',
+          inline: 'nearest'
+        });
+      }, 100);
+
+      const timer = setTimeout(() => {
+        setHighlightProductId(null);
+      }, 3000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [isHighlighted, setHighlightProductId]);
 
   // Styles
   const backgroundStyle = useMemo(() => ({
@@ -196,9 +221,10 @@ const ProductCard = memo(function ProductCard({ product, onPreorder: _onPreorder
       whileHover={!android ? { y: -4 } : undefined}
       whileTap={{ scale: android ? 0.99 : 0.98 }}
       transition={quickSpring}
+      ref={cardRef}
       className={`relative min-h-[200px] rounded-3xl overflow-hidden group ${
         hasDiscount ? 'ring-2 ring-red-500/50 shadow-[0_0_20px_rgba(255,71,87,0.25)]' : ''
-      }`}
+      } ${isHighlighted ? 'ring-2 ring-orange-500 animate-pulse shadow-[0_0_30px_rgba(255,107,0,0.4)]' : ''}`}
       style={backgroundStyle}
     >
       {!android && (
@@ -284,7 +310,7 @@ const ProductCard = memo(function ProductCard({ product, onPreorder: _onPreorder
               <div className="space-y-0.5">
                 <div className="flex items-center gap-1.5">
                   <span className="text-xs text-gray-400 line-through font-medium">
-                    ${parseFloat(originalPrice).toFixed(2)}
+                    ${Math.floor(parseFloat(originalPrice))}
                   </span>
                   <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-500 text-white">
                     -{Math.round(discountPercentage)}%
@@ -298,7 +324,7 @@ const ProductCard = memo(function ProductCard({ product, onPreorder: _onPreorder
                     whiteSpace: 'nowrap',
                   }}
                 >
-                  ${parseFloat(product.price).toFixed(2)}
+                  ${Math.floor(parseFloat(product.price))}
                 </span>
               </div>
             ) : (
@@ -310,7 +336,7 @@ const ProductCard = memo(function ProductCard({ product, onPreorder: _onPreorder
                   whiteSpace: 'nowrap',
                 }}
               >
-                ${parseFloat(product.price).toFixed(2)}
+                ${Math.floor(parseFloat(product.price))}
               </span>
             )}
 

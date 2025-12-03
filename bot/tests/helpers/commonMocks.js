@@ -53,3 +53,43 @@ export function mockValidateCircular(mock, options = {}) {
     data: { valid },
   });
 }
+
+/**
+ * Mock shop orders endpoint (GET /shops/:shopId/orders)
+ * Used by orderApi.getShopOrders()
+ *
+ * @param {MockAdapter} mock - axios-mock-adapter instance
+ * @param {number} shopId - Shop ID to mock
+ * @param {Array} orders - Array of order objects
+ * @param {object} pagination - Pagination metadata (optional)
+ */
+export function mockShopOrders(mock, shopId, orders = [], pagination = null) {
+  const paginationData = pagination || {
+    total: orders.length,
+    totalPages: Math.max(1, Math.ceil(orders.length / 5)),
+    page: 1,
+    limit: 5,
+    hasMore: false,
+  };
+
+  mock.onGet(`/shops/${shopId}/orders`).reply(200, {
+    success: true,
+    data: orders,
+    pagination: paginationData,
+  });
+}
+
+/**
+ * Mock shop orders error (for testing error handling)
+ *
+ * @param {MockAdapter} mock - axios-mock-adapter instance
+ * @param {number} shopId - Shop ID to mock
+ * @param {number} status - HTTP status code (default: 500)
+ * @param {string} error - Error message
+ */
+export function mockShopOrdersError(mock, shopId, status = 500, error = 'Internal server error') {
+  mock.onGet(`/shops/${shopId}/orders`).reply(status, {
+    success: false,
+    error,
+  });
+}

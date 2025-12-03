@@ -2,8 +2,7 @@
  * Subscription Service
  *
  * Handles recurring monthly subscriptions for shops:
- * - Free tier: $25/month
- * - PRO tier: $35/month
+ * - Basic tier and PRO tier (see config/subscriptionPricing.js for pricing)
  * - Grace period: 2 days after expiration
  * - Auto-deactivation after grace period
  */
@@ -15,6 +14,7 @@ import {
   SUBSCRIPTION_PRICES_YEARLY,
   SUBSCRIPTION_PERIOD_DAYS,
   GRACE_PERIOD_DAYS,
+  TRIAL_PERIOD_DAYS,
 } from '../config/subscriptionPricing.js';
 // paymentVerificationService removed - only CrystalPay payments supported
 
@@ -195,7 +195,95 @@ async function deactivateShop(shopId, client = null) {
   }
 }
 
-async function activatePromoSubscription(shopId, userId, promoCode) {
+/**
+ * Activate free 7-day PRO trial for a new shop
+ *
+ * @param {number} shopId - Shop ID
+ * @param {number} userId - User ID (shop owner)
+ * @returns {Promise<{shopId: number, trialEndsAt: Date}>}
+ */
+async function activateFreeTrial(shopId, userId) {
+  const client = await pool.connect();
+  try {
+    const now = new Date();
+    const trialEnd = addDays(now, TRIAL_PERIOD_DAYS);
+
+    await client.query(
+      `UPDATE shops
+       SET is_trial = true,
+           trial_ends_at = $1,
+           tier = 'pro',
+           subscription_status = 'active',
+           next_payment_due = $1,
+           is_active = true,
+           updated_at = NOW()
+       WHERE id = $2`,
+      [trialEnd, shopId]
+    );
+
+    logger.info(`[Subscription] Free trial activated for shop ${shopId} until ${trialEnd.toISOString()}`);
+
+    return { shopId, trialEndsAt: trialEnd };
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Check for expired trials and transition to grace period
+ *
+ * @returns {Promise<{transitioned: number}>}
+ */
+async function checkExpiredTrials() {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const now = new Date();
+
+    const expiredTrials = await client.query(
+      `SELECT id, name, trial_ends_at FROM shops
+       WHERE is_trial = true AND trial_ends_at < $1`,
+      [now]
+    );
+
+    let transitioned = 0;
+
+    for (const shop of expiredTrials.rows) {
+      const gracePeriodEnd = addDays(now, GRACE_PERIOD_DAYS);
+
+      // Keep tier as PRO but mark trial expired - shop enters grace period
+      // After grace period, shop will be deactivated until subscription is paid
+      await client.query(
+        `UPDATE shops
+         SET is_trial = false,
+             subscription_status = 'grace_period',
+             grace_period_until = $1,
+             updated_at = NOW()
+         WHERE id = $2`,
+        [gracePeriodEnd, shop.id]
+      );
+
+      logger.warn(`[Trial] Shop ${shop.id} (${shop.name}) trial expired, entered grace period until ${gracePeriodEnd.toISOString()}`);
+      transitioned++;
+    }
+
+    if (transitioned > 0) {
+      logger.info(`[Trial] ${transitioned} trials expired and transitioned to grace period`);
+    }
+
+    await client.query('COMMIT');
+    return { transitioned };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    logger.error('[SubscriptionService] checkExpiredTrials error:', error);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+async function activatePromoSubscription(shopId, userId, promoCode, targetTier = 'pro') {
   const client = await pool.connect();
 
   try {
@@ -236,22 +324,22 @@ async function activatePromoSubscription(shopId, userId, promoCode) {
 
     await client.query(
       `INSERT INTO shop_subscriptions (user_id, shop_id, tier, amount, tx_hash, currency, period_start, period_end, status, verified_at)
-       VALUES ($1, $2, 'pro', 0, $3, 'USDT', $4, $5, 'active', NOW())`,
-      [userId, shopId, promoTx, now, periodEnd]
+       VALUES ($1, $2, $3, 0, $4, 'USDT', $5, $6, 'active', NOW())`,
+      [userId, shopId, targetTier, promoTx, now, periodEnd]
     );
 
     const updatedShop = await client.query(
       `UPDATE shops
-       SET tier = 'pro',
+       SET tier = $2,
            subscription_status = 'active',
-           next_payment_due = $2,
+           next_payment_due = $3,
            grace_period_until = NULL,
            registration_paid = true,
            is_active = true,
            updated_at = NOW()
        WHERE id = $1
        RETURNING *`,
-      [shopId, periodEnd]
+      [shopId, targetTier, periodEnd]
     );
 
     await client.query('COMMIT');
@@ -273,7 +361,7 @@ async function activatePromoSubscription(shopId, userId, promoCode) {
  * Run via cron job daily at 10:00
  *
  * @param {object} bot - Telegram bot instance
- * @returns {Promise<{reminded: number}>}
+ * @returns {Promise<{reminded: number, sent: number, failed: number}>}
  */
 async function sendExpirationReminders(bot) {
   const client = await pool.connect();
@@ -298,6 +386,7 @@ async function sendExpirationReminders(bot) {
     );
 
     let reminded = 0;
+    let failed = 0;
 
     for (const shop of shopsResult.rows) {
       const { id, name, tier, next_payment_due, telegram_id, first_name } = shop;
@@ -308,7 +397,7 @@ async function sendExpirationReminders(bot) {
       let message = `🔔 <b>Напоминание о подписке</b>\n\n`;
       message += `Привет, ${ownerName}!\n`;
       message += `Магазин: <b>${name}</b>\n`;
-      message += `Tier: ${tier === 'pro' ? 'PRO' : 'Free'}\n`;
+      message += `Tier: ${tier === 'max' ? 'MAX' : 'PRO'}\n`;
       message += `Стоимость: $${SUBSCRIPTION_PRICES[tier]}/месяц\n\n`;
 
       if (daysUntilExpiry <= 0) {
@@ -330,12 +419,13 @@ async function sendExpirationReminders(bot) {
         );
       } catch (error) {
         logger.error(`[Subscription] Failed to send reminder to shop ${id}:`, error.message);
+        failed++;
       }
     }
 
     logger.info(`[Subscription] Reminders sent: ${reminded}`);
 
-    return { reminded };
+    return { reminded, sent: reminded, failed };
   } catch (error) {
     logger.error('[Subscription] Error sending expiration reminders:', error);
     throw error;
@@ -351,51 +441,57 @@ async function sendExpirationReminders(bot) {
  * @returns {Promise<object>} Subscription status
  */
 async function getSubscriptionStatus(shopId) {
-  const client = await pool.connect();
+  const shopResult = await pool.query(
+    `SELECT id, tier, subscription_status, next_payment_due, grace_period_until, is_active
+     FROM shops
+     WHERE id = $1`,
+    [shopId]
+  );
 
-  try {
-    const shopResult = await client.query(
-      `SELECT id, tier, subscription_status, next_payment_due, grace_period_until, is_active
-       FROM shops
-       WHERE id = $1`,
-      [shopId]
-    );
+  if (shopResult.rows.length === 0) {
+    throw new Error('Shop not found');
+  }
 
-    if (shopResult.rows.length === 0) {
-      throw new Error('Shop not found');
-    }
+  const shop = shopResult.rows[0];
 
-    const shop = shopResult.rows[0];
+  // Get current active subscription
+  const subResult = await pool.query(
+    `SELECT * FROM shop_subscriptions
+     WHERE shop_id = $1
+     AND status = 'active'
+     AND period_end > NOW()
+     ORDER BY period_end DESC
+     LIMIT 1`,
+    [shopId]
+  );
 
-    // Get current subscription
-    const subResult = await client.query(
+  const currentSubscription = subResult.rows[0] || null;
+
+  // Also get the latest subscription for renewal (even if expired)
+  // This is needed for renewal flow when current subscription has expired
+  let latestSubscription = currentSubscription;
+  if (!currentSubscription) {
+    const latestResult = await pool.query(
       `SELECT * FROM shop_subscriptions
        WHERE shop_id = $1
-       AND status = 'active'
-       AND period_end > NOW()
        ORDER BY period_end DESC
        LIMIT 1`,
       [shopId]
     );
-
-    const currentSubscription = subResult.rows[0] || null;
-
-    return {
-      shopId: shop.id,
-      tier: shop.tier,
-      status: shop.subscription_status,
-      isActive: shop.is_active,
-      nextPaymentDue: shop.next_payment_due,
-      gracePeriodUntil: shop.grace_period_until,
-      currentSubscription,
-      price: SUBSCRIPTION_PRICES[shop.tier],
-    };
-  } catch (error) {
-    logger.error('[Subscription] Error getting subscription status:', error);
-    throw error;
-  } finally {
-    client.release();
+    latestSubscription = latestResult.rows[0] || null;
   }
+
+  return {
+    shopId: shop.id,
+    tier: shop.tier,
+    status: shop.subscription_status,
+    isActive: shop.is_active,
+    nextPaymentDue: shop.next_payment_due,
+    gracePeriodUntil: shop.grace_period_until,
+    currentSubscription,
+    latestSubscription, // For renewal flow
+    price: SUBSCRIPTION_PRICES[shop.tier],
+  };
 }
 
 /**
@@ -406,24 +502,15 @@ async function getSubscriptionStatus(shopId) {
  * @returns {Promise<array>} Payment history
  */
 async function getSubscriptionHistory(shopId, limit = 10) {
-  const client = await pool.connect();
+  const result = await pool.query(
+    `SELECT * FROM shop_subscriptions
+     WHERE shop_id = $1
+     ORDER BY created_at DESC
+     LIMIT $2`,
+    [shopId, limit]
+  );
 
-  try {
-    const result = await client.query(
-      `SELECT * FROM shop_subscriptions
-       WHERE shop_id = $1
-       ORDER BY created_at DESC
-       LIMIT $2`,
-      [shopId, limit]
-    );
-
-    return result.rows;
-  } catch (error) {
-    logger.error('[Subscription] Error getting subscription history:', error);
-    throw error;
-  } finally {
-    client.release();
-  }
+  return result.rows;
 }
 
 /**
@@ -433,64 +520,55 @@ async function getSubscriptionHistory(shopId, limit = 10) {
  * @returns {Promise<object>} Upgrade cost details
  */
 async function calculateUpgradeCost(shopId) {
-  const client = await pool.connect();
+  const shopResult = await pool.query('SELECT tier FROM shops WHERE id = $1', [shopId]);
 
-  try {
-    const shopResult = await client.query('SELECT tier FROM shops WHERE id = $1', [shopId]);
-
-    if (shopResult.rows.length === 0) {
-      throw new Error('Shop not found');
-    }
-
-    const shop = shopResult.rows[0];
-
-    if (shop.tier === 'pro') {
-      return {
-        alreadyPro: true,
-        amount: 0,
-      };
-    }
-
-    // Get current subscription
-    const subResult = await client.query(
-      `SELECT * FROM shop_subscriptions
-       WHERE shop_id = $1
-       AND status = 'active'
-       AND period_end > NOW()
-       ORDER BY period_end DESC
-       LIMIT 1`,
-      [shopId]
-    );
-
-    if (subResult.rows.length === 0) {
-      throw new Error('No active subscription found');
-    }
-
-    const currentSub = subResult.rows[0];
-
-    // Calculate prorated upgrade from basic to pro tier
-    const amount = calculateUpgradeAmount(
-      currentSub.period_start,
-      currentSub.period_end,
-      SUBSCRIPTION_PRICES.basic,  // Fixed: was .free (undefined), should be .basic
-      SUBSCRIPTION_PRICES.pro
-    );
-
-    return {
-      alreadyPro: false,
-      amount,
-      currentTier: 'basic',
-      newTier: 'pro',
-      periodStart: currentSub.period_start,
-      periodEnd: currentSub.period_end,
-      remainingDays: Math.ceil((currentSub.period_end - new Date()) / (1000 * 60 * 60 * 24)),
-    };
-  } catch (error) {
-    logger.error('[Subscription] Error calculating upgrade cost:', error);
-    throw error;
-  } finally {
-    client.release();
+  if (shopResult.rows.length === 0) {
+    throw new Error('Shop not found');
   }
+
+  const shop = shopResult.rows[0];
+
+  if (shop.tier === 'max') {
+    return {
+      alreadyMax: true,
+      amount: 0,
+    };
+  }
+
+  // Get current subscription
+  const subResult = await pool.query(
+    `SELECT * FROM shop_subscriptions
+     WHERE shop_id = $1
+     AND status = 'active'
+     AND period_end > NOW()
+     ORDER BY period_end DESC
+     LIMIT 1`,
+    [shopId]
+  );
+
+  if (subResult.rows.length === 0) {
+    throw new Error('No active subscription found');
+  }
+
+  const currentSub = subResult.rows[0];
+
+  // Calculate prorated upgrade from pro to max tier
+  const amount = calculateUpgradeAmount(
+    currentSub.period_start,
+    currentSub.period_end,
+    SUBSCRIPTION_PRICES.pro,
+    SUBSCRIPTION_PRICES.max
+  );
+
+  return {
+    alreadyMax: false,
+    amount,
+    currentTier: 'pro',
+    newTier: 'max',
+    periodStart: currentSub.period_start,
+    periodEnd: currentSub.period_end,
+    remainingDays: Math.ceil((currentSub.period_end - new Date()) / (1000 * 60 * 60 * 24)),
+  };
 }
 
 /**
@@ -570,6 +648,8 @@ export {
   processSubscriptionPayment,
   upgradeShopToPro,
   checkExpiredSubscriptions,
+  checkExpiredTrials,
+  activateFreeTrial,
   deactivateShop,
   sendExpirationReminders,
   getSubscriptionStatus,

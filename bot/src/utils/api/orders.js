@@ -1,6 +1,14 @@
 import { api, logger } from './config.js';
 
 export const orderApi = {
+  // Get order by ID (with ownership check on backend)
+  async getOrder(orderId, token) {
+    const { data } = await api.get(`/orders/${orderId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return data.data || data;
+  },
+
   // Get buyer orders
   async getMyOrders(token) {
     const { data } = await api.get('/orders/my', {
@@ -63,20 +71,28 @@ export const orderApi = {
           hasDataData: !!data?.data,
           isArray: Array.isArray(data),
           dataIsArray: Array.isArray(data?.data),
-          payloadHasOrders: !!(data?.data?.orders || data?.orders),
-          ordersCount:
-            data?.data?.orders?.length ||
-            data?.data?.length ||
-            data?.orders?.length ||
-            data?.length ||
-            0,
+          hasPagination: !!data?.pagination,
+          ordersCount: data?.data?.length || 0,
         },
       });
 
-      // Unwrap response: return data.data (array of orders) instead of wrapper
-      const payload = data.data || data;
-      const orders = Array.isArray(payload?.orders) ? payload.orders : payload;
-      return Array.isArray(orders) ? orders : [];
+      // Return full response with pagination for proper sync
+      // Format: { success: true, data: [...], pagination: { total, totalPages, page, limit, hasMore } }
+      if (data.success && Array.isArray(data.data)) {
+        return {
+          success: data.success,
+          data: data.data,
+          pagination: data.pagination || { total: data.data.length, hasMore: false },
+        };
+      }
+
+      // Legacy fallback: wrap array in expected format
+      const orders = Array.isArray(data.data) ? data.data : Array.isArray(data) ? data : [];
+      return {
+        success: true,
+        data: orders,
+        pagination: { total: orders.length, totalPages: 1, hasMore: false },
+      };
     } catch (error) {
       logger.error('getShopOrders error:', {
         error: error.message,

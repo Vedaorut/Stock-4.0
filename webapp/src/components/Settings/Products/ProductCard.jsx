@@ -48,7 +48,7 @@ function ProductCard({ product, onEdit, onDelete, t }) {
             <p className="text-gray-400 text-sm mb-2">{product.description}</p>
           )}
           <div className="flex items-center gap-3 text-sm">
-            <span className="text-orange-primary font-bold">${parseFloat(product.price || 0).toFixed(2)}</span>
+            <span className="text-orange-primary font-bold">${Math.floor(parseFloat(product.price || 0))}</span>
             <span className="text-gray-500">В наличии: {product.stock || 0}</span>
           </div>
         </div>

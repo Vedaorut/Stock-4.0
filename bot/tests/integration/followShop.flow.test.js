@@ -57,7 +57,7 @@ describe('Follow Shop - Create/View/Delete Flow (P0)', () => {
 
     const text1 = testBot.getLastReplyText();
     // When list is empty, shows explanation and empty message
-    expect(text1).toContain('👀 Следить');
+    expect(text1).toContain('Следить');
     expect(text1).toContain('У вас пока нет активных подписок');
 
     testBot.captor.reset();
@@ -147,7 +147,7 @@ describe('Follow Shop - Create/View/Delete Flow (P0)', () => {
     await new Promise((resolve) => setImmediate(resolve));
 
     const text5 = testBot.getLastReplyText();
-    expect(text5).toContain('👀 Следить');
+    expect(text5).toContain('Следить');
     expect(text5).toContain('SourceShop');
 
     testBot.captor.reset();
@@ -209,7 +209,7 @@ describe('Follow Shop - Create/View/Delete Flow (P0)', () => {
 
     // After delete, returns to empty follow list
     const text7 = testBot.getLastReplyText();
-    expect(text7).toContain('👀 Следить');
+    expect(text7).toContain('Следить');
     expect(text7).toContain('У вас пока нет активных подписок');
 
     // Verify DELETE was called

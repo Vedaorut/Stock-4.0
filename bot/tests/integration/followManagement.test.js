@@ -25,7 +25,7 @@ describe('Follow Management - Update/Switch/Delete (P0)', () => {
         token: 'test-jwt-token',
         shopId: 1,
         shopName: 'MyShop',
-        user: { id: 1, telegramId: '123456', selectedRole: 'seller' },
+        user: { id: 1, telegramId: '123456', selectedRole: 'seller', language: 'ru' },
       },
     });
     mock = new MockAdapter(api);
@@ -168,7 +168,7 @@ describe('Follow Management - Update/Switch/Delete (P0)', () => {
     await new Promise((resolve) => setImmediate(resolve));
 
     const text2 = testBot.getLastReplyText();
-    expect(text2).toContain('Режим: 💰 Перепродажа');
+    expect(text2).toContain('Режим: Перепродажа');
 
     // Verify PUT was called
     expect(mock.history.put.length).toBe(1);
@@ -407,7 +407,7 @@ describe('Follow Management - Update/Switch/Delete (P0)', () => {
 
     // After delete, returns to empty follow list
     const text = testBot.getLastReplyText();
-    expect(text).toContain('👀 Следить');
+    expect(text).toContain('Следить');
     expect(text).toContain('У вас пока нет активных подписок');
 
     // Verify DELETE was called
@@ -533,7 +533,7 @@ describe('Follow Management - Update/Switch/Delete (P0)', () => {
     await new Promise((resolve) => setImmediate(resolve));
 
     const text1 = testBot.getLastReplyText();
-    expect(text1).toContain('👀 Следить');
+    expect(text1).toContain('Следить');
     expect(text1).toContain('Shop444');
 
     testBot.captor.reset();
@@ -572,7 +572,7 @@ describe('Follow Management - Update/Switch/Delete (P0)', () => {
     await new Promise((resolve) => setImmediate(resolve));
 
     const text3 = testBot.getLastReplyText();
-    expect(text3).toContain('👀 Следить');
+    expect(text3).toContain('Следить');
   });
 
   it('без токена → ошибка авторизации при просмотре деталей', async () => {
@@ -582,7 +582,7 @@ describe('Follow Management - Update/Switch/Delete (P0)', () => {
         token: null,
         shopId: 1,
         shopName: 'MyShop',
-        user: { id: 1, telegramId: '123456', selectedRole: 'seller' },
+        user: { id: 1, telegramId: '123456', selectedRole: 'seller', language: 'ru' },
       },
     });
 

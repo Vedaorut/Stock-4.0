@@ -74,7 +74,7 @@ const showResults = async (ctx) => {
     if (!shops || shops.length === 0) {
       await smartMessage.send(ctx, {
         text: searchMessages.noResults,
-        keyboard: buyerMenu,
+        keyboard: buyerMenu(ctx.lang),
       });
       return await ctx.scene.leave();
     }
@@ -102,7 +102,7 @@ const showResults = async (ctx) => {
     logger.error('Error searching shops:', error);
     await smartMessage.send(ctx, {
       text: searchMessages.error,
-      keyboard: buyerMenu,
+      keyboard: buyerMenu(ctx.lang),
     });
     return await ctx.scene.leave();
   }
@@ -113,11 +113,17 @@ const searchShopScene = new Scenes.WizardScene('searchShop', enterShopName, show
 
 // Handle scene leave
 searchShopScene.leave(async (ctx) => {
-  // ✅ P1-2 FIX: Clear wizard state to prevent memory leak
+  // P1-2 FIX: Clear wizard state to prevent memory leak
   if (ctx.wizard) {
     delete ctx.wizard.state;
   }
   ctx.scene.state = {};
+
+  // Очистить __scenes из Redis сессии для предотвращения застревания
+  if (ctx.session && ctx.session.__scenes) {
+    delete ctx.session.__scenes;
+  }
+
   logger.info(`User ${ctx.from?.id} left searchShop scene`);
 });
 
@@ -129,14 +135,14 @@ searchShopScene.action('cancel_scene', async (ctx) => {
     await ctx.scene.leave();
 
     // Silent transition - edit message without "Отменено" text
-    await ctx.editMessageText(buyerMessages.panel, buyerMenu);
+    await ctx.editMessageText(buyerMessages.panel, buyerMenu(ctx.lang));
   } catch (error) {
     logger.error('Error in cancel_scene handler:', error);
     // Local error handling - don't throw to avoid infinite spinner
     try {
       await smartMessage.send(ctx, {
         text: generalMessages.actionFailed,
-        keyboard: buyerMenu,
+        keyboard: buyerMenu(ctx.lang),
       });
     } catch (replyError) {
       logger.error('Failed to send error message:', replyError);

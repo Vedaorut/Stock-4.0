@@ -77,7 +77,7 @@ export const authController = {
           jti: crypto.randomBytes(16).toString('hex'),
         },
         config.jwt.secret,
-        { expiresIn: config.jwt.expiresIn }
+        { expiresIn: config.jwt.expiresIn, algorithm: 'HS256' }
       );
 
       // Generate refresh token
@@ -97,6 +97,7 @@ export const authController = {
             first_name: user.first_name,
             last_name: user.last_name,
             selected_role: user.selected_role,
+            language: user.language || 'ru',
             created_at: user.created_at,
           },
         },
@@ -172,7 +173,7 @@ export const authController = {
           jti: crypto.randomBytes(16).toString('hex'),
         },
         config.jwt.secret,
-        { expiresIn: config.jwt.expiresIn }
+        { expiresIn: config.jwt.expiresIn, algorithm: 'HS256' }
       );
 
       // Generate refresh token
@@ -190,6 +191,7 @@ export const authController = {
           first_name: user.first_name,
           last_name: user.last_name,
           selected_role: user.selected_role,
+          language: user.language || 'ru',
           created_at: user.created_at,
         },
       });
@@ -219,6 +221,7 @@ export const authController = {
           first_name: user.first_name,
           last_name: user.last_name,
           selected_role: user.selected_role,
+          language: user.language || 'ru',
           created_at: user.created_at,
           updated_at: user.updated_at,
         },
@@ -341,7 +344,7 @@ export const authController = {
           jti: crypto.randomBytes(16).toString('hex'),
         },
         config.jwt.secret,
-        { expiresIn: config.jwt.expiresIn }
+        { expiresIn: config.jwt.expiresIn, algorithm: 'HS256' }
       );
 
       // Generate refresh token
@@ -361,6 +364,7 @@ export const authController = {
             first_name: user.first_name,
             last_name: user.last_name,
             selected_role: user.selected_role,
+            language: user.language || 'ru',
             created_at: user.created_at,
           },
         },
@@ -436,7 +440,7 @@ export const authController = {
           jti: crypto.randomBytes(16).toString('hex'),
         },
         config.jwt.secret,
-        { expiresIn: config.jwt.expiresIn }
+        { expiresIn: config.jwt.expiresIn, algorithm: 'HS256' }
       );
 
       // Generate refresh token
@@ -455,6 +459,7 @@ export const authController = {
           first_name: user.first_name,
           last_name: user.last_name,
           selected_role: user.selected_role,
+          language: user.language || 'ru',
           created_at: user.created_at,
         },
       });
@@ -506,7 +511,7 @@ export const authController = {
           jti: crypto.randomBytes(16).toString('hex'),
         },
         config.jwt.secret,
-        { expiresIn: config.jwt.expiresIn }
+        { expiresIn: config.jwt.expiresIn, algorithm: 'HS256' }
       );
 
       logger.info(`Token refreshed for user: ${user.telegram_id}`);

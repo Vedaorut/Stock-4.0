@@ -8,7 +8,9 @@ import { useBackButton } from '../../hooks/useBackButton';
 // Compact Plan Card
 function PlanCard({ name, price, features, isActive, onSelect, delay = 0 }) {
   const { triggerHaptic } = useTelegram();
+  const isMax = name === 'max';
   const isPro = name === 'pro';
+  const isPremiumTier = isMax || isPro;
 
   return (
     <motion.div
@@ -20,14 +22,16 @@ function PlanCard({ name, price, features, isActive, onSelect, delay = 0 }) {
       {/* Card */}
       <div
         className={`relative flex-1 rounded-2xl p-4 overflow-hidden ${
-          isPro ? 'bg-gradient-to-br from-orange-500/20 via-orange-600/10 to-transparent' : 'bg-white/5'
+          isMax ? 'bg-gradient-to-br from-purple-500/20 via-purple-600/10 to-transparent' : isPro ? 'bg-gradient-to-br from-orange-500/20 via-orange-600/10 to-transparent' : 'bg-white/5'
         }`}
         style={{
           border: isActive
             ? '2px solid rgba(34, 197, 94, 0.5)'
-            : isPro
-              ? '1px solid rgba(255, 107, 0, 0.3)'
-              : '1px solid rgba(255, 255, 255, 0.08)',
+            : isMax
+              ? '1px solid rgba(168, 85, 247, 0.3)'
+              : isPro
+                ? '1px solid rgba(255, 107, 0, 0.3)'
+                : '1px solid rgba(255, 255, 255, 0.08)',
         }}
       >
         {/* Active badge */}
@@ -44,8 +48,8 @@ function PlanCard({ name, price, features, isActive, onSelect, delay = 0 }) {
           </motion.div>
         )}
 
-        {/* PRO shine effect */}
-        {isPro && (
+        {/* PRO/MAX shine effect */}
+        {isPremiumTier && (
           <motion.div
             className="absolute inset-0 pointer-events-none"
             style={{
@@ -60,12 +64,16 @@ function PlanCard({ name, price, features, isActive, onSelect, delay = 0 }) {
         <div className="flex items-center gap-2 mb-3">
           <div
             className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-              isPro
-                ? 'bg-gradient-to-br from-orange-400 to-orange-600'
-                : 'bg-gray-600/50'
+              isMax
+                ? 'bg-gradient-to-br from-purple-400 to-purple-600'
+                : isPro
+                  ? 'bg-gradient-to-br from-orange-400 to-orange-600'
+                  : 'bg-gray-600/50'
             }`}
           >
-            {isPro ? (
+            {isMax ? (
+              <span className="text-sm">👑</span>
+            ) : isPro ? (
               <svg className="w-4 h-4 text-white" viewBox="0 0 20 20" fill="currentColor">
                 <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
               </svg>
@@ -75,7 +83,7 @@ function PlanCard({ name, price, features, isActive, onSelect, delay = 0 }) {
               </svg>
             )}
           </div>
-          <span className={`text-base font-bold uppercase tracking-wide ${isPro ? 'text-orange-400' : 'text-gray-300'}`}>
+          <span className={`text-base font-bold uppercase tracking-wide ${isMax ? 'text-purple-400' : isPro ? 'text-orange-400' : 'text-gray-300'}`}>
             {name}
           </span>
         </div>
@@ -97,7 +105,7 @@ function PlanCard({ name, price, features, isActive, onSelect, delay = 0 }) {
               transition={{ delay: delay + 0.1 * i }}
             >
               <svg
-                className={`w-3.5 h-3.5 mt-0.5 flex-shrink-0 ${isPro ? 'text-orange-400' : 'text-gray-500'}`}
+                className={`w-3.5 h-3.5 mt-0.5 flex-shrink-0 ${isMax ? 'text-purple-400' : isPro ? 'text-orange-400' : 'text-gray-500'}`}
                 viewBox="0 0 20 20"
                 fill="currentColor"
               >
@@ -116,13 +124,15 @@ function PlanCard({ name, price, features, isActive, onSelect, delay = 0 }) {
               onSelect?.();
             }}
             className={`w-full py-2.5 rounded-xl text-xs font-bold transition-all ${
-              isPro
-                ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-lg shadow-orange-500/25'
-                : 'bg-white/10 text-gray-300 hover:bg-white/15'
+              isMax
+                ? 'bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/25'
+                : isPro
+                  ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-lg shadow-orange-500/25'
+                  : 'bg-white/10 text-gray-300 hover:bg-white/15'
             }`}
             whileTap={{ scale: 0.97 }}
           >
-            {isPro ? 'Перейти на PRO' : 'Выбрать'}
+            {isMax ? 'Перейти на MAX' : isPro ? 'Перейти на PRO' : 'Выбрать'}
           </motion.button>
         ) : (
           <div className="w-full py-2.5 rounded-xl text-xs font-bold text-center text-green-400 bg-green-500/10 border border-green-500/20">
@@ -181,8 +191,8 @@ export default function SubscriptionModal({ isOpen, onClose }) {
   }, [isOpen, loadData]);
 
   const handleSelectPlan = async (plan) => {
-    await alert(plan === 'pro'
-      ? 'Для перехода на PRO перейдите в бота'
+    await alert(plan === 'max'
+      ? 'Для перехода на MAX перейдите в бота'
       : 'Для изменения плана перейдите в бота'
     );
   };
@@ -222,7 +232,7 @@ export default function SubscriptionModal({ isOpen, onClose }) {
     );
   }
 
-  const currentTier = status?.tier || 'basic';
+  const currentTier = status?.tier || 'pro';
   const daysLeft = status?.expiresAt
     ? Math.max(0, Math.ceil((new Date(status.expiresAt) - new Date()) / (1000 * 60 * 60 * 24)))
     : null;
@@ -272,23 +282,16 @@ export default function SubscriptionModal({ isOpen, onClose }) {
                       )}
                     </div>
                   </div>
+                  {currentTier === 'max' && (
+                    <span className="text-lg">👑</span>
+                  )}
                   {currentTier === 'pro' && (
-                    <span className="text-lg">✨</span>
+                    <span className="text-lg">⭐</span>
                   )}
                 </motion.div>
 
                 {/* Plans grid - 2 columns */}
                 <div className="grid grid-cols-2 gap-3 flex-1 min-h-0">
-                  {pricing?.basic && (
-                    <PlanCard
-                      name="basic"
-                      price={pricing.basic.pricing?.month || pricing.basic.price}
-                      features={pricing.basic.features}
-                      isActive={currentTier === 'basic'}
-                      onSelect={() => handleSelectPlan('basic')}
-                      delay={0}
-                    />
-                  )}
                   {pricing?.pro && (
                     <PlanCard
                       name="pro"
@@ -296,6 +299,16 @@ export default function SubscriptionModal({ isOpen, onClose }) {
                       features={pricing.pro.features}
                       isActive={currentTier === 'pro'}
                       onSelect={() => handleSelectPlan('pro')}
+                      delay={0}
+                    />
+                  )}
+                  {pricing?.max && (
+                    <PlanCard
+                      name="max"
+                      price={pricing.max.pricing?.month || pricing.max.price}
+                      features={pricing.max.features}
+                      isActive={currentTier === 'max'}
+                      onSelect={() => handleSelectPlan('max')}
                       delay={0.1}
                     />
                   )}
@@ -336,7 +349,7 @@ export default function SubscriptionModal({ isOpen, onClose }) {
                           {history.map((p, _i) => (
                             <div key={p.id} className="flex items-center justify-between py-2 px-3 rounded-lg bg-white/5 text-xs">
                               <div className="flex items-center gap-2">
-                                <span>{p.tier === 'pro' ? '⭐' : '📦'}</span>
+                                <span>{p.tier === 'max' ? '👑' : p.tier === 'pro' ? '⭐' : '📦'}</span>
                                 <span className="text-gray-400 capitalize">{p.tier}</span>
                               </div>
                               <div className="flex items-center gap-3">

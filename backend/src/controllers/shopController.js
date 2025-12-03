@@ -6,6 +6,7 @@ import { activatePromoSubscription } from '../services/subscriptionService.js';
 import { validateAddress } from '../utils/addressValidation.js';
 import * as promoCodeQueries from '../../database/queries/promoCodeQueries.js';
 import { broadcast } from '../utils/websocket.js';
+import { TRIAL_PERIOD_DAYS } from '../config/subscriptionPricing.js';
 
 /**
  * Shop Controller
@@ -17,24 +18,31 @@ export const shopController = {
    */
   create: asyncHandler(async (req, res) => {
     try {
-      const { name, description, logo, promoCode, tier = 'basic', subscriptionId } = req.body;
+      const { name, description, logo, promoCode, tier = 'pro', subscriptionId, trial } = req.body;
       const normalizedPromo = promoCode?.trim().toLowerCase();
-      const wantsPro = tier === 'pro';
+      const wantsMax = tier === 'max';
 
       logger.info('[ShopController] Creating shop:', {
         userId: req.user.id,
         name,
         tier,
         subscriptionId,
+        trial: !!trial,
       });
 
+      // Validate only ONE payment method allowed
+      const paymentMethods = [trial, !!normalizedPromo, !!subscriptionId].filter(Boolean);
+      if (paymentMethods.length > 1) {
+        throw new ValidationError('Cannot use trial, promo code, and subscription together. Choose one.');
+      }
+
       // Validate tier
-      if (!['basic', 'pro'].includes(tier)) {
-        throw new ValidationError('Invalid tier. Must be "basic" or "pro"');
+      if (!['pro', 'max'].includes(tier)) {
+        throw new ValidationError('Invalid tier. Must be "pro" or "max"');
       }
 
       // Check if user already has a shop
-      const existingShops = await shopQueries.findByOwnerId(req.user.id);
+      const existingShops = await shopQueries.findByOwnerId(req.user.id, { includeInactive: true });
       if (existingShops.length > 0) {
         throw new ValidationError('User already has a shop');
       }
@@ -130,6 +138,71 @@ export const shopController = {
         }
       }
 
+      // Handle FREE TRIAL - 7 days PRO for new sellers
+      if (trial) {
+        const trialTier = tier === 'max' ? 'max' : 'pro';
+        const now = Date.now();
+        const trialEndsAt = new Date(now + TRIAL_PERIOD_DAYS * 24 * 60 * 60 * 1000);
+
+        // Check if user EVER had a trial (prevent abuse)
+        const { getClient } = await import('../config/database.js');
+        const client = await getClient();
+
+        try {
+          await client.query('BEGIN');
+
+          // Check for previous trials (even on deleted shops)
+          const previousTrial = await client.query(
+            `SELECT id FROM shops WHERE owner_id = $1 AND (is_trial = true OR trial_ends_at IS NOT NULL)`,
+            [req.user.id]
+          );
+
+          if (previousTrial.rows.length > 0) {
+            await client.query('ROLLBACK');
+            throw new ValidationError('Free trial already used. Please subscribe to continue.');
+          }
+
+          // Create shop with trial fields in single transaction
+          const shopResult = await client.query(
+            `INSERT INTO shops (
+               owner_id,
+               name,
+               description,
+               logo,
+               tier,
+               is_trial,
+               trial_ends_at,
+               subscription_status,
+               is_active,
+               next_payment_due
+             )
+             VALUES ($1, $2, $3, $4, $5, true, $6, 'active', true, $7)
+             RETURNING *`,
+            [req.user.id, name.trim(), description, logo, trialTier, trialEndsAt, trialEndsAt]
+          );
+
+          await client.query('COMMIT');
+          const shop = shopResult.rows[0];
+
+          logger.info('[ShopController] Free trial activated:', {
+            shopId: shop.id,
+            userId: req.user.id,
+            trialEndsAt: shop.trial_ends_at,
+            tier: shop.tier,
+          });
+
+          return res.status(201).json({
+            success: true,
+            data: shop,
+          });
+        } catch (error) {
+          await client.query('ROLLBACK');
+          throw error;
+        } finally {
+          client.release();
+        }
+      }
+
       // Handle promo code - promo code DETERMINES the tier
       let promoValidation = null;
       let effectiveTier = tier; // Default to requested tier
@@ -149,9 +222,9 @@ export const shopController = {
           promoTier: effectiveTier,
           requestedTier: tier,
         });
-      } else if (wantsPro) {
-        // PRO without promo code requires payment
-        throw new PaymentRequiredError('PRO plan requires payment or valid promo code');
+      } else if (wantsMax) {
+        // MAX without promo code requires payment
+        throw new PaymentRequiredError('MAX plan requires payment or valid promo code');
       }
 
       let shop = await shopQueries.create({
@@ -165,7 +238,12 @@ export const shopController = {
       // Activate promo subscription if promo code was used
       if (promoValidation && promoValidation.valid) {
         try {
-          shop = await activatePromoSubscription(shop.id, req.user.id, normalizedPromo);
+          shop = await activatePromoSubscription(
+            shop.id,
+            req.user.id,
+            normalizedPromo,
+            promoValidation.tier
+          );
 
           // Increment promo code usage count
           await promoCodeQueries.incrementUsageCount(promoValidation.promoCode.id);
@@ -283,7 +361,7 @@ export const shopController = {
    */
   getMyShops: asyncHandler(async (req, res) => {
     try {
-      const shops = await shopQueries.findByOwnerId(req.user.id);
+      const shops = await shopQueries.findByOwnerId(req.user.id, { includeInactive: true });
 
       // Add availableCryptos for each shop (owner can see which cryptos are configured)
       const shopsWithCryptos = shops.map((shop) => {

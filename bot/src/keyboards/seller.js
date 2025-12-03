@@ -1,15 +1,15 @@
 import { Markup } from 'telegraf';
 import { getWebAppUrl } from '../utils/webappUrl.js';
-import { buttons as buttonText } from '../texts/messages.js';
+import { t } from '../i18n/index.js';
 
 // Seller menu (with active shop) - redesigned hierarchical structure
-export const sellerMenu = (activeOrdersCount = 0, options = {}) => {
+export const sellerMenu = (activeOrdersCount = 0, options = {}, lang = 'ru') => {
   const { hasFollows = false } = options;
   const buttons = [
-    [Markup.button.webApp(buttonText.openCatalog, getWebAppUrl())],
+    [Markup.button.webApp(t('buttons.openCatalog', {}, lang), getWebAppUrl())],
     [
       Markup.button.callback(
-        `${buttonText.activeOrders}${activeOrdersCount > 0 ? ` (${activeOrdersCount})` : ''}`,
+        `${t('buttons.activeOrders', {}, lang)}${activeOrdersCount > 0 ? ` (${activeOrdersCount})` : ''}`,
         'seller:active_orders'
       ),
     ],
@@ -17,88 +17,95 @@ export const sellerMenu = (activeOrdersCount = 0, options = {}) => {
 
   // Show "Manage Follows" button only if hasFollows is true
   if (hasFollows) {
-    buttons.push([Markup.button.callback(buttonText.manageFollows, 'seller:follows')]);
+    buttons.push([Markup.button.callback(t('buttons.manageFollows', {}, lang), 'seller:follows')]);
   }
 
-  buttons.push([Markup.button.callback(buttonText.orderHistory, 'seller:order_history')]);
-  buttons.push([Markup.button.callback(buttonText.tools, 'seller:tools')]);
-  buttons.push([Markup.button.callback(buttonText.switchRole, 'role:toggle')]);
+  buttons.push([Markup.button.callback(t('buttons.orderHistory', {}, lang), 'seller:order_history')]);
+  buttons.push([Markup.button.callback(t('buttons.tools', {}, lang), 'seller:tools')]);
+  buttons.push([Markup.button.callback(t('buttons.settings', {}, lang), 'settings')]);
+  buttons.push([Markup.button.callback(t('buttons.switchRole', {}, lang), 'role:toggle')]);
 
   return Markup.inlineKeyboard(buttons);
 };
 
 // Seller Tools Submenu - advanced features (Wallets, Follows, Workers)
-export const sellerToolsMenu = (isOwner = false) => {
+export const sellerToolsMenu = (isOwner = false, lang = 'ru') => {
   const buttons = [
-    [Markup.button.callback(buttonText.manageWallets, 'seller:wallets')],
-    [Markup.button.callback(buttonText.manageFollows, 'seller:follows')],
+    [Markup.button.callback(t('buttons.manageWallets', {}, lang), 'seller:wallets')],
+    [Markup.button.callback(t('buttons.manageFollows', {}, lang), 'seller:follows')],
   ];
 
   if (isOwner) {
-    buttons.push([Markup.button.callback(buttonText.manageWorkers, 'seller:workers')]);
+    buttons.push([Markup.button.callback(t('buttons.manageWorkers', {}, lang), 'seller:workers')]);
   }
 
+  // Invite link - available for all sellers with shop
+  buttons.push([Markup.button.callback(t('buttons.inviteLink', {}, lang), 'seller:invite_link')]);
+
   if (isOwner) {
-    buttons.push([Markup.button.callback(buttonText.changeChannel, 'seller:migrate_channel')]);
+    buttons.push([Markup.button.callback(t('buttons.changeChannel', {}, lang), 'seller:migrate_channel')]);
   }
-  buttons.push([Markup.button.callback(buttonText.backToMenu, 'seller:menu')]);
+  buttons.push([Markup.button.callback(t('buttons.backToMenu', {}, lang), 'seller:menu')]);
 
   return Markup.inlineKeyboard(buttons);
 };
 
 // Products menu (inside "Товары" screen) - minimalist
-export const productsMenu = () =>
+export const productsMenu = (lang = 'ru') =>
   Markup.inlineKeyboard([
-    [Markup.button.callback(buttonText.addProduct, 'seller:add_product')],
-    [Markup.button.callback(buttonText.backToTools, 'seller:tools')],
+    [Markup.button.callback(t('buttons.addProduct', {}, lang), 'seller:add_product')],
+    [Markup.button.callback(t('buttons.backToTools', {}, lang), 'seller:tools')],
   ]);
 
 // Follows menu - minimalist
-export const followsMenu = (hasFollows = false, followButtons = []) => {
+export const followsMenu = (hasFollows = false, followButtons = [], lang = 'ru') => {
   const keyboard = [...followButtons];
 
   keyboard.push([
     Markup.button.callback(
-      hasFollows ? buttonText.addFollowMore : buttonText.addFollow,
+      hasFollows ? t('buttons.addFollowMore', {}, lang) : t('buttons.addFollow', {}, lang),
       'follows:create'
     ),
   ]);
-  keyboard.push([Markup.button.callback(buttonText.backSimple, 'seller:menu')]);
+  keyboard.push([Markup.button.callback(t('buttons.backSimple', {}, lang), 'seller:menu')]);
 
   return Markup.inlineKeyboard(keyboard);
 };
 
 // Follow detail menu
-export const followDetailMenu = (followId, mode = 'monitor') => {
+export const followDetailMenu = (followId, mode = 'monitor', lang = 'ru') => {
   const modeButtonText =
-    mode === 'resell' ? 'Переключить на Мониторинг' : 'Переключить на Перепродажу';
+    mode === 'resell'
+      ? t('buttons.switchToMonitor', {}, lang)
+      : t('buttons.switchToResell', {}, lang);
 
-  const buttons = [[Markup.button.callback('Каталог', `follow_detail:${followId}`)]];
+  const buttons = [[Markup.button.callback(t('buttons.catalog', {}, lang), `follow_detail:${followId}`)]];
 
   if (mode === 'resell') {
-    buttons.push([Markup.button.callback(buttonText.editMarkup, `follow_edit:${followId}`)]);
+    buttons.push([Markup.button.callback(t('buttons.editMarkup', {}, lang), `follow_edit:${followId}`)]);
   }
 
   buttons.push([Markup.button.callback(modeButtonText, `follow_mode:${followId}`)]);
-  buttons.push([Markup.button.callback(buttonText.delete, `follow_delete:${followId}`)]);
-  buttons.push([Markup.button.callback(buttonText.backToFollows, 'follows:list')]);
+  buttons.push([Markup.button.callback(t('buttons.delete', {}, lang), `follow_delete:${followId}`)]);
+  buttons.push([Markup.button.callback(t('buttons.backToFollows', {}, lang), 'follows:list')]);
 
   return Markup.inlineKeyboard(buttons);
 };
 
-export const followCatalogMenu = (followId) =>
+export const followCatalogMenu = (followId, lang = 'ru') =>
   Markup.inlineKeyboard([
-    [Markup.button.callback(buttonText.refresh, `follow_detail:${followId}`)],
-    [Markup.button.callback(buttonText.followSettings, `follow_settings:${followId}`)],
-    [Markup.button.callback(buttonText.backSimple, 'follows:list')],
+    [Markup.button.callback(t('buttons.refresh', {}, lang), `follow_detail:${followId}`)],
+    [Markup.button.callback(t('buttons.followSettings', {}, lang), `follow_settings:${followId}`)],
+    [Markup.button.callback(t('buttons.backSimple', {}, lang), 'follows:list')],
   ]);
 
 // Seller menu (no shop - need registration) - minimalist
-export const sellerMenuNoShop = Markup.inlineKeyboard([
-  [Markup.button.callback(buttonText.createShop, 'seller:create_shop')],
-  [Markup.button.callback(buttonText.mainMenu, 'main_menu')],
-]);
+export const sellerMenuNoShop = (lang = 'ru') =>
+  Markup.inlineKeyboard([
+    [Markup.button.callback(t('buttons.createShop', {}, lang), 'seller:create_shop')],
+    [Markup.button.callback(t('buttons.mainMenu', {}, lang), 'main_menu')],
+  ]);
 
 // Subscription status menu
-export const subscriptionStatusMenu = () =>
-  Markup.inlineKeyboard([[Markup.button.callback(buttonText.backToTools, 'seller:tools')]]);
+export const subscriptionStatusMenu = (lang = 'ru') =>
+  Markup.inlineKeyboard([[Markup.button.callback(t('buttons.backToTools', {}, lang), 'seller:tools')]]);

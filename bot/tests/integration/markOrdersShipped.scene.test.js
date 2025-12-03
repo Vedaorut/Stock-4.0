@@ -261,7 +261,8 @@ describe('Mark Orders Shipped Scene (P0)', () => {
       expect(text).toContain('1'); // count
       expect(text).toContain('Laptop');
       expect(text).toContain('@techbuy');
-      expect(text).toContain('1 шт');
+      // Quantity shown in parentheses: (1)
+      expect(text).toMatch(/Laptop.*\(1\)/);
       expect(text).toContain('1200'); // price without currency symbol
       expect(text).toContain('отправленные'); // confirmation text
 

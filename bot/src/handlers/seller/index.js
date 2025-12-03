@@ -293,7 +293,10 @@ export const handleSellerRole = async (ctx, options = {}) => {
             return [];
           }),
           // Shop health check
-          checkShopHealth(shop.id, ctx.session.token),
+          checkShopHealth(shop.id, ctx.session.token).catch((error) => {
+            logger.error('Failed to check shop health:', error);
+            return null;
+          }),
         ]);
 
         const weekRevenue = analyticsResult?.summary?.totalRevenue || 0;

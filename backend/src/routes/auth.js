@@ -4,6 +4,8 @@ import { authValidation } from '../middleware/validation.js';
 import { verifyToken } from '../middleware/auth.js';
 import { authLimiter } from '../middleware/rateLimiter.js';
 import { verifyTelegramInitData } from '../middleware/telegramAuth.js';
+import { userQueries } from '../database/queries/index.js';
+import { isSupported } from '../i18n/index.js';
 
 const router = express.Router();
 
@@ -67,5 +69,35 @@ router.post('/refresh', authController.refreshToken);
  * @access  Public (optionally authenticated)
  */
 router.post('/logout', authController.logout);
+
+/**
+ * @route   PATCH /api/auth/language
+ * @desc    Update user's preferred language
+ * @access  Private
+ */
+router.patch('/language', verifyToken, async (req, res) => {
+  const { language } = req.body;
+
+  if (!language || !isSupported(language)) {
+    return res.status(400).json({
+      success: false,
+      error: 'Invalid language. Supported: ru, en',
+    });
+  }
+
+  const user = await userQueries.updateLanguage(req.user.id, language);
+
+  if (!user) {
+    return res.status(404).json({
+      success: false,
+      error: 'User not found',
+    });
+  }
+
+  res.json({
+    success: true,
+    data: { language: user.language },
+  });
+});
 
 export default router;

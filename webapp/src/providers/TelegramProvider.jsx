@@ -23,6 +23,7 @@ import {
   showPopup,
   closeApp,
 } from '../utils/telegram';
+import { t } from '../i18n';
 
 const TelegramContext = createContext(null);
 
@@ -66,6 +67,10 @@ export function TelegramProvider({ children }) {
         apiLoggedRef.current = true;
       }
 
+      // Debug: Log initData info (without exposing sensitive data)
+      // eslint-disable-next-line no-console
+      console.log('[Auth] Validating initData, length:', initData?.length || 0);
+
       const response = await axios.post(
         `${API_URL}/auth/telegram-validate`,
         {},
@@ -87,9 +92,19 @@ export function TelegramProvider({ children }) {
       // Store backend user locally for context (includes selected_role)
       setBackendUser(user);
 
+      // eslint-disable-next-line no-console
+      console.log('[Auth] ✅ Token received, user:', user?.username);
+
       setError(null);
     } catch (err) {
-      console.error('Telegram auth validation failed:', err);
+      // eslint-disable-next-line no-console
+      console.error('[Auth] ❌ Validation failed:', {
+        status: err.response?.status,
+        error: err.response?.data?.error || err.message,
+        hasInitData: !!initData,
+        initDataLength: initData?.length || 0,
+      });
+
       const errorMessage = err.response?.data?.error || err.message;
       setError(errorMessage);
       throw new Error(errorMessage);
@@ -190,22 +205,22 @@ export function TelegramProvider({ children }) {
   // Confirm dialog
   const confirm = useCallback(async (message) => {
     const result = await showPopup({
-      title: 'Подтверждение',
+      title: t('confirm.title'),
       message,
       buttons: [
-        { id: 'ok', type: 'ok', text: 'Да' },
-        { id: 'cancel', type: 'cancel', text: 'Отмена' },
+        { id: 'ok', type: 'ok', text: t('common.yes') },
+        { id: 'cancel', type: 'cancel', text: t('common.cancel') },
       ],
     });
     return result === 'ok';
   }, []);
 
   // Alert dialog
-  const alert = useCallback(async (message, title = 'Внимание') => {
+  const alert = useCallback(async (message, title) => {
     await showPopup({
-      title,
+      title: title || t('common.attention'),
       message,
-      buttons: [{ id: 'ok', type: 'close', text: 'OK' }],
+      buttons: [{ id: 'ok', type: 'close', text: t('common.ok') }],
     });
   }, []);
 

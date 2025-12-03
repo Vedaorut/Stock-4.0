@@ -61,20 +61,6 @@ export const getHistory = asyncHandler(async (req, res) => {
 export const getPricing = asyncHandler(async (req, res) => {
   try {
     res.json({
-      basic: {
-        price: subscriptionService.SUBSCRIPTION_PRICES.basic,
-        currency: 'USD',
-        period: 'month',
-        pricing: {
-          month: subscriptionService.SUBSCRIPTION_PRICES.basic,
-        },
-        features: [
-          'Create and manage shop',
-          'Up to 4 products',
-          'Basic analytics',
-          'Crypto payments (BTC, ETH, USDT)',
-        ],
-      },
       pro: {
         price: subscriptionService.SUBSCRIPTION_PRICES.pro,
         currency: 'USD',
@@ -83,12 +69,27 @@ export const getPricing = asyncHandler(async (req, res) => {
           month: subscriptionService.SUBSCRIPTION_PRICES.pro,
         },
         features: [
-          'All Basic features',
+          'Create and manage shop',
           'Unlimited products',
           'Unlimited Follow Shop (dropshipping)',
           'Channel Migration (2 times/month)',
           'Priority support',
           'Advanced analytics',
+        ],
+      },
+      max: {
+        price: subscriptionService.SUBSCRIPTION_PRICES.max,
+        currency: 'USD',
+        period: 'month',
+        pricing: {
+          month: subscriptionService.SUBSCRIPTION_PRICES.max,
+        },
+        features: [
+          'Everything in PRO',
+          'Unlimited channel migrations',
+          'Up to 5 workers and automations',
+          '365 days of analytics history',
+          'Priority support (fast lane)',
         ],
       },
       gracePeriod: {

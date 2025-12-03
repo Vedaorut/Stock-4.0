@@ -1,6 +1,7 @@
 import express from 'express';
 import { workerController } from '../controllers/workerController.js';
 import { verifyToken } from '../middleware/auth.js';
+import { workerLimiter } from '../middleware/rateLimiter.js';
 
 const router = express.Router();
 
@@ -25,7 +26,7 @@ router.get('/worker', verifyToken, workerController.getWorkerShops); // alias fo
  * @access  Private (Shop owner only)
  * @body    { telegram_id: number } OR { username: string }
  */
-router.post('/:shopId/workers', verifyToken, workerController.add);
+router.post('/:shopId/workers', verifyToken, workerLimiter, workerController.add);
 
 /**
  * @route   GET /api/shops/:shopId/workers
@@ -39,7 +40,7 @@ router.get('/:shopId/workers', verifyToken, workerController.list);
  * @desc    Remove worker from shop
  * @access  Private (Shop owner only)
  */
-router.delete('/:shopId/workers/:workerId', verifyToken, workerController.remove);
+router.delete('/:shopId/workers/:workerId', verifyToken, workerLimiter, workerController.remove);
 
 /**
  * @route   PATCH /api/workers/mute

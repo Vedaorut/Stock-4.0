@@ -38,6 +38,9 @@ jest.unstable_mockModule('../../models/syncedProductQueries.js', () => ({
 
 jest.unstable_mockModule('../../config/database.js', () => ({
   getClient: jest.fn(),
+  pool: {
+    query: jest.fn(),
+  },
 }));
 
 jest.unstable_mockModule('../../utils/logger.js', () => ({
@@ -53,7 +56,7 @@ jest.unstable_mockModule('../../utils/logger.js', () => ({
 const { productQueries } = await import('../../database/queries/index.js');
 const { shopFollowQueries } = await import('../../models/shopFollowQueries.js');
 const { syncedProductQueries } = await import('../../models/syncedProductQueries.js');
-const { getClient } = await import('../../config/database.js');
+const { getClient, pool } = await import('../../config/database.js');
 const logger = (await import('../../utils/logger.js')).default;
 
 const {
@@ -81,6 +84,11 @@ describe('Product Sync Service', () => {
 
     getClient.mockResolvedValue(mockClient);
     mockClient.query.mockResolvedValue({ rows: [] });
+
+    // Reset pool.query mock - default to PRO tier with 0 products (can add more)
+    pool.query.mockResolvedValue({
+      rows: [{ tier: 'pro', product_count: 0 }],
+    });
   });
 
   describe('calculatePriceWithMarkup', () => {
@@ -171,7 +179,8 @@ describe('Product Sync Service', () => {
 
       const result = await copyProductWithMarkup(100, 1);
 
-      expect(result).toEqual(mockSyncRecord);
+      // Result includes name for tracking new products in syncAllProductsForFollow
+      expect(result).toEqual({ ...mockSyncRecord, name: 'Test Product' });
       expect(shopFollowQueries.findById).toHaveBeenCalledWith(1);
       expect(productQueries.findById).toHaveBeenCalledWith(100);
       expect(syncedProductQueries.findBySyncedProductId).toHaveBeenCalledWith(100);
@@ -539,15 +548,15 @@ describe('Product Sync Service', () => {
         .mockResolvedValueOnce(null); // Product 101 not synced yet
 
       productQueries.list.mockResolvedValue([]); // Name collision checks
-      productQueries.create.mockResolvedValue({ id: 200 });
+      productQueries.create.mockResolvedValue({ id: 200, name: 'Product 2' });
       syncedProductQueries.create.mockResolvedValue({ id: 2 });
 
       const results = await syncAllProductsForFollow(1);
 
-      // copyProductWithMarkup returns existing record for Product 100
-      // Current logic treats any non-null result as 'synced', not 'skipped'
-      expect(results.synced).toBe(2); // Both counted as synced
-      expect(results.skipped).toBe(0);
+      // copyProductWithMarkup returns existing record for Product 100 (no name) → skipped
+      // copyProductWithMarkup returns new record for Product 101 (with name) → synced
+      expect(results.synced).toBe(1);  // Product 101 newly synced
+      expect(results.skipped).toBe(1); // Product 100 already synced
     });
 
     it('should count blocked chain copies', async () => {
@@ -913,7 +922,7 @@ describe('Product Sync Service', () => {
       expect(stats.updated).toBe(1);
     });
 
-    it('should handle errors gracefully', async () => {
+    it('should handle individual product errors gracefully (no rollback)', async () => {
       const mockStaleProducts = [
         {
           id: 1,
@@ -935,12 +944,14 @@ describe('Product Sync Service', () => {
 
       mockClient.query
         .mockResolvedValueOnce({ rows: [] }) // BEGIN
-        .mockRejectedValueOnce(new Error('Database error')); // SELECT fails
+        .mockRejectedValueOnce(new Error('Database error')) // SELECT FOR UPDATE fails
+        .mockResolvedValueOnce({ rows: [] }); // COMMIT (still called after individual error)
 
       const stats = await runPeriodicSync();
 
+      // Individual product error is caught and counted, but chunk continues and commits
       expect(stats.errors).toBe(1);
-      expect(mockClient.query).toHaveBeenCalledWith('ROLLBACK');
+      expect(mockClient.query).toHaveBeenCalledWith('COMMIT'); // Not ROLLBACK - individual errors don't rollback chunk
       expect(logger.error).toHaveBeenCalled();
     });
 

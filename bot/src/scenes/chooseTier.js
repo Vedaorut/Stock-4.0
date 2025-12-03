@@ -4,9 +4,9 @@
  * Allows user to select subscription tier before creating a shop
  *
  * Steps:
- * 1. Show tier options (BASIC / PRO) with pricing
+ * 1. Show tier options (PRO / MAX) with pricing
  * 2. Handle tier selection
- * 3. Optional: Enter promo code
+ * 3. Optional: Enter promo code or free trial
  * 4. Transition to createShop scene with selected tier
  */
 
@@ -15,6 +15,7 @@ import logger from '../utils/logger.js';
 import { reply as cleanReply, replyHTML as cleanReplyHTML } from '../utils/cleanReply.js';
 import { messages, buttons as buttonText } from '../texts/messages.js';
 import { subscriptionApi } from '../utils/api.js';
+import { t } from '../i18n/index.js';
 
 const { subscription: subMessages } = messages;
 
@@ -26,24 +27,28 @@ const chooseTierScene = new Scenes.WizardScene(
     try {
       logger.info('choose_tier_step:entry', { userId: ctx.from.id });
 
+      const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+
       // Fetch current prices from backend API
       const pricing = await subscriptionApi.getPricing();
-      const basicPrice = pricing.basic?.price || 25;
-      const proPrice = pricing.pro?.price || 35;
+      const proPrice = pricing.pro?.price || 25;
+      const maxPrice = pricing.max?.price || 35;
 
       // Store prices in wizard state for later use
-      ctx.wizard.state.pricing = { basic: basicPrice, pro: proPrice };
+      ctx.wizard.state.pricing = { pro: proPrice, max: maxPrice };
 
-      const message = `${subMessages.chooseTierIntro}\n\n${subMessages.tierDescriptionBasic}\n\n${subMessages.tierDescriptionPro}`;
+      const message = t('chooseTier.title', {}, lang) + '\n\n' +
+        t('chooseTier.proDescription', { price: proPrice }, lang) + '\n\n' +
+        t('chooseTier.maxDescription', { price: maxPrice }, lang);
 
       await cleanReplyHTML(
         ctx,
         message,
         Markup.inlineKeyboard([
-          [Markup.button.callback(`BASIC $${basicPrice}/month`, 'tier_select:basic')],
-          [Markup.button.callback(`PRO $${proPrice}/month`, 'tier_select:pro')],
-          [Markup.button.callback(buttonText.promoCode, 'tier_promo')],
-          [Markup.button.callback(buttonText.back, 'cancel_scene')],
+          [Markup.button.callback(t('chooseTier.freeTrialButton', {}, lang), 'tier_trial')],
+          [Markup.button.callback(t('chooseTier.proButton', { price: proPrice }, lang), 'tier_select:pro')],
+          [Markup.button.callback(t('chooseTier.maxButton', { price: maxPrice }, lang), 'tier_select:max')],
+          [Markup.button.callback(t('chooseTier.promoButton', {}, lang), 'tier_promo')],
         ])
       );
 
@@ -70,8 +75,16 @@ const chooseTierScene = new Scenes.WizardScene(
           return;
         }
 
+        // Free Trial selection - gives MAX tier for 7 days
+        if (action === 'tier_trial') {
+          logger.info('tier_trial_selected', { userId: ctx.from.id });
+          await ctx.scene.leave();
+          await ctx.scene.enter('createShop', { trial: true, tier: 'max' });
+          return;
+        }
+
         // Tier selection
-        if (action === 'tier_select:basic' || action === 'tier_select:pro') {
+        if (action === 'tier_select:pro' || action === 'tier_select:max') {
           const tier = action.replace('tier_select:', '');
           ctx.wizard.state.selectedTier = tier;
 
@@ -81,8 +94,8 @@ const chooseTierScene = new Scenes.WizardScene(
           });
 
           // Get price from wizard state (fetched in step 1)
-          const pricing = ctx.wizard.state.pricing || { basic: 25, pro: 35 };
-          const tierPrice = `$${pricing[tier] || (tier === 'pro' ? 35 : 25)}`;
+          const pricing = ctx.wizard.state.pricing || { pro: 25, max: 35 };
+          const tierPrice = `$${pricing[tier] || (tier === 'max' ? 35 : 25)}`;
           const tierName = tier.toUpperCase();
           const message = `Вы выбрали ${tierName} (${tierPrice}/мес)\n\nДля создания магазина необходимо оплатить подписку.`;
 
@@ -164,7 +177,9 @@ const chooseTierScene = new Scenes.WizardScene(
         // Back to tier selection
         if (action === 'choose_tier:back') {
           await ctx.answerCbQuery();
-          return ctx.wizard.selectStep(0);
+          // Re-enter scene to properly re-render step 0
+          await ctx.scene.reenter();
+          return;
         }
 
         // Promo code flow
@@ -181,7 +196,9 @@ const chooseTierScene = new Scenes.WizardScene(
 
         // Back to tier selection (from promo)
         if (action === 'tier_back') {
-          return ctx.wizard.back();
+          await ctx.answerCbQuery();
+          await ctx.scene.reenter();
+          return;
         }
       } catch (error) {
         logger.error('Error in chooseTier callback handler:', error);
@@ -196,8 +213,9 @@ const chooseTierScene = new Scenes.WizardScene(
     // Handle back button
     if (ctx.callbackQuery?.data === 'tier_back') {
       await ctx.answerCbQuery();
-      // Go back to tier selection
-      return ctx.wizard.selectStep(0);
+      // Re-enter scene to properly re-render step 0
+      await ctx.scene.reenter();
+      return;
     }
 
     // Wait for text message with promo code
@@ -231,8 +249,8 @@ const chooseTierScene = new Scenes.WizardScene(
     // Transition to createShop scene with promo code
     await ctx.scene.leave();
 
-    // Enter createShop scene with promo code and PRO tier
-    await ctx.scene.enter('createShop', { promoCode, tier: 'pro' });
+    // Enter createShop scene with promo code - promo determines tier
+    await ctx.scene.enter('createShop', { promoCode });
   }
 );
 
@@ -253,6 +271,12 @@ chooseTierScene.leave(async (ctx) => {
     delete ctx.wizard.state;
   }
   ctx.scene.state = {};
+
+  // Очистить __scenes из Redis сессии для предотвращения застревания
+  if (ctx.session && ctx.session.__scenes) {
+    delete ctx.session.__scenes;
+  }
+
   logger.info(`User ${ctx.from?.id} left chooseTier scene`);
 });
 

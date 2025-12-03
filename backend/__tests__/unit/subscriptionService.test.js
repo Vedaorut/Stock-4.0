@@ -45,6 +45,7 @@ jest.unstable_mockModule('../../src/config/subscriptionPricing.js', () => ({
   SUBSCRIPTION_PRICES_YEARLY: { basic: 250, pro: 350 },
   SUBSCRIPTION_PERIOD_DAYS: 30,
   GRACE_PERIOD_DAYS: 2,
+  TRIAL_PERIOD_DAYS: 7,
 }));
 
 // Import mocked modules after mocking
@@ -57,6 +58,7 @@ const {
 
 const {
   checkExpiredSubscriptions,
+  checkExpiredTrials,
   deactivateShop,
   activatePromoSubscription,
   calculateUpgradeAmount,
@@ -291,6 +293,303 @@ describe('Subscription Service', () => {
 
         expect(result.deactivated).toBe(0);
         expect(result.gracePeriod).toBe(0);
+      });
+    });
+  });
+
+  // ============================================================================
+  // checkExpiredTrials - CRITICAL (P0)
+  // ============================================================================
+  describe('checkExpiredTrials', () => {
+    describe('Transaction Handling', () => {
+      it('should wrap updates in transaction (BEGIN/COMMIT)', async () => {
+        const expiredTrial = {
+          id: 1,
+          name: 'Test Shop',
+          trial_ends_at: new Date(Date.now() - 1000),
+        };
+
+        mockClient.query.mockImplementation(
+          createMockQueryHandler({
+            'SELECT id, name, trial_ends_at FROM shops': () =>
+              Promise.resolve({ rows: [expiredTrial] }),
+            'UPDATE shops': () => Promise.resolve(),
+          })
+        );
+
+        await checkExpiredTrials();
+
+        expect(mockClient.query).toHaveBeenCalledWith('BEGIN');
+        expect(mockClient.query).toHaveBeenCalledWith('COMMIT');
+        expect(mockClient.release).toHaveBeenCalled();
+      });
+
+      it('should rollback on database error', async () => {
+        mockClient.query
+          .mockResolvedValueOnce({}) // BEGIN
+          .mockRejectedValueOnce(new Error('DB Error'));
+
+        await expect(checkExpiredTrials()).rejects.toThrow('DB Error');
+
+        expect(mockClient.query).toHaveBeenCalledWith('ROLLBACK');
+        expect(mockClient.release).toHaveBeenCalled();
+      });
+
+      it('should always release client in finally block', async () => {
+        const dbError = new Error('Connection failed');
+        mockClient.query.mockRejectedValue(dbError);
+
+        await expect(checkExpiredTrials()).rejects.toThrow('Connection failed');
+
+        expect(mockClient.release).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe('Tier Reset Logic', () => {
+      it('should reset tier to basic when trial expires', async () => {
+        const expiredTrial = {
+          id: 1,
+          name: 'Pro Trial Shop',
+          trial_ends_at: new Date(Date.now() - 1000),
+        };
+
+        let updateParams = null;
+        mockClient.query.mockImplementation((sql, params) => {
+          if (sql === 'BEGIN' || sql === 'COMMIT' || sql === 'ROLLBACK') {
+            return Promise.resolve();
+          }
+          if (typeof sql === 'string' && sql.includes('SELECT id, name, trial_ends_at')) {
+            return Promise.resolve({ rows: [expiredTrial] });
+          }
+          if (typeof sql === 'string' && sql.includes('UPDATE shops')) {
+            updateParams = { sql, params };
+            return Promise.resolve();
+          }
+          return Promise.resolve({ rows: [] });
+        });
+
+        await checkExpiredTrials();
+
+        expect(updateParams).not.toBeNull();
+        expect(updateParams.sql).toContain("tier = 'basic'");
+        expect(updateParams.sql).toContain('is_trial = false');
+        expect(updateParams.sql).toContain("subscription_status = 'grace_period'");
+      });
+
+      it('should set is_trial to false when trial expires', async () => {
+        const expiredTrial = {
+          id: 5,
+          name: 'Expired Trial Shop',
+          trial_ends_at: new Date(Date.now() - 24 * 60 * 60 * 1000), // 1 day ago
+        };
+
+        let updateQuery = null;
+        mockClient.query.mockImplementation((sql, params) => {
+          if (sql === 'BEGIN' || sql === 'COMMIT' || sql === 'ROLLBACK') {
+            return Promise.resolve();
+          }
+          if (typeof sql === 'string' && sql.includes('SELECT id, name, trial_ends_at')) {
+            return Promise.resolve({ rows: [expiredTrial] });
+          }
+          if (typeof sql === 'string' && sql.includes('UPDATE shops')) {
+            updateQuery = sql;
+            return Promise.resolve();
+          }
+          return Promise.resolve({ rows: [] });
+        });
+
+        await checkExpiredTrials();
+
+        expect(updateQuery).toContain('is_trial = false');
+      });
+
+      it('should set subscription_status to grace_period', async () => {
+        const expiredTrial = {
+          id: 3,
+          name: 'Trial Shop',
+          trial_ends_at: new Date(Date.now() - 1000),
+        };
+
+        let updateQuery = null;
+        mockClient.query.mockImplementation((sql, params) => {
+          if (sql === 'BEGIN' || sql === 'COMMIT' || sql === 'ROLLBACK') {
+            return Promise.resolve();
+          }
+          if (typeof sql === 'string' && sql.includes('SELECT id, name, trial_ends_at')) {
+            return Promise.resolve({ rows: [expiredTrial] });
+          }
+          if (typeof sql === 'string' && sql.includes('UPDATE shops')) {
+            updateQuery = sql;
+            return Promise.resolve();
+          }
+          return Promise.resolve({ rows: [] });
+        });
+
+        await checkExpiredTrials();
+
+        expect(updateQuery).toContain("subscription_status = 'grace_period'");
+      });
+
+      it('should calculate grace_period_until correctly (GRACE_PERIOD_DAYS from now)', async () => {
+        const expiredTrial = {
+          id: 1,
+          name: 'Test Shop',
+          trial_ends_at: new Date(Date.now() - 1000),
+        };
+
+        let gracePeriodUntil = null;
+        mockClient.query.mockImplementation((sql, params) => {
+          if (sql === 'BEGIN' || sql === 'COMMIT' || sql === 'ROLLBACK') {
+            return Promise.resolve();
+          }
+          if (typeof sql === 'string' && sql.includes('SELECT id, name, trial_ends_at')) {
+            return Promise.resolve({ rows: [expiredTrial] });
+          }
+          if (typeof sql === 'string' && sql.includes('UPDATE shops') && params) {
+            // First param is grace_period_until, second is shop id
+            gracePeriodUntil = params[0];
+            return Promise.resolve();
+          }
+          return Promise.resolve({ rows: [] });
+        });
+
+        const beforeTest = new Date();
+        await checkExpiredTrials();
+        const afterTest = new Date();
+
+        expect(gracePeriodUntil).toBeInstanceOf(Date);
+
+        // Grace period should be ~2 days from now (GRACE_PERIOD_DAYS = 2)
+        const expectedMinMs = beforeTest.getTime() + 2 * 24 * 60 * 60 * 1000 - 1000;
+        const expectedMaxMs = afterTest.getTime() + 2 * 24 * 60 * 60 * 1000 + 1000;
+
+        expect(gracePeriodUntil.getTime()).toBeGreaterThanOrEqual(expectedMinMs);
+        expect(gracePeriodUntil.getTime()).toBeLessThanOrEqual(expectedMaxMs);
+      });
+    });
+
+    describe('Edge Cases', () => {
+      it('should return transitioned: 0 when no expired trials exist', async () => {
+        mockClient.query.mockImplementation(
+          createMockQueryHandler({
+            'SELECT id, name, trial_ends_at FROM shops': () =>
+              Promise.resolve({ rows: [] }),
+          })
+        );
+
+        const result = await checkExpiredTrials();
+
+        expect(result).toEqual({ transitioned: 0 });
+        expect(mockClient.query).toHaveBeenCalledWith('BEGIN');
+        expect(mockClient.query).toHaveBeenCalledWith('COMMIT');
+      });
+
+      it('should process multiple expired trials (batch processing)', async () => {
+        const expiredTrials = [
+          { id: 1, name: 'Shop 1', trial_ends_at: new Date(Date.now() - 1000) },
+          { id: 2, name: 'Shop 2', trial_ends_at: new Date(Date.now() - 2000) },
+          { id: 3, name: 'Shop 3', trial_ends_at: new Date(Date.now() - 3000) },
+        ];
+
+        let updateCount = 0;
+        mockClient.query.mockImplementation((sql, params) => {
+          if (sql === 'BEGIN' || sql === 'COMMIT' || sql === 'ROLLBACK') {
+            return Promise.resolve();
+          }
+          if (typeof sql === 'string' && sql.includes('SELECT id, name, trial_ends_at')) {
+            return Promise.resolve({ rows: expiredTrials });
+          }
+          if (typeof sql === 'string' && sql.includes('UPDATE shops')) {
+            updateCount++;
+            return Promise.resolve();
+          }
+          return Promise.resolve({ rows: [] });
+        });
+
+        const result = await checkExpiredTrials();
+
+        expect(result.transitioned).toBe(3);
+        expect(updateCount).toBe(3);
+      });
+
+      it('should log warning for each transitioned shop', async () => {
+        const expiredTrial = {
+          id: 42,
+          name: 'Logged Shop',
+          trial_ends_at: new Date(Date.now() - 1000),
+        };
+
+        mockClient.query.mockImplementation(
+          createMockQueryHandler({
+            'SELECT id, name, trial_ends_at FROM shops': () =>
+              Promise.resolve({ rows: [expiredTrial] }),
+            'UPDATE shops': () => Promise.resolve(),
+          })
+        );
+
+        await checkExpiredTrials();
+
+        expect(logger.warn).toHaveBeenCalledWith(
+          expect.stringContaining('Shop 42 (Logged Shop) trial expired')
+        );
+      });
+
+      it('should log info when trials are transitioned', async () => {
+        const expiredTrials = [
+          { id: 1, name: 'Shop 1', trial_ends_at: new Date(Date.now() - 1000) },
+          { id: 2, name: 'Shop 2', trial_ends_at: new Date(Date.now() - 2000) },
+        ];
+
+        mockClient.query.mockImplementation(
+          createMockQueryHandler({
+            'SELECT id, name, trial_ends_at FROM shops': () =>
+              Promise.resolve({ rows: expiredTrials }),
+            'UPDATE shops': () => Promise.resolve(),
+          })
+        );
+
+        await checkExpiredTrials();
+
+        expect(logger.info).toHaveBeenCalledWith(
+          '[Trial] 2 trials expired and transitioned to grace period'
+        );
+      });
+
+      it('should not log info when no trials are transitioned', async () => {
+        mockClient.query.mockImplementation(
+          createMockQueryHandler({
+            'SELECT id, name, trial_ends_at FROM shops': () =>
+              Promise.resolve({ rows: [] }),
+          })
+        );
+
+        // Clear previous calls
+        logger.info.mockClear();
+
+        await checkExpiredTrials();
+
+        // Should not have the "X trials expired" log
+        const infoCalls = logger.info.mock.calls;
+        const hasTrialExpiredLog = infoCalls.some(
+          call => typeof call[0] === 'string' && call[0].includes('trials expired')
+        );
+        expect(hasTrialExpiredLog).toBe(false);
+      });
+    });
+
+    describe('Error Handling', () => {
+      it('should log error before rethrowing', async () => {
+        const dbError = new Error('Database connection lost');
+        mockClient.query
+          .mockResolvedValueOnce({}) // BEGIN
+          .mockRejectedValueOnce(dbError);
+
+        await expect(checkExpiredTrials()).rejects.toThrow('Database connection lost');
+
+        expect(logger.error).toHaveBeenCalledWith(
+          '[SubscriptionService] checkExpiredTrials error:',
+          dbError
+        );
       });
     });
   });
@@ -589,6 +888,7 @@ describe('Subscription Service', () => {
 
   // ============================================================================
   // calculateUpgradeCost - MEDIUM (P1)
+  // Uses pool.query() directly (optimized - no pool.connect())
   // ============================================================================
   describe('calculateUpgradeCost', () => {
     it('should return upgrade cost with remaining days info', async () => {
@@ -602,14 +902,9 @@ describe('Subscription Service', () => {
         period_end: periodEnd,
       };
 
-      mockClient.query.mockImplementation(
-        createMockQueryHandler({
-          'SELECT tier FROM shops': () =>
-            Promise.resolve({ rows: [mockShop] }),
-          'SELECT * FROM shop_subscriptions': () =>
-            Promise.resolve({ rows: [mockSubscription] }),
-        })
-      );
+      mockPoolQuery
+        .mockResolvedValueOnce({ rows: [mockShop] })
+        .mockResolvedValueOnce({ rows: [mockSubscription] });
 
       const result = await calculateUpgradeCost(1);
 
@@ -618,29 +913,18 @@ describe('Subscription Service', () => {
       expect(result.newTier).toBe('pro');
       expect(result.remainingDays).toBe(20);
       expect(result.amount).toBeCloseTo(6.67, 1);
-      expect(mockClient.release).toHaveBeenCalled();
     });
 
     it('should throw error if shop not found', async () => {
-      mockClient.query.mockImplementation(
-        createMockQueryHandler({
-          'SELECT tier FROM shops': () => Promise.resolve({ rows: [] }),
-        })
-      );
+      mockPoolQuery.mockResolvedValueOnce({ rows: [] });
 
       await expect(calculateUpgradeCost(999)).rejects.toThrow('Shop not found');
-      expect(mockClient.release).toHaveBeenCalled();
     });
 
     it('should throw error if no active subscription found', async () => {
-      mockClient.query.mockImplementation(
-        createMockQueryHandler({
-          'SELECT tier FROM shops': () =>
-            Promise.resolve({ rows: [{ tier: 'basic' }] }),
-          'SELECT * FROM shop_subscriptions': () =>
-            Promise.resolve({ rows: [] }),
-        })
-      );
+      mockPoolQuery
+        .mockResolvedValueOnce({ rows: [{ tier: 'basic' }] })
+        .mockResolvedValueOnce({ rows: [] });
 
       await expect(calculateUpgradeCost(1)).rejects.toThrow(
         'No active subscription found'
@@ -648,24 +932,58 @@ describe('Subscription Service', () => {
     });
 
     it('should return alreadyPro: true with amount 0 for pro tier', async () => {
-      mockClient.query.mockImplementation(
-        createMockQueryHandler({
-          'SELECT tier FROM shops': () =>
-            Promise.resolve({ rows: [{ tier: 'pro' }] }),
-        })
-      );
+      mockPoolQuery.mockResolvedValueOnce({ rows: [{ tier: 'pro' }] });
 
       const result = await calculateUpgradeCost(1);
 
       expect(result.alreadyPro).toBe(true);
       expect(result.amount).toBe(0);
     });
+
+    it('should use pool.query() directly (not pool.connect())', async () => {
+      mockPoolQuery
+        .mockResolvedValueOnce({ rows: [{ tier: 'basic' }] })
+        .mockResolvedValueOnce({ rows: [{ period_start: new Date(), period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) }] });
+
+      await calculateUpgradeCost(1);
+
+      expect(mockPoolQuery).toHaveBeenCalled();
+      expect(mockPoolConnect).not.toHaveBeenCalled();
+    });
   });
 
   // ============================================================================
   // getSubscriptionStatus - MEDIUM (P1)
+  // Uses pool.query() directly (optimized - no pool.connect())
   // ============================================================================
   describe('getSubscriptionStatus', () => {
+    it('should use pool.query() directly (not pool.connect())', async () => {
+      const mockShop = {
+        id: 1,
+        tier: 'pro',
+        subscription_status: 'active',
+        next_payment_due: new Date(),
+        grace_period_until: null,
+        is_active: true,
+      };
+      const mockSubscription = {
+        id: 100,
+        shop_id: 1,
+        tier: 'pro',
+        status: 'active',
+      };
+
+      mockPoolQuery
+        .mockResolvedValueOnce({ rows: [mockShop] }) // First query: shop info
+        .mockResolvedValueOnce({ rows: [mockSubscription] }); // Second query: subscription
+
+      await getSubscriptionStatus(1);
+
+      // Should use pool.query() not pool.connect()
+      expect(mockPoolQuery).toHaveBeenCalledTimes(2);
+      expect(mockPoolConnect).not.toHaveBeenCalled();
+    });
+
     it('should return shop info with current subscription', async () => {
       const mockShop = {
         id: 1,
@@ -682,14 +1000,9 @@ describe('Subscription Service', () => {
         status: 'active',
       };
 
-      mockClient.query.mockImplementation(
-        createMockQueryHandler({
-          'SELECT id, tier, subscription_status': () =>
-            Promise.resolve({ rows: [mockShop] }),
-          'SELECT * FROM shop_subscriptions': () =>
-            Promise.resolve({ rows: [mockSubscription] }),
-        })
-      );
+      mockPoolQuery
+        .mockResolvedValueOnce({ rows: [mockShop] })
+        .mockResolvedValueOnce({ rows: [mockSubscription] });
 
       const result = await getSubscriptionStatus(1);
 
@@ -699,19 +1012,12 @@ describe('Subscription Service', () => {
       expect(result.isActive).toBe(true);
       expect(result.currentSubscription).toEqual(mockSubscription);
       expect(result.price).toBe(SUBSCRIPTION_PRICES.pro);
-      expect(mockClient.release).toHaveBeenCalled();
     });
 
     it('should throw error if shop not found', async () => {
-      mockClient.query.mockImplementation(
-        createMockQueryHandler({
-          'SELECT id, tier, subscription_status': () =>
-            Promise.resolve({ rows: [] }),
-        })
-      );
+      mockPoolQuery.mockResolvedValueOnce({ rows: [] });
 
       await expect(getSubscriptionStatus(999)).rejects.toThrow('Shop not found');
-      expect(mockClient.release).toHaveBeenCalled();
     });
 
     it('should return null currentSubscription if no active subscription', async () => {
@@ -724,55 +1030,125 @@ describe('Subscription Service', () => {
         is_active: false,
       };
 
-      mockClient.query.mockImplementation(
-        createMockQueryHandler({
-          'SELECT id, tier, subscription_status': () =>
-            Promise.resolve({ rows: [mockShop] }),
-          'SELECT * FROM shop_subscriptions': () =>
-            Promise.resolve({ rows: [] }),
-        })
-      );
+      const mockLatestSubscription = {
+        id: 123,
+        shop_id: 1,
+        tier: 'basic',
+        status: 'expired',
+        period_end: new Date(Date.now() - 86400000), // Yesterday
+      };
+
+      mockPoolQuery
+        .mockResolvedValueOnce({ rows: [mockShop] })
+        .mockResolvedValueOnce({ rows: [] }) // No active subscription
+        .mockResolvedValueOnce({ rows: [mockLatestSubscription] }); // Latest subscription for renewal
 
       const result = await getSubscriptionStatus(1);
 
       expect(result.currentSubscription).toBeNull();
+      expect(result.latestSubscription).toEqual(mockLatestSubscription);
+    });
+
+    it('should query shop with correct SQL', async () => {
+      const mockShop = {
+        id: 1,
+        tier: 'basic',
+        subscription_status: 'active',
+        next_payment_due: new Date(),
+        grace_period_until: null,
+        is_active: true,
+      };
+
+      mockPoolQuery
+        .mockResolvedValueOnce({ rows: [mockShop] })
+        .mockResolvedValueOnce({ rows: [] }) // No active subscription
+        .mockResolvedValueOnce({ rows: [] }); // No latest subscription either
+
+      await getSubscriptionStatus(1);
+
+      expect(mockPoolQuery).toHaveBeenCalledWith(
+        expect.stringContaining('SELECT id, tier, subscription_status'),
+        [1]
+      );
     });
   });
 
   // ============================================================================
   // getSubscriptionHistory - LOW (P2)
+  // Uses pool.query() directly (optimized - no pool.connect())
   // ============================================================================
   describe('getSubscriptionHistory', () => {
+    it('should use pool.query() directly (not pool.connect())', async () => {
+      const mockHistory = [
+        { id: 1, shop_id: 1, tier: 'pro', created_at: new Date() },
+      ];
+
+      mockPoolQuery.mockResolvedValueOnce({ rows: mockHistory });
+
+      await getSubscriptionHistory(1, 10);
+
+      // Should use pool.query() not pool.connect()
+      expect(mockPoolQuery).toHaveBeenCalledTimes(1);
+      expect(mockPoolConnect).not.toHaveBeenCalled();
+    });
+
     it('should return subscription history for shop', async () => {
       const mockHistory = [
         { id: 1, shop_id: 1, tier: 'pro', created_at: new Date() },
         { id: 2, shop_id: 1, tier: 'basic', created_at: new Date() },
       ];
 
-      mockClient.query.mockImplementation(
-        createMockQueryHandler({
-          'SELECT * FROM shop_subscriptions WHERE shop_id': () =>
-            Promise.resolve({ rows: mockHistory }),
-        })
-      );
+      mockPoolQuery.mockResolvedValueOnce({ rows: mockHistory });
 
       const result = await getSubscriptionHistory(1, 10);
 
       expect(result).toHaveLength(2);
       expect(result[0].tier).toBe('pro');
-      expect(mockClient.release).toHaveBeenCalled();
     });
 
     it('should use default limit of 10', async () => {
-      mockClient.query.mockImplementation((sql, params) => {
-        if (sql.includes('shop_subscriptions')) {
-          expect(params[1]).toBe(10);
-          return Promise.resolve({ rows: [] });
-        }
-        return Promise.resolve({ rows: [] });
-      });
+      mockPoolQuery.mockResolvedValueOnce({ rows: [] });
 
       await getSubscriptionHistory(1);
+
+      expect(mockPoolQuery).toHaveBeenCalledWith(
+        expect.stringContaining('LIMIT $2'),
+        [1, 10]
+      );
+    });
+
+    it('should use custom limit when provided', async () => {
+      mockPoolQuery.mockResolvedValueOnce({ rows: [] });
+
+      await getSubscriptionHistory(1, 5);
+
+      expect(mockPoolQuery).toHaveBeenCalledWith(
+        expect.any(String),
+        [1, 5]
+      );
+    });
+
+    it('should query with correct SQL structure', async () => {
+      mockPoolQuery.mockResolvedValueOnce({ rows: [] });
+
+      await getSubscriptionHistory(1, 10);
+
+      expect(mockPoolQuery).toHaveBeenCalledWith(
+        expect.stringContaining('SELECT * FROM shop_subscriptions'),
+        expect.any(Array)
+      );
+      expect(mockPoolQuery).toHaveBeenCalledWith(
+        expect.stringContaining('ORDER BY created_at DESC'),
+        expect.any(Array)
+      );
+    });
+
+    it('should return empty array when no history exists', async () => {
+      mockPoolQuery.mockResolvedValueOnce({ rows: [] });
+
+      const result = await getSubscriptionHistory(999, 10);
+
+      expect(result).toEqual([]);
     });
   });
 

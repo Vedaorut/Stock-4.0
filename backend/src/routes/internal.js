@@ -20,36 +20,37 @@ if (!BOT_TOKEN) {
   throw new Error('TELEGRAM_BOT_TOKEN is required for internal auth signature verification');
 }
 
-// Allowed IPs for internal API (localhost + Docker networks)
+// Allowed IPs for internal API (localhost ONLY - no Docker networks for security)
 const ALLOWED_INTERNAL_IPS = [
   '127.0.0.1',
   '::1',
   '::ffff:127.0.0.1',
-  'localhost',
-  // Docker bridge network
-  /^172\.(1[6-9]|2[0-9]|3[0-1])\./,
-  /^192\.168\./,
-  /^10\./,
 ];
+
+// Optional additional secret for internal API access (defense in depth)
+const INTERNAL_API_SECRET = process.env.INTERNAL_API_SECRET;
 
 function isAllowedIP(ip) {
   if (!ip) {return false;}
 
-  return ALLOWED_INTERNAL_IPS.some((allowed) => {
-    if (allowed instanceof RegExp) {
-      return allowed.test(ip);
-    }
-    return ip === allowed || ip.includes(allowed);
-  });
+  // Exact match only - no regex, no partial matching
+  return ALLOWED_INTERNAL_IPS.includes(ip);
 }
 
 /**
  * Middleware to verify internal requests with HMAC signature
  *
- * Headers required:
- * - x-internal-secret: shared secret
- * - x-internal-timestamp: request timestamp (anti-replay)
- * - x-internal-signature: HMAC-SHA256(body + timestamp, secret)
+ * Security layers (defense in depth):
+ * 1. IP whitelist - only localhost allowed (127.0.0.1, ::1, ::ffff:127.0.0.1)
+ * 2. INTERNAL_API_SECRET (optional) - if env var set, requires X-Internal-Api-Secret header
+ * 3. INTERNAL_SECRET - always required via X-Internal-Secret header
+ * 4. HMAC signature (for /auth/* routes) - X-Internal-Signature + X-Internal-Timestamp
+ *
+ * Headers:
+ * - X-Internal-Api-Secret: optional additional secret (if INTERNAL_API_SECRET env is set)
+ * - X-Internal-Secret: shared secret (required)
+ * - X-Internal-Timestamp: request timestamp (required for /auth/* routes)
+ * - X-Internal-Signature: HMAC-SHA256(body + timestamp, BOT_TOKEN) (required for /auth/* routes)
  */
 function verifyInternalSecret(req, res, next) {
   const secret = req.headers['x-internal-secret'];
@@ -69,7 +70,23 @@ function verifyInternalSecret(req, res, next) {
     });
   }
 
-  // 2. Check secret
+  // 2. Check INTERNAL_API_SECRET if configured (additional layer of security)
+  if (INTERNAL_API_SECRET) {
+    const providedApiSecret = req.headers['x-internal-api-secret'];
+    if (!providedApiSecret || providedApiSecret !== INTERNAL_API_SECRET) {
+      logger.warn('Internal API access with invalid/missing API secret', {
+        ip: clientIP,
+        path: req.path,
+        hasSecret: !!providedApiSecret,
+      });
+      return res.status(403).json({
+        success: false,
+        error: 'Invalid internal API secret',
+      });
+    }
+  }
+
+  // 3. Check secret
   if (secret !== INTERNAL_SECRET) {
     logger.warn('Unauthorized internal API access attempt', {
       ip: clientIP,
@@ -249,7 +266,7 @@ router.post('/auth/bot-register', verifyInternalSecret, async (req, res) => {
       logger.info(`[Internal] Existing user authenticated via bot: ${telegramId} (@${username})`);
     }
 
-    // Generate JWT token
+    // Generate JWT token (explicit algorithm to prevent algorithm confusion attacks)
     const token = jwt.sign(
       {
         id: user.id,
@@ -258,7 +275,7 @@ router.post('/auth/bot-register', verifyInternalSecret, async (req, res) => {
         jti: crypto.randomBytes(16).toString('hex'),
       },
       config.jwt.secret,
-      { expiresIn: config.jwt.expiresIn }
+      { expiresIn: config.jwt.expiresIn, algorithm: 'HS256' }
     );
 
     res.status(isNewUser ? 201 : 200).json({
