@@ -6,97 +6,7 @@ import { useApi } from '../../hooks/useApi';
 import { useBackButton } from '../../hooks/useBackButton';
 import { useTranslation } from '../../i18n/useTranslation';
 import { useStore } from '../../store/useStore';
-
-// Follow Card Component
-function FollowCard({ follow, onModeSwitch, onDelete, t }) {
-  const { triggerHaptic, confirm } = useTelegram();
-  const [switching, setSwitching] = useState(false);
-
-  const handleModeSwitch = async () => {
-    setSwitching(true);
-    triggerHaptic('light');
-    await onModeSwitch(follow, follow.mode === 'monitor' ? 'resell' : 'monitor');
-    setSwitching(false);
-  };
-
-  const handleDelete = async () => {
-    triggerHaptic('medium');
-    const confirmed = await confirm(t('follows.unsubscribeConfirm', { shop: follow.source_shop_name || t('shop.products') }));
-    if (confirmed) {
-      triggerHaptic('success');
-      onDelete(follow.id);
-    }
-  };
-
-  const modeColors = {
-    monitor: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-    resell: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
-  };
-
-  return (
-    <motion.div
-      className="glass-card rounded-2xl p-4"
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, x: -20 }}
-      layout
-    >
-      <div className="flex items-start justify-between gap-3 mb-3">
-        <div className="flex-1 min-w-0">
-          <h3 className="text-white font-semibold mb-1 truncate">
-            {follow.source_shop_name || `Shop #${follow.target_shop_id}`}
-          </h3>
-          {follow.source_shop_logo && (
-            <p className="text-sm text-gray-400 truncate">@{follow.source_username || ''}</p>
-          )}
-        </div>
-        <motion.button
-          onClick={handleDelete}
-          className="w-9 h-9 rounded-xl flex items-center justify-center text-red-400"
-          style={{
-            background: 'rgba(255, 59, 48, 0.1)',
-            border: '1px solid rgba(255, 59, 48, 0.2)',
-          }}
-          whileTap={{ scale: 0.9 }}
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-            />
-          </svg>
-        </motion.button>
-      </div>
-
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span
-            className={`px-3 py-1 rounded-full text-xs font-semibold border ${modeColors[follow.mode]}`}
-          >
-            {follow.mode === 'monitor' ? t('follows.monitorMode') : t('follows.resellMode')}
-          </span>
-          {follow.mode === 'resell' && follow.markup_percentage && (
-            <span className="text-xs text-gray-400">+{follow.markup_percentage}%</span>
-          )}
-        </div>
-        <motion.button
-          onClick={handleModeSwitch}
-          disabled={switching}
-          className="px-3 py-1 rounded-lg text-xs font-medium text-orange-primary disabled:opacity-50"
-          style={{
-            background: 'rgba(255, 107, 0, 0.1)',
-            border: '1px solid rgba(255, 107, 0, 0.2)',
-          }}
-          whileTap={!switching ? { scale: 0.95 } : {}}
-        >
-          {switching ? '...' : follow.mode === 'monitor' ? t('follows.switchToResell') : t('follows.switchToMonitor')}
-        </motion.button>
-      </div>
-    </motion.div>
-  );
-}
+import FollowCard from '../Follows/FollowCard';
 
 // Main Modal Component
 export default function FollowsModal({ isOpen, onClose }) {
@@ -132,12 +42,11 @@ export default function FollowsModal({ isOpen, onClose }) {
         // 1. Get shop - simplified parsing
         const shopsRes = await fetchApi('/shops/my', {
           signal,
-          timeout: 10000, // 10 second timeout to prevent infinite loading
+          timeout: 10000,
         });
 
         if (signal?.aborted) return { status: 'aborted' };
 
-        // ✅ FIX: Standardized safe array extraction
         const shopsList = Array.isArray(shopsRes?.data)
           ? shopsRes.data
           : Array.isArray(shopsRes)
@@ -154,23 +63,21 @@ export default function FollowsModal({ isOpen, onClose }) {
           return { status: 'success' };
         }
 
-        // 2. Check PRO tier
-
-        // 3. Load follows and limits in parallel
+        // 2. Load follows and limits in parallel
         const [followsRes, limitRes] = await Promise.all([
           fetchApi(`/follows/my?shopId=${shop.id}`, {
             signal,
-            timeout: 10000, // 10 second timeout to prevent infinite loading
+            timeout: 10000,
           }),
           fetchApi(`/follows/check-limit?shopId=${shop.id}`, {
             signal,
-            timeout: 10000, // 10 second timeout to prevent infinite loading
+            timeout: 10000,
           }),
         ]);
 
         if (signal?.aborted) return { status: 'aborted' };
 
-        // 4. Parse follows - standardized safe extraction
+        // 3. Parse follows
         const followsList = Array.isArray(followsRes?.data)
           ? followsRes.data
           : Array.isArray(followsRes)
@@ -179,7 +86,7 @@ export default function FollowsModal({ isOpen, onClose }) {
 
         setFollows(followsList);
 
-        // 5. Parse limit info - simplified with fallback
+        // 4. Parse limit info
         try {
           let limitData = null;
           if (limitRes && typeof limitRes === 'object') {
@@ -196,7 +103,6 @@ export default function FollowsModal({ isOpen, onClose }) {
               reached: limitData.reached === true,
             });
           } else {
-            // Fallback - safe defaults
             setLimitInfo({
               count: followsList.length,
               limit: null,
@@ -252,64 +158,18 @@ export default function FollowsModal({ isOpen, onClose }) {
         }
       })
       .finally(() => {
-        // ✅ FIX: Always reset loading, even on abort
-        // This prevents infinite spinner when modal is reopened after quick close
         setLoading(false);
       });
 
     return () => controller.abort();
   }, [isOpen, loadData]);
 
-  const handleModeSwitch = async (follow, newMode) => {
-    try {
-      const requestBody = { mode: newMode };
-
-      if (newMode === 'resell') {
-        const defaultMarkup = follow.markup_percentage || 15;
-        const input = window.prompt(t('follows.markupPrompt'), defaultMarkup);
-
-        if (input === null) {
-          return false;
-        }
-
-        const parsed = Number.parseFloat(String(input).trim().replace(',', '.'));
-        if (!Number.isFinite(parsed) || parsed < 1 || parsed > 500) {
-          await alert(t('follows.markupError'));
-          return false;
-        }
-
-        requestBody.markupPercentage = parsed;
-        // Preserve existing markup type and fixed value
-        requestBody.markupType = follow.markup_type || 'percentage';
-        requestBody.markupFixed = follow.markup_fixed || 0;
-      }
-
-      await fetchApi(`/follows/${follow.id}/mode`, {
-        method: 'PUT',
-        body: JSON.stringify(requestBody),
-      });
-
-      triggerHaptic('success');
-      await loadData();
-      return true;
-    } catch (error) {
-      await alert(error.message || t('follows.modeError'));
-      return false;
-    }
-  };
-
-  const handleDeleteFollow = async (followId) => {
-    try {
-      await fetchApi(`/follows/${followId}`, {
-        method: 'DELETE',
-      });
-
-      triggerHaptic('success');
-      await loadData();
-    } catch (error) {
-      await alert(error.message || t('follows.deleteError'));
-    }
-  };
+  // Navigate to FollowDetail page
+  const handleFollowClick = useCallback((followId) => {
+    triggerHaptic('light');
+    useStore.getState().setFollowDetailId(followId);
+    handleClose();
+  }, [triggerHaptic, handleClose]);
 
   const handleSearchShop = async () => {
     if (!searchQuery.trim()) {
@@ -333,7 +193,6 @@ export default function FollowsModal({ isOpen, onClose }) {
         await alert(t('follows.notFound'));
       }
     } catch (error) {
-      // Ignore abort errors
       if (error.name === 'AbortError') return;
       await alert(error.message || t('follows.searchError'));
     } finally {
@@ -361,7 +220,6 @@ export default function FollowsModal({ isOpen, onClose }) {
       setSearchQuery('');
       setSearchResults([]);
       await loadData();
-      // Update global state so TabBar shows Following tab immediately
       useStore.getState().setHasFollows(true);
       await alert(t('follows.added'));
     } catch (error) {
@@ -566,9 +424,7 @@ export default function FollowsModal({ isOpen, onClose }) {
                       <FollowCard
                         key={follow.id}
                         follow={follow}
-                        onModeSwitch={handleModeSwitch}
-                        onDelete={handleDeleteFollow}
-                        t={t}
+                        onClick={() => handleFollowClick(follow.id)}
                       />
                     ))}
                   </AnimatePresence>

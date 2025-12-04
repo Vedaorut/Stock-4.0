@@ -7,6 +7,8 @@ import { useStore } from '../store/useStore';
 import { useTelegram } from '../hooks/useTelegram';
 import { useTranslation } from '../i18n/useTranslation';
 import FollowCard from '../components/Follows/FollowCard';
+// eslint-disable-next-line no-unused-vars -- Used in JSX below
+import ProductsPreview from '../components/Follows/ProductsPreview';
 
 export default function Follows() {
   const { get } = useApi();
@@ -250,6 +252,11 @@ export default function Follows() {
                 <FollowCard
                   follow={follow}
                   onClick={() => handleFollowClick(follow.id)}
+                />
+                <ProductsPreview
+                  followId={follow.id}
+                  mode={follow.mode}
+                  maxProducts={5}
                 />
               </motion.div>
             ))}
