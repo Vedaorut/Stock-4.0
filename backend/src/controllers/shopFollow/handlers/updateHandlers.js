@@ -79,7 +79,7 @@ export const updateFollowMarkup = asyncHandler(async (req, res) => {
 export const switchFollowMode = asyncHandler(async (req, res) => {
   try {
     const { id } = req.params;
-    const { markupPercentage } = req.body;
+    const { markupPercentage, markupType, markupFixed } = req.body;
     const modeRaw = typeof req.body.mode === 'string' ? req.body.mode.trim().toLowerCase() : '';
 
     const followId = Number.parseInt(id, 10);
@@ -110,17 +110,29 @@ export const switchFollowMode = asyncHandler(async (req, res) => {
       }
     }
 
+    // Check if already in same mode (skip for resell - may need to re-sync if products missing)
     if (existingFollow.mode === normalizedMode && normalizedMode !== 'resell') {
       return res.json({ success: true, data: formatFollowResponse(existingFollow) });
     }
 
+    // For resell mode: check if we need to sync (products may be missing from failed previous attempt)
+    const needsSync = normalizedMode === 'resell' &&
+      (existingFollow.mode !== 'resell' || existingFollow.synced_products_count === 0);
+
     await shopFollowQueries.updateMode(followId, normalizedMode);
 
     if (normalizedMode === 'resell') {
-      await shopFollowQueries.updateMarkup(followId, markupValue);
-      await syncAllProductsForFollow(followId);
+      // Preserve existing markup type/fixed if not provided in request
+      const type = markupType || existingFollow.markup_type || 'percentage';
+      const fixed = markupFixed ?? existingFollow.markup_fixed ?? 0;
+      await shopFollowQueries.updateMarkup(followId, markupValue, type, fixed);
+
+      // Only sync if switching to resell OR if products are missing
+      if (needsSync) {
+        await syncAllProductsForFollow(followId);
+      }
     } else {
-      await shopFollowQueries.updateMarkup(followId, 0);
+      await shopFollowQueries.updateMarkup(followId, 0, 'percentage', 0);
 
       const synced = await syncedProductQueries.findByFollowId(followId);
       if (synced.length > 0) {

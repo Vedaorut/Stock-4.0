@@ -25,7 +25,7 @@ async function getShopProductCapacity(shopId) {
   const result = await pool.query(
     `SELECT s.tier, COUNT(p.id)::int as product_count
      FROM shops s
-     LEFT JOIN products p ON p.shop_id = s.id AND p.deleted_at IS NULL
+     LEFT JOIN products p ON p.shop_id = s.id AND p.is_active = true
      WHERE s.id = $1
      GROUP BY s.id, s.tier`,
     [shopId]
