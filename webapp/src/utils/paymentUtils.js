@@ -110,6 +110,38 @@ export const calculateCryptoAmount = (usdAmount, crypto) => {
 };
 
 /**
+ * Generate payment URI for QR code (includes amount)
+ * BIP21 for BTC, EIP-681 for ETH, standard for others
+ * @param {string} address - Wallet address
+ * @param {number|string} amount - Crypto amount
+ * @param {string} crypto - Cryptocurrency type
+ * @returns {string} Payment URI for QR code
+ */
+export const generatePaymentQRValue = (address, amount, crypto) => {
+  if (!address) return '';
+
+  const numAmount = parseFloat(amount) || 0;
+
+  switch (crypto) {
+    case 'BTC':
+      // BIP21 format: bitcoin:address?amount=X
+      return `bitcoin:${address}?amount=${numAmount.toFixed(8)}`;
+    case 'ETH':
+      // EIP-681 format: ethereum:address?value=X (value in wei, but we use simple format)
+      return `ethereum:${address}?value=${numAmount.toFixed(6)}`;
+    case 'LTC':
+      // Litecoin uses same BIP21 format
+      return `litecoin:${address}?amount=${numAmount.toFixed(5)}`;
+    case 'USDT_TRC20':
+      // TRON USDT - just address (no standard URI scheme widely supported)
+      // Users need to copy address and enter amount manually
+      return address;
+    default:
+      return address;
+  }
+};
+
+/**
  * Format crypto amount with proper decimal places
  * @param {number} amount - The crypto amount (guaranteed NUMBER from Store)
  * @param {string} crypto - The cryptocurrency type (BTC, ETH, USDT, USDT_TRC20, LTC)

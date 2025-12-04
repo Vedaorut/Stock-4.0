@@ -27,6 +27,26 @@
       "shipped": "Shipped",
       "delivered": "Delivered",
       "cancelled": "Cancelled"
+    },
+    "submitted": {
+      "buyer": {
+        "title": "Payment Submitted!",
+        "shop": "Shop: {shopName}",
+        "product": "Product: {productName}",
+        "amountUsd": "Amount: ${amount}",
+        "amountCrypto": "Paid: {cryptoAmount} {currency}",
+        "txHash": "TX: {txHash}",
+        "verifying": "Verifying payment. We'll notify you once confirmed."
+      },
+      "seller": {
+        "title": "Buyer claimed payment!",
+        "orderId": "Order #{orderId}",
+        "product": "{productName}",
+        "amount": "${amount} ({cryptoAmount} {currency})",
+        "buyer": "Buyer: @{username}",
+        "txHash": "TX: {txHash}",
+        "warning": "Verify the transaction before delivering the product."
+      }
     }
   },
   "subscription": {

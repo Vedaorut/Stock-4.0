@@ -77,8 +77,10 @@ export function useApi() {
 
           // Handle 401 Unauthorized - attempt token refresh and retry ONCE
           if (err.response?.status === 401 && !isRetry && isTokenRefreshInitialized()) {
-            // eslint-disable-next-line no-console
-            console.log('[useApi] 🔄 Got 401, attempting token refresh for:', endpoint);
+            if (import.meta.env.DEV) {
+              // eslint-disable-next-line no-console
+              console.log('[useApi] 🔄 Got 401, attempting token refresh for:', endpoint);
+            }
 
             try {
               await refreshAuthToken();
@@ -86,18 +88,22 @@ export function useApi() {
               // Get fresh token after refresh
               const newToken = tokenGetter();
 
-              // eslint-disable-next-line no-console
-              console.log('[useApi] ✅ Token refreshed, retrying request');
+              if (import.meta.env.DEV) {
+                // eslint-disable-next-line no-console
+                console.log('[useApi] ✅ Token refreshed, retrying request');
+              }
 
               // Retry the request with new token (mark as retry to prevent infinite loop)
               const retryResponse = await makeRequest(newToken);
               return { data: retryResponse.data, error: null };
             } catch (refreshError) {
-              console.error('[useApi] ❌ Token refresh failed:', {
-                error: refreshError.message,
-                endpoint,
-                hint: 'initData may have expired. Restart the app from Telegram.',
-              });
+              if (import.meta.env.DEV) {
+                console.error('[useApi] ❌ Token refresh failed:', {
+                  error: refreshError.message,
+                  endpoint,
+                  hint: 'initData may have expired. Restart the app from Telegram.',
+                });
+              }
               // Token refresh failed - return user-friendly error
               return { data: null, error: 'Session expired. Please restart the app from Telegram.' };
             }

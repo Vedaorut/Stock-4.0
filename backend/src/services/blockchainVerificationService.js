@@ -56,7 +56,8 @@ const BLOCKCHAIN_CONFIG = {
   },
   ETH: {
     provider: 'etherscan',
-    baseUrl: 'https://api.etherscan.io/api',
+    baseUrl: 'https://api.etherscan.io/v2/api',
+    chainId: 1, // Ethereum Mainnet
     minConfirmations: SUPPORTED_CURRENCIES.ETH.confirmations,
     decimals: SUPPORTED_CURRENCIES.ETH.decimals,
   },
@@ -478,7 +479,8 @@ export async function verifyEthereumPayment(txHash, expectedAddress, expectedAmo
   }
 
   // Get transaction details (may throw BlockchainAPIError)
-  const txUrl = `${config.baseUrl}?module=proxy&action=eth_getTransactionByHash&txhash=${txHash}&apikey=${apiKey}`;
+  // V2 API requires chainid parameter
+  const txUrl = `${config.baseUrl}?chainid=${config.chainId}&module=proxy&action=eth_getTransactionByHash&txhash=${txHash}&apikey=${apiKey}`;
   const txData = await fetchWithRetry(txUrl);
 
   if (!txData.result) {
@@ -538,8 +540,9 @@ export async function verifyEthereumPayment(txHash, expectedAddress, expectedAmo
   }
 
   // Parallel fetch: receipt + currentBlock (optimized from sequential calls)
-  const receiptUrl = `${config.baseUrl}?module=proxy&action=eth_getTransactionReceipt&txhash=${txHash}&apikey=${apiKey}`;
-  const currentBlockUrl = `${config.baseUrl}?module=proxy&action=eth_blockNumber&apikey=${apiKey}`;
+  // V2 API requires chainid parameter
+  const receiptUrl = `${config.baseUrl}?chainid=${config.chainId}&module=proxy&action=eth_getTransactionReceipt&txhash=${txHash}&apikey=${apiKey}`;
+  const currentBlockUrl = `${config.baseUrl}?chainid=${config.chainId}&module=proxy&action=eth_blockNumber&apikey=${apiKey}`;
 
   const [receiptData, currentBlockData] = await Promise.all([
     fetchWithRetry(receiptUrl),

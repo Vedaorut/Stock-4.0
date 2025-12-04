@@ -2,7 +2,7 @@ import express from 'express';
 import { productController } from '../controllers/productController.js';
 import { productValidation, validateBulkOperation } from '../middleware/validation.js';
 import { verifyToken } from '../middleware/auth.js';
-import { productCreationLimiter } from '../middleware/rateLimiter.js';
+import { productCreationLimiter, apiLimiter } from '../middleware/rateLimiter.js';
 import { checkProductLimit, getProductLimitStatus } from '../middleware/productLimits.js';
 
 const router = express.Router();
@@ -59,16 +59,16 @@ router.get('/search', verifyToken, productController.search);
 /**
  * @route   GET /api/products
  * @desc    List products with filters
- * @access  Public
+ * @access  Public (rate limited)
  */
-router.get('/', productValidation.list, productController.list);
+router.get('/', apiLimiter, productValidation.list, productController.list);
 
 /**
  * @route   GET /api/products/:id
  * @desc    Get product by ID
- * @access  Public
+ * @access  Public (rate limited)
  */
-router.get('/:id', productValidation.getById, productController.getById);
+router.get('/:id', apiLimiter, productValidation.getById, productController.getById);
 
 /**
  * @route   PUT /api/products/:id

@@ -270,7 +270,7 @@ describe('Follow Shop - Create/View/Delete Flow (P0)', () => {
 
     const text2 = testBot.getLastReplyText();
     expect(text2).toContain('Подписка');
-    expect(text2).toContain('Resell'); // Current implementation uses "Resell"
+    expect(text2).toMatch(/Resell|перепродажа|resell/i);
     expect(text2).toContain('20%');
 
     // Verify POST with correct markup (filter out validateCircular POST)

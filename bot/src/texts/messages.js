@@ -76,7 +76,6 @@ const buildButtons = () => ({
   sendNotifications: t('buttons.sendNotifications'),
   modeMonitor: t('buttons.modeMonitor'),
   modeResell: t('buttons.modeResell'),
-  tierBasic: t('buttons.tierBasic'),
   tierPro: t('buttons.tierPro'),
   tierMax: t('buttons.tierMax'),
   cryptoBTC: t('buttons.cryptoBTC'),
@@ -153,17 +152,22 @@ const buildMessages = () => ({
     panel: (lang = 'ru') => t('seller.panel', {}, lang),
     shopPanel: (shop, lang = 'ru') => t('seller.shopPanel', { shop: safe(shop) }, lang),
     shopPanelWithStats: (shop, revenue, activeOrders, statusBar = null, lang = 'ru') => {
-      let message = '';
+      const lines = [];
 
-      if (statusBar) {
-        message += `${safe(statusBar)}\n\n`;
-      }
+      // Shop name first
+      lines.push(safe(shop));
+      lines.push('');
 
+      // Revenue line with "last 7 days" context
       const formattedRevenue =
         revenue > 0
           ? `$${Number(revenue).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
           : '$0';
+      lines.push(t('stats.revenue7days', { amount: formattedRevenue }, lang));
 
+      lines.push('');
+
+      // Active orders on separate line
       const ordersText = (() => {
         if (activeOrders <= 0) {
           return t('formatters.ordersActiveNone', {}, lang);
@@ -179,11 +183,15 @@ const buildMessages = () => ({
         }
         return t('formatters.ordersActive5', { count: activeOrders }, lang);
       })();
+      lines.push(t('stats.activeOrders', { orders: ordersText }, lang));
 
-      message += `${safe(shop)}\n\n`;
-      message += `${formattedRevenue}  ${ordersText}`;
+      // Status bar (warning/tip) at the bottom with visual separation
+      if (statusBar) {
+        lines.push('');
+        lines.push(`${safe(statusBar)}`);
+      }
 
-      return message;
+      return lines.join('\n');
     },
     noShop: (lang = 'ru') => t('seller.noShop', {}, lang),
     noWorkers: (shop, lang = 'ru') => t('seller.noWorkers', { shop: safe(shop) }, lang),
@@ -283,7 +291,7 @@ const buildMessages = () => ({
     paymentHashShort: (lang = 'ru') => t('seller.paymentHashShort', {}, lang),
     paymentFailed: (lang = 'ru') => t('seller.paymentFailed', {}, lang),
     subscriptionStatus: (tier, lang = 'ru') =>
-      t('seller.subscriptionStatus', { tier: tier === 'pro' ? 'PRO' : 'BASIC' }, lang),
+      t('seller.subscriptionStatus', { tier: tier === 'max' ? 'MAX' : 'PRO' }, lang),
     subscriptionStatusLine: (status, date, lang = 'ru') => {
       const statusLabel = status === 'active' ? t('formatters.statusActive', {}, lang) : t('formatters.statusInactive', {}, lang);
       return date
@@ -361,11 +369,6 @@ const buildMessages = () => ({
     activeOrdersEmpty: (lang = 'ru') => t('seller.activeOrdersEmpty', {}, lang),
     orderHistoryContext: (lang = 'ru') => t('seller.orderHistoryContext', {}, lang),
     orderHistoryEmpty: (lang = 'ru') => t('seller.orderHistoryEmpty', {}, lang),
-    subscriptionBasicInfo: (data, lang = 'ru') => {
-      const statusLabel =
-        data.status === 'active' ? t('formatters.statusActive', {}, lang) : t('formatters.statusInactive', {}, lang);
-      return t('seller.subscriptionBasicInfo', { status: statusLabel }, lang);
-    },
     subscriptionProInfo: (data, lang = 'ru') => {
       const statusLabel =
         data.status === 'active' ? t('formatters.statusActive', {}, lang) : t('formatters.statusInactive', {}, lang);
@@ -516,7 +519,6 @@ const buildMessages = () => ({
   },
   subscription: {
     chooseTierIntro: (lang = 'ru') => t('subscription.chooseTierIntro', {}, lang),
-    tierDescriptionBasic: (lang = 'ru') => t('subscription.tierDescriptionBasic', {}, lang),
     tierDescriptionPro: (lang = 'ru') => t('subscription.tierDescriptionPro', {}, lang),
     tierDescriptionMax: (lang = 'ru') => t('subscription.tierDescriptionMax', {}, lang),
     chooseCryptoIntro: (tier, amount, lang = 'ru') =>

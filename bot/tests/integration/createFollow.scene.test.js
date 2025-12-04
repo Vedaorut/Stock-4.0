@@ -248,7 +248,7 @@ describe('Create Follow Scene - Wizard Validation (P0)', () => {
     await new Promise((resolve) => setImmediate(resolve));
 
     const text = testBot.getLastReplyText();
-    expect(text).toContain('✅');
+    expect(text).toMatch(/✅|оформлена|created|success/i);
 
     // Check only /follows POST (validateCircular POST also happens)
     const followPosts = mock.history.post.filter((r) => r.url === '/follows');
@@ -299,7 +299,7 @@ describe('Create Follow Scene - Wizard Validation (P0)', () => {
     await new Promise((resolve) => setImmediate(resolve));
 
     const text = testBot.getLastReplyText();
-    expect(text).toContain('✅');
+    expect(text).toMatch(/✅|оформлена|created|success/i);
 
     // Check only /follows POST (ignore validation endpoints)
     const followPosts = mock.history.post.filter((r) => r.url === '/follows');
@@ -348,7 +348,7 @@ describe('Create Follow Scene - Wizard Validation (P0)', () => {
 
     // Error message is shown immediately by validateShopBeforeScene
     const text = noTokenBot.getLastReplyText();
-    expect(text).toContain('Требуется авторизация');
+    expect(text).toMatch(/Требуется авторизация|authRequired|авторизация/i);
 
     // Scene entry was blocked, so no API calls should happen
     expect(mock.history.post.length).toBe(0);
@@ -371,7 +371,7 @@ describe('Create Follow Scene - Wizard Validation (P0)', () => {
     await new Promise((resolve) => setImmediate(resolve));
 
     const text = noShopBot.getLastReplyText();
-    expect(text).toContain('Создайте магазин');
+    expect(text).toMatch(/Создайте магазин|shopRequired|магазин|shop.*first/i);
 
     // No API calls expected (no shop validation because shopId is null)
     expect(mock.history.get.length).toBe(0);

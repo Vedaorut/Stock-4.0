@@ -7,7 +7,7 @@ import { orderController } from '../controllers/orderController.js';
 import { shopValidation } from '../middleware/validation.js';
 import { productValidation } from '../middleware/validation.js';
 import { verifyToken, optionalAuth, requireShopOwner, requireShopAccess } from '../middleware/auth.js';
-import { shopCreationLimiter } from '../middleware/rateLimiter.js';
+import { shopCreationLimiter, apiLimiter } from '../middleware/rateLimiter.js';
 import { checkProductLimit } from '../middleware/productLimits.js';
 import * as migrationController from '../controllers/migrationController.js';
 import { productQueries } from '../database/queries/index.js';
@@ -68,9 +68,9 @@ router.get('/worker', verifyToken, workerController.getWorkerShops);
 /**
  * @route   GET /api/shops/active
  * @desc    List all active shops
- * @access  Public
+ * @access  Public (rate limited)
  */
-router.get('/active', shopController.listActive);
+router.get('/active', apiLimiter, shopController.listActive);
 
 /**
  * @route   GET /api/shops/:shopId/products
@@ -147,9 +147,9 @@ router.get(
 /**
  * @route   GET /api/shops/search
  * @desc    Search active shops by name
- * @access  Public (auth optional to include subscription flag)
+ * @access  Public (auth optional, rate limited)
  */
-router.get('/search', optionalAuth, shopController.search);
+router.get('/search', apiLimiter, optionalAuth, shopController.search);
 
 // ============================================
 // Shop Subscriber Routes (Invite Links)
@@ -179,9 +179,9 @@ router.get('/:shopId/subscribed', verifyToken, shopSubscriberController.checkSub
 /**
  * @route   GET /api/shops/:shopId/subscribers/count
  * @desc    Get subscriber count for a shop
- * @access  Public
+ * @access  Public (rate limited)
  */
-router.get('/:shopId/subscribers/count', shopSubscriberController.getCount);
+router.get('/:shopId/subscribers/count', apiLimiter, shopSubscriberController.getCount);
 
 /**
  * @route   GET /api/shops/:shopId/subscribers

@@ -25,11 +25,16 @@ export const orderQueries = {
               p.name as product_name,
               s.id as shop_id,
               s.name as shop_name, s.owner_id,
-              u.username as buyer_username, u.telegram_id as buyer_telegram_id
+              u.username as buyer_username, u.telegram_id as buyer_telegram_id,
+              u.language as buyer_language,
+              seller.telegram_id as seller_telegram_id,
+              seller.username as seller_username,
+              seller.language as seller_language
        FROM orders o
        LEFT JOIN products p ON o.product_id = p.id
        LEFT JOIN shops s ON p.shop_id = s.id
        LEFT JOIN users u ON o.buyer_id = u.id
+       LEFT JOIN users seller ON s.owner_id = seller.id
        WHERE o.id = $1`,
       [id]
     );

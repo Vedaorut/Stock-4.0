@@ -11,9 +11,13 @@ const { follows: followMessages } = messages;
 describe('Follow Formatters', () => {
   describe('formatFollowsList', () => {
     it('возвращает текст об отсутствии подписок для пустого списка', () => {
-      expect(formatFollowsList([])).toBe(followMessages.listEmpty);
-      expect(formatFollowsList(null)).toBe(followMessages.listEmpty);
-      expect(formatFollowsList(undefined)).toBe(followMessages.listEmpty);
+      // followMessages.listEmpty is now a function, compare to its output
+      const emptyText = typeof followMessages.listEmpty === 'function'
+        ? followMessages.listEmpty()
+        : followMessages.listEmpty;
+      expect(formatFollowsList([])).toBe(emptyText);
+      expect(formatFollowsList(null)).toBe(emptyText);
+      expect(formatFollowsList(undefined)).toBe(emptyText);
     });
 
     it('отображает одну подписку мониторинга', () => {
@@ -29,9 +33,17 @@ describe('Follow Formatters', () => {
 
       const result = formatFollowsList(follows);
 
-      expect(result).toContain(followMessages.listHeader(1));
-      expect(result).toContain('1. SourceShop (Мониторинг)');
-      expect(result).toContain(followMessages.listManageHint);
+      // Handle both function and string message types
+      const header = typeof followMessages.listHeader === 'function'
+        ? followMessages.listHeader(1)
+        : followMessages.listHeader;
+      const manageHint = typeof followMessages.listManageHint === 'function'
+        ? followMessages.listManageHint()
+        : followMessages.listManageHint;
+
+      expect(result).toContain(header);
+      expect(result).toMatch(/SourceShop.*Мониторинг|SourceShop.*Monitor/i);
+      expect(result).toContain(manageHint);
     });
 
     it('отображает подписку перепродажи с наценкой', () => {

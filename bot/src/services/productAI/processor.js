@@ -294,8 +294,8 @@ export async function processProductCommand(userCommand, context) {
     const UPDATE_THROTTLE_MS = 500; // Update max once per 500ms
     const WORDS_PER_UPDATE = 15; // Or every 15 words
 
-    // onChunk callback for streaming updates (currently unused but kept for future)
-    const _onChunk = async (chunk, fullText) => {
+    // onChunk callback for streaming updates to Telegram
+    const onChunk = async (chunk, fullText) => {
       if (!ctx) return;
 
       wordCount++;
@@ -325,14 +325,15 @@ export async function processProductCommand(userCommand, context) {
       }
     };
 
-    // Call DeepSeek API (NON-streaming for reliability - guaranteed complete JSON)
+    // Call DeepSeek API with streaming for progressive text display
     let response;
     try {
-      response = await deepseek.chat(
+      response = await deepseek.chatStreaming(
         systemPrompt,
         sanitizedCommand,
         productTools,
-        conversationHistory
+        conversationHistory,
+        onChunk
       );
     } finally {
       // Stop typing indicator

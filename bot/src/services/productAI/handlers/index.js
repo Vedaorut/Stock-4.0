@@ -36,3 +36,6 @@ export {
   handleRemoveDiscount,
   handleBulkUpdatePrices,
 } from './discountHandlers.js';
+
+// Utility handlers
+export { handleShowCapabilities } from './showCapabilities.js';

@@ -666,6 +666,31 @@ Rules:
       },
     },
   },
+  {
+    type: 'function',
+    strict: true,
+    function: {
+      name: 'showCapabilities',
+      description: `Show AI assistant capabilities to the user.
+
+CALL THIS FUNCTION when user asks:
+- "что ты умеешь?" / "what can you do?"
+- "помощь" / "help"
+- "какие команды есть?" / "what commands do you have?"
+- "как пользоваться?" / "how to use?"
+
+CRITICAL:
+- ALWAYS call this function for capability questions - don't generate text
+- Return instant pre-formatted response
+- This saves API tokens and provides consistent UX`,
+      parameters: {
+        type: 'object',
+        properties: {},
+        required: [],
+        additionalProperties: false,
+      },
+    },
+  },
 ];
 
 export default productTools;

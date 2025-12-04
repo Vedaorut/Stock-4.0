@@ -96,8 +96,9 @@ export const createCartSlice = (set, get) => ({
 
   clearCart: () => {
     set({ cart: [] });
-    // FIX: Clear payment state to avoid orphan orders
-    get().resetPaymentFlow({ clearCart: false, reason: 'cart_cleared' });
+    // NOTE: Don't reset payment flow here!
+    // If called from submitPaymentHash after success, we need to keep paymentStep='success'
+    // resetPaymentFlow is called explicitly when needed (e.g., clearCheckout)
   },
 
   getCartTotal: () => {

@@ -80,14 +80,23 @@ const handleShopInvite = async (ctx, shopId) => {
     await ctx.reply(t('inviteLink.subscribed', { shopName }, lang));
     logger.info(`User ${ctx.from.id} subscribed to shop ${shopId} via invite link`);
   } catch (error) {
-    // Silently ignore errors (already subscribed, shop doesn't exist, etc.)
+    // Handle subscription errors with user feedback
     if (error.response?.status === 409) {
-      // Already subscribed - not an error
+      // Already subscribed - show friendly message
       logger.debug(`User ${ctx.from.id} already subscribed to shop ${shopId}`);
+      try {
+        const shop = await shopApi.getShop(shopId, ctx.session.token);
+        const shopName = shop?.name || `#${shopId}`;
+        await ctx.reply(t('inviteLink.alreadySubscribed', { shopName }, lang));
+      } catch {
+        await ctx.reply(t('inviteLink.alreadySubscribed', { shopName: `#${shopId}` }, lang));
+      }
     } else if (error.response?.status === 404) {
       logger.warn(`Shop ${shopId} not found for invite link`);
+      await ctx.reply(t('inviteLink.shopNotFound', {}, lang));
     } else {
       logger.warn('Shop subscribe via invite link failed:', error.message);
+      await ctx.reply(t('inviteLink.error', {}, lang));
     }
   }
 };

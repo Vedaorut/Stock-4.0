@@ -1,8 +1,7 @@
 import logger from '../utils/logger.js';
 import { mainMenuButton } from '../keyboards/common.js';
 import { reply as cleanReply } from '../utils/cleanReply.js';
-import { messages } from '../texts/messages.js';
-const { general: generalMessages } = messages;
+import { t } from '../i18n/index.js';
 
 /**
  * Global error handling middleware
@@ -17,8 +16,9 @@ const errorMiddleware = async (ctx, next) => {
       update: ctx.update,
     });
 
-    // User-friendly error message
-    const errorMessage = generalMessages.actionFailed;
+    // User-friendly error message (use i18n directly since ctx.t may not be available)
+    const lang = ctx.lang || ctx.session?.language || 'ru';
+    const errorMessage = t('general.actionFailed', {}, lang);
 
     try {
       if (ctx.callbackQuery) {

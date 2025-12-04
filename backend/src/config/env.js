@@ -11,12 +11,66 @@ if (process.env.JEST_WORKER_ID !== undefined) {
 
 /**
  * Validate required environment variables
+ * In production: throw error if missing
+ * In development: log warning for non-critical vars
  */
-const requiredEnvVars = ['PORT', 'DATABASE_URL', 'JWT_SECRET', 'TELEGRAM_BOT_TOKEN'];
+const isProduction = process.env.NODE_ENV === 'production';
+const missing = [];
+const warnings = [];
 
-for (const envVar of requiredEnvVars) {
-  if (!process.env[envVar]) {
-    throw new Error(`Missing required environment variable: ${envVar}`);
+// JWT_SECRET - always required
+if (!process.env.JWT_SECRET) {
+  missing.push('JWT_SECRET');
+}
+
+// Database - require either DATABASE_URL or individual DB credentials
+const hasDbUrl = !!process.env.DATABASE_URL;
+const hasDbCredentials =
+  process.env.DB_HOST && process.env.DB_NAME && process.env.DB_USER && process.env.DB_PASSWORD;
+
+if (!hasDbUrl && !hasDbCredentials) {
+  missing.push('DATABASE_URL or (DB_HOST + DB_NAME + DB_USER + DB_PASSWORD)');
+}
+
+// TELEGRAM_BOT_TOKEN - always required for auth
+if (!process.env.TELEGRAM_BOT_TOKEN) {
+  missing.push('TELEGRAM_BOT_TOKEN');
+}
+
+// PORT - optional, has default
+if (!process.env.PORT) {
+  warnings.push('PORT not set, using default: 3000');
+}
+
+// FRONTEND_URL - required in production for CORS
+if (isProduction && !process.env.FRONTEND_URL) {
+  missing.push('FRONTEND_URL');
+} else if (!process.env.FRONTEND_URL) {
+  warnings.push('FRONTEND_URL not set, using default: http://localhost:5173');
+}
+
+// Log warnings
+if (warnings.length > 0) {
+  warnings.forEach((w) => console.warn(`[Config Warning] ${w}`));
+}
+
+// Handle missing variables - always throw in production, warn in development
+if (missing.length > 0) {
+  const message = `Missing required environment variable${missing.length > 1 ? 's' : ''}: ${missing.join(', ')}`;
+  if (isProduction) {
+    throw new Error(message);
+  } else {
+    // In development, still require critical vars
+    const criticalMissing = missing.filter(
+      (v) =>
+        v === 'JWT_SECRET' ||
+        v === 'TELEGRAM_BOT_TOKEN' ||
+        v.includes('DATABASE_URL')
+    );
+    if (criticalMissing.length > 0) {
+      throw new Error(message);
+    }
+    console.error(`[Config Warning] ${message}`);
   }
 }
 

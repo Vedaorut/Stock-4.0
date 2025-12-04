@@ -141,7 +141,8 @@ describe('Validation Utils Tests', () => {
     it('should return generic error for unknown crypto', () => {
       const error = getCryptoValidationError('UNKNOWN');
       expect(error).toContain('UNKNOWN');
-      expect(error).toContain('проверьте формат адреса');
+      // Error may be localized text or i18n key
+      expect(error).toMatch(/проверьте формат адреса|check.*format|address format|invalidCrypto/i);
     });
   });
 

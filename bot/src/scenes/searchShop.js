@@ -109,7 +109,7 @@ const showResults = async (ctx) => {
     const langErr = ctx.lang || ctx.session?.language || 'ru';
     const { search: searchMsgs } = getMessages(langErr);
     await smartMessage.send(ctx, {
-      text: searchMsgs.error,
+      text: searchMsgs.error(langErr),
       keyboard: buyerMenu(langErr),
     });
     return await ctx.scene.leave();

@@ -6,8 +6,15 @@ import * as smartMessage from '../utils/smartMessage.js';
 
 /**
  * Get shop info for settings context
+ * Note: Subscription options are only shown for sellers, not buyers
  */
 async function getShopContext(ctx) {
+  // Buyers should NOT see subscription options - that's seller-only functionality
+  const role = ctx.session?.role;
+  if (role === 'buyer') {
+    return { hasShop: false };
+  }
+
   if (!ctx.session.token) return { hasShop: false };
 
   try {
@@ -90,12 +97,26 @@ export function setupSettingsHandlers(bot) {
         }
       }
 
-      // Show confirmation and return to settings
-      const shopContext = await getShopContext(ctx);
-      await ctx.editMessageText(
-        t('settings.languageChanged', {}, newLang) + '\n\n' + t('settings.title', {}, newLang),
-        settingsMenu(shopContext, newLang)
-      );
+      // Show confirmation and redirect to main menu (role-based)
+      await smartMessage.send(ctx, {
+        text: t('settings.languageChanged', {}, newLang),
+      });
+
+      // Small delay for user to see confirmation
+      await new Promise((r) => setTimeout(r, 500));
+
+      // Redirect to role-based main menu
+      const role = ctx.session.role;
+      if (role === 'seller') {
+        const { handleSellerRole } = await import('./seller/index.js');
+        await handleSellerRole(ctx, { skipRoleUpdate: true });
+      } else if (role === 'buyer') {
+        const { handleBuyerRole } = await import('./buyer/index.js');
+        await handleBuyerRole(ctx, { skipRoleUpdate: true });
+      } else {
+        const { handleStart } = await import('./start.js');
+        await handleStart(ctx);
+      }
     } catch (error) {
       logger.error('Error changing language:', error);
     }

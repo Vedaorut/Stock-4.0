@@ -2,6 +2,7 @@ import { orderQueries, shopQueries } from '../../../database/queries/index.js';
 import { asyncHandler } from '../../../middleware/errorHandler.js';
 import logger from '../../../utils/logger.js';
 import cryptoPriceService from '../../../services/cryptoPriceService.js';
+import telegramService from '../../../services/telegram.js';
 import {
   ConflictError,
   NotFoundError,
@@ -118,13 +119,15 @@ export const getPaymentInfo = asyncHandler(async (req, res) => {
 /**
  * POST /api/orders/:id/submit-payment
  * Buyer submits tx_hash after payment
+ * Accepts both raw tx hash and explorer URLs (hash will be extracted)
  */
 export const submitPayment = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { tx_hash, currency } = req.body;
   const userId = req.user.id;
 
-  validateTxHash(tx_hash);
+  // validateTxHash now extracts hash from URL if needed and returns the clean hash
+  const cleanTxHash = validateTxHash(tx_hash);
   const currencyUpper = validateCurrencyParam(currency);
 
   const order = await orderQueries.findById(id);
@@ -156,7 +159,7 @@ export const submitPayment = asyncHandler(async (req, res) => {
   }
 
   const { paymentQueries } = await import('../../../database/queries/index.js');
-  const existingPayment = await paymentQueries.findByTxHash(tx_hash);
+  const existingPayment = await paymentQueries.findByTxHash(cleanTxHash);
   if (existingPayment && existingPayment.order_id !== parseInt(id)) {
     throw new ConflictError('This transaction hash is already used for another payment');
   }
@@ -171,7 +174,7 @@ export const submitPayment = asyncHandler(async (req, res) => {
   } else {
     payment = await paymentQueries.createForDirectCrypto({
       orderId: parseInt(id),
-      txHash: tx_hash,
+      txHash: cleanTxHash,
       amount: order.total_price,
       currency: currencyUpper,
       recipientAddress,
@@ -179,13 +182,54 @@ export const submitPayment = asyncHandler(async (req, res) => {
     });
   }
 
-  await orderQueries.updatePaymentHash(id, tx_hash);
+  await orderQueries.updatePaymentHash(id, cleanTxHash);
 
   logger.info('[Payment] Crypto payment submitted', {
     orderId: id,
     paymentId: payment.id,
-    txHash: tx_hash,
+    txHash: cleanTxHash,
     currency: currencyUpper,
+  });
+
+  // Non-blocking Telegram notifications
+  Promise.allSettled([
+    // Notify buyer
+    order.buyer_telegram_id && telegramService.notifyPaymentSubmittedBuyer(
+      order.buyer_telegram_id,
+      {
+        shopName: order.shop_name,
+        productName: order.product_name,
+        amount: order.total_price,
+        cryptoAmount: order.crypto_amount,
+        currency: currencyUpper,
+        txHash: cleanTxHash,
+      },
+      order.buyer_language || 'ru'
+    ),
+    // Notify seller
+    order.seller_telegram_id && telegramService.notifyPaymentSubmittedSeller(
+      order.seller_telegram_id,
+      {
+        orderId: parseInt(id),
+        productName: order.product_name,
+        amount: order.total_price,
+        cryptoAmount: order.crypto_amount,
+        currency: currencyUpper,
+        buyerUsername: order.buyer_username,
+        txHash: cleanTxHash,
+      },
+      order.seller_language || 'ru'
+    ),
+  ]).then((results) => {
+    results.forEach((result, idx) => {
+      if (result.status === 'rejected') {
+        logger.error('[Payment] Telegram notification failed', {
+          orderId: id,
+          target: idx === 0 ? 'buyer' : 'seller',
+          error: result.reason?.message || result.reason,
+        });
+      }
+    });
   });
 
   return res.json({

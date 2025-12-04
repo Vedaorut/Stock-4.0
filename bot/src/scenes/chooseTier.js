@@ -187,7 +187,7 @@ const chooseTierScene = new Scenes.WizardScene(
         if (action === 'tier_promo') {
           logger.info('choose_tier_step:promo', { userId: ctx.from.id });
 
-          await ctx.editMessageText(subMessages.promoPrompt, {
+          await ctx.editMessageText(subMessages.promoPrompt(lang), {
             parse_mode: 'HTML',
             ...Markup.inlineKeyboard([[Markup.button.callback(t('buttons.back', {}, lang), 'tier_back')]]),
           });
@@ -203,7 +203,7 @@ const chooseTierScene = new Scenes.WizardScene(
         }
       } catch (error) {
         logger.error('Error in chooseTier callback handler:', error);
-        await cleanReply(ctx, subMessages.unknownCommand);
+        await cleanReply(ctx, subMessages.unknownCommand(lang));
         return ctx.scene.leave();
       }
     }
@@ -224,7 +224,7 @@ const chooseTierScene = new Scenes.WizardScene(
 
     // Wait for text message with promo code
     if (!ctx.message?.text) {
-      await cleanReply(ctx, t('scenes.sendPromoText', {}, lang) + '\n\n' + subMessages.promoTextPrompt);
+      await cleanReply(ctx, t('scenes.sendPromoText', {}, lang) + '\n\n' + subMessages.promoTextPrompt(lang));
       return;
     }
 
@@ -238,7 +238,7 @@ const chooseTierScene = new Scenes.WizardScene(
 
     // Basic validation
     if (promoCode.length < 3 || promoCode.length > 50) {
-      await cleanReply(ctx, subMessages.promoInvalid);
+      await cleanReply(ctx, subMessages.promoInvalid(lang));
       return;
     }
 

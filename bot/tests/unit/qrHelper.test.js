@@ -110,22 +110,25 @@ describe('QR Helper', () => {
       const error = new Error('Unknown error');
       const message = getQRErrorMessage(error);
 
+      // Uses i18n key 'qrHelper.defaultError' which resolves to localized text
       expect(message).toBe('Не удалось сформировать QR-код');
     });
 
-    it('should use custom default message if provided', () => {
+    it('should use specified language for default message', () => {
       const error = new Error('Unknown error');
-      const customDefault = 'Custom error message';
-      const message = getQRErrorMessage(error, customDefault);
+      // Second parameter is now 'lang', not 'defaultMessage'
+      const message = getQRErrorMessage(error, 'ru');
 
-      expect(message).toBe(customDefault);
+      // Should return default error message in Russian
+      expect(message).toBe('Не удалось сформировать QR-код');
     });
 
     it('should handle error without response property', () => {
       const error = new Error('Network error');
-      const message = getQRErrorMessage(error, 'Default message');
+      // Second parameter is 'lang', function returns localized default message
+      const message = getQRErrorMessage(error, 'ru');
 
-      expect(message).toBe('Default message');
+      expect(message).toBe('Не удалось сформировать QR-код');
     });
   });
 });

@@ -35,7 +35,7 @@ const migrateChannelScene = new Scenes.WizardScene(
       const { seller: sellerMessages } = getMessages(lang);
 
       await smartMessage.send(ctx, {
-        text: `${sellerMessages.migration.intro}\n\n${sellerMessages.migration.confirmPrompt}`,
+        text: `${sellerMessages.migration.intro(lang)}\n\n${sellerMessages.migration.confirmPrompt(lang)}`,
         keyboard: Markup.inlineKeyboard([
           [Markup.button.callback(t('buttons.migrationConfirm', {}, lang), 'migrate:confirm')],
           [Markup.button.callback(t('buttons.backToTools', {}, lang), 'seller:tools')],
@@ -75,7 +75,7 @@ const migrateChannelScene = new Scenes.WizardScene(
 
     try {
       await smartMessage.send(ctx, {
-        text: sellerMessages.migration.askChannel,
+        text: sellerMessages.migration.askChannel(lang),
         keyboard: Markup.inlineKeyboard([
           [Markup.button.callback(t('buttons.backToTools', {}, lang), 'seller:tools')],
         ]),
@@ -117,7 +117,7 @@ const migrateChannelScene = new Scenes.WizardScene(
 
     if (!parsedChannel) {
       await smartMessage.send(ctx, {
-        text: sellerMessages.migration.invalidChannel,
+        text: sellerMessages.migration.invalidChannel(lang),
         keyboard: Markup.inlineKeyboard([
           [Markup.button.callback(t('buttons.backToTools', {}, lang), 'seller:tools')],
         ]),
@@ -202,7 +202,7 @@ const migrateChannelScene = new Scenes.WizardScene(
 
     if (!shopId || !token || !newChannel) {
       await smartMessage.send(ctx, {
-        text: generalMessages.actionFailed,
+        text: generalMessages.actionFailed(lang),
         keyboard: Markup.inlineKeyboard([
           [Markup.button.callback(t('buttons.backToTools', {}, lang), 'seller:tools')],
         ]),
@@ -212,7 +212,7 @@ const migrateChannelScene = new Scenes.WizardScene(
 
     let loadingMessage;
     try {
-      loadingMessage = await smartMessage.send(ctx, { text: sellerMessages.migration.sending });
+      loadingMessage = await smartMessage.send(ctx, { text: sellerMessages.migration.sending(lang) });
     } catch (error) {
       logger.warn('Failed to send migration loading message:', error.message);
     }
@@ -232,7 +232,7 @@ const migrateChannelScene = new Scenes.WizardScene(
     } catch (error) {
       logger.error('Error migrating channel:', error);
       await smartMessage.send(ctx, {
-        text: sellerMessages.migration.error,
+        text: sellerMessages.migration.error(lang),
         keyboard: Markup.inlineKeyboard([
           [Markup.button.callback(t('buttons.backToTools', {}, lang), 'seller:tools')],
         ]),

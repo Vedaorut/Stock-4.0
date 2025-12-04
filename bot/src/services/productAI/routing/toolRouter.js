@@ -21,6 +21,7 @@ import {
   handleApplyDiscount,
   handleRemoveDiscount,
   handleBulkUpdatePrices,
+  handleShowCapabilities,
 } from '../handlers/index.js';
 
 /**
@@ -80,6 +81,9 @@ export async function executeToolCall(functionName, args, context) {
 
       case 'bulkUpdatePrices':
         return await handleBulkUpdatePrices(args, shopId, token, products);
+
+      case 'showCapabilities':
+        return await handleShowCapabilities({ lang: ctx?.session?.language || 'ru' });
 
       default:
         return {

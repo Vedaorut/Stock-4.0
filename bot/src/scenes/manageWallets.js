@@ -52,7 +52,7 @@ async function showQRCode(ctx, crypto) {
     const address = shop[`wallet_${crypto.toLowerCase()}`];
 
     if (!address) {
-      await ctx.answerCbQuery(sellerMessages.walletsNotFound, { show_alert: true });
+      await ctx.answerCbQuery(sellerMessages.walletsNotFound(lang), { show_alert: true });
       return;
     }
 
@@ -78,7 +78,7 @@ async function showQRCode(ctx, crypto) {
 
     if (!response.success) {
       const { seller: sellerMsgs } = getMessages(lang);
-      await cleanReply(ctx, sellerMsgs.walletsQrError);
+      await cleanReply(ctx, sellerMsgs.walletsQrError(lang));
       return;
     }
 
@@ -106,7 +106,7 @@ async function showQRCode(ctx, crypto) {
     // Provide user-friendly error message based on error type
     const langErr = ctx.lang || ctx.session?.language || 'ru';
     const { seller: sellerMsgs } = getMessages(langErr);
-    const errorMessage = getQRErrorMessage(error, sellerMsgs.walletsQrError);
+    const errorMessage = getQRErrorMessage(error, sellerMsgs.walletsQrError(langErr));
     await cleanReply(ctx, errorMessage);
   }
 }
@@ -139,13 +139,13 @@ const showWalletsSilent = async (ctx) => {
       LTC: shop.wallet_ltc || null,
     };
 
-    const message = sellerMessages.walletsContext;
+    const message = sellerMessages.walletsContext(lang);
 
     const buttons = SUPPORTED_CRYPTOS.map((crypto) => {
       const address = wallets[crypto];
       const status = address
         ? formatAddress(address) || address
-        : sellerMessages.walletsStatusEmpty;
+        : sellerMessages.walletsStatusEmpty(lang);
       const action = address ? `wallet:view:${crypto}` : `wallet:add:${crypto}`;
       return [Markup.button.callback(`${crypto} • ${status}`, action)];
     });
@@ -170,7 +170,7 @@ const showWallets = async (ctx) => {
     // Validate session
     if (!ctx.session.shopId) {
       await smartMessage.send(ctx, {
-        text: generalMessages.shopRequired,
+        text: generalMessages.shopRequired(lang),
         keyboard: successButtons(lang),
       });
       return await ctx.scene.leave();
@@ -178,7 +178,7 @@ const showWallets = async (ctx) => {
 
     if (!ctx.session.token) {
       await smartMessage.send(ctx, {
-        text: generalMessages.authorizationRequired,
+        text: generalMessages.authorizationRequired(lang),
         keyboard: successButtons(lang),
       });
       return await ctx.scene.leave();
@@ -194,13 +194,13 @@ const showWallets = async (ctx) => {
       LTC: shop.wallet_ltc || null,
     };
 
-    const message = sellerMessages.walletsContext;
+    const message = sellerMessages.walletsContext(lang);
 
     const buttons = SUPPORTED_CRYPTOS.map((crypto) => {
       const address = wallets[crypto];
       const status = address
         ? formatAddress(address) || address
-        : sellerMessages.walletsStatusEmpty;
+        : sellerMessages.walletsStatusEmpty(lang);
       const action = address ? `wallet:view:${crypto}` : `wallet:add:${crypto}`;
       return [Markup.button.callback(`${crypto} • ${status}`, action)];
     });
@@ -215,7 +215,7 @@ const showWallets = async (ctx) => {
     const langErr = ctx.lang || ctx.session?.language || 'ru';
     const { seller: sellerMessages } = getMessages(langErr);
     await smartMessage.send(ctx, {
-      text: sellerMessages.walletsLoadError,
+      text: sellerMessages.walletsLoadError(langErr),
       keyboard: successButtons(langErr),
     });
     return await ctx.scene.leave();
@@ -280,7 +280,7 @@ const handleInput = async (ctx) => {
 
         if (!address) {
           await ctx.editMessageText(
-            sellerMessages.walletsNotFound,
+            sellerMessages.walletsNotFound(lang),
             Markup.inlineKeyboard([
               [Markup.button.callback(t('buttons.backToWallets', {}, lang), 'wallet:back')],
               [Markup.button.callback(t('buttons.backToTools', {}, lang), 'seller:tools')],
@@ -309,7 +309,7 @@ const handleInput = async (ctx) => {
         await ctx.answerCbQuery();
         ctx.wizard.state.editingWallet = null;
         await ctx.editMessageText(
-          sellerMessages.walletsAddPrompt,
+          sellerMessages.walletsAddPrompt(lang),
           Markup.inlineKeyboard([
             [Markup.button.callback(t('buttons.backToWallets', {}, lang), 'wallet:back')],
             [Markup.button.callback(t('buttons.backToTools', {}, lang), 'seller:tools')],
@@ -424,7 +424,7 @@ const handleInput = async (ctx) => {
       }
 
       // Unknown action
-      await ctx.answerCbQuery(sellerMessages.walletsUnknownCommand, { show_alert: true });
+      await ctx.answerCbQuery(sellerMessages.walletsUnknownCommand(lang), { show_alert: true });
       return;
     }
 
@@ -455,7 +455,7 @@ const handleInput = async (ctx) => {
         await deleteUserInput();
         await cleanReply(
           ctx,
-          `${sellerMessages.walletsUnknownAddress}\n${sellerMessages.walletsUseButtons}`,
+          `${sellerMessages.walletsUnknownAddress(lang)}\n${sellerMessages.walletsUseButtons(lang)}`,
           Markup.inlineKeyboard([
             [Markup.button.callback(t('buttons.backToWallets', {}, lang), 'wallet:back')],
             [Markup.button.callback(t('buttons.backToTools', {}, lang), 'seller:tools')],
@@ -541,14 +541,14 @@ ${formatted}`,
 
     // No input - user sent non-text message
     await smartMessage.send(ctx, {
-      text: t('scenes.sendWalletAddress', {}, lang) + '\n\n' + sellerMessages.walletsUseButtons,
+      text: t('scenes.sendWalletAddress', {}, lang) + '\n\n' + sellerMessages.walletsUseButtons(lang),
     });
   } catch (error) {
     logger.error('Error in handleInput:', error);
     const langErr = ctx.lang || ctx.session?.language || 'ru';
     const { seller: sellerMsgs } = getMessages(langErr);
     await smartMessage.send(ctx, {
-      text: sellerMsgs.walletsLoadError,
+      text: sellerMsgs.walletsLoadError(langErr),
       keyboard: successButtons(langErr),
     });
     return await ctx.scene.leave();
@@ -596,8 +596,7 @@ manageWalletsScene.action('cancel_scene', async (ctx) => {
     try {
       const lang = ctx.lang || ctx.session?.language || 'ru';
       const { general: generalMessages } = getMessages(lang);
-      const langErr = ctx.lang || ctx.session?.language || 'ru';
-      await ctx.editMessageText(generalMessages.actionFailed, successButtons(langErr));
+      await ctx.editMessageText(generalMessages.actionFailed(lang), successButtons(lang));
     } catch (replyError) {
       logger.error('Failed to send error message:', replyError);
     }

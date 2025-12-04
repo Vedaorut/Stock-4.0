@@ -6,36 +6,62 @@ import { t } from '../i18n/index.js';
 // Tips keys for rotation
 const TIP_KEYS = ['follow', 'resell', 'ai', 'stats', 'workers'];
 
+// Contextual tips based on missing features
+const CONTEXTUAL_TIP_KEYS = ['addEth', 'addBtc', 'addUsdt', 'addWorker'];
+
 /**
  * Get next tip (avoiding the last shown one)
  */
-function getNextTipKey(lastTipKey) {
+function getNextTipKey(lastTipKey, availableKeys = TIP_KEYS) {
   // If few tips or lastTipKey not set, choose random
-  if (TIP_KEYS.length <= 1 || !lastTipKey) {
-    return TIP_KEYS[Math.floor(Math.random() * TIP_KEYS.length)];
+  if (availableKeys.length <= 1 || !lastTipKey) {
+    return availableKeys[Math.floor(Math.random() * availableKeys.length)];
   }
 
   // Filter out last shown tip
-  const availableTips = TIP_KEYS.filter((key) => key !== lastTipKey);
+  const filtered = availableKeys.filter((key) => key !== lastTipKey);
 
   // Choose random from remaining
-  return availableTips[Math.floor(Math.random() * availableTips.length)];
+  return filtered[Math.floor(Math.random() * filtered.length)];
+}
+
+/**
+ * Get contextual tips based on what's missing
+ * @param {Object} shopHealth - Shop health data with wallets and tier info
+ * @returns {string[]} - Array of applicable contextual tip keys
+ */
+function getContextualTipKeys(shopHealth) {
+  const tips = [];
+
+  // Check missing wallets (only if at least one wallet exists - not critical)
+  if (shopHealth.hasWallets && shopHealth.wallets) {
+    if (!shopHealth.wallets.ETH) tips.push('addEth');
+    if (!shopHealth.wallets.BTC) tips.push('addBtc');
+    if (!shopHealth.wallets.USDT) tips.push('addUsdt');
+  }
+
+  // Check workers (only for PRO/MAX tiers)
+  if (['pro', 'max'].includes(shopHealth.tier) && !shopHealth.hasWorkers) {
+    tips.push('addWorker');
+  }
+
+  return tips;
 }
 
 /**
  * Get tip/warning for shop based on its state
  * @param {Object} ctx - Telegraf context
- * @param {Object} shopHealth - Shop state { hasWallets, productsCount, tier }
+ * @param {Object} shopHealth - Shop state { hasWallets, wallets, productsCount, tier, hasWorkers }
  * @returns {string|null} - Text to show or null
  */
 function getTipForShop(ctx, shopHealth) {
   const lang = ctx.lang || 'ru';
 
-  // Priority 1: Critical warnings
+  // Priority 1: Critical warnings (with warning emoji)
 
-  // Check wallets
+  // Check wallets - CRITICAL
   if (!shopHealth.hasWallets) {
-    return t('warnings.noWallets', {}, lang);
+    return t('warnings.noWalletsCritical', {}, lang);
   }
 
   // Check products
@@ -43,15 +69,31 @@ function getTipForShop(ctx, shopHealth) {
     return t('warnings.noProducts', {}, lang);
   }
 
-  // Priority 2: Useful tips (rotation)
-  const lastTipKey = ctx.session.lastTipShown || null;
-  const nextTipKey = getNextTipKey(lastTipKey);
+  // Priority 2: Contextual tips based on missing features (30% chance)
+  const contextualKeys = getContextualTipKeys(shopHealth);
+  if (contextualKeys.length > 0 && Math.random() < 0.3) {
+    const lastTipKey = ctx.session?.lastTipShown || null;
+    const nextTipKey = getNextTipKey(lastTipKey, contextualKeys);
+
+    if (ctx.session) {
+      ctx.session.lastTipShown = nextTipKey;
+      ctx.session.lastTipTimestamp = Date.now();
+    }
+
+    return t(`tips.${nextTipKey}`, {}, lang);
+  }
+
+  // Priority 3: General useful tips (rotation)
+  const lastTipKey = ctx.session?.lastTipShown || null;
+  const nextTipKey = getNextTipKey(lastTipKey, TIP_KEYS);
 
   // Save shown tip key in session
-  ctx.session.lastTipShown = nextTipKey;
-  ctx.session.lastTipTimestamp = Date.now();
+  if (ctx.session) {
+    ctx.session.lastTipShown = nextTipKey;
+    ctx.session.lastTipTimestamp = Date.now();
+  }
 
   return t(`tips.${nextTipKey}`, {}, lang);
 }
 
-export { getTipForShop, getNextTipKey, TIP_KEYS };
+export { getTipForShop, getNextTipKey, getContextualTipKeys, TIP_KEYS, CONTEXTUAL_TIP_KEYS };

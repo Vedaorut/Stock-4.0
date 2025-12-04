@@ -27,6 +27,26 @@
       "shipped": "Отправлен",
       "delivered": "Доставлен",
       "cancelled": "Отменён"
+    },
+    "submitted": {
+      "buyer": {
+        "title": "Платёж отправлен!",
+        "shop": "Магазин: {shopName}",
+        "product": "Товар: {productName}",
+        "amountUsd": "Сумма: ${amount}",
+        "amountCrypto": "Оплачено: {cryptoAmount} {currency}",
+        "txHash": "TX: {txHash}",
+        "verifying": "Проверяем платёж. Уведомим когда подтвердится."
+      },
+      "seller": {
+        "title": "Покупатель заявил оплату!",
+        "orderId": "Заказ #{orderId}",
+        "product": "{productName}",
+        "amount": "${amount} ({cryptoAmount} {currency})",
+        "buyer": "Покупатель: @{username}",
+        "txHash": "TX: {txHash}",
+        "warning": "Проверьте транзакцию перед выдачей товара."
+      }
     }
   },
   "subscription": {

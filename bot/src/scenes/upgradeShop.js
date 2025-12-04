@@ -58,7 +58,7 @@ const upgradeShopScene = new Scenes.WizardScene(
 
       const token = ctx.session.token;
       if (!token) {
-        await smartMessage.send(ctx, { text: generalMessages.authorizationRequired });
+        await smartMessage.send(ctx, { text: generalMessages.authorizationRequired(lang) });
         return ctx.scene.leave();
       }
 
@@ -71,7 +71,7 @@ const upgradeShopScene = new Scenes.WizardScene(
       if (shopTier === 'max' || currentSubscription?.tier === 'max') {
         await cleanReply(
           ctx,
-          sellerMessages.upgrade.alreadyMax,
+          sellerMessages.upgrade.alreadyMax(lang),
           Markup.inlineKeyboard([[Markup.button.callback(t('buttons.backToMenu', {}, lang), 'seller:menu')]])
         );
         return ctx.scene.leave();
@@ -85,7 +85,7 @@ const upgradeShopScene = new Scenes.WizardScene(
       ) {
         await cleanReply(
           ctx,
-          sellerMessages.upgrade.notEligible,
+          sellerMessages.upgrade.notEligible(lang),
           Markup.inlineKeyboard([
             [Markup.button.callback(t('buttons.paySubscription', {}, lang), 'subscription:pay')],
             [Markup.button.callback(t('buttons.backToMenu', {}, lang), 'seller:menu')],
@@ -170,14 +170,14 @@ ${t('upgradeShop.benefitAnalytics', {}, lang)}`;
 
     // Handle cancel
     if (data === 'seller:menu') {
-      await ctx.answerCbQuery(sellerMessages.upgrade.cancelled);
+      await ctx.answerCbQuery(sellerMessages.upgrade.cancelled(lang));
       await ctx.scene.leave();
       await showSellerMainMenu(ctx);
       return;
     }
 
     if (data !== 'upgrade:confirm') {
-      await ctx.answerCbQuery(generalMessages.invalidChoice);
+      await ctx.answerCbQuery(generalMessages.invalidChoice(lang));
       return;
     }
 
@@ -222,7 +222,7 @@ ${t('upgradeShop.benefitAnalytics', {}, lang)}`;
 
     // Handle cancel
     if (data === 'seller:menu') {
-      await ctx.answerCbQuery(sellerMessages.upgrade.cancelled);
+      await ctx.answerCbQuery(sellerMessages.upgrade.cancelled(lang));
       await ctx.scene.leave();
       await showSellerMainMenu(ctx);
       return;
@@ -230,13 +230,13 @@ ${t('upgradeShop.benefitAnalytics', {}, lang)}`;
 
     // Parse crypto selection
     if (!data.startsWith('upgrade:crypto:')) {
-      await ctx.answerCbQuery(sellerMessages.upgrade.unknownCommand, { show_alert: true });
+      await ctx.answerCbQuery(sellerMessages.upgrade.unknownCommand(lang), { show_alert: true });
       return;
     }
 
     const currency = data.replace('upgrade:crypto:', '');
     if (!['BTC', 'ETH', 'USDT', 'LTC'].includes(currency)) {
-      await ctx.answerCbQuery(sellerMessages.upgrade.unknownCommand, { show_alert: true });
+      await ctx.answerCbQuery(sellerMessages.upgrade.unknownCommand(lang), { show_alert: true });
       return;
     }
 
@@ -284,7 +284,7 @@ ${t('upgradeShop.benefitAnalytics', {}, lang)}`;
       const data = ctx.callbackQuery.data;
 
       if (data === 'seller:menu') {
-        await ctx.answerCbQuery(sellerMessages.upgrade.cancelled);
+        await ctx.answerCbQuery(sellerMessages.upgrade.cancelled(lang));
         await ctx.scene.leave();
         await showSellerMainMenu(ctx);
         return;
@@ -299,7 +299,7 @@ ${t('upgradeShop.benefitAnalytics', {}, lang)}`;
 
           await cleanReplyHTML(
             ctx,
-            paymentStateMessage(status, { hint: sellerMessages.upgrade.sendHashPrompt }),
+            paymentStateMessage(status, { hint: sellerMessages.upgrade.sendHashPrompt(lang) }),
             paymentStateKeyboard(status, {
               retryCb: 'upgrade:retry',
               cancelCb: 'seller:menu',
@@ -322,7 +322,7 @@ ${t('upgradeShop.benefitAnalytics', {}, lang)}`;
       if (data === 'upgrade:retry') {
         await ctx.answerCbQuery();
         if (!currency) {
-          await smartMessage.send(ctx, { text: sellerMessages.upgrade.sendHashPrompt });
+          await smartMessage.send(ctx, { text: sellerMessages.upgrade.sendHashPrompt(lang) });
           return;
         }
         try {
@@ -344,7 +344,7 @@ ${t('upgradeShop.benefitAnalytics', {}, lang)}`;
       if (data === 'upgrade:paid') {
         await ctx.answerCbQuery();
         ctx.wizard.state.awaitingTxHash = true;
-        await smartMessage.send(ctx, { text: sellerMessages.upgrade.sendHashPrompt, keyboard: getCancelButtonHashInput(lang) });
+        await smartMessage.send(ctx, { text: sellerMessages.upgrade.sendHashPrompt(lang), keyboard: getCancelButtonHashInput(lang) });
         return;
       }
 
@@ -355,7 +355,7 @@ ${t('upgradeShop.benefitAnalytics', {}, lang)}`;
     if (!ctx.message?.text) {
       if (ctx.wizard.state.awaitingTxHash) {
         await smartMessage.send(ctx, {
-          text: ctx.t('seller.enterTxHash') + '\n\n' + sellerMessages.upgrade.sendHashPrompt,
+          text: ctx.t('seller.enterTxHash') + '\n\n' + sellerMessages.upgrade.sendHashPrompt(lang),
           keyboard: getCancelButtonHashInput(lang),
         });
       }
@@ -364,7 +364,7 @@ ${t('upgradeShop.benefitAnalytics', {}, lang)}`;
 
     const txHash = ctx.message.text.trim();
     if (txHash.length < 10) {
-      await smartMessage.send(ctx, { text: sellerMessages.upgrade.hashInvalid });
+      await smartMessage.send(ctx, { text: sellerMessages.upgrade.hashInvalid(lang) });
       return;
     }
 
@@ -373,7 +373,7 @@ ${t('upgradeShop.benefitAnalytics', {}, lang)}`;
 
     let loadingMsg = null;
     try {
-      loadingMsg = await smartMessage.send(ctx, { text: sellerMessages.upgrade.verifying });
+      loadingMsg = await smartMessage.send(ctx, { text: sellerMessages.upgrade.verifying(lang) });
 
       const token = ctx.session.token;
       const upgradeResponse = await subscriptionApi.confirmUpgradePayment(
@@ -415,7 +415,7 @@ ${t('upgradeShop.benefitAnalytics', {}, lang)}`;
 
         await cleanReplyHTML(
           ctx,
-          `${successText}\n\n${sellerMessages.upgrade.benefits}`,
+          `${successText}\n\n${sellerMessages.upgrade.benefits(lang)}`,
           Markup.inlineKeyboard([[Markup.button.callback(t('buttons.mainMenu', {}, lang), 'seller:menu')]])
         );
 
@@ -428,7 +428,7 @@ ${t('upgradeShop.benefitAnalytics', {}, lang)}`;
 
       await cleanReplyHTML(
         ctx,
-        paymentStateMessage(status, { hint: sellerMessages.upgrade.verificationError }),
+        paymentStateMessage(status, { hint: sellerMessages.upgrade.verificationError(lang) }),
         paymentStateKeyboard(status, {
           retryCb: 'upgrade:retry',
           cancelCb: 'seller:menu',
@@ -446,7 +446,7 @@ ${t('upgradeShop.benefitAnalytics', {}, lang)}`;
 
       await cleanReplyHTML(
         ctx,
-        paymentStateMessage(status, { hint: sellerMessages.upgrade.verificationError }),
+        paymentStateMessage(status, { hint: sellerMessages.upgrade.verificationError(lang) }),
         paymentStateKeyboard(status, {
           retryCb: 'upgrade:retry',
           cancelCb: 'seller:menu',

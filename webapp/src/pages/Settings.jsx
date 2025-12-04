@@ -255,7 +255,7 @@ export default function Settings() {
   const { t, lang } = useTranslation();
   const viewMode = useStore((state) => state.viewMode);
   const setViewMode = useStore((state) => state.setViewMode);
-  const { put } = useApi();
+  const { patch } = useApi();
   const [showWallets, setShowWallets] = useState(false);
   const [showLanguage, setShowLanguage] = useState(false);
   const [showProducts, setShowProducts] = useState(false);
@@ -330,8 +330,8 @@ export default function Settings() {
         // Optimistic update
         setViewMode(newMode);
 
-        // API update
-        await put('/auth/role', { role: newMode });
+        // API update (PATCH not PUT)
+        await patch('/auth/role', { role: newMode });
 
         triggerHaptic('success');
       } catch (error) {

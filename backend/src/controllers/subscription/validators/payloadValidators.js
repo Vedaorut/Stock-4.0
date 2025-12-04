@@ -1,5 +1,6 @@
 import { ValidationError } from '../../../utils/errors.js';
 import { CHAIN_MAP, VALID_TIERS } from '../constants.js';
+import { extractTxHashFromUrl } from '../../order/validators/payloadValidators.js';
 
 const TEST_CHAIN_ADDRESSES = {
   BTC: 'bcrt1qtestaddress000000000000000000000',
@@ -31,15 +32,18 @@ export function validateChainSelection(chain) {
 }
 
 export function ensurePaymentProof({ txHash, paymentLink, txLink, transactionUrl } = {}) {
-  const proof = txHash || paymentLink || txLink || transactionUrl;
+  const rawProof = txHash || paymentLink || txLink || transactionUrl;
 
-  if (!proof) {
+  if (!rawProof) {
     throw new ValidationError('txHash or payment link is required');
   }
 
+  // Extract hash from URL if provided (supports Etherscan, TronScan, Blockchair, etc.)
+  const extractedHash = extractTxHashFromUrl(rawProof);
+
   return {
-    proof,
-    txHash,
+    proof: extractedHash,
+    txHash: extractedHash,
     paymentLink: paymentLink || txLink || transactionUrl || null,
   };
 }

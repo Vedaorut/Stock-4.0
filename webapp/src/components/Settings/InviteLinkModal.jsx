@@ -37,7 +37,9 @@ export default function InviteLinkModal({ isOpen, onClose }) {
     return () => controller.abort();
   }, [isOpen, loadData]);
 
-  const inviteLink = myShop ? `t.me/SellStatusBot?start=shop_${myShop.id}` : '';
+  // Bot username from config or fallback
+  const botUsername = import.meta.env.VITE_BOT_USERNAME || 'saveropus_bot';
+  const inviteLink = myShop ? `t.me/${botUsername}?start=shop_${myShop.id}` : '';
 
   const handleCopy = async () => {
     if (!inviteLink) return;

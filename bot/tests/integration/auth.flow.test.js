@@ -70,7 +70,7 @@ describe('Bot auth middleware', () => {
 
     const session = testBot.getSession();
     expect(session.token).toBe('jwt-test-token');
-    expect(session.user?.id).toBe(11484);
+    expect(session.userId).toBe(11484);
     expect(Date.parse(session.tokenCreatedAt)).not.toBeNaN();
 
     // Second command should reuse existing token (no extra auth call)

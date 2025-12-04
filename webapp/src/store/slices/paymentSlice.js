@@ -278,10 +278,12 @@ export const createPaymentSlice = (set, get) => ({
           }
         } else {
           // Validate order total matches cart total
-          const orderTotal = parseFloat(order.total_price) || 0;
-          const diff = Math.abs(orderTotal - cartTotal);
+          // Use integer cents comparison to avoid floating point errors
+          const orderTotalCents = Math.round((parseFloat(order.total_price) || 0) * 100);
+          const cartTotalCents = Math.round(cartTotal * 100);
+          const diffCents = Math.abs(orderTotalCents - cartTotalCents);
 
-          if (diff > 0.01) {
+          if (diffCents > 1) {  // 1 cent tolerance
             // Re-create order with current cart data
             order = await get().createOrder();
             if (!order) {

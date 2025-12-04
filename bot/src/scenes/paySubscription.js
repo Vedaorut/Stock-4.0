@@ -88,14 +88,14 @@ const paySubscriptionScene = new Scenes.WizardScene(
       const shopId = ctx.session.shopId;
 
       if (!shopId) {
-        await smartMessage.send(ctx, { text: generalMessages.shopRequired });
+        await smartMessage.send(ctx, { text: generalMessages.shopRequired(lang) });
         return ctx.scene.leave();
       }
 
       // Get current subscription status
       const token = ctx.session.token;
       if (!token) {
-        await smartMessage.send(ctx, { text: generalMessages.authorizationRequired });
+        await smartMessage.send(ctx, { text: generalMessages.authorizationRequired(lang) });
         return ctx.scene.leave();
       }
 
@@ -103,9 +103,9 @@ const paySubscriptionScene = new Scenes.WizardScene(
       const shopName = ctx.session.shopName || ctx.t('general.shopFallbackName');
 
       const message = [
-        subMessages.chooseTierIntro,
-        subMessages.tierDescriptionPro,
-        subMessages.tierDescriptionMax,
+        subMessages.chooseTierIntro(lang),
+        subMessages.tierDescriptionPro(lang),
+        subMessages.tierDescriptionMax(lang),
       ].join('\n\n');
 
       await cleanReplyHTML(
@@ -158,20 +158,20 @@ const paySubscriptionScene = new Scenes.WizardScene(
 
     // Handle cancel
     if (data === 'seller:menu') {
-      await ctx.answerCbQuery(subMessages.cancelled);
+      await ctx.answerCbQuery(subMessages.cancelled(lang));
       await ctx.scene.leave();
       await showSellerMainMenu(ctx);
       return;
     }
 
     if (!data.startsWith('subscription:tier:')) {
-      await ctx.answerCbQuery(subMessages.unknownCommand, { show_alert: true });
+      await ctx.answerCbQuery(subMessages.unknownCommand(lang), { show_alert: true });
       return;
     }
 
     const tier = data.replace('subscription:tier:', '');
     if (tier !== 'pro' && tier !== 'max') {
-      await ctx.answerCbQuery(subMessages.invalidTier);
+      await ctx.answerCbQuery(subMessages.invalidTier(lang));
       return;
     }
 
@@ -245,7 +245,7 @@ const paySubscriptionScene = new Scenes.WizardScene(
 
     // Handle cancel
     if (data === 'seller:menu') {
-      await ctx.answerCbQuery(subMessages.cancelled);
+      await ctx.answerCbQuery(subMessages.cancelled(lang));
       await ctx.scene.leave();
       await showSellerMainMenu(ctx);
       return;
@@ -253,7 +253,7 @@ const paySubscriptionScene = new Scenes.WizardScene(
 
     // Parse payment method selection
     if (!data.startsWith('subscription:method:')) {
-      await ctx.answerCbQuery(generalMessages.invalidChoice);
+      await ctx.answerCbQuery(generalMessages.invalidChoice(lang));
       return;
     }
 
@@ -278,7 +278,7 @@ const paySubscriptionScene = new Scenes.WizardScene(
           userId: ctx.from.id,
           subscriptionId,
         });
-        await ctx.editMessageText(generalMessages.authorizationRequired, {
+        await ctx.editMessageText(generalMessages.authorizationRequired(lang), {
           parse_mode: 'HTML',
           ...Markup.inlineKeyboard([
             [Markup.button.callback(t('buttons.cancel', {}, lang), 'seller:menu')],
@@ -366,7 +366,7 @@ const paySubscriptionScene = new Scenes.WizardScene(
 
     // Handle cancel
     if (data === 'seller:menu') {
-      await ctx.answerCbQuery(subMessages.cancelled);
+      await ctx.answerCbQuery(subMessages.cancelled(lang));
       await ctx.scene.leave();
       await showSellerMainMenu(ctx);
       return;
@@ -394,7 +394,7 @@ const paySubscriptionScene = new Scenes.WizardScene(
             userId: ctx.from.id,
             invoiceId,
           });
-          await ctx.editMessageText(generalMessages.authorizationRequired, {
+          await ctx.editMessageText(generalMessages.authorizationRequired(lang), {
             parse_mode: 'HTML',
             ...Markup.inlineKeyboard([
               [Markup.button.callback(t('buttons.cancel', {}, lang), 'seller:menu')],

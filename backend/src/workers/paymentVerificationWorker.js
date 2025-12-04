@@ -412,6 +412,17 @@ async function confirmOrderPayment(orderId, paymentId, verificationResult) {
 }
 
 /**
+ * Escape HTML special characters for Telegram HTML parse_mode
+ */
+function escapeHtml(text) {
+  if (!text) {return '';}
+  return String(text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+/**
  * Notify seller about received payment
  */
 async function notifySellerPaymentReceived(orderId) {
@@ -421,7 +432,6 @@ async function notifySellerPaymentReceived(orderId) {
          o.id as order_id,
          o.total_price,
          o.currency,
-         o.buyer_contact,
          p.name as product_name,
          oi.quantity,
          pay.currency as crypto_currency,
@@ -449,6 +459,28 @@ async function notifySellerPaymentReceived(orderId) {
 
     const order = result.rows[0];
 
+    // Format price - remove trailing zeros
+    const formatPrice = (price) => {
+      const num = parseFloat(price);
+      return num % 1 === 0 ? num.toFixed(0) : num.toFixed(2);
+    };
+
+    // Format crypto amount - max 8 decimals, no trailing zeros
+    const formatCrypto = (amount) => {
+      const num = parseFloat(amount);
+      return num.toFixed(8).replace(/\.?0+$/, '');
+    };
+
+    // Format date
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('ru-RU', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+
     // Notify seller
     if (order.seller_telegram_id) {
       const buyerContact = order.buyer_username
@@ -456,19 +488,22 @@ async function notifySellerPaymentReceived(orderId) {
         : order.buyer_first_name || 'Покупатель';
 
       const sellerMessage = [
-        '💰 *Получен платёж!*',
+        '💰 <b>Новый заказ оплачен!</b>',
         '',
         `🧾 Заказ #${order.order_id}`,
-        `📦 ${order.product_name} × ${order.quantity || 1}`,
-        `💵 ${order.total_price} ${order.currency}`,
-        `💎 ${order.expected_crypto_amount} ${order.crypto_currency}`,
+        `📅 ${dateStr}`,
+        '',
+        `📦 ${escapeHtml(order.product_name)} × ${order.quantity || 1}`,
+        `💵 ${formatPrice(order.total_price)} ${order.currency}`,
+        `💎 ${formatCrypto(order.expected_crypto_amount)} ${order.crypto_currency}`,
         '',
         `👤 Покупатель: ${buyerContact}`,
-        order.buyer_contact ? `📞 ${order.buyer_contact}` : null,
+        '',
+        '⚡️ <i>Свяжитесь с покупателем и выдайте товар</i>',
       ].filter(Boolean).join('\n');
 
       await telegramService.sendMessage(order.seller_telegram_id, sellerMessage, {
-        parse_mode: 'Markdown'
+        parse_mode: 'HTML'
       });
     }
 
@@ -479,19 +514,23 @@ async function notifySellerPaymentReceived(orderId) {
         : order.seller_first_name || 'Продавец';
 
       const buyerMessage = [
-        '✅ *Платёж подтверждён!*',
+        '✅ <b>Платёж подтверждён!</b>',
         '',
         `🧾 Заказ #${order.order_id}`,
-        `📦 ${order.product_name}`,
-        `💵 ${order.total_price} ${order.currency}`,
-        `💎 ${order.expected_crypto_amount} ${order.crypto_currency}`,
+        `📅 ${dateStr}`,
         '',
-        `🏪 Магазин: ${order.shop_name}`,
+        `📦 ${escapeHtml(order.product_name)}`,
+        `💵 ${formatPrice(order.total_price)} ${order.currency}`,
+        `💎 ${formatCrypto(order.expected_crypto_amount)} ${order.crypto_currency}`,
+        '',
+        `🏪 Магазин: ${escapeHtml(order.shop_name)}`,
         `👤 Продавец: ${sellerContact}`,
+        '',
+        '⏳ <i>Продавец скоро свяжется с вами</i>',
       ].join('\n');
 
       await telegramService.sendMessage(order.buyer_telegram_id, buyerMessage, {
-        parse_mode: 'Markdown'
+        parse_mode: 'HTML'
       });
     }
 

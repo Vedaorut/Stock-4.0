@@ -5,7 +5,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { useTelegram } from '../../hooks/useTelegram';
 import { useTranslation } from '../../i18n/useTranslation';
 import { useToast } from '../../hooks/useToast';
-import { CRYPTO_OPTIONS, formatCryptoAmount } from '../../utils/paymentUtils';
+import { CRYPTO_OPTIONS, formatCryptoAmount, generatePaymentQRValue } from '../../utils/paymentUtils';
 import { usePlatform } from '../../hooks/usePlatform';
 import {
   getSpringPreset,
@@ -417,7 +417,7 @@ export default function PaymentDetailsModal() {
                       }
                     >
                       <QRCodeSVG
-                        value={paymentWallet}
+                        value={generatePaymentQRValue(paymentWallet, cryptoAmount, selectedCrypto)}
                         size={qrSize}
                         level="H"
                         includeMargin={false}

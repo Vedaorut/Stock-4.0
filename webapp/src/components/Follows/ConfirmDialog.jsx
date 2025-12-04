@@ -17,11 +17,10 @@ const ConfirmDialog = ({
   
   useBackButton(isOpen ? onClose : null);
 
-  if (!isOpen) return null;
-
   return (
     <AnimatePresence>
-      <motion.div
+      {isOpen && (
+        <motion.div
         className="fixed inset-0 bg-[#000]/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -101,6 +100,7 @@ const ConfirmDialog = ({
           </div>
         </motion.div>
       </motion.div>
+      )}
     </AnimatePresence>
   );
 };

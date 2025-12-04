@@ -122,7 +122,8 @@ const buildCatalogMessage = (followInfo, products, mode, lang = 'ru') => {
 
   const pcsLabel = t('orders.pcs', {}, lang);
   const productLabel = t('orders.productDefault', {}, lang);
-  products.slice(0, 10).forEach((product, index) => {
+  const productsList = products.slice(0, 10);
+  productsList.forEach((product, index) => {
     if (isResell) {
       const synced = product.synced_product || product.syncedProduct || {};
       const name =
@@ -138,6 +139,10 @@ const buildCatalogMessage = (followInfo, products, mode, lang = 'ru') => {
       const stock = product.stock_quantity ?? 0;
       lines.push(formatProductLine(index, name, price, stock, lang));
     }
+    // Add blank line between products for readability (except after last)
+    if (index < productsList.length - 1) {
+      lines.push('');
+    }
   });
 
   return lines.join('\n');
@@ -147,19 +152,20 @@ const buildCatalogMessage = (followInfo, products, mode, lang = 'ru') => {
  * View all follows for current shop
  */
 export const handleViewFollows = async (ctx) => {
+  const lang = getLangSafe(ctx);
   const { general: generalMessages, follows: followMessages } = getLocalizedMessages(ctx);
   try {
     await ctx.answerCbQuery();
 
     if (!ctx.session.shopId) {
-      await ctx.reply(generalMessages.shopRequired, sellerMenuNoShop);
+      await ctx.reply(generalMessages.shopRequired(lang), sellerMenuNoShop);
       return;
     }
 
     if (!ctx.session.token) {
       await ctx.reply(
-        generalMessages.authorizationRequired,
-        sellerMenu(0, { hasFollows: ctx.session?.hasFollows }, ctx.lang)
+        generalMessages.authorizationRequired(lang),
+        sellerMenu(0, { hasFollows: ctx.session?.hasFollows }, lang)
       );
       return;
     }
@@ -170,26 +176,26 @@ export const handleViewFollows = async (ctx) => {
     ctx.session.hasFollows = hasFollows;
 
     if (!hasFollows) {
-      const text = `${followMessages.contextDetailed}\n\n${followMessages.emptyState}`;
-      await sendOrEdit(ctx, text, followsMenu(false, [], ctx.lang));
+      const text = `${followMessages.contextDetailed(lang)}\n\n${followMessages.emptyState(lang)}`;
+      await sendOrEdit(ctx, text, followsMenu(false, [], lang));
       return;
     }
 
     const followButtons = follows.map((follow) => [
-      Markup.button.callback(buildFollowLabel(follow, ctx.lang), `follow_detail:${follow.id}`),
+      Markup.button.callback(buildFollowLabel(follow, lang), `follow_detail:${follow.id}`),
     ]);
 
     const listText = follows
-      .map((follow, index) => `${index + 1}. ${buildFollowLabel(follow, ctx.lang).slice(2)}`) // remove leading emoji for text list
+      .map((follow, index) => `${index + 1}. ${buildFollowLabel(follow, lang).slice(2)}`) // remove leading emoji for text list
       .join('\n');
 
-    const message = `${followMessages.contextDetailed}\n\n${listText}`;
+    const message = `${followMessages.contextDetailed(lang)}\n\n${listText}`;
 
-    await sendOrEdit(ctx, message, followsMenu(true, followButtons, ctx.lang));
+    await sendOrEdit(ctx, message, followsMenu(true, followButtons, lang));
     logger.info(`User ${ctx.from.id} viewed follows (${follows.length} total)`);
   } catch (error) {
     logger.error('Error fetching follows:', error);
-    await sendOrEdit(ctx, followMessages.loadError, followsMenu(Boolean(ctx.session?.hasFollows), [], ctx.lang));
+    await sendOrEdit(ctx, followMessages.loadError(lang), followsMenu(Boolean(ctx.session?.hasFollows), [], lang));
   }
 };
 
@@ -198,6 +204,7 @@ export const handleViewFollows = async (ctx) => {
  * P2-9 FIX: Validate shop existence before entering scene
  */
 export const handleCreateFollow = async (ctx) => {
+  const lang = getLangSafe(ctx);
   const { general: generalMessages } = getLocalizedMessages(ctx);
   try {
     await ctx.answerCbQuery();
@@ -210,8 +217,8 @@ export const handleCreateFollow = async (ctx) => {
   } catch (error) {
     logger.error('Error entering createFollow scene:', error);
     await ctx.reply(
-      generalMessages.actionFailed,
-      followsMenu(Boolean(ctx.session?.hasFollows), [], ctx.lang)
+      generalMessages.actionFailed(lang),
+      followsMenu(Boolean(ctx.session?.hasFollows), [], lang)
     );
   }
 };
@@ -221,6 +228,7 @@ export const handleCreateFollow = async (ctx) => {
  * SECURITY FIX: Added shopId check as defense-in-depth (backend also verifies ownership)
  */
 export const handleFollowDetail = async (ctx) => {
+  const lang = getLangSafe(ctx);
   const { general: generalMessages, follows: followMessages } = getLocalizedMessages(ctx);
   try {
     await ctx.answerCbQuery();
@@ -229,12 +237,12 @@ export const handleFollowDetail = async (ctx) => {
 
     // SECURITY FIX: Require shop session before accessing follows
     if (!ctx.session.shopId) {
-      await ctx.editMessageText(generalMessages.shopRequired, followsMenu(false, [], ctx.lang));
+      await ctx.editMessageText(generalMessages.shopRequired(lang), followsMenu(false, [], lang));
       return;
     }
 
     if (!ctx.session.token) {
-      await ctx.editMessageText(generalMessages.authorizationRequired);
+      await ctx.editMessageText(generalMessages.authorizationRequired(lang));
       return;
     }
 
@@ -251,7 +259,7 @@ export const handleFollowDetail = async (ctx) => {
       ]);
     } catch (error) {
       if (error.response?.status === 404) {
-        await ctx.editMessageText(followMessages.notFound, followsMenu(false, [], ctx.lang));
+        await ctx.editMessageText(followMessages.notFound(lang), followsMenu(false, [], lang));
         return;
       }
       if (error.response?.status === 403) {
@@ -261,7 +269,7 @@ export const handleFollowDetail = async (ctx) => {
           followId,
           shopId: ctx.session?.shopId,
         });
-        await ctx.editMessageText(followMessages.accessDenied, followsMenu(false, [], ctx.lang));
+        await ctx.editMessageText(followMessages.accessDenied(lang), followsMenu(false, [], lang));
         return;
       }
       throw error;
@@ -271,7 +279,7 @@ export const handleFollowDetail = async (ctx) => {
     const mode = payload.mode || followDetail.mode;
     const products = Array.isArray(payload.products) ? payload.products : [];
 
-    const message = buildCatalogMessage(followDetail, products, mode, ctx.lang);
+    const message = buildCatalogMessage(followDetail, products, mode, lang);
 
     await ctx.editMessageText(message, followCatalogMenu(followId));
     logger.info(`User ${ctx.from.id} viewed follow catalog ${followId}`);
@@ -285,16 +293,17 @@ export const handleFollowDetail = async (ctx) => {
     logger.error('Error viewing follow detail:', error);
     const status = error.response?.status;
     if (status === 404) {
-      await ctx.editMessageText(followMessages.notFound, followsMenu(false, [], ctx.lang));
+      await ctx.editMessageText(followMessages.notFound(lang), followsMenu(false, [], lang));
     } else if (status === 403) {
-      await ctx.editMessageText(followMessages.accessDenied, followsMenu(false, [], ctx.lang));
+      await ctx.editMessageText(followMessages.accessDenied(lang), followsMenu(false, [], lang));
     } else {
-      await ctx.editMessageText(followMessages.loadError, followsMenu(false, [], ctx.lang));
+      await ctx.editMessageText(followMessages.loadError(lang), followsMenu(false, [], lang));
     }
   }
 };
 
 export const handleFollowSettings = async (ctx) => {
+  const lang = getLangSafe(ctx);
   const { general: generalMessages, follows: followMessages } = getLocalizedMessages(ctx);
   try {
     await ctx.answerCbQuery();
@@ -302,13 +311,13 @@ export const handleFollowSettings = async (ctx) => {
     const followId = parseInt(ctx.match[1], 10);
 
     if (!ctx.session.token) {
-      await ctx.editMessageText(generalMessages.authorizationRequired);
+      await ctx.editMessageText(generalMessages.authorizationRequired(lang));
       return;
     }
 
     const follow = await followApi.getFollowDetail(followId, ctx.session.token);
 
-    const message = formatFollowDetail(follow, ctx.lang);
+    const message = formatFollowDetail(follow, lang);
     await ctx.editMessageText(message, followDetailMenu(followId, follow.mode));
     logger.info(`User ${ctx.from.id} viewed follow settings ${followId}`);
   } catch (error) {
@@ -316,11 +325,11 @@ export const handleFollowSettings = async (ctx) => {
 
     const status = error.response?.status;
     if (status === 404) {
-      await ctx.editMessageText(followMessages.notFound, followsMenu(false, [], ctx.lang));
+      await ctx.editMessageText(followMessages.notFound(lang), followsMenu(false, [], lang));
     } else if (status === 403) {
-      await ctx.editMessageText(followMessages.accessDenied, followsMenu(false, [], ctx.lang));
+      await ctx.editMessageText(followMessages.accessDenied(lang), followsMenu(false, [], lang));
     } else {
-      await ctx.editMessageText(followMessages.loadError, followsMenu(false, [], ctx.lang));
+      await ctx.editMessageText(followMessages.loadError(lang), followsMenu(false, [], lang));
     }
   }
 };
@@ -329,6 +338,7 @@ export const handleFollowSettings = async (ctx) => {
  * Show delete confirmation dialog
  */
 export const handleDeleteFollow = async (ctx) => {
+  const lang = getLangSafe(ctx);
   const { general: generalMessages, follows: followMessages } = getLocalizedMessages(ctx);
   try {
     await ctx.answerCbQuery();
@@ -336,7 +346,7 @@ export const handleDeleteFollow = async (ctx) => {
     const followId = parseInt(ctx.match[1]);
 
     if (!ctx.session.token) {
-      await ctx.editMessageText(generalMessages.authorizationRequired);
+      await ctx.editMessageText(generalMessages.authorizationRequired(lang));
       return;
     }
 
@@ -346,18 +356,18 @@ export const handleDeleteFollow = async (ctx) => {
       follow = await followApi.getFollowDetail(followId, ctx.session.token);
     } catch (error) {
       if (error.response?.status === 404) {
-        await ctx.editMessageText(followMessages.notFound, followsMenu(false, [], ctx.lang));
+        await ctx.editMessageText(followMessages.notFound(lang), followsMenu(false, [], lang));
         return;
       }
       throw error;
     }
 
-    const shopName = follow.source_shop_name || follow.sourceShopName || t('formatters.followShop', {}, ctx.lang);
+    const shopName = follow.source_shop_name || follow.sourceShopName || t('formatters.followShop', {}, lang);
     const isResell = follow.mode === 'resell';
 
     let confirmMessage = ctx.t('follows.confirmDelete', { shopName });
     if (isResell) {
-      confirmMessage += `\n\n❗ ${ctx.t('follows.confirmDeleteResell')}`;
+      confirmMessage += `\n\n${ctx.t('follows.confirmDeleteResell')}`;
     }
 
     const confirmKeyboard = Markup.inlineKeyboard([
@@ -371,7 +381,7 @@ export const handleDeleteFollow = async (ctx) => {
     logger.info(`User ${ctx.from.id} requested delete confirmation for follow ${followId}`);
   } catch (error) {
     logger.error('Error showing delete confirmation:', error);
-    await ctx.editMessageText(followMessages.deleteError, followsMenu(false, [], ctx.lang));
+    await ctx.editMessageText(followMessages.deleteError(lang), followsMenu(false, [], lang));
   }
 };
 
@@ -379,6 +389,7 @@ export const handleDeleteFollow = async (ctx) => {
  * Confirm and execute follow deletion
  */
 export const handleConfirmDeleteFollow = async (ctx) => {
+  const lang = getLangSafe(ctx);
   const { general: generalMessages, follows: followMessages } = getLocalizedMessages(ctx);
   try {
     await ctx.answerCbQuery(ctx.t('follows.deleting'));
@@ -386,7 +397,7 @@ export const handleConfirmDeleteFollow = async (ctx) => {
     const followId = parseInt(ctx.match[1]);
 
     if (!ctx.session.token) {
-      await ctx.editMessageText(generalMessages.authorizationRequired);
+      await ctx.editMessageText(generalMessages.authorizationRequired(lang));
       return;
     }
 
@@ -398,25 +409,25 @@ export const handleConfirmDeleteFollow = async (ctx) => {
     ctx.session.hasFollows = hasFollows;
 
     if (!hasFollows) {
-      const text = `${followMessages.contextDetailed}\n\n${followMessages.emptyState}`;
-      await ctx.editMessageText(text, followsMenu(false, [], ctx.lang));
+      const text = `${followMessages.contextDetailed(lang)}\n\n${followMessages.emptyState(lang)}`;
+      await ctx.editMessageText(text, followsMenu(false, [], lang));
       return;
     }
 
     const followButtons = follows.map((follow) => [
-      Markup.button.callback(buildFollowLabel(follow, ctx.lang), `follow_detail:${follow.id}`),
+      Markup.button.callback(buildFollowLabel(follow, lang), `follow_detail:${follow.id}`),
     ]);
 
     const listText = follows
-      .map((follow, index) => `${index + 1}. ${buildFollowLabel(follow, ctx.lang).slice(2)}`)
+      .map((follow, index) => `${index + 1}. ${buildFollowLabel(follow, lang).slice(2)}`)
       .join('\n');
 
-    const message = `${followMessages.contextDetailed}\n\n${listText}`;
+    const message = `${followMessages.contextDetailed(lang)}\n\n${listText}`;
 
-    await ctx.editMessageText(message, followsMenu(true, followButtons, ctx.lang));
+    await ctx.editMessageText(message, followsMenu(true, followButtons, lang));
   } catch (error) {
     logger.error('Error deleting follow:', error);
-    await ctx.editMessageText(followMessages.deleteError, followsMenu(false, [], ctx.lang));
+    await ctx.editMessageText(followMessages.deleteError(lang), followsMenu(false, [], lang));
   }
 };
 
@@ -424,6 +435,7 @@ export const handleConfirmDeleteFollow = async (ctx) => {
  * Cancel follow deletion - return to follow detail
  */
 export const handleCancelDeleteFollow = async (ctx) => {
+  const lang = getLangSafe(ctx);
   const { general: generalMessages, follows: followMessages } = getLocalizedMessages(ctx);
   try {
     await ctx.answerCbQuery(ctx.t('follows.cancelled'));
@@ -431,22 +443,22 @@ export const handleCancelDeleteFollow = async (ctx) => {
     const followId = parseInt(ctx.match[1]);
 
     if (!ctx.session.token) {
-      await ctx.editMessageText(generalMessages.authorizationRequired);
+      await ctx.editMessageText(generalMessages.authorizationRequired(lang));
       return;
     }
 
     // Return to follow settings view
     const follow = await followApi.getFollowDetail(followId, ctx.session.token);
-    const message = formatFollowDetail(follow, ctx.lang);
+    const message = formatFollowDetail(follow, lang);
     await ctx.editMessageText(message, followDetailMenu(followId, follow.mode));
     logger.info(`User ${ctx.from.id} cancelled delete for follow ${followId}`);
   } catch (error) {
     logger.error('Error cancelling delete:', error);
     // If follow not found, go back to list
     if (error.response?.status === 404) {
-      await ctx.editMessageText(followMessages.notFound, followsMenu(false, [], ctx.lang));
+      await ctx.editMessageText(followMessages.notFound(lang), followsMenu(false, [], lang));
     } else {
-      await ctx.editMessageText(followMessages.loadError, followsMenu(false, [], ctx.lang));
+      await ctx.editMessageText(followMessages.loadError(lang), followsMenu(false, [], lang));
     }
   }
 };
@@ -457,6 +469,7 @@ export const handleCancelDeleteFollow = async (ctx) => {
  * P2-9 FIX: Validate shop existence before entering scene
  */
 export const handleSwitchMode = async (ctx) => {
+  const lang = getLangSafe(ctx);
   const { general: generalMessages, follows: followMessages } = getLocalizedMessages(ctx);
   try {
     await ctx.answerCbQuery();
@@ -464,7 +477,7 @@ export const handleSwitchMode = async (ctx) => {
     const followId = parseInt(ctx.match[1]);
 
     if (!ctx.session.token) {
-      await ctx.editMessageText(generalMessages.authorizationRequired);
+      await ctx.editMessageText(generalMessages.authorizationRequired(lang));
       return;
     }
 
@@ -509,7 +522,7 @@ export const handleSwitchMode = async (ctx) => {
     await followApi.switchMode(followId, newMode, ctx.session.token);
 
     const updated = await followApi.getFollowDetail(followId, ctx.session.token);
-    const message = formatFollowDetail(updated, ctx.lang);
+    const message = formatFollowDetail(updated, lang);
     await ctx.editMessageText(message, followDetailMenu(followId, updated.mode));
     logger.info(`User ${ctx.from.id} switched follow ${followId} to ${newMode}`);
   } catch (error) {
@@ -518,13 +531,13 @@ export const handleSwitchMode = async (ctx) => {
     const errorMsg = error.response?.data?.error;
 
     if (error.response?.status === 402) {
-      await ctx.editMessageText(followMessages.limitReached, followsMenu(false, [], ctx.lang));
+      await ctx.editMessageText(followMessages.limitReached(lang), followsMenu(false, [], lang));
     } else if (error.response?.status === 404) {
-      await ctx.editMessageText(followMessages.notFound, followsMenu(false, [], ctx.lang));
+      await ctx.editMessageText(followMessages.notFound(lang), followsMenu(false, [], lang));
     } else if (errorMsg?.toLowerCase().includes('circular')) {
-      await ctx.editMessageText(followMessages.modeLimit, followsMenu(false, [], ctx.lang));
+      await ctx.editMessageText(followMessages.modeLimit(lang), followsMenu(false, [], lang));
     } else {
-      await ctx.editMessageText(followMessages.switchError, followsMenu(false, [], ctx.lang));
+      await ctx.editMessageText(followMessages.switchError(lang), followsMenu(false, [], lang));
     }
   }
 };
@@ -533,6 +546,7 @@ export const handleSwitchMode = async (ctx) => {
  * Confirm switch to monitor mode (after warning about synced products deletion)
  */
 export const handleConfirmSwitchToMonitor = async (ctx) => {
+  const lang = getLangSafe(ctx);
   const { general: generalMessages, follows: followMessages } = getLocalizedMessages(ctx);
   try {
     await ctx.answerCbQuery(ctx.t('follows.switching'));
@@ -540,7 +554,7 @@ export const handleConfirmSwitchToMonitor = async (ctx) => {
     const followId = parseInt(ctx.match[1]);
 
     if (!ctx.session.token) {
-      await ctx.editMessageText(generalMessages.authorizationRequired);
+      await ctx.editMessageText(generalMessages.authorizationRequired(lang));
       return;
     }
 
@@ -548,7 +562,7 @@ export const handleConfirmSwitchToMonitor = async (ctx) => {
     await followApi.switchMode(followId, 'monitor', ctx.session.token);
 
     const updated = await followApi.getFollowDetail(followId, ctx.session.token);
-    const message = formatFollowDetail(updated, ctx.lang);
+    const message = formatFollowDetail(updated, lang);
     await ctx.editMessageText(message, followDetailMenu(followId, updated.mode));
     logger.info(`User ${ctx.from.id} confirmed switch follow ${followId} to monitor`);
   } catch (error) {
@@ -557,11 +571,11 @@ export const handleConfirmSwitchToMonitor = async (ctx) => {
     const errorMsg = error.response?.data?.error;
 
     if (error.response?.status === 404) {
-      await ctx.editMessageText(followMessages.notFound, followsMenu(false, [], ctx.lang));
+      await ctx.editMessageText(followMessages.notFound(lang), followsMenu(false, [], lang));
     } else if (errorMsg?.toLowerCase().includes('circular')) {
-      await ctx.editMessageText(followMessages.modeLimit, followsMenu(false, [], ctx.lang));
+      await ctx.editMessageText(followMessages.modeLimit(lang), followsMenu(false, [], lang));
     } else {
-      await ctx.editMessageText(followMessages.switchError, followsMenu(false, [], ctx.lang));
+      await ctx.editMessageText(followMessages.switchError(lang), followsMenu(false, [], lang));
     }
   }
 };
@@ -572,6 +586,7 @@ export const handleConfirmSwitchToMonitor = async (ctx) => {
  * P2-9 FIX: Validate shop existence before entering scene
  */
 export const handleEditMarkup = async (ctx) => {
+  const lang = getLangSafe(ctx);
   const { general: generalMessages, follows: followMessages } = getLocalizedMessages(ctx);
   try {
     await ctx.answerCbQuery();
@@ -579,7 +594,7 @@ export const handleEditMarkup = async (ctx) => {
     const followId = parseInt(ctx.match[1]);
 
     if (!ctx.session.token) {
-      await ctx.editMessageText(generalMessages.authorizationRequired);
+      await ctx.editMessageText(generalMessages.authorizationRequired(lang));
       return;
     }
 
@@ -593,7 +608,7 @@ export const handleEditMarkup = async (ctx) => {
     logger.info(`User ${ctx.from.id} initiated markup edit for follow ${followId}`);
   } catch (error) {
     logger.error('Error initiating markup edit:', error);
-    await ctx.editMessageText(followMessages.switchError);
+    await ctx.editMessageText(followMessages.switchError(lang));
   }
 };
 

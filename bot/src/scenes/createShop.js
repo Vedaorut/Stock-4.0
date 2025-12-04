@@ -67,7 +67,7 @@ const handleShopNameAndCreate = async (ctx) => {
     if (!ctx.message || !ctx.message.text) {
       await cleanReply(
         ctx,
-        `${t('scenes.sendShopNameText', {}, lang)}\n\n${sellerMessages.createShopNamePrompt}`
+        `${t('scenes.sendShopNameText', {}, lang)}\n\n${sellerMessages.createShopNamePrompt(lang)}`
       );
       return;
     }
@@ -84,7 +84,7 @@ const handleShopNameAndCreate = async (ctx) => {
     if (shopName.length < 3 || shopName.length > 100) {
       await cleanReply(
         ctx,
-        `${sellerMessages.createShopNameInvalidLength}\n${sellerMessages.createShopNameHint}`
+        `${sellerMessages.createShopNameInvalidLength(lang)}\n${sellerMessages.createShopNameHint(lang)}`
       );
       return;
     }
@@ -93,7 +93,7 @@ const handleShopNameAndCreate = async (ctx) => {
     if (!validNamePattern.test(shopName)) {
       await cleanReply(
         ctx,
-        `${sellerMessages.createShopNameInvalidChars}\n${sellerMessages.createShopNameHint}`
+        `${sellerMessages.createShopNameInvalidChars(lang)}\n${sellerMessages.createShopNameHint(lang)}`
       );
       return;
     }
@@ -106,7 +106,7 @@ const handleShopNameAndCreate = async (ctx) => {
     const { seller: sellerMsgs } = getMessages(langErr);
 
     await smartMessage.send(ctx, {
-      text: sellerMsgs.createShopError,
+      text: sellerMsgs.createShopError(langErr),
       keyboard: successButtons(langErr),
     });
 
@@ -153,11 +153,11 @@ const createShop = async (ctx, shopName, lang = ctx.lang || ctx.session?.languag
         session: ctx.session,
       });
 
-      await cleanReply(ctx, generalMessages.authorizationRequired, successButtons(lang));
+      await cleanReply(ctx, generalMessages.authorizationRequired(lang), successButtons(lang));
       return await ctx.scene.leave();
     }
 
-    loadingMsg = await cleanReply(ctx, sellerMessages.createShopSaving);
+    loadingMsg = await cleanReply(ctx, sellerMessages.createShopSaving(lang));
 
     const payload = {
       name: shopName,
@@ -277,7 +277,7 @@ const createShop = async (ctx, shopName, lang = ctx.lang || ctx.session?.languag
           errorMsg.toLowerCase().includes('\u0443\u0436\u0435 \u0437\u0430\u043d\u044f\u0442\u043e') ||
           errorMsg.toLowerCase().includes('already exists')
         ) {
-          await cleanReply(ctx, sellerMessages.createShopNameTaken, cancelButton(lang));
+          await cleanReply(ctx, sellerMessages.createShopNameTaken(lang), cancelButton(lang));
           return;
         }
 
@@ -340,7 +340,7 @@ createShopScene.action('cancel_scene', async (ctx) => {
     await ctx.scene.leave();
 
     // Silent transition - edit message without cancelled text
-    await ctx.editMessageText(startMessages.welcome, successButtons(lang));
+    await ctx.editMessageText(startMessages.welcome(lang), successButtons(lang));
   } catch (error) {
     logger.error('Error in cancel_scene handler:', error);
     // Local error handling - don't throw to avoid infinite spinner
@@ -348,7 +348,7 @@ createShopScene.action('cancel_scene', async (ctx) => {
       const langErr = ctx.lang || ctx.session?.language || 'ru';
       const { general: generalMessages } = getMessages(langErr);
       await smartMessage.send(ctx, {
-        text: generalMessages.actionFailed,
+        text: generalMessages.actionFailed(langErr),
         keyboard: successButtons(langErr),
       });
     } catch (replyError) {
@@ -367,7 +367,7 @@ createShopScene.action('cancel', async (ctx) => {
     const { start: startMessages } = getMessages(lang);
 
     await ctx.scene.leave();
-    await ctx.editMessageText(startMessages.welcome, successButtons(lang));
+    await ctx.editMessageText(startMessages.welcome(lang), successButtons(lang));
   } catch (error) {
     logger.error('Error in cancel handler:', error);
     try {

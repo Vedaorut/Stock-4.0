@@ -224,6 +224,74 @@ ${t('order.status.status', { status }, lang)}
   }
 
   /**
+   * Notify buyer that their payment was submitted
+   * @param {number} buyerTelegramId - Buyer's Telegram ID
+   * @param {object} data - { shopName, productName, amount, cryptoAmount, currency, txHash }
+   * @param {string} lang - User language preference
+   */
+  async notifyPaymentSubmittedBuyer(buyerTelegramId, data, lang = DEFAULT_LANGUAGE) {
+    if (!buyerTelegramId) {
+      return null;
+    }
+
+    const truncatedTxHash = data.txHash.length > 16
+      ? `${data.txHash.slice(0, 8)}...${data.txHash.slice(-8)}`
+      : data.txHash;
+
+    const message = `<b>${t('order.submitted.buyer.title', {}, lang)}</b>
+
+${t('order.submitted.buyer.shop', { shopName: data.shopName }, lang)}
+${t('order.submitted.buyer.product', { productName: data.productName }, lang)}
+${t('order.submitted.buyer.amountUsd', { amount: parseFloat(data.amount).toFixed(2) }, lang)}
+${t('order.submitted.buyer.amountCrypto', { cryptoAmount: data.cryptoAmount, currency: data.currency }, lang)}
+
+${t('order.submitted.buyer.txHash', { txHash: truncatedTxHash }, lang)}
+
+${t('order.submitted.buyer.verifying', {}, lang)}`;
+
+    return this.sendMessage(buyerTelegramId, message.trim(), { parse_mode: 'HTML' });
+  }
+
+  /**
+   * Notify seller that buyer claimed payment
+   * @param {number} sellerTelegramId - Seller's Telegram ID
+   * @param {object} data - { orderId, productName, amount, cryptoAmount, currency, buyerUsername, txHash }
+   * @param {string} lang - User language preference
+   */
+  async notifyPaymentSubmittedSeller(sellerTelegramId, data, lang = DEFAULT_LANGUAGE) {
+    if (!sellerTelegramId) {
+      return null;
+    }
+
+    const truncatedTxHash = data.txHash.length > 16
+      ? `${data.txHash.slice(0, 8)}...${data.txHash.slice(-8)}`
+      : data.txHash;
+
+    // Fix double @@ - remove @ if username already has it
+    const cleanUsername = data.buyerUsername?.replace(/^@/, '') || '';
+    const buyerDisplay = cleanUsername ? `@${cleanUsername}` : 'Anonymous';
+
+    // Generate explorer link based on currency
+    const explorerUrl = this._getExplorerUrl(data.currency, data.txHash);
+    const txDisplay = explorerUrl
+      ? `<a href="${explorerUrl}">${truncatedTxHash}</a>`
+      : truncatedTxHash;
+
+    const message = `<b>${t('order.submitted.seller.title', {}, lang)}</b>
+
+${t('order.submitted.seller.orderId', { orderId: data.orderId }, lang)}
+${t('order.submitted.seller.product', { productName: data.productName }, lang)}
+${t('order.submitted.seller.amount', { amount: parseFloat(data.amount).toFixed(2), cryptoAmount: data.cryptoAmount, currency: data.currency }, lang)}
+${t('order.submitted.seller.buyer', { username: buyerDisplay }, lang)}
+
+🔗 TX: ${txDisplay}
+
+${t('order.submitted.seller.warning', {}, lang)}`;
+
+    return this.sendMessage(sellerTelegramId, message.trim(), { parse_mode: 'HTML' });
+  }
+
+  /**
    * Notify shop owner about successful subscription activation
    * @param {number} telegramId - Owner Telegram ID
    * @param {object} payload - { shopName, tier, nextPaymentDue }
@@ -332,6 +400,25 @@ ${t('subscription.pendingSetup.createShop', {}, lang)}`;
       });
       throw error;
     }
+  }
+
+  /**
+   * Get blockchain explorer URL for transaction
+   * @param {string} currency - BTC, ETH, LTC, USDT_TRC20
+   * @param {string} txHash - Transaction hash
+   * @returns {string|null} Explorer URL or null
+   */
+  _getExplorerUrl(currency, txHash) {
+    if (!txHash) return null;
+
+    const explorers = {
+      BTC: `https://blockchair.com/bitcoin/transaction/${txHash}`,
+      LTC: `https://blockchair.com/litecoin/transaction/${txHash}`,
+      ETH: `https://etherscan.io/tx/${txHash}`,
+      USDT_TRC20: `https://tronscan.org/#/transaction/${txHash}`,
+    };
+
+    return explorers[currency] || null;
   }
 
   /**

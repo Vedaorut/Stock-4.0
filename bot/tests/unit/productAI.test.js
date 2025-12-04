@@ -588,7 +588,7 @@ describe('detectSingleProductDiscountIntent', () => {
       const result = detectSingleProductDiscountIntent('скидка 0% на iPhone 15 Pro', mockProducts);
       expect(result).not.toBeNull();
       expect(result.error).toBeDefined();
-      expect(result.error.message).toContain('больше 0%');
+      expect(result.error.message).toMatch(/больше 0%|greater than 0%/i);
     });
 
     it('should return error for negative discount', () => {

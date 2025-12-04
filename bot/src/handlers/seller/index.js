@@ -459,7 +459,7 @@ const handleInviteLink = async (ctx) => {
     }
 
     const shopId = ctx.session.shopId;
-    const botUsername = process.env.BOT_USERNAME || 'SellStatusBot';
+    const botUsername = process.env.BOT_USERNAME || 'saveropus_bot';
     const lang = getLangSafe(ctx);
 
     // Build invite link message with copyable link

@@ -88,7 +88,7 @@ const showMarkupTypeSelection = async (ctx) => {
       [Markup.button.callback(ctx.t('buttons.cancel'), 'cancel_scene')],
     ]);
 
-    await ctx.reply(followMessages.markupTypePrompt, dynamicMarkupTypeKeyboard);
+    await ctx.reply(followMessages.markupTypePrompt(lang), dynamicMarkupTypeKeyboard);
 
     return ctx.wizard.next();
   } catch (error) {
@@ -103,7 +103,7 @@ const waitForMarkupType = async (ctx) => {
   if (ctx.message?.text) {
     const lang = ctx.lang || ctx.session?.language || 'ru';
     const { follows: followMessages } = getMessages(lang);
-    await cleanReply(ctx, followMessages.markupTypeRequired, cancelButton(lang));
+    await cleanReply(ctx, followMessages.markupTypeRequired(lang), cancelButton(lang));
   }
   return;
 };
@@ -116,14 +116,14 @@ const handleMarkupInput = async (ctx) => {
 
     const markupType = ctx.scene.state.markupType;
     if (!markupType) {
-      await cleanReply(ctx, followMessages.markupTypeRequired, cancelButton(lang));
+      await cleanReply(ctx, followMessages.markupTypeRequired(lang), cancelButton(lang));
       return;
     }
 
     if (!ctx.message || !ctx.message.text) {
       const prompt = markupType === 'fixed'
-        ? followMessages.markupFixedPrompt
-        : followMessages.markupPercentagePrompt;
+        ? followMessages.markupFixedPrompt(lang)
+        : followMessages.markupPercentagePrompt(lang);
       await cleanReply(ctx, ctx.t('follows.enterMarkupPrompt') + '\n\n' + prompt, cancelButton(lang));
       return;
     }
@@ -139,11 +139,11 @@ const handleMarkupInput = async (ctx) => {
     if (markupType === 'fixed') {
       // Fixed: $0-$1000
       isValid = !isNaN(markup) && markup >= 0 && markup <= 1000;
-      invalidMessage = followMessages.markupFixedInvalid;
+      invalidMessage = followMessages.markupFixedInvalid(lang);
     } else {
       // Percentage: 1-500%
       isValid = !isNaN(markup) && markup >= 1 && markup <= 500;
-      invalidMessage = followMessages.markupInvalid;
+      invalidMessage = followMessages.markupInvalid(lang);
     }
 
     if (!isValid) {
@@ -182,7 +182,7 @@ const handleMarkupInput = async (ctx) => {
     const token = ctx.session.token;
 
     if (!token) {
-      await cleanReply(ctx, generalMessages.authorizationRequired, cancelButton(lang));
+      await cleanReply(ctx, generalMessages.authorizationRequired(lang), cancelButton(lang));
       return ctx.scene.leave();
     }
 
@@ -194,7 +194,7 @@ const handleMarkupInput = async (ctx) => {
       pendingModeSwitch,
     });
 
-    await cleanReply(ctx, followMessages.createSaving);
+    await cleanReply(ctx, followMessages.createSaving(lang));
 
     // Build markup data object
     const markupData = {
@@ -235,14 +235,14 @@ const handleMarkupInput = async (ctx) => {
       logger.error('Error updating markup:', error);
 
       const errorMsg = error.response?.data?.error;
-      let message = followMessages.switchError;
+      let message = followMessages.switchError(lang);
 
       if (error.response?.status === 402) {
-        message = followMessages.limitReached;
+        message = followMessages.limitReached(lang);
       } else if (error.response?.status === 404) {
-        message = followMessages.notFound;
+        message = followMessages.notFound(lang);
       } else if (errorMsg?.toLowerCase().includes('markup')) {
-        message = followMessages.markupInvalid;
+        message = followMessages.markupInvalid(lang);
       }
 
       await cleanReply(ctx, message, followsMenu(Boolean(ctx.session?.hasFollows)));
@@ -252,7 +252,7 @@ const handleMarkupInput = async (ctx) => {
     logger.error('Error in handleMarkupInput step:', error);
     const langErr = ctx.lang || ctx.session?.language || 'ru';
     const { follows: followMsgs } = getMessages(langErr);
-    await cleanReply(ctx, followMsgs.switchError, followsMenu(Boolean(ctx.session?.hasFollows)));
+    await cleanReply(ctx, followMsgs.switchError(langErr), followsMenu(Boolean(ctx.session?.hasFollows)));
     return ctx.scene.leave();
   }
 };
@@ -307,8 +307,8 @@ editFollowMarkupScene.action(/^markup_type:(percentage|fixed)$/, async (ctx) => 
 
     // Show appropriate prompt based on type
     const prompt = markupType === 'fixed'
-      ? followMessages.markupFixedPrompt
-      : followMessages.markupPercentagePrompt;
+      ? followMessages.markupFixedPrompt(lang)
+      : followMessages.markupPercentagePrompt(lang);
 
     await ctx.editMessageText(
       prompt,
@@ -321,7 +321,7 @@ editFollowMarkupScene.action(/^markup_type:(percentage|fixed)$/, async (ctx) => 
     logger.error('Error in markup_type handler:', error);
     const lang = ctx.lang || ctx.session?.language || 'ru';
     const { follows: followMessages } = getMessages(lang);
-    await cleanReply(ctx, followMessages.switchError, followsMenu(Boolean(ctx.session?.hasFollows)));
+    await cleanReply(ctx, followMessages.switchError(lang), followsMenu(Boolean(ctx.session?.hasFollows)));
     return ctx.scene.leave();
   }
 });
@@ -335,13 +335,13 @@ editFollowMarkupScene.action('cancel_scene', async (ctx) => {
     await ctx.answerCbQuery();
     logger.info('edit_markup_cancelled', { userId: ctx.from.id });
     await ctx.scene.leave();
-    await cleanReply(ctx, followMessages.createCancelled, followsMenu(Boolean(ctx.session?.hasFollows)));
+    await cleanReply(ctx, followMessages.createCancelled(lang), followsMenu(Boolean(ctx.session?.hasFollows)));
   } catch (error) {
     logger.error('Error in cancel_scene handler:', error);
     try {
       const lang = ctx.lang || ctx.session?.language || 'ru';
       const { follows: followMessages } = getMessages(lang);
-      await cleanReply(ctx, followMessages.cancelOperationError, followsMenu(Boolean(ctx.session?.hasFollows)));
+      await cleanReply(ctx, followMessages.cancelOperationError(lang), followsMenu(Boolean(ctx.session?.hasFollows)));
     } catch (replyError) {
       logger.error('Failed to send error message:', replyError);
     }
@@ -357,7 +357,7 @@ editFollowMarkupScene.action('cancel', async (ctx) => {
     await ctx.answerCbQuery();
     logger.info('edit_markup_cancelled', { userId: ctx.from.id });
     await ctx.scene.leave();
-    await cleanReply(ctx, followMessages.createCancelled, followsMenu(Boolean(ctx.session?.hasFollows)));
+    await cleanReply(ctx, followMessages.createCancelled(lang), followsMenu(Boolean(ctx.session?.hasFollows)));
   } catch (error) {
     logger.error('Error in cancel handler:', error);
     try {

@@ -24,7 +24,7 @@ const enterName = async (ctx) => {
     const { seller: sellerMessages } = getMessages(lang);
 
     await smartMessage.send(ctx, {
-      text: sellerMessages.addProductNamePrompt,
+      text: sellerMessages.addProductNamePrompt(lang),
       keyboard: cancelButton(lang),
     });
 
@@ -44,7 +44,7 @@ const enterPrice = async (ctx) => {
     // Get product name from message
     if (!ctx.message || !ctx.message.text) {
       await smartMessage.send(ctx, {
-        text: t('scenes.sendProductName', {}, lang) + '\n\n' + sellerMessages.addProductNamePrompt,
+        text: t('scenes.sendProductName', {}, lang) + '\n\n' + sellerMessages.addProductNamePrompt(lang),
         keyboard: cancelButton(lang),
       });
       return;
@@ -54,7 +54,7 @@ const enterPrice = async (ctx) => {
 
     if (productName.length < 3) {
       await smartMessage.send(ctx, {
-        text: sellerMessages.addProductNamePrompt,
+        text: sellerMessages.addProductNamePrompt(lang),
         keyboard: cancelButton(lang),
       });
       return;
@@ -74,7 +74,7 @@ const enterPrice = async (ctx) => {
     });
 
     await smartMessage.send(ctx, {
-      text: sellerMessages.addProductPricePrompt,
+      text: sellerMessages.addProductPricePrompt(lang),
       keyboard: cancelButton(lang),
     });
 
@@ -94,7 +94,7 @@ const complete = async (ctx) => {
     // Get price from message
     if (!ctx.message || !ctx.message.text) {
       await smartMessage.send(ctx, {
-        text: t('scenes.sendPriceText', {}, lang) + '\n\n' + sellerMessages.addProductPricePrompt,
+        text: t('scenes.sendPriceText', {}, lang) + '\n\n' + sellerMessages.addProductPricePrompt(lang),
         keyboard: cancelButton(lang),
       });
       return;
@@ -105,7 +105,7 @@ const complete = async (ctx) => {
 
     if (isNaN(price) || price <= 0) {
       await smartMessage.send(ctx, {
-        text: sellerMessages.addProductPriceInvalid,
+        text: sellerMessages.addProductPriceInvalid(lang),
         keyboard: cancelButton(lang),
       });
       return;
@@ -133,7 +133,7 @@ const complete = async (ctx) => {
         session: ctx.session,
       });
       await smartMessage.send(ctx, {
-        text: generalMessages.shopRequired,
+        text: generalMessages.shopRequired(lang),
         keyboard: successButtons(lang),
       });
       return await ctx.scene.leave();
@@ -145,14 +145,14 @@ const complete = async (ctx) => {
         session: ctx.session,
       });
       await smartMessage.send(ctx, {
-        text: generalMessages.authorizationRequired,
+        text: generalMessages.authorizationRequired(lang),
         keyboard: successButtons(lang),
       });
       return await ctx.scene.leave();
     }
 
     // Create product via backend
-    await smartMessage.send(ctx, { text: sellerMessages.addProductSaving });
+    await smartMessage.send(ctx, { text: sellerMessages.addProductSaving(lang) });
 
     const product = await productApi.createProduct(
       {
@@ -190,7 +190,7 @@ const complete = async (ctx) => {
     const langErr = ctx.lang || ctx.session?.language || 'ru';
     const { seller: sellerMsgs } = getMessages(langErr);
     await smartMessage.send(ctx, {
-      text: sellerMsgs.addProductError,
+      text: sellerMsgs.addProductError(langErr),
       keyboard: successButtons(langErr),
     });
     return await ctx.scene.leave();
@@ -244,7 +244,7 @@ addProductScene.action('cancel_scene', async (ctx) => {
     try {
       const lang = ctx.lang || ctx.session?.language || 'ru';
       const { general: generalMessages } = getMessages(lang);
-      await ctx.reply(generalMessages.actionFailed);
+      await ctx.reply(generalMessages.actionFailed(lang));
     } catch (replyError) {
       logger.error('Failed to send error message:', replyError);
     }

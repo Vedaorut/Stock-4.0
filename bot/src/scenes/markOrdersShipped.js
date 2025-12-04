@@ -28,7 +28,7 @@ const showPrompt = async (ctx) => {
 
     // Validate session
     if (!ctx.session.shopId || !ctx.session.token) {
-      await ctx.editMessageText(generalMessages.authorizationRequired);
+      await ctx.editMessageText(generalMessages.authorizationRequired(lang));
       return await ctx.scene.leave();
     }
 
@@ -44,7 +44,7 @@ const showPrompt = async (ctx) => {
 
     if (activeOrders.length === 0) {
       await ctx.editMessageText(
-        ctx.t('seller.noActiveOrders'),
+        t('seller.noActiveOrders', {}, lang),
         Markup.inlineKeyboard([[Markup.button.callback(t('buttons.back', {}, lang), 'cancel_scene')]])
       );
       return;
@@ -67,18 +67,18 @@ const showPrompt = async (ctx) => {
       .map((order, index) => {
         const buyer = order.buyer_username
           ? `@${order.buyer_username}`
-          : order.buyer_first_name || ctx.t('orders.buyerDefault');
-        const productName = order.product_name || order.productName || ctx.t('orders.productDefault');
+          : order.buyer_first_name || t('orders.buyerDefault', {}, lang);
+        const productName = order.product_name || order.productName || t('orders.productDefault', {}, lang);
         const quantity = order.quantity ?? 1;
         const totalPrice = formatPrice(order.total_price ?? order.totalPrice ?? 0);
-        return `${index + 1}. ${buyer} — ${productName} (${quantity} ${ctx.t('orders.pcs')}) — $${totalPrice}`;
+        return `${index + 1}. ${buyer} — ${productName} (${quantity} ${t('orders.pcs', {}, lang)}) — $${totalPrice}`;
       })
       .join('\n');
 
-    const message = ctx.t('orders.bulkShipList', {
+    const message = t('orders.bulkShipList', {
       count: activeOrders.length,
       list: ordersList,
-    });
+    }, lang);
 
     await ctx.editMessageText(
       message,
@@ -90,7 +90,7 @@ const showPrompt = async (ctx) => {
     logger.error('Error in markOrdersShipped showPrompt:', error);
     const langErr = ctx.lang || ctx.session?.language || 'ru';
     const { general: generalMsgs } = getMessages(langErr);
-    await ctx.editMessageText(generalMsgs.actionFailed);
+    await ctx.editMessageText(generalMsgs.actionFailed(langErr));
     return await ctx.scene.leave();
   }
 };
@@ -107,7 +107,7 @@ const handleInput = async (ctx) => {
     // Handle cancel button
     if (ctx.callbackQuery?.data === 'cancel_scene') {
       await ctx.answerCbQuery();
-      await ctx.editMessageText(sellerMessages.bulkShip.cancelled);
+      await ctx.editMessageText(sellerMessages.bulkShip.cancelled(lang));
       return await ctx.scene.leave();
     }
 
@@ -126,7 +126,7 @@ const handleInput = async (ctx) => {
     const activeOrders = ctx.wizard.state.activeOrders || [];
 
     if (activeOrders.length === 0) {
-      await ctx.reply(ctx.t('seller.noActiveOrders'));
+      await ctx.reply(t('seller.noActiveOrders', {}, lang));
       return await ctx.scene.leave();
     }
 
@@ -135,7 +135,7 @@ const handleInput = async (ctx) => {
 
     if (!parseResult.valid) {
       await ctx.reply(
-        `${sellerMessages.bulkShip.invalidInput}\n\n${ctx.t('orders.error')}: ${parseResult.error}`,
+        `${sellerMessages.bulkShip.invalidInput(lang)}\n\n${t('orders.error', {}, lang)}: ${parseResult.error}`,
         Markup.inlineKeyboard([[Markup.button.callback(t('buttons.cancel', {}, lang), 'cancel_scene')]])
       );
       return; // Stay in scene, let user try again
@@ -159,7 +159,7 @@ const handleInput = async (ctx) => {
 
     // Format confirmation message
     const ordersList = sellerMessages.bulkShip.confirmList(selectedOrders, lang);
-    const confirmMessage = ctx.t('orders.confirmBulkShip', { count: selectedOrders.length }) +
+    const confirmMessage = t('orders.confirmBulkShip', { count: selectedOrders.length }, lang) +
       '\n\n' + ordersList;
 
     // Show confirmation
@@ -176,7 +176,7 @@ const handleInput = async (ctx) => {
     logger.error('Error in markOrdersShipped handleInput:', error);
     const langErr = ctx.lang || ctx.session?.language || 'ru';
     const { general: generalMsgs } = getMessages(langErr);
-    await ctx.reply(generalMsgs.actionFailed);
+    await ctx.reply(generalMsgs.actionFailed(langErr));
     return await ctx.scene.leave();
   }
 };
@@ -196,7 +196,7 @@ const handleConfirmation = async (ctx) => {
 
     // Cancel
     if (action === 'cancel_ship') {
-      await ctx.editMessageText(sellerMessages.bulkShip.cancelled);
+      await ctx.editMessageText(sellerMessages.bulkShip.cancelled(lang));
       return await ctx.scene.leave();
     }
 
@@ -206,7 +206,7 @@ const handleConfirmation = async (ctx) => {
       const token = ctx.session.token;
 
       if (selectedOrders.length === 0) {
-        await ctx.editMessageText(ctx.t('seller.noOrdersSelected'));
+        await ctx.editMessageText(t('seller.noOrdersSelected', {}, lang));
         return await ctx.scene.leave();
       }
 
@@ -230,15 +230,15 @@ const handleConfirmation = async (ctx) => {
         await ctx.editMessageText(
           sellerMessages.bulkShip.success(selectedOrders.length, lang),
           Markup.inlineKeyboard([
-            [Markup.button.callback(ctx.t('buttons.activeOrders'), 'seller:active_orders')],
-            [Markup.button.callback(ctx.t('buttons.backToMenu'), 'seller:menu')],
+            [Markup.button.callback(t('buttons.activeOrders', {}, lang), 'seller:active_orders')],
+            [Markup.button.callback(t('buttons.backToMenu', {}, lang), 'seller:menu')],
           ])
         );
 
         return await ctx.scene.leave();
       } catch (error) {
         logger.error('Error bulk updating orders:', error);
-        const errorMsg = error.response?.data?.error || generalMessages.actionFailed;
+        const errorMsg = error.response?.data?.error || generalMessages.actionFailed(lang);
         await ctx.editMessageText(errorMsg);
         return await ctx.scene.leave();
       }
@@ -247,7 +247,7 @@ const handleConfirmation = async (ctx) => {
     logger.error('Error in markOrdersShipped handleConfirmation:', error);
     const langErr = ctx.lang || ctx.session?.language || 'ru';
     const { general: generalMsgs } = getMessages(langErr);
-    await ctx.editMessageText(generalMsgs.actionFailed);
+    await ctx.editMessageText(generalMsgs.actionFailed(langErr));
     return await ctx.scene.leave();
   }
 };
@@ -340,14 +340,14 @@ markOrdersShippedScene.action('cancel_scene', async (ctx) => {
     await ctx.answerCbQuery();
     logger.info('mark_orders_shipped:cancelled', { userId: ctx.from.id });
 
-    await ctx.editMessageText(sellerMessages.bulkShip.cancelled);
+    await ctx.editMessageText(sellerMessages.bulkShip.cancelled(lang));
     await ctx.scene.leave();
   } catch (error) {
     logger.error('Error in cancel_scene handler:', error);
     try {
       const lang = ctx.lang || ctx.session?.language || 'ru';
       const { general: generalMessages } = getMessages(lang);
-      await ctx.editMessageText(generalMessages.actionFailed);
+      await ctx.editMessageText(generalMessages.actionFailed(lang));
     } catch (replyError) {
       logger.error('Failed to send error message:', replyError);
     }
@@ -363,7 +363,7 @@ markOrdersShippedScene.action('cancel', async (ctx) => {
     await ctx.answerCbQuery();
     logger.info('mark_orders_shipped:cancelled', { userId: ctx.from.id });
 
-    await ctx.editMessageText(sellerMessages.bulkShip.cancelled);
+    await ctx.editMessageText(sellerMessages.bulkShip.cancelled(lang));
     await ctx.scene.leave();
   } catch (error) {
     logger.error('Error in cancel handler:', error);
