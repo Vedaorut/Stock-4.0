@@ -3,9 +3,7 @@ import { subscriptionApi, shopApi, authApi, orderApi, productApi } from '../../u
 import { splitProductsByAvailability } from '../../utils/minimalist.js';
 import logger from '../../utils/logger.js';
 import * as smartMessage from '../../utils/smartMessage.js';
-import { messages, formatters } from '../../texts/messages.js';
-
-const { buyer: buyerMessages, general: generalMessages } = messages;
+import { getMessages, formatters } from '../../texts/messages.js';
 
 /**
  * Get language with fallback (C5 fix: ctx.lang undefined)
@@ -31,7 +29,7 @@ export const setupBuyerHandlers = (bot) => {
   // Unsubscribe from shop
   bot.action(/^unsubscribe:(.+)$/, handleUnsubscribe);
 
-  // Noop handler for "Подписан" button
+  // Noop handler for "Subscribed" button
   bot.action(/^noop:/, handleNoop);
 
   // Back to buyer menu
@@ -73,13 +71,14 @@ const resolveSectionCounts = async (shopId, products = null) => {
   }
 };
 
-const buildSubscriptionsMessage = (subscriptions) => {
+const buildSubscriptionsMessage = (subscriptions, lang = 'ru') => {
+  const { buyer: buyerMessages } = getMessages(lang);
   if (!subscriptions?.length) {
-    return buyerMessages.noSubscriptions;
+    return buyerMessages.noSubscriptions(lang);
   }
 
-  const list = formatters.subscriptions(subscriptions);
-  return `${buyerMessages.listSubscriptionsTitle(subscriptions.length)}\n${list}`;
+  const list = formatters.subscriptions(subscriptions, lang);
+  return `${buyerMessages.listSubscriptionsTitle(subscriptions.length, lang)}\n${list}`;
 };
 
 const buildShopInfoMessage = (shop, sections) => formatters.shopInfo(shop, sections);
@@ -94,6 +93,9 @@ const buildProductSectionMessage = (section, shopName, products) =>
  * @param {boolean} options.skipRoleUpdate - Skip PATCH /auth/role (already called by caller)
  */
 export const handleBuyerRole = async (ctx, options = {}) => {
+  const lang = getLangSafe(ctx);
+  const { buyer: buyerMessages, general: generalMessages } = getMessages(lang);
+
   try {
     if (ctx.callbackQuery) {
       await ctx.answerCbQuery();
@@ -138,8 +140,8 @@ export const handleBuyerRole = async (ctx, options = {}) => {
       if (shops !== null && (!shops || shops.length === 0)) {
         // No shop - show CTA to create shop
         await smartMessage.send(ctx, {
-          text: buyerMessages.panel,
-          keyboard: buyerMenuNoShop(getLangSafe(ctx)),
+          text: buyerMessages.panel(lang),
+          keyboard: buyerMenuNoShop(lang),
         });
         logger.info(`Buyer ${ctx.from.id} has no shop, showing CTA`);
         return;
@@ -147,16 +149,16 @@ export const handleBuyerRole = async (ctx, options = {}) => {
     }
 
     await smartMessage.send(ctx, {
-      text: buyerMessages.panel,
-      keyboard: buyerMenu(getLangSafe(ctx)),
+      text: buyerMessages.panel(lang),
+      keyboard: buyerMenu(lang),
     });
   } catch (error) {
     logger.error('Error in buyer role handler:', error);
     // Local error handling - don't throw to avoid infinite spinner
     try {
       await smartMessage.send(ctx, {
-        text: generalMessages.actionFailed,
-        keyboard: buyerMenu(getLangSafe(ctx)),
+        text: generalMessages.actionFailed(lang),
+        keyboard: buyerMenu(lang),
       });
     } catch (replyError) {
       logger.error('Failed to send error message:', replyError);
@@ -168,6 +170,9 @@ export const handleBuyerRole = async (ctx, options = {}) => {
  * Handle search shops action
  */
 const handleSearchShops = async (ctx) => {
+  const lang = getLangSafe(ctx);
+  const { general: generalMessages } = getMessages(lang);
+
   try {
     await ctx.answerCbQuery();
 
@@ -178,8 +183,8 @@ const handleSearchShops = async (ctx) => {
     // Local error handling - don't throw to avoid infinite spinner
     try {
       await smartMessage.send(ctx, {
-        text: generalMessages.actionFailed,
-        keyboard: buyerMenu(getLangSafe(ctx)),
+        text: generalMessages.actionFailed(lang),
+        keyboard: buyerMenu(lang),
       });
     } catch (replyError) {
       logger.error('Failed to send error message:', replyError);
@@ -191,31 +196,34 @@ const handleSearchShops = async (ctx) => {
  * Handle view subscriptions
  */
 const handleSubscriptions = async (ctx) => {
+  const lang = getLangSafe(ctx);
+  const { general: generalMessages } = getMessages(lang);
+
   try {
     await ctx.answerCbQuery();
 
     // Get user subscriptions
     if (!ctx.session.token) {
       await smartMessage.send(ctx, {
-        text: generalMessages.authorizationRequired,
-        keyboard: buyerMenu(getLangSafe(ctx)),
+        text: generalMessages.authorizationRequired(lang),
+        keyboard: buyerMenu(lang),
       });
       return;
     }
 
     const subscriptions = await subscriptionApi.getMySubscriptions(ctx.session.token);
 
-    const message = buildSubscriptionsMessage(subscriptions);
+    const message = buildSubscriptionsMessage(subscriptions, lang);
 
     await smartMessage.send(ctx, {
       text: message,
-      keyboard: buyerMenu(getLangSafe(ctx)),
+      keyboard: buyerMenu(lang),
     });
   } catch (error) {
     logger.error('Error fetching subscriptions:', error);
     await smartMessage.send(ctx, {
-      text: generalMessages.actionFailed,
-      keyboard: buyerMenu(getLangSafe(ctx)),
+      text: generalMessages.actionFailed(lang),
+      keyboard: buyerMenu(lang),
     });
   }
 };
@@ -224,6 +232,9 @@ const handleSubscriptions = async (ctx) => {
  * Handle subscribe to shop
  */
 const handleSubscribe = async (ctx) => {
+  const lang = getLangSafe(ctx);
+  const { buyer: buyerMessages, general: generalMessages } = getMessages(lang);
+
   try {
     const shopId = parseInt(ctx.match[1], 10);
 
@@ -235,7 +246,7 @@ const handleSubscribe = async (ctx) => {
 
     // Check authentication
     if (!ctx.session.token) {
-      await ctx.answerCbQuery(generalMessages.authorizationRequired, { show_alert: true });
+      await ctx.answerCbQuery(generalMessages.authorizationRequired(lang), { show_alert: true });
       return;
     }
 
@@ -243,12 +254,12 @@ const handleSubscribe = async (ctx) => {
     const checkResult = await subscriptionApi.checkSubscription(shopId, ctx.session.token);
 
     if (checkResult.subscribed) {
-      await ctx.answerCbQuery(buyerMessages.subscriptionAlreadyToast);
+      await ctx.answerCbQuery(buyerMessages.subscriptionAlreadyToast(lang));
 
       const counts = await resolveSectionCounts(shopId);
 
       await smartMessage.send(ctx, {
-        text: buyerMessages.subscriptionActive(),
+        text: buyerMessages.subscriptionActive(lang),
         keyboard: shopActionsKeyboard(shopId, true, counts),
       });
 
@@ -262,16 +273,16 @@ const handleSubscribe = async (ctx) => {
     // P2-1 FIX: Handle case when shop is deleted after subscription
     const shop = await shopApi.getShop(shopId);
     if (!shop) {
-      await ctx.answerCbQuery(buyerMessages.shopNotFound || 'Магазин не найден', { show_alert: true });
+      await ctx.answerCbQuery(ctx.t('general.shopNotFound'), { show_alert: true });
       return;
     }
 
     const counts = await resolveSectionCounts(shopId);
 
-    await ctx.answerCbQuery(generalMessages.done);
+    await ctx.answerCbQuery(generalMessages.done(lang));
 
     await smartMessage.send(ctx, {
-      text: buyerMessages.subscriptionAdded(shop.name),
+      text: buyerMessages.subscriptionAdded(shop.name, lang),
       keyboard: shopActionsKeyboard(shopId, true, counts),
     });
 
@@ -283,11 +294,11 @@ const handleSubscribe = async (ctx) => {
     const errorMsg = error.response?.data?.error;
 
     if (errorMsg === 'Cannot subscribe to your own shop') {
-      await ctx.answerCbQuery(buyerMessages.subscriptionOwnShop, { show_alert: true });
+      await ctx.answerCbQuery(buyerMessages.subscriptionOwnShop(lang), { show_alert: true });
     } else if (errorMsg === 'Already subscribed to this shop') {
-      await ctx.answerCbQuery(buyerMessages.subscriptionAlreadyToast, { show_alert: true });
+      await ctx.answerCbQuery(buyerMessages.subscriptionAlreadyToast(lang), { show_alert: true });
     } else {
-      await ctx.answerCbQuery(buyerMessages.subscriptionError, { show_alert: true });
+      await ctx.answerCbQuery(buyerMessages.subscriptionError(lang), { show_alert: true });
     }
   }
 };
@@ -296,6 +307,9 @@ const handleSubscribe = async (ctx) => {
  * Handle unsubscribe from shop
  */
 const handleUnsubscribe = async (ctx) => {
+  const lang = getLangSafe(ctx);
+  const { buyer: buyerMessages, general: generalMessages } = getMessages(lang);
+
   try {
     const shopId = parseInt(ctx.match[1], 10);
 
@@ -307,7 +321,7 @@ const handleUnsubscribe = async (ctx) => {
 
     // Check authentication
     if (!ctx.session.token) {
-      await ctx.answerCbQuery(generalMessages.authorizationRequired, { show_alert: true });
+      await ctx.answerCbQuery(generalMessages.authorizationRequired(lang), { show_alert: true });
       return;
     }
 
@@ -317,17 +331,17 @@ const handleUnsubscribe = async (ctx) => {
     const shop = await shopApi.getShop(shopId);
     const counts = await resolveSectionCounts(shopId);
 
-    await ctx.answerCbQuery(generalMessages.done);
+    await ctx.answerCbQuery(generalMessages.done(lang));
 
     await smartMessage.send(ctx, {
-      text: buyerMessages.subscriptionRemoved(shop.name),
+      text: buyerMessages.subscriptionRemoved(shop.name, lang),
       keyboard: shopActionsKeyboard(shopId, false, counts),
     });
 
     logger.info(`User ${ctx.from.id} unsubscribed from shop ${shopId}`);
   } catch (error) {
     logger.error('Error unsubscribing from shop:', error);
-    await ctx.answerCbQuery(buyerMessages.unsubscribeError, { show_alert: true });
+    await ctx.answerCbQuery(buyerMessages.unsubscribeError(lang), { show_alert: true });
   }
 };
 
@@ -335,14 +349,17 @@ const handleUnsubscribe = async (ctx) => {
  * Handle view orders
  */
 const handleOrders = async (ctx) => {
+  const lang = getLangSafe(ctx);
+  const { buyer: buyerMessages, general: generalMessages } = getMessages(lang);
+
   try {
     await ctx.answerCbQuery();
 
     // Check authentication
     if (!ctx.session.token) {
       await smartMessage.send(ctx, {
-        text: generalMessages.authorizationRequired,
-        keyboard: buyerMenu(getLangSafe(ctx)),
+        text: generalMessages.authorizationRequired(lang),
+        keyboard: buyerMenu(lang),
       });
       return;
     }
@@ -351,19 +368,19 @@ const handleOrders = async (ctx) => {
     const orders = await orderApi.getMyOrders(ctx.session.token);
 
     const message = orders.length
-      ? `${buyerMessages.ordersTitle(orders.length)}\n${formatters.orders(orders)}`
-      : buyerMessages.ordersEmpty;
+      ? `${buyerMessages.ordersTitle(orders.length, lang)}\n${formatters.orders(orders, lang)}`
+      : buyerMessages.ordersEmpty(lang);
 
     await smartMessage.send(ctx, {
       text: message,
-      keyboard: buyerMenu(getLangSafe(ctx)),
+      keyboard: buyerMenu(lang),
     });
     logger.info(`User ${ctx.from.id} viewed orders (${orders.length} total)`);
   } catch (error) {
     logger.error('Error fetching orders:', error);
     await smartMessage.send(ctx, {
-      text: generalMessages.actionFailed,
-      keyboard: buyerMenu(getLangSafe(ctx)),
+      text: generalMessages.actionFailed(lang),
+      keyboard: buyerMenu(lang),
     });
   }
 };
@@ -372,8 +389,11 @@ const handleOrders = async (ctx) => {
  * Handle noop action (informational button)
  */
 const handleNoop = async (ctx) => {
+  const lang = getLangSafe(ctx);
+  const { buyer: buyerMessages } = getMessages(lang);
+
   try {
-    await ctx.answerCbQuery(buyerMessages.subscriptionAlreadyToast);
+    await ctx.answerCbQuery(buyerMessages.subscriptionAlreadyToast(lang));
   } catch (error) {
     logger.error('Error in noop handler:', error);
   }
@@ -383,6 +403,9 @@ const handleNoop = async (ctx) => {
  * Handle view shop details
  */
 const handleShopView = async (ctx) => {
+  const lang = getLangSafe(ctx);
+  const { general: generalMessages } = getMessages(lang);
+
   try {
     const shopId = parseInt(ctx.match[1], 10);
 
@@ -404,8 +427,8 @@ const handleShopView = async (ctx) => {
     // P2-2 FIX: Handle deleted shop
     if (!shop) {
       await smartMessage.send(ctx, {
-        text: buyerMessages.shopNotFound || 'Магазин не найден или был удалён',
-        keyboard: buyerMenu(getLangSafe(ctx)),
+        text: ctx.t('general.shopNotFound'),
+        keyboard: buyerMenu(lang),
       });
       return;
     }
@@ -425,14 +448,14 @@ const handleShopView = async (ctx) => {
   } catch (error) {
     logger.error('Error viewing shop:', error);
 
-    // ✅ P2-2 FIX: Answer callback query to remove spinner
+    // P2-2 FIX: Answer callback query to remove spinner
     if (ctx.callbackQuery) {
       await ctx.answerCbQuery(ctx.t('errors.loadError')).catch(() => {});
     }
 
     await smartMessage.send(ctx, {
-      text: generalMessages.actionFailed,
-      keyboard: buyerMenu(getLangSafe(ctx)),
+      text: generalMessages.actionFailed(lang),
+      keyboard: buyerMenu(lang),
     });
   }
 };
@@ -441,6 +464,9 @@ const handleShopStock = async (ctx) => handleShopSection(ctx, 'stock');
 const handleShopPreorder = async (ctx) => handleShopSection(ctx, 'preorder');
 
 const handleShopSection = async (ctx, section) => {
+  const lang = getLangSafe(ctx);
+  const { general: generalMessages } = getMessages(lang);
+
   try {
     const shopId = parseInt(ctx.match[1], 10);
 
@@ -474,14 +500,14 @@ const handleShopSection = async (ctx, section) => {
   } catch (error) {
     logger.error('Error viewing shop section:', error);
 
-    // ✅ P2-2 FIX: Answer callback query to remove spinner
+    // P2-2 FIX: Answer callback query to remove spinner
     if (ctx.callbackQuery) {
       await ctx.answerCbQuery(ctx.t('errors.loadError')).catch(() => {});
     }
 
     await smartMessage.send(ctx, {
-      text: generalMessages.actionFailed,
-      keyboard: buyerMenu(getLangSafe(ctx)),
+      text: generalMessages.actionFailed(lang),
+      keyboard: buyerMenu(lang),
     });
   }
 };

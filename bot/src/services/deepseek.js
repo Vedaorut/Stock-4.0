@@ -227,8 +227,8 @@ class DeepSeekClient {
         model: 'deepseek-chat',
         messages,
         tools: tools.length > 0 ? tools : undefined,
-        tool_choice: tools.length > 0 ? 'auto' : undefined, // 'auto' - AI сам решает когда использовать функции
-        temperature: tools.length > 0 ? 0.2 : 0.7, // Низкая temp для function calling, нормальная для чата
+        tool_choice: tools.length > 0 ? 'auto' : undefined, // 'auto' - AI decides when to use functions
+        temperature: tools.length > 0 ? 0.2 : 0.7, // Low temp for function calling, normal for chat
         max_tokens: 500,
         stream: true, // Enable streaming
       });

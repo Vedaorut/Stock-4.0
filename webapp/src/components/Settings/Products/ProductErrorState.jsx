@@ -13,7 +13,7 @@ function ProductErrorState({ error, onRetry, onClose, triggerHaptic }) {
       exit={{ x: '100%' }}
       transition={{ type: 'spring', damping: 30, stiffness: 300 }}
     >
-      <PageHeader title="Мои товары" onBack={onClose} variant="close" />
+      <PageHeader title="My Products" onBack={onClose} variant="close" />
       <div
         className="flex-1 overflow-y-auto"
         style={{
@@ -39,7 +39,7 @@ function ProductErrorState({ error, onRetry, onClose, triggerHaptic }) {
                 d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
               />
             </svg>
-            <h3 className="text-xl font-bold text-white mb-2">Ошибка загрузки</h3>
+            <h3 className="text-xl font-bold text-white mb-2">Loading Error</h3>
             <p className="text-red-400 text-sm mb-6">{error}</p>
             <motion.button
               onClick={() => {
@@ -53,7 +53,7 @@ function ProductErrorState({ error, onRetry, onClose, triggerHaptic }) {
               }}
               whileTap={{ scale: 0.98 }}
             >
-              Повторить
+              Retry
             </motion.button>
           </div>
         </div>

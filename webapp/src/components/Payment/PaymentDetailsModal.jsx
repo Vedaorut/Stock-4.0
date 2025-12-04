@@ -180,7 +180,7 @@ export default function PaymentDetailsModal() {
           >
             <div className="text-center">
               <div className="w-16 h-16 border-4 border-orange-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-              <p className="text-white font-semibold text-lg">Загрузка деталей платежа...</p>
+              <p className="text-white font-semibold text-lg">Loading payment details...</p>
             </div>
           </motion.div>
         )}
@@ -234,16 +234,16 @@ export default function PaymentDetailsModal() {
                     />
                   </svg>
                 </div>
-                <h3 className="text-xl font-bold text-white mb-2">Неизвестная криптовалюта</h3>
+                <h3 className="text-xl font-bold text-white mb-2">Unknown cryptocurrency</h3>
                 <p className="text-gray-400 mb-4">
-                  Выбранная криптовалюта ({selectedCrypto}) не поддерживается
+                  Selected cryptocurrency ({selectedCrypto}) is not supported
                 </p>
                 <motion.button
                   onClick={handleClose}
                   className="px-6 py-3 bg-orange-primary hover:bg-orange-light text-white font-semibold rounded-xl transition-colors"
                   whileTap={{ scale: 0.95 }}
                 >
-                  Закрыть
+                  Close
                 </motion.button>
               </div>
             </motion.div>
@@ -253,7 +253,7 @@ export default function PaymentDetailsModal() {
     );
   }
 
-  // Валидация остальных данных
+  // Validate remaining data
   if (!currentOrder) {
     return null;
   }
@@ -265,7 +265,7 @@ export default function PaymentDetailsModal() {
         cryptoAmount,
       });
     }
-    // Если данных нет - показываем error state
+    // If no data - show error state
     return (
       <AnimatePresence>
         {isOpen && (
@@ -298,14 +298,14 @@ export default function PaymentDetailsModal() {
                     d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
                   />
                 </svg>
-                <h3 className="text-lg font-semibold text-white mb-2">Ошибка загрузки</h3>
-                <p className="text-sm text-gray-400 mb-4">Не удалось получить данные платежа</p>
+                <h3 className="text-lg font-semibold text-white mb-2">Loading error</h3>
+                <p className="text-sm text-gray-400 mb-4">Failed to get payment details</p>
                 <motion.button
                   onClick={handleClose}
                   className="px-6 py-3 rounded-xl font-semibold text-white bg-orange-primary"
                   whileTap={{ scale: 0.95 }}
                 >
-                  Назад
+                  Back
                 </motion.button>
               </div>
             </motion.div>
@@ -529,7 +529,7 @@ export default function PaymentDetailsModal() {
                     {formatCryptoAmount(cryptoAmount, selectedCrypto)} {selectedCrypto}
                   </div>
                   <p className="text-gray-500 text-[10px] mt-2">
-                    {copiedAmount ? 'Скопировано!' : 'Нажмите для копирования'}
+                    {copiedAmount ? 'Copied!' : 'Tap to copy'}
                   </p>
                 </motion.button>
               </div>

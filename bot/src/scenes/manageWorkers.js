@@ -4,10 +4,13 @@ import { cancelButton } from '../keyboards/common.js';
 import { workerApi } from '../utils/api.js';
 import logger from '../utils/logger.js';
 import * as smartMessage from '../utils/smartMessage.js';
-import { messages } from '../texts/messages.js';
 import { showSellerToolsMenu } from '../utils/sellerNavigation.js';
+import { t } from '../i18n/index.js';
 
-const { seller: sellerMessages, general: generalMessages } = messages;
+/**
+ * Get language with fallback
+ */
+const getLangSafe = (ctx) => ctx.lang || ctx.session?.user?.language || 'ru';
 
 /**
  * Manage Workers Scene - Add/Remove workers
@@ -19,12 +22,13 @@ const enterTelegramId = async (ctx) => {
   try {
     logger.info('manage_workers_step:telegram_id', { userId: ctx.from.id });
 
+    const lang = getLangSafe(ctx);
     // Show context + prompt
-    const message = `${sellerMessages.workersContext}\n\n${sellerMessages.workerPrompt}`;
+    const message = `${t('seller.workersContext', {}, lang)}\n\n${t('seller.workerPrompt', {}, lang)}`;
 
     await smartMessage.send(ctx, {
       text: message,
-      keyboard: cancelButton,
+      keyboard: cancelButton(lang),
     });
 
     return ctx.wizard.next();
@@ -37,9 +41,11 @@ const enterTelegramId = async (ctx) => {
 // Step 2: Confirm and add worker
 const confirmAndAdd = async (ctx) => {
   try {
+    const lang = getLangSafe(ctx);
+
     if (!ctx.message || !ctx.message.text) {
       await smartMessage.send(ctx, {
-        text: 'Пожалуйста, отправьте Telegram ID или @username текстом.\n\n' + sellerMessages.workerPrompt,
+        text: t('scenes.sendTelegramIdText', {}, lang) + '\n\n' + t('seller.workerPrompt', {}, lang),
       });
       return;
     }
@@ -56,7 +62,7 @@ const confirmAndAdd = async (ctx) => {
       const usernameRegex = /^[a-zA-Z0-9_]{5,32}$/;
       if (!usernameInput || !usernameRegex.test(usernameInput)) {
         await smartMessage.send(ctx, {
-          text: '❌ Некорректный username.\n\nUsername должен:\n• Длина 5-32 символа\n• Только буквы, цифры и _\n\nПример: @john_doe',
+          text: t('seller.workerUsernameInvalid', {}, lang),
         });
         return;
       }
@@ -64,7 +70,7 @@ const confirmAndAdd = async (ctx) => {
       try {
         const chat = await ctx.telegram.getChat(input);
         if (!chat || !chat.id) {
-          await smartMessage.send(ctx, { text: sellerMessages.workerAddNotFound });
+          await smartMessage.send(ctx, { text: t('seller.workerAddNotFound', {}, lang) });
           return;
         }
         telegramId = chat.id;
@@ -77,30 +83,30 @@ const confirmAndAdd = async (ctx) => {
           resolvedId: telegramId,
         });
       } catch (lookupError) {
-        // FALLBACK: getChat не сработал - отправим username на backend для поиска в БД
+        // FALLBACK: getChat failed - send username to backend for DB lookup
         logger.info('manage_workers_username_fallback', {
           requester: ctx.from.id,
           username: usernameInput,
           reason: lookupError.message,
         });
-        telegramId = null; // Backend будет искать только по username
+        telegramId = null; // Backend will search by username only
       }
     } else if (/^\d+$/.test(input)) {
       telegramId = Number.parseInt(input, 10);
       if (!Number.isFinite(telegramId) || telegramId <= 0) {
-        await smartMessage.send(ctx, { text: sellerMessages.workerIdInvalid });
+        await smartMessage.send(ctx, { text: t('seller.workerIdInvalid', {}, lang) });
         return;
       }
     } else {
-      await smartMessage.send(ctx, { text: sellerMessages.workerIdInvalid });
+      await smartMessage.send(ctx, { text: t('seller.workerIdInvalid', {}, lang) });
       return;
     }
 
     ctx.wizard.state.telegramId = telegramId;
 
-    // Если нет ни telegramId, ни username - это ошибка
+    // If no telegramId and no username - this is an error
     if (!telegramId && !usernameInput) {
-      await smartMessage.send(ctx, { text: sellerMessages.workerAddNotFound });
+      await smartMessage.send(ctx, { text: t('seller.workerAddNotFound', {}, lang) });
       return;
     }
 
@@ -116,8 +122,8 @@ const confirmAndAdd = async (ctx) => {
         session: ctx.session,
       });
       await smartMessage.send(ctx, {
-        text: generalMessages.shopRequired,
-        keyboard: manageWorkersMenu(),
+        text: t('general.shopRequired', {}, lang),
+        keyboard: manageWorkersMenu(lang),
       });
       return await ctx.scene.leave();
     }
@@ -128,8 +134,8 @@ const confirmAndAdd = async (ctx) => {
         session: ctx.session,
       });
       await smartMessage.send(ctx, {
-        text: generalMessages.authorizationRequired,
-        keyboard: manageWorkersMenu(),
+        text: t('general.authorizationRequired', {}, lang),
+        keyboard: manageWorkersMenu(lang),
       });
       return await ctx.scene.leave();
     }
@@ -152,13 +158,13 @@ const confirmAndAdd = async (ctx) => {
       )
     ) {
       await smartMessage.send(ctx, {
-        text: sellerMessages.workerAddAlready,
-        keyboard: manageWorkersMenu(),
+        text: t('seller.workerAddAlready', {}, lang),
+        keyboard: manageWorkersMenu(lang),
       });
       return await ctx.scene.leave();
     }
 
-    await smartMessage.send(ctx, { text: sellerMessages.workerAdding });
+    await smartMessage.send(ctx, { text: t('seller.workerAdding', {}, lang) });
 
     try {
       logger.info('worker_add_request', {
@@ -193,40 +199,41 @@ const confirmAndAdd = async (ctx) => {
       }
 
       await smartMessage.send(ctx, {
-        text: sellerMessages.workerAdded(workerName),
-        keyboard: manageWorkersMenu(),
+        text: t('seller.workerAdded', { name: workerName }, lang),
+        keyboard: manageWorkersMenu(lang),
       });
     } catch (error) {
       logger.error('Error adding worker:', error);
 
-      let errorMessage = sellerMessages.workerAddError;
+      let errorMessage = t('seller.workerAddError', {}, lang);
 
       if (error.response?.data?.error) {
         const apiError = error.response.data.error;
 
         if (apiError.includes('not found') || apiError.includes('used the bot')) {
-          errorMessage = sellerMessages.workerAddNotFound;
+          errorMessage = t('seller.workerAddNotFound', {}, lang);
         } else if (apiError.includes('already a worker')) {
-          errorMessage = sellerMessages.workerAddAlready;
+          errorMessage = t('seller.workerAddAlready', {}, lang);
         } else if (apiError.includes('owner cannot be added')) {
-          errorMessage = sellerMessages.workerAddOwner;
+          errorMessage = t('seller.workerAddOwner', {}, lang);
         } else if (apiError.includes('PRO subscription') || apiError.includes('Workspace feature')) {
-          errorMessage = 'Функция Workspace доступна только для PRO магазинов. Обновите подписку.';
+          errorMessage = t('seller.workersProSubscriptionRequired', {}, lang);
         }
       }
 
       await smartMessage.send(ctx, {
         text: errorMessage,
-        keyboard: manageWorkersMenu(),
+        keyboard: manageWorkersMenu(lang),
       });
     }
 
     return await ctx.scene.leave();
   } catch (error) {
     logger.error('Error in confirmAndAdd step:', error);
+    const lang = getLangSafe(ctx);
     await smartMessage.send(ctx, {
-      text: sellerMessages.workerLookupError,
-      keyboard: manageWorkersMenu(),
+      text: t('seller.workerLookupError', {}, lang),
+      keyboard: manageWorkersMenu(lang),
     });
     return await ctx.scene.leave();
   }
@@ -243,7 +250,7 @@ manageWorkersScene.leave(async (ctx) => {
   }
   ctx.scene.state = {};
 
-  // Очистить __scenes из Redis сессии для предотвращения застревания
+  // Clear __scenes from Redis session to prevent stuck state
   if (ctx.session && ctx.session.__scenes) {
     delete ctx.session.__scenes;
   }
@@ -256,13 +263,13 @@ manageWorkersScene.command('cancel', async (ctx) => {
   try {
     logger.info('manage_workers_cancelled_cmd', { userId: ctx.from.id });
     await ctx.scene.leave();
-    
+
     const { showSellerToolsMenu } = await import('../utils/sellerNavigation.js');
     await showSellerToolsMenu(ctx);
   } catch (error) {
     logger.error('Error in cancel command handler:', error);
     try {
-      await ctx.reply(generalMessages.actionFailed);
+      await ctx.reply(t('general.actionFailed', {}, getLangSafe(ctx)));
     } catch { /* Intentionally ignored */ }
   }
 });
@@ -276,10 +283,28 @@ manageWorkersScene.action('cancel_scene', async (ctx) => {
     await showSellerToolsMenu(ctx);
   } catch (error) {
     logger.error('Error in cancel_scene handler:', error);
+    const lang = getLangSafe(ctx);
     try {
-      await ctx.editMessageText(generalMessages.actionFailed, manageWorkersMenu());
+      await ctx.editMessageText(t('general.actionFailed', {}, lang), manageWorkersMenu(lang));
     } catch (replyError) {
       logger.error('Failed to send error message:', replyError);
+    }
+  }
+});
+
+// Also handle 'cancel' action (some buttons use this)
+manageWorkersScene.action('cancel', async (ctx) => {
+  try {
+    await ctx.answerCbQuery();
+    logger.info('manage_workers_cancelled', { userId: ctx.from.id });
+    await ctx.scene.leave();
+    await showSellerToolsMenu(ctx);
+  } catch (error) {
+    logger.error('Error in cancel handler:', error);
+    try {
+      await ctx.scene.leave();
+    } catch (leaveError) {
+      logger.error('Failed to leave scene:', leaveError);
     }
   }
 });
@@ -292,10 +317,11 @@ manageWorkersScene.action('seller:tools', async (ctx) => {
     await showSellerToolsMenu(ctx);
   } catch (error) {
     logger.error('Error handling seller:tools in manageWorkers scene:', error);
+    const lang = getLangSafe(ctx);
     try {
       await smartMessage.send(ctx, {
-        text: generalMessages.actionFailed,
-        keyboard: manageWorkersMenu(),
+        text: t('general.actionFailed', {}, lang),
+        keyboard: manageWorkersMenu(lang),
       });
     } catch (replyError) {
       logger.error('Failed to send fallback message:', replyError);

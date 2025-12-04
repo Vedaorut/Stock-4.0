@@ -1,4 +1,5 @@
 import logger from '../utils/logger.js';
+import { t, getLang } from '../i18n/index.js';
 
 /**
  * P1-BOT-014: User Rate Limiting Middleware
@@ -72,9 +73,10 @@ export const userRateLimitMiddleware = async (ctx, next) => {
       resetIn,
     });
 
+    const lang = getLang(ctx);
     await ctx
       .reply(
-        `⚠️ Превышен лимит команд.\n\nМаксимум ${MAX_COMMANDS_PER_WINDOW} команд в минуту.\nПопробуйте через ${resetIn} сек.`,
+        t('rateLimit.exceeded', { max: MAX_COMMANDS_PER_WINDOW, resetIn }, lang),
         { reply_to_message_id: ctx.message?.message_id }
       )
       .catch(() => {});

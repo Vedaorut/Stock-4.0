@@ -140,7 +140,7 @@ export function LoadingSpinner() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
       >
-        Проверяем права на миграцию...
+        Checking migration permissions...
       </motion.p>
     </motion.div>
   );

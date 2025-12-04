@@ -4,11 +4,11 @@ import { t } from '../i18n/index.js';
 /**
  * Language selection keyboard (shown once on first start)
  */
-export const languageMenu = () =>
+export const languageMenu = (lang = 'ru') =>
   Markup.inlineKeyboard([
     [
-      Markup.button.callback('🇷🇺 Русский', 'lang:ru'),
-      Markup.button.callback('🇬🇧 English', 'lang:en'),
+      Markup.button.callback(t('settings.languageOptionRu', {}, lang), 'lang:ru'),
+      Markup.button.callback(t('settings.languageOptionEn', {}, lang), 'lang:en'),
     ],
   ]);
 

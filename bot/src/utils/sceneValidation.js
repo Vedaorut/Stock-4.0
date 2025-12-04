@@ -37,14 +37,14 @@ export const validateShopBeforeScene = async (ctx, sceneName) => {
   // 1. Check shopId exists in session
   if (!ctx.session.shopId) {
     logger.warn(`[validateShop] No shopId for scene ${sceneName}`);
-    await ctx.reply('❌ У вас нет магазина. Создайте магазин сначала.', sellerMenuNoShop);
+    await ctx.reply(ctx.t('errors.shopRequired'), sellerMenuNoShop);
     return false;
   }
 
   // 2. Check token exists in session
   if (!ctx.session.token) {
     logger.warn(`[validateShop] No token for scene ${sceneName}`);
-    await ctx.reply('❌ Требуется авторизация. Отправьте /start для повторной авторизации.');
+    await ctx.reply(ctx.t('errors.authRequired'));
     return false;
   }
 
@@ -55,7 +55,7 @@ export const validateShopBeforeScene = async (ctx, sceneName) => {
     if (!shop) {
       logger.warn(`[validateShop] Shop ${ctx.session.shopId} not found for scene ${sceneName}`);
       ctx.session.shopId = null; // Clear invalid shopId
-      await ctx.reply('❌ Магазин не найден. Возможно он был удалён.', sellerMenuNoShop);
+      await ctx.reply(ctx.t('general.shopNotFound'), sellerMenuNoShop);
       return false;
     }
 
@@ -70,7 +70,7 @@ export const validateShopBeforeScene = async (ctx, sceneName) => {
     if (error.response?.status === 404) {
       logger.warn(`[validateShop] Shop ${ctx.session.shopId} returned 404 for scene ${sceneName}`);
       ctx.session.shopId = null; // Clear invalid shopId
-      await ctx.reply('❌ Магазин не найден.', sellerMenuNoShop);
+      await ctx.reply(ctx.t('general.shopNotFound'), sellerMenuNoShop);
       return false;
     }
 
@@ -80,7 +80,7 @@ export const validateShopBeforeScene = async (ctx, sceneName) => {
       );
       ctx.session.shopId = null; // Clear invalid shopId
       await ctx.reply(
-        '❌ Доступ к магазину запрещён. Вы не являетесь владельцем.',
+        ctx.t('errors.shopAccessDenied'),
         sellerMenuNoShop
       );
       return false;
@@ -91,7 +91,7 @@ export const validateShopBeforeScene = async (ctx, sceneName) => {
         `[validateShop] Unauthorized for shop ${ctx.session.shopId} for scene ${sceneName}`
       );
       ctx.session.token = null; // Clear invalid token
-      await ctx.reply('❌ Требуется повторная авторизация. Отправьте /start.');
+      await ctx.reply(ctx.t('errors.sessionExpired'));
       return false;
     }
 
@@ -99,7 +99,7 @@ export const validateShopBeforeScene = async (ctx, sceneName) => {
     if (error.code === 'ECONNREFUSED' || error.code === 'ETIMEDOUT' || error.code === 'ENOTFOUND') {
       logger.error(`[validateShop] Network error for scene ${sceneName}:`, error.message);
       try {
-        await ctx.answerCbQuery('Сервер временно недоступен', { show_alert: true });
+        await ctx.answerCbQuery(ctx.t('errors.serverUnavailable'), { show_alert: true });
       } catch {
         // Ignore answerCbQuery errors
       }

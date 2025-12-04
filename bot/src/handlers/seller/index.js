@@ -3,7 +3,7 @@ import { sellerMenu, sellerMenuNoShop, sellerToolsMenu } from '../../keyboards/s
 import { manageWorkersMenu, confirmWorkerRemoval } from '../../keyboards/workspace.js';
 import { shopApi, authApi, orderApi, workerApi, followApi } from '../../utils/api.js';
 import logger from '../../utils/logger.js';
-import { messages, buttons as buttonText } from '../../texts/messages.js';
+import { messages } from '../../texts/messages.js';
 import { t } from '../../i18n/index.js';
 import { checkShopHealth } from '../../utils/shopHealthCheck.js';
 import { getTipForShop } from '../../utils/sellerTips.js';
@@ -22,7 +22,7 @@ import {
 import { showSellerToolsMenu } from '../../utils/sellerNavigation.js';
 import { validateShopBeforeScene } from '../../utils/sceneValidation.js';
 
-const { seller: sellerMessages, general: generalMessages } = messages;
+const { seller: sellerMessages } = messages;
 
 /**
  * Get language with fallback (C5 fix: ctx.lang undefined)
@@ -85,7 +85,7 @@ const getSellerMenu = async (ctx) => {
       }
     } catch (error) {
       logger.error('Failed to compose seller menu data:', error);
-      // Гарантия что значения установлены
+      // Ensure values are set
       activeCount = 0;
       hasFollows = false;
     }
@@ -119,19 +119,20 @@ const getWorkerDisplayName = (worker) => {
   return `User#${worker.user_id}`;
 };
 
-const buildWorkersListKeyboard = (workers) => {
+const buildWorkersListKeyboard = (workers, lang = 'ru') => {
   const buttons = workers.map((worker) => [
     Markup.button.callback(getWorkerDisplayName(worker), `workers:remove:${worker.id}`),
   ]);
 
-  buttons.push([Markup.button.callback(buttonText.addWorker, 'workers:add')]);
-  buttons.push([Markup.button.callback(buttonText.back, 'seller:workers')]);
+  buttons.push([Markup.button.callback(t('buttons.addWorker', {}, lang), 'workers:add')]);
+  buttons.push([Markup.button.callback(t('buttons.back', {}, lang), 'seller:workers')]);
 
   return Markup.inlineKeyboard(buttons);
 };
 
 const showWorkersList = async (ctx, options = {}) => {
-  const shopName = ctx.session.shopName || 'Магазин';
+  const lang = getLangSafe(ctx);
+  const shopName = ctx.session.shopName || t('general.shop', {}, lang);
   const successPrefix = options.successMessage ? `${options.successMessage}\n\n` : '';
 
   try {
@@ -139,26 +140,30 @@ const showWorkersList = async (ctx, options = {}) => {
     ctx.session.workerList = workers;
 
     if (!Array.isArray(workers) || workers.length === 0) {
-      await ctx.reply(`${successPrefix}${sellerMessages.noWorkers(shopName)}`, manageWorkersMenu());
+      await ctx.reply(
+        `${successPrefix}${ctx.t('seller.noWorkers', { shop: shopName })}`,
+        manageWorkersMenu(lang)
+      );
       return;
     }
 
     const lines = workers.map((worker) => `- ${getWorkerDisplayName(worker)}`).join('\n');
-    const header = sellerMessages.workersListTitle(shopName);
-    const instruction = sellerMessages.workersListInstruction;
+    const header = ctx.t('seller.workersListTitle', { shop: shopName });
+    const instruction = ctx.t('seller.workersListInstruction');
     await ctx.reply(
       `${successPrefix}${header}\n\n${instruction}\n${lines}`,
-      buildWorkersListKeyboard(workers)
+      buildWorkersListKeyboard(workers, lang)
     );
   } catch (error) {
     logger.error('Error fetching workers:', error);
-    await ctx.reply(generalMessages.actionFailed, manageWorkersMenu());
+    await ctx.reply(ctx.t('general.actionFailed'), manageWorkersMenu(lang));
   }
 };
 
-const formatSubscriptionStatus = (data) => {
+const formatSubscriptionStatus = (ctx, data) => {
   const tier = data.tier || 'pro';
   const status = data.status || (data.currentSubscription ? 'active' : 'inactive');
+  const lang = getLangSafe(ctx);
 
   // Prepare expiresAt date
   const dateSource =
@@ -166,31 +171,49 @@ const formatSubscriptionStatus = (data) => {
 
   // Use detailed messages based on tier (PRO or MAX)
   if (tier === 'pro') {
-    return sellerMessages.subscriptionProInfo({ status, renewDate: dateSource });
+    return t(
+      'seller.subscriptionProInfo',
+      {
+        status,
+        renewDate: dateSource,
+      },
+      lang
+    );
   }
 
   if (tier === 'max') {
-    return sellerMessages.subscriptionMaxInfo({ status, renewDate: dateSource });
+    return t(
+      'seller.subscriptionMaxInfo',
+      {
+        status,
+        renewDate: dateSource,
+      },
+      lang
+    );
   }
 
-  // Fallback for unknown tier
-  const fallbackDate = dateSource ? new Date(dateSource).toLocaleDateString('ru-RU') : '—';
-  return `Тариф: ${tier.toUpperCase()}\nСтатус: ${status}\nДействителен до: ${fallbackDate}`;
+  // Fallback for unknown tier - use i18n
+  const fallbackDate = dateSource ? new Date(dateSource).toLocaleDateString() : '—';
+  return t(
+    'seller.subscriptionFallback',
+    { tier: tier.toUpperCase(), status, date: fallbackDate },
+    lang
+  );
 };
 
-const buildSubscriptionKeyboard = (data) => {
+const buildSubscriptionKeyboard = (data, lang = 'ru') => {
   const buttons = [];
   const status = data.status || (data.currentSubscription ? 'active' : 'inactive');
 
   if (!data.currentSubscription || ['inactive', 'grace_period', 'past_due'].includes(status)) {
-    buttons.push([Markup.button.callback(buttonText.paySubscription, 'subscription:pay')]);
+    buttons.push([Markup.button.callback(t('buttons.paySubscription', {}, lang), 'subscription:pay')]);
   }
 
   if (data.tier === 'pro') {
-    buttons.push([Markup.button.callback(buttonText.upgradeToMax, 'subscription:upgrade')]);
+    buttons.push([Markup.button.callback(t('buttons.upgradeToMax', {}, lang), 'subscription:upgrade')]);
   }
 
-  buttons.push([Markup.button.callback(buttonText.backToMenu, 'seller:menu')]);
+  buttons.push([Markup.button.callback(t('buttons.backToMenu', {}, lang), 'seller:menu')]);
   return Markup.inlineKeyboard(buttons);
 };
 
@@ -309,10 +332,10 @@ export const handleSellerRole = async (ctx, options = {}) => {
         const hasFollows = Array.isArray(followsResult) && followsResult.length > 0;
         ctx.session.hasFollows = hasFollows;
 
-        // H9 FIX: Получить совет или предупреждение (с проверкой на null)
+        // H9 FIX: Get tip or warning (with null check)
         const statusBar = shopHealth ? getTipForShop(ctx, shopHealth) : '';
 
-        // Форматировать заголовок с аналитикой и статус-баром
+        // Format header with analytics and status bar
         const header = sellerMessages.shopPanelWithStats(
           shop.name,
           weekRevenue,
@@ -397,7 +420,7 @@ const handleAddProduct = async (ctx) => {
     // Local error handling - don't throw to avoid infinite spinner
     try {
       const menu = await getSellerMenuKeyboard(ctx);
-      await ctx.reply(generalMessages.actionFailed, menu);
+      await ctx.reply(ctx.t('general.actionFailed'), menu);
     } catch (replyError) {
       logger.error('Failed to send error message:', replyError);
     }
@@ -423,7 +446,7 @@ const handleWallets = async (ctx) => {
     // Local error handling - don't throw to avoid infinite spinner
     try {
       const menu = await getSellerMenuKeyboard(ctx);
-      await ctx.reply(generalMessages.actionFailed, menu);
+      await ctx.reply(ctx.t('general.actionFailed'), menu);
     } catch (replyError) {
       logger.error('Failed to send error message:', replyError);
     }
@@ -438,7 +461,7 @@ const handleInviteLink = async (ctx) => {
     await ctx.answerCbQuery();
 
     if (!ctx.session.shopId) {
-      await ctx.reply(generalMessages.shopRequired, sellerMenuNoShop(getLangSafe(ctx)));
+      await ctx.reply(ctx.t('general.shopRequired'), sellerMenuNoShop(getLangSafe(ctx)));
       return;
     }
 
@@ -461,7 +484,7 @@ const handleInviteLink = async (ctx) => {
     logger.error('Error in invite link handler:', error);
     try {
       const menu = await getSellerMenuKeyboard(ctx);
-      await ctx.reply(generalMessages.actionFailed, menu);
+      await ctx.reply(ctx.t('general.actionFailed'), menu);
     } catch (replyError) {
       logger.error('Failed to send error message:', replyError);
     }
@@ -495,7 +518,7 @@ export const setupSellerHandlers = (bot) => {
       await ctx.scene.enter('markOrdersShipped');
     } catch (error) {
       logger.error('Error entering markOrdersShipped scene:', error);
-      await ctx.reply(generalMessages.actionFailed, await getSellerMenuKeyboard(ctx));
+      await ctx.reply(ctx.t('general.actionFailed'), await getSellerMenuKeyboard(ctx));
     }
   });
   bot.action(/^order:ship:(\d+)$/, handleMarkShipped);
@@ -550,7 +573,10 @@ export const setupSellerHandlers = (bot) => {
       }
 
       if (!isOwner) {
-        await ctx.reply(sellerMessages.migration.accessDenied, sellerToolsMenu(false, getLangSafe(ctx)));
+        await ctx.reply(
+          ctx.t('seller.migration.accessDenied'),
+          sellerToolsMenu(false, getLangSafe(ctx))
+        );
         return;
       }
 
@@ -558,7 +584,7 @@ export const setupSellerHandlers = (bot) => {
     } catch (error) {
       logger.error('Error entering migrate_channel scene:', error);
       await ctx.reply(
-        generalMessages.actionFailed,
+        ctx.t('general.actionFailed'),
         sellerToolsMenu(ctx.session.isShopOwner ?? false, getLangSafe(ctx))
       );
     }
@@ -578,7 +604,7 @@ export const setupSellerHandlers = (bot) => {
       await ctx.scene.enter('pay_subscription');
     } catch (error) {
       logger.error('Error entering pay_subscription scene:', error);
-      await ctx.reply(generalMessages.actionFailed, await getSellerMenuKeyboard(ctx));
+      await ctx.reply(ctx.t('general.actionFailed'), await getSellerMenuKeyboard(ctx));
     }
   });
 
@@ -594,7 +620,7 @@ export const setupSellerHandlers = (bot) => {
       await ctx.scene.enter('upgrade_shop');
     } catch (error) {
       logger.error('Error entering upgrade_shop scene:', error);
-      await ctx.reply(generalMessages.actionFailed, await getSellerMenuKeyboard(ctx));
+      await ctx.reply(ctx.t('general.actionFailed'), await getSellerMenuKeyboard(ctx));
     }
   });
 
@@ -603,13 +629,13 @@ export const setupSellerHandlers = (bot) => {
       await ctx.answerCbQuery();
 
       if (!ctx.session.shopId) {
-        await ctx.reply(generalMessages.shopRequired, sellerMenuNoShop);
+        await ctx.reply(ctx.t('general.shopRequired'), sellerMenuNoShop);
         return;
       }
 
       if (!ctx.session.token) {
         await ctx.reply(
-          generalMessages.authorizationRequired,
+          ctx.t('general.authorizationRequired'),
           sellerMenu(0, { hasFollows: ctx.session?.hasFollows }, getLangSafe(ctx))
         );
         return;
@@ -621,15 +647,15 @@ export const setupSellerHandlers = (bot) => {
       });
 
       const status = response.data;
-      const message = formatSubscriptionStatus(status);
+      const message = formatSubscriptionStatus(ctx, status);
 
-      await ctx.reply(message, buildSubscriptionKeyboard(status));
+      await ctx.reply(message, buildSubscriptionKeyboard(status, getLangSafe(ctx)));
 
       logger.info(`User ${ctx.from.id} viewed subscription status`);
     } catch (error) {
       logger.error('Error fetching subscription status:', error);
       await ctx.reply(
-        sellerMessages.subscriptionStatusError,
+        ctx.t('seller.subscriptionStatusError'),
         sellerMenu(0, { hasFollows: ctx.session?.hasFollows }, getLangSafe(ctx))
       );
     }
@@ -642,7 +668,7 @@ export const setupSellerHandlers = (bot) => {
 
       if (!ctx.session.shopId || !ctx.session.token) {
         const menu = await getSellerMenuKeyboard(ctx);
-        await ctx.reply(generalMessages.authorizationRequired, menu);
+        await ctx.reply(ctx.t('general.authorizationRequired'), menu);
         return;
       }
 
@@ -660,7 +686,7 @@ export const setupSellerHandlers = (bot) => {
     } catch (error) {
       logger.error('Error in tools submenu handler:', error);
       const menu = await getSellerMenuKeyboard(ctx);
-      await ctx.reply(sellerMessages.toolsError, menu);
+      await ctx.reply(ctx.t('seller.toolsError'), menu);
     }
   });
 
@@ -680,13 +706,13 @@ const handleWorkers = async (ctx) => {
 
   try {
     if (!ctx.session.shopId) {
-      await ctx.reply(generalMessages.shopRequired, sellerMenuNoShop);
+      await ctx.reply(ctx.t('general.shopRequired'), sellerMenuNoShop);
       return;
     }
 
     if (!ctx.session.token) {
       const menu = await getSellerMenuKeyboard(ctx);
-      await ctx.reply(generalMessages.authorizationRequired, menu);
+      await ctx.reply(ctx.t('general.authorizationRequired'), menu);
       return;
     }
 
@@ -702,25 +728,25 @@ const handleWorkers = async (ctx) => {
 
         if (shopDetails?.owner_id && shopDetails.owner_id !== ctx.session.user?.id) {
           const menu = await getSellerMenuKeyboard(ctx);
-          await ctx.reply(sellerMessages.workersOwnerOnly, menu);
+          await ctx.reply(ctx.t('seller.workersOwnerOnly'), menu);
           return;
         }
       } catch (error) {
         logger.error('Failed to load shop details for workers menu:', error);
         const menu = await getSellerMenuKeyboard(ctx);
-        await ctx.reply(generalMessages.actionFailed, menu);
+        await ctx.reply(ctx.t('general.actionFailed'), menu);
         return;
       }
     }
 
     if (shopTier !== 'max') {
       const menu = await getSellerMenuKeyboard(ctx);
-      await ctx.reply(sellerMessages.workersMaxOnly, menu);
+      await ctx.reply(ctx.t('seller.workersMaxOnly'), menu);
       return;
     }
 
-    const shopName = ctx.session.shopName || 'Магазин';
-    await ctx.reply(sellerMessages.workersMenuIntro(shopName), manageWorkersMenu());
+    const shopName = ctx.session.shopName || ctx.t('general.shopFallbackName');
+    await ctx.reply(ctx.t('seller.workersMenuIntro', { shop: shopName }), manageWorkersMenu(getLangSafe(ctx)));
 
     logger.info(`User ${ctx.from.id} opened workers management`);
   } catch (error) {
@@ -728,15 +754,15 @@ const handleWorkers = async (ctx) => {
 
     try {
       const menu = await getSellerMenuKeyboard(ctx);
-      // Edit message вместо reply (не создаёт новое сообщение)
-      await ctx.editMessageText(generalMessages.actionFailed, menu);
+      // Edit message instead of reply (does not create new message)
+      await ctx.editMessageText(ctx.t('general.actionFailed'), menu);
     } catch (editError) {
-      // Fallback если edit не удался (например, сообщение удалено)
+      // Fallback if edit failed (e.g., message deleted)
       // Check if callback query was already answered
       if (!ctx.callbackQuery?.answered) {
         logger.debug('Failed to edit message, using reply fallback:', editError.message);
         const menu = await getSellerMenuKeyboard(ctx);
-        await ctx.reply(generalMessages.actionFailed, menu);
+        await ctx.reply(ctx.t('general.actionFailed'), menu);
       }
     }
   }
@@ -758,7 +784,7 @@ const handleWorkersAdd = async (ctx) => {
     await ctx.scene.enter('manageWorkers');
   } catch (error) {
     logger.error('Error entering manageWorkers scene:', error);
-    await ctx.reply(generalMessages.actionFailed, manageWorkersMenu());
+    await ctx.reply(ctx.t('general.actionFailed'), manageWorkersMenu(getLangSafe(ctx)));
   }
 };
 
@@ -770,12 +796,12 @@ const handleWorkersList = async (ctx) => {
     await ctx.answerCbQuery();
 
     if (!ctx.session.shopId) {
-      await ctx.reply(generalMessages.shopRequired, sellerMenuNoShop);
+      await ctx.reply(ctx.t('general.shopRequired'), sellerMenuNoShop);
       return;
     }
 
     if (!ctx.session.token) {
-      await ctx.reply(generalMessages.authorizationRequired, manageWorkersMenu());
+      await ctx.reply(ctx.t('general.authorizationRequired'), manageWorkersMenu(getLangSafe(ctx)));
       return;
     }
     await showWorkersList(ctx);
@@ -784,7 +810,7 @@ const handleWorkersList = async (ctx) => {
     logger.info(`User ${ctx.from.id} viewed workers list (${workerCount} total)`);
   } catch (error) {
     logger.error('Error fetching workers:', error);
-    await ctx.reply(generalMessages.actionFailed, manageWorkersMenu());
+    await ctx.reply(ctx.t('general.actionFailed'), manageWorkersMenu(getLangSafe(ctx)));
   }
 };
 
@@ -797,25 +823,25 @@ const handleWorkerRemove = async (ctx) => {
     await ctx.answerCbQuery();
 
     if (!ctx.session.shopId) {
-      await ctx.reply(generalMessages.shopRequired, sellerMenuNoShop);
+      await ctx.reply(ctx.t('general.shopRequired'), sellerMenuNoShop);
       return;
     }
 
     if (!ctx.session.token) {
       const menu = await getSellerMenuKeyboard(ctx);
-      await ctx.reply(generalMessages.authorizationRequired, menu);
+      await ctx.reply(ctx.t('general.authorizationRequired'), menu);
       return;
     }
 
     // SECURITY FIX: Only shop owner can remove workers
     if (!ctx.session.isShopOwner) {
-      await ctx.reply(sellerMessages.workersOwnerOnly, manageWorkersMenu());
+      await ctx.reply(ctx.t('seller.workersOwnerOnly'), manageWorkersMenu(getLangSafe(ctx)));
       return;
     }
 
     const workerId = Number.parseInt(ctx.match[1], 10);
     if (!Number.isInteger(workerId) || workerId <= 0) {
-      await ctx.answerCbQuery(sellerMessages.workerSelectionInvalid);
+      await ctx.answerCbQuery(ctx.t('seller.workerSelectionInvalid'));
       return;
     }
 
@@ -829,16 +855,19 @@ const handleWorkerRemove = async (ctx) => {
     }
 
     if (!worker) {
-      await ctx.answerCbQuery(sellerMessages.workerNotFound);
+      await ctx.answerCbQuery(ctx.t('seller.workerNotFound'));
       await showWorkersList(ctx);
       return;
     }
 
     const name = getWorkerDisplayName(worker);
-    await ctx.reply(sellerMessages.workerRemoveConfirm(name), confirmWorkerRemoval(workerId));
+    await ctx.reply(
+      ctx.t('seller.workerRemoveConfirm', { name }),
+      confirmWorkerRemoval(workerId, getLangSafe(ctx))
+    );
   } catch (error) {
     logger.error('Error in worker remove handler:', error);
-    await ctx.answerCbQuery(generalMessages.actionFailed);
+    await ctx.answerCbQuery(ctx.t('general.actionFailed'));
   }
 };
 
@@ -851,25 +880,25 @@ const handleWorkerRemoveConfirm = async (ctx) => {
     await ctx.answerCbQuery();
 
     if (!ctx.session.shopId) {
-      await ctx.reply(generalMessages.shopRequired, sellerMenuNoShop);
+      await ctx.reply(ctx.t('general.shopRequired'), sellerMenuNoShop);
       return;
     }
 
     if (!ctx.session.token) {
       const menu = await getSellerMenuKeyboard(ctx);
-      await ctx.reply(generalMessages.authorizationRequired, menu);
+      await ctx.reply(ctx.t('general.authorizationRequired'), menu);
       return;
     }
 
     // SECURITY FIX: Only shop owner can remove workers
     if (!ctx.session.isShopOwner) {
-      await ctx.reply(sellerMessages.workersOwnerOnly, manageWorkersMenu());
+      await ctx.reply(ctx.t('seller.workersOwnerOnly'), manageWorkersMenu(getLangSafe(ctx)));
       return;
     }
 
     const workerId = Number.parseInt(ctx.match[1], 10);
     if (!Number.isInteger(workerId) || workerId <= 0) {
-      await ctx.answerCbQuery(sellerMessages.workerSelectionInvalid);
+      await ctx.answerCbQuery(ctx.t('seller.workerSelectionInvalid'));
       return;
     }
 
@@ -881,12 +910,12 @@ const handleWorkerRemoveConfirm = async (ctx) => {
 
     logger.info(`User ${ctx.from.id} removed worker ${workerId}`);
 
-    await showWorkersList(ctx, { successMessage: sellerMessages.workerRemoved });
+    await showWorkersList(ctx, { successMessage: ctx.t('seller.workerRemoved') });
   } catch (error) {
     logger.error('Error in worker remove confirm handler:', error);
     const backendMessage = error.response?.data?.error;
-    const message = backendMessage || sellerMessages.workerRemoveError;
+    const message = backendMessage || ctx.t('seller.workerRemoveError');
 
-    await ctx.reply(message, manageWorkersMenu());
+    await ctx.reply(message, manageWorkersMenu(getLangSafe(ctx)));
   }
 };

@@ -4,38 +4,50 @@
  * Converts technical errors to user-friendly messages
  */
 
-const ERROR_MESSAGES = {
+import { t } from '../i18n/index.js';
+
+/**
+ * Get error messages map for a given language
+ * @param {string} lang - Language code
+ * @returns {Object} Error messages map
+ */
+const getErrorMessages = (lang = 'ru') => ({
   // Network errors
-  ECONNREFUSED: '⚠️ Сервер временно недоступен. Попробуйте позже.',
-  ETIMEDOUT: '⚠️ Превышено время ожидания. Попробуйте позже.',
-  ENOTFOUND: '⚠️ Сервер не найден. Проверьте подключение к интернету.',
-  ENETUNREACH: '⚠️ Сеть недоступна. Проверьте подключение.',
+  ECONNREFUSED: t('friendlyErrors.econnrefused', {}, lang),
+  ETIMEDOUT: t('friendlyErrors.etimedout', {}, lang),
+  ENOTFOUND: t('friendlyErrors.enotfound', {}, lang),
+  ENETUNREACH: t('friendlyErrors.enetunreach', {}, lang),
 
   // HTTP errors
-  400: '⚠️ Некорректный запрос. Проверьте введённые данные.',
-  401: '⚠️ Требуется авторизация. Нажмите /start',
-  403: '⚠️ Доступ запрещён. У вас нет прав для этого действия.',
-  404: '⚠️ Данные не найдены.',
-  409: '⚠️ Конфликт данных. Такая запись уже существует.',
-  429: '⚠️ Слишком много запросов. Попробуйте через минуту.',
-  500: '⚠️ Ошибка сервера. Попробуйте позже.',
-  502: '⚠️ Сервер временно недоступен.',
-  503: '⚠️ Сервис временно недоступен.',
-  504: '⚠️ Превышено время ожидания сервера.',
-};
+  400: t('friendlyErrors.http400', {}, lang),
+  401: t('friendlyErrors.http401', {}, lang),
+  403: t('friendlyErrors.http403', {}, lang),
+  404: t('friendlyErrors.http404', {}, lang),
+  409: t('friendlyErrors.http409', {}, lang),
+  429: t('friendlyErrors.http429', {}, lang),
+  500: t('friendlyErrors.http500', {}, lang),
+  502: t('friendlyErrors.http502', {}, lang),
+  503: t('friendlyErrors.http503', {}, lang),
+  504: t('friendlyErrors.http504', {}, lang),
+});
 
 /**
  * Convert error to user-friendly message
+ * @param {Error} error - Error object
+ * @param {string} lang - Language code
+ * @returns {string} User-friendly error message
  */
-export const toFriendlyError = (error) => {
+export const toFriendlyError = (error, lang = 'ru') => {
+  const errorMessages = getErrorMessages(lang);
+
   // Network errors
-  if (error.code && ERROR_MESSAGES[error.code]) {
-    return ERROR_MESSAGES[error.code];
+  if (error.code && errorMessages[error.code]) {
+    return errorMessages[error.code];
   }
 
   // HTTP errors
-  if (error.response?.status && ERROR_MESSAGES[error.response.status]) {
-    return ERROR_MESSAGES[error.response.status];
+  if (error.response?.status && errorMessages[error.response.status]) {
+    return errorMessages[error.response.status];
   }
 
   // API error with custom message
@@ -44,19 +56,19 @@ export const toFriendlyError = (error) => {
 
     // Common API errors
     if (apiError.includes('not found')) {
-      return '⚠️ Данные не найдены.';
+      return t('friendlyErrors.notFound', {}, lang);
     }
     if (apiError.includes('unauthorized') || apiError.includes('invalid token')) {
-      return '⚠️ Сессия истекла. Нажмите /start для повторной авторизации.';
+      return t('friendlyErrors.sessionExpired', {}, lang);
     }
     if (apiError.includes('already exists')) {
-      return '⚠️ Такая запись уже существует.';
+      return t('friendlyErrors.alreadyExists', {}, lang);
     }
     if (apiError.includes('limit reached') || apiError.includes('tier limit')) {
-      return '⚠️ Достигнут лимит тарифного плана. Обновите тариф для продолжения.';
+      return t('friendlyErrors.tierLimit', {}, lang);
     }
     if (apiError.includes('circular')) {
-      return '⚠️ Невозможно создать циклическую подписку.';
+      return t('friendlyErrors.circularFollow', {}, lang);
     }
   }
 
@@ -65,11 +77,11 @@ export const toFriendlyError = (error) => {
     const validationErrors = error.response.data.details
       .map((d) => `• ${d.message || d.msg || d}`)
       .join('\n');
-    return `⚠️ Ошибка валидации:\n\n${validationErrors}`;
+    return t('friendlyErrors.validationError', { errors: validationErrors }, lang);
   }
 
   // Default
-  return '⚠️ Произошла ошибка. Попробуйте позже.';
+  return t('friendlyErrors.default', {}, lang);
 };
 
 export default toFriendlyError;

@@ -9,10 +9,12 @@ import {
 import { followApi } from '../../utils/api.js';
 import { formatFollowDetail } from '../../utils/minimalist.js';
 import logger from '../../utils/logger.js';
-import { messages } from '../../texts/messages.js';
+import { getMessages } from '../../texts/messages.js';
 import { validateShopBeforeScene } from '../../utils/sceneValidation.js';
+import { t } from '../../i18n/index.js';
 
-const { general: generalMessages, follows: followMessages } = messages;
+const getLangSafe = (ctx) => ctx.lang || ctx.session?.user?.language || 'ru';
+const getLocalizedMessages = (ctx) => getMessages(getLangSafe(ctx));
 
 const formatMoney = (value) => {
   const amount = Number(value);
@@ -23,7 +25,7 @@ const formatMoney = (value) => {
 };
 
 const buildFollowLabel = (follow, lang = 'ru') => {
-  const name = follow.source_shop_name || follow.sourceShopName || follow.name || (lang === 'en' ? 'Shop' : 'Магазин');
+  const name = follow.source_shop_name || follow.sourceShopName || follow.name || t('formatters.followShop', {}, lang);
   const isResell = follow.mode === 'resell';
   const markupType = follow.markup_type || 'percentage';
   let markupSuffix = '';
@@ -40,7 +42,7 @@ const buildFollowLabel = (follow, lang = 'ru') => {
       }
     }
   }
-  const modeLabel = isResell ? (lang === 'en' ? 'Resell' : 'Перепродажа') : (lang === 'en' ? 'Monitor' : 'Мониторинг');
+  const modeLabel = isResell ? t('formatters.modeResell', {}, lang) : t('formatters.modeMonitor', {}, lang);
   return `🏪 ${name} (${modeLabel}${markupSuffix})`;
 };
 
@@ -52,8 +54,12 @@ const sendOrEdit = async (ctx, text, keyboard) => {
   return ctx.reply(text, replyMarkup);
 };
 
-const formatProductLine = (index, name, price, stock, lang = 'ru') =>
-  `${index + 1}. ${name} • $${formatMoney(price)} • ${Number.isFinite(stock) ? stock : 0} ${lang === 'en' ? 'pcs' : 'шт'}`;
+const formatProductLine = (index, name, price, stock, lang = 'ru') => {
+  const pcsLabel = t('orders.pcs', {}, lang);
+  return `${index + 1}. ${name} • $${formatMoney(price)} • ${
+    Number.isFinite(stock) ? stock : 0
+  } ${pcsLabel}`;
+};
 
 const formatPriceWithMarkup = (sourcePrice, markupType, markupValue) => {
   const price = Number(sourcePrice) || 0;
@@ -75,7 +81,7 @@ const formatPriceWithMarkup = (sourcePrice, markupType, markupValue) => {
 
 const buildCatalogMessage = (followInfo, products, mode, lang = 'ru') => {
   const lines = [];
-  const shopName = followInfo.source_shop_name || followInfo.sourceShopName || (lang === 'en' ? 'Shop' : 'Магазин');
+  const shopName = followInfo.source_shop_name || followInfo.sourceShopName || t('formatters.followShop', {}, lang);
   const isResell = mode === 'resell';
   const markupType = followInfo.markup_type || 'percentage';
   let markupSuffix = '';
@@ -92,17 +98,21 @@ const buildCatalogMessage = (followInfo, products, mode, lang = 'ru') => {
       }
     }
   }
-  const resellLabel = lang === 'en' ? 'Resell' : 'Перепродажа';
-  const monitorLabel = lang === 'en' ? 'Monitor' : 'Мониторинг';
+  const resellLabel = t('formatters.modeResell', {}, lang);
+  const monitorLabel = t('formatters.modeMonitor', {}, lang);
   const modeLabel = isResell ? `${resellLabel}${markupSuffix}` : monitorLabel;
-  const modeCaption = lang === 'en' ? 'Mode' : 'Режим';
+  const modeCaption = t('formatters.followMode', {}, lang);
 
   lines.push(`🏪 ${shopName}`);
   lines.push(`${modeCaption}: ${modeLabel}`);
   lines.push('');
 
   if (!Array.isArray(products) || products.length === 0) {
-    lines.push(isResell ? followMessages.resellProductsEmpty : followMessages.monitorProductsEmpty);
+    lines.push(
+      isResell
+        ? t('follows.resellProductsEmpty', {}, lang)
+        : t('follows.monitorProductsEmpty', {}, lang)
+    );
     return lines.join('\n');
   }
 
@@ -110,8 +120,8 @@ const buildCatalogMessage = (followInfo, products, mode, lang = 'ru') => {
     ? (followInfo.markup_fixed ?? 0)
     : (followInfo.markup_percentage ?? followInfo.markup ?? 0);
 
-  const pcsLabel = lang === 'en' ? 'pcs' : 'шт';
-  const productLabel = lang === 'en' ? 'Product' : 'Товар';
+  const pcsLabel = t('orders.pcs', {}, lang);
+  const productLabel = t('orders.productDefault', {}, lang);
   products.slice(0, 10).forEach((product, index) => {
     if (isResell) {
       const synced = product.synced_product || product.syncedProduct || {};
@@ -137,6 +147,7 @@ const buildCatalogMessage = (followInfo, products, mode, lang = 'ru') => {
  * View all follows for current shop
  */
 export const handleViewFollows = async (ctx) => {
+  const { general: generalMessages, follows: followMessages } = getLocalizedMessages(ctx);
   try {
     await ctx.answerCbQuery();
 
@@ -187,6 +198,7 @@ export const handleViewFollows = async (ctx) => {
  * P2-9 FIX: Validate shop existence before entering scene
  */
 export const handleCreateFollow = async (ctx) => {
+  const { general: generalMessages } = getLocalizedMessages(ctx);
   try {
     await ctx.answerCbQuery();
 
@@ -197,7 +209,10 @@ export const handleCreateFollow = async (ctx) => {
     await ctx.scene.enter('createFollow');
   } catch (error) {
     logger.error('Error entering createFollow scene:', error);
-    await ctx.reply(generalMessages.actionFailed, followsMenu(Boolean(ctx.session?.hasFollows), [], ctx.lang));
+    await ctx.reply(
+      generalMessages.actionFailed,
+      followsMenu(Boolean(ctx.session?.hasFollows), [], ctx.lang)
+    );
   }
 };
 
@@ -206,6 +221,7 @@ export const handleCreateFollow = async (ctx) => {
  * SECURITY FIX: Added shopId check as defense-in-depth (backend also verifies ownership)
  */
 export const handleFollowDetail = async (ctx) => {
+  const { general: generalMessages, follows: followMessages } = getLocalizedMessages(ctx);
   try {
     await ctx.answerCbQuery();
 
@@ -279,6 +295,7 @@ export const handleFollowDetail = async (ctx) => {
 };
 
 export const handleFollowSettings = async (ctx) => {
+  const { general: generalMessages, follows: followMessages } = getLocalizedMessages(ctx);
   try {
     await ctx.answerCbQuery();
 
@@ -312,6 +329,7 @@ export const handleFollowSettings = async (ctx) => {
  * Show delete confirmation dialog
  */
 export const handleDeleteFollow = async (ctx) => {
+  const { general: generalMessages, follows: followMessages } = getLocalizedMessages(ctx);
   try {
     await ctx.answerCbQuery();
 
@@ -334,7 +352,7 @@ export const handleDeleteFollow = async (ctx) => {
       throw error;
     }
 
-    const shopName = follow.source_shop_name || follow.sourceShopName || (ctx.lang === 'en' ? 'Shop' : 'Магазин');
+    const shopName = follow.source_shop_name || follow.sourceShopName || t('formatters.followShop', {}, ctx.lang);
     const isResell = follow.mode === 'resell';
 
     let confirmMessage = ctx.t('follows.confirmDelete', { shopName });
@@ -361,6 +379,7 @@ export const handleDeleteFollow = async (ctx) => {
  * Confirm and execute follow deletion
  */
 export const handleConfirmDeleteFollow = async (ctx) => {
+  const { general: generalMessages, follows: followMessages } = getLocalizedMessages(ctx);
   try {
     await ctx.answerCbQuery(ctx.t('follows.deleting'));
 
@@ -405,6 +424,7 @@ export const handleConfirmDeleteFollow = async (ctx) => {
  * Cancel follow deletion - return to follow detail
  */
 export const handleCancelDeleteFollow = async (ctx) => {
+  const { general: generalMessages, follows: followMessages } = getLocalizedMessages(ctx);
   try {
     await ctx.answerCbQuery(ctx.t('follows.cancelled'));
 
@@ -437,6 +457,7 @@ export const handleCancelDeleteFollow = async (ctx) => {
  * P2-9 FIX: Validate shop existence before entering scene
  */
 export const handleSwitchMode = async (ctx) => {
+  const { general: generalMessages, follows: followMessages } = getLocalizedMessages(ctx);
   try {
     await ctx.answerCbQuery();
 
@@ -512,6 +533,7 @@ export const handleSwitchMode = async (ctx) => {
  * Confirm switch to monitor mode (after warning about synced products deletion)
  */
 export const handleConfirmSwitchToMonitor = async (ctx) => {
+  const { general: generalMessages, follows: followMessages } = getLocalizedMessages(ctx);
   try {
     await ctx.answerCbQuery(ctx.t('follows.switching'));
 
@@ -550,6 +572,7 @@ export const handleConfirmSwitchToMonitor = async (ctx) => {
  * P2-9 FIX: Validate shop existence before entering scene
  */
 export const handleEditMarkup = async (ctx) => {
+  const { general: generalMessages, follows: followMessages } = getLocalizedMessages(ctx);
   try {
     await ctx.answerCbQuery();
 

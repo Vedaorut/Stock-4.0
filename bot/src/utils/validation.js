@@ -6,6 +6,7 @@
 
 import WAValidator from 'wallet-validator';
 import logger from './logger.js';
+import { t } from '../i18n/index.js';
 
 /**
  * Validate crypto wallet address
@@ -81,15 +82,9 @@ export function detectCryptoType(address) {
 /**
  * Get user-friendly validation error message
  * @param {string} crypto - Cryptocurrency type
+ * @param {string} lang - Language code
  * @returns {string} - Error message with examples
  */
-export function getCryptoValidationError(crypto) {
-  const examples = {
-    BTC: '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa (начинается с 1, 3, или bc1)',
-    ETH: '0x742d35Cc6634C0532925a3b844Bc7e7595f42bE1 (начинается с 0x)',
-    USDT: 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t (начинается с TR)',
-    LTC: 'LTC1A2B3C4D5E6F7G8H9J0K1L2M3N4P5Q6R (начинается с L, M, или ltc1)',
-  };
-
-  return `❌ Неверный формат ${crypto} адреса\n\nПример:\n${examples[crypto] || 'проверьте формат адреса'}`;
+export function getCryptoValidationError(crypto, lang = 'ru') {
+  return t(`validation.invalidCrypto${crypto}`, {}, lang);
 }

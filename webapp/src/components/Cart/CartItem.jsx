@@ -19,7 +19,7 @@ const CartItem = memo(function CartItem({ item }) {
   const platform = usePlatform();
   const android = isAndroid(platform);
 
-  // Drag controls для iOS swipe-to-delete
+  // Drag controls for iOS swipe-to-delete
   const dragControls = useDragControls();
 
   const startDrag = (e) => {
@@ -70,7 +70,7 @@ const CartItem = memo(function CartItem({ item }) {
     : {
         drag: 'x',
         dragControls,
-        dragListener: false, // КРИТИЧНО: убираем глобальный слушатель
+        dragListener: false, // CRITICAL: remove global listener
         dragDirectionLock: true,
         dragElastic: 0.08,
         dragMomentum: false,

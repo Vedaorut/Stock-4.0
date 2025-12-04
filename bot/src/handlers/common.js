@@ -7,7 +7,7 @@ import { handleSellerRole } from './seller/index.js';
 import { handleBuyerRole } from './buyer/index.js';
 import logger from '../utils/logger.js';
 import * as smartMessage from '../utils/smartMessage.js';
-import { messages } from '../texts/messages.js';
+import { getMessages } from '../texts/messages.js';
 import { workerMenu } from '../keyboards/worker.js';
 import { handleWorkerDashboard } from './worker/index.js';
 import { t } from '../i18n/index.js';
@@ -18,12 +18,6 @@ import { handleStart } from './start.js';
  */
 const getLangSafe = (ctx) => ctx.lang || ctx.session?.user?.language || 'ru';
 
-const {
-  start: startMessages,
-  general: generalMessages,
-  seller: sellerMessages,
-  buyer: buyerMessages,
-} = messages;
 
 /**
  * Setup common handlers (main menu, cancel, etc.)
@@ -112,7 +106,7 @@ const handleMainMenu = async (ctx) => {
   try {
     await ctx.answerCbQuery();
 
-    // КРИТИЧНО: Выйти из любой активной сцены перед переходом
+    // CRITICAL: Leave any active scene before transition
     if (ctx.scene && ctx.scene.current) {
       await ctx.scene.leave();
       logger.info(`User ${ctx.from.id} left scene ${ctx.scene.current} via main_menu`);
@@ -135,19 +129,24 @@ const handleMainMenu = async (ctx) => {
     // No saved role - show role selection
     ctx.session.role = null;
 
+    const lang = getLangSafe(ctx);
+    const { start: startMessages } = getMessages(lang);
+
     await smartMessage.send(ctx, {
-      text: startMessages.welcome,
-      keyboard: mainMenu(false, getLangSafe(ctx)),
+      text: startMessages.welcome(lang),
+      keyboard: mainMenu(false, lang),
     });
   } catch (error) {
     logger.error('Error in main menu handler:', error);
     // H8 FIX: Answer callback query in catch to prevent infinite spinner
     try { await ctx.answerCbQuery(); } catch { /* ignore */ }
     // Local error handling - don't throw to avoid infinite spinner
+    const lang = getLangSafe(ctx);
+    const { general: generalMessages } = getMessages(lang);
     try {
       await smartMessage.send(ctx, {
-        text: generalMessages.actionFailed,
-        keyboard: mainMenu(false, getLangSafe(ctx)),
+        text: generalMessages.actionFailed(lang),
+        keyboard: mainMenu(false, lang),
       });
     } catch (replyError) {
       logger.error('Failed to send error message:', replyError);
@@ -157,6 +156,7 @@ const handleMainMenu = async (ctx) => {
 
 /**
  * Handle cancel scene action
+ * Routes user back to appropriate menu based on their role
  */
 const handleCancelScene = async (ctx) => {
   try {
@@ -165,18 +165,39 @@ const handleCancelScene = async (ctx) => {
     // Leave current scene
     await ctx.scene.leave();
 
-    // Return to main menu (minimalist)
-    await smartMessage.send(ctx, {
-      text: startMessages.welcome,
-      keyboard: mainMenu(false, getLangSafe(ctx)),
-    });
+    // Route based on user role
+    const role = ctx.session?.role || ctx.session?.user?.selectedRole;
+    const lang = getLangSafe(ctx);
+    const { start: startMessages, seller: sellerMessages, buyer: buyerMessages } = getMessages(lang);
+
+    if (role === 'buyer') {
+      // Buyer: return to buyer menu
+      await smartMessage.send(ctx, {
+        text: buyerMessages.panel(lang),
+        keyboard: buyerMenu(lang),
+      });
+    } else if (role === 'seller') {
+      // Seller: return to seller menu
+      await smartMessage.send(ctx, {
+        text: sellerMessages.panel(lang),
+        keyboard: sellerMenu(0, { hasFollows: ctx.session?.hasFollows }, lang),
+      });
+    } else {
+      // No role or unknown: return to main menu
+      await smartMessage.send(ctx, {
+        text: startMessages.welcome(lang),
+        keyboard: mainMenu(false, lang),
+      });
+    }
   } catch (error) {
     logger.error('Error canceling scene:', error);
     // Local error handling - don't throw to avoid infinite spinner
+    const lang = getLangSafe(ctx);
+    const { general: generalMessages } = getMessages(lang);
     try {
       await smartMessage.send(ctx, {
-        text: generalMessages.actionFailed,
-        keyboard: mainMenu(false, getLangSafe(ctx)),
+        text: generalMessages.actionFailed(lang),
+        keyboard: mainMenu(false, lang),
       });
     } catch (replyError) {
       logger.error('Failed to send error message:', replyError);
@@ -191,26 +212,29 @@ const handleBack = async (ctx) => {
   try {
     await ctx.answerCbQuery();
 
+    const lang = getLangSafe(ctx);
+    const { start: startMessages, seller: sellerMessages, buyer: buyerMessages } = getMessages(lang);
+
     // Route based on current role
     if (ctx.session.role === 'seller') {
       await smartMessage.send(ctx, {
-        text: sellerMessages.panel,
-        keyboard: sellerMenu(0, { hasFollows: ctx.session?.hasFollows }),
+        text: sellerMessages.panel(lang),
+        keyboard: sellerMenu(0, { hasFollows: ctx.session?.hasFollows }, lang),
       });
     } else if (ctx.session.role === 'worker') {
       await smartMessage.send(ctx, {
         text: ctx.t('worker.menu'),
-        keyboard: workerMenu(undefined, getLangSafe(ctx)),
+        keyboard: workerMenu(undefined, lang),
       });
     } else if (ctx.session.role === 'buyer') {
       await smartMessage.send(ctx, {
-        text: buyerMessages.panel,
-        keyboard: buyerMenu(getLangSafe(ctx)),
+        text: buyerMessages.panel(lang),
+        keyboard: buyerMenu(lang),
       });
     } else {
       await smartMessage.send(ctx, {
-        text: startMessages.welcome,
-        keyboard: mainMenu(false, getLangSafe(ctx)),
+        text: startMessages.welcome(lang),
+        keyboard: mainMenu(false, lang),
       });
     }
   } catch (error) {
@@ -218,10 +242,12 @@ const handleBack = async (ctx) => {
     // H7 FIX: Answer callback query in catch to prevent infinite spinner
     try { await ctx.answerCbQuery(); } catch { /* ignore */ }
     // Local error handling - don't throw to avoid infinite spinner
+    const lang = getLangSafe(ctx);
+    const { general: generalMessages } = getMessages(lang);
     try {
       await smartMessage.send(ctx, {
-        text: generalMessages.actionFailed,
-        keyboard: mainMenu(false, getLangSafe(ctx)),
+        text: generalMessages.actionFailed(lang),
+        keyboard: mainMenu(false, lang),
       });
     } catch (replyError) {
       logger.error('Failed to send error message:', replyError);
@@ -272,10 +298,12 @@ const handleRoleToggle = async (ctx) => {
     });
   } catch (error) {
     logger.error('Error in role toggle handler:', error);
+    const lang = getLangSafe(ctx);
+    const { general: generalMessages } = getMessages(lang);
     try {
       await smartMessage.send(ctx, {
-        text: generalMessages.actionFailed,
-        keyboard: mainMenu(false, getLangSafe(ctx)),
+        text: generalMessages.actionFailed(lang),
+        keyboard: mainMenu(false, lang),
       });
     } catch (replyError) {
       logger.error('Failed to send error message:', replyError);
@@ -316,10 +344,12 @@ const handleRoleBuyer = async (ctx) => {
     await handleBuyerRole(ctx, { skipRoleUpdate: true });
   } catch (error) {
     logger.error('Error in role:buyer handler:', error);
+    const lang = getLangSafe(ctx);
+    const { general: generalMessages } = getMessages(lang);
     try {
       await smartMessage.send(ctx, {
-        text: generalMessages.actionFailed,
-        keyboard: mainMenu(false, getLangSafe(ctx)),
+        text: generalMessages.actionFailed(lang),
+        keyboard: mainMenu(false, lang),
       });
     } catch (replyError) {
       logger.error('Failed to send error message:', replyError);
@@ -360,10 +390,12 @@ const handleRoleSeller = async (ctx) => {
     await handleSellerRole(ctx, { skipRoleUpdate: true });
   } catch (error) {
     logger.error('Error in role:seller handler:', error);
+    const lang = getLangSafe(ctx);
+    const { general: generalMessages } = getMessages(lang);
     try {
       await smartMessage.send(ctx, {
-        text: generalMessages.actionFailed,
-        keyboard: mainMenu(false, getLangSafe(ctx)),
+        text: generalMessages.actionFailed(lang),
+        keyboard: mainMenu(false, lang),
       });
     } catch (replyError) {
       logger.error('Failed to send error message:', replyError);
@@ -456,10 +488,12 @@ const handleRoleWorker = async (ctx) => {
     } catch (cbError) {
       logger.error('Failed to answer callback:', cbError);
     }
+    const lang = getLangSafe(ctx);
+    const { general: generalMessages } = getMessages(lang);
     try {
       await smartMessage.send(ctx, {
-        text: generalMessages.actionFailed,
-        keyboard: mainMenu(false, getLangSafe(ctx)),
+        text: generalMessages.actionFailed(lang),
+        keyboard: mainMenu(false, lang),
       });
     } catch (replyError) {
       logger.error('Failed to send error message:', replyError);
@@ -516,10 +550,12 @@ const handleSelectWorkspace = async (ctx) => {
     } catch (cbError) {
       logger.error('Failed to answer callback:', cbError);
     }
+    const lang = getLangSafe(ctx);
+    const { general: generalMessages } = getMessages(lang);
     try {
       await smartMessage.send(ctx, {
-        text: generalMessages.actionFailed,
-        keyboard: mainMenu(false, getLangSafe(ctx)),
+        text: generalMessages.actionFailed(lang),
+        keyboard: mainMenu(false, lang),
       });
     } catch (replyError) {
       logger.error('Failed to send error message:', replyError);
@@ -534,7 +570,7 @@ const handleBackToMain = async (ctx) => {
   try {
     await ctx.answerCbQuery();
 
-    // КРИТИЧНО: Выйти из любой активной сцены
+    // CRITICAL: Leave any active scene
     if (ctx.scene && ctx.scene.current) {
       await ctx.scene.leave();
       logger.info(`User ${ctx.from.id} left scene ${ctx.scene.current} via back_to_main`);
@@ -560,10 +596,12 @@ const handleBackToMain = async (ctx) => {
     await handleSellerRole(ctx, { skipRoleUpdate: true });
   } catch (error) {
     logger.error('Error in back to main handler:', error);
+    const lang = getLangSafe(ctx);
+    const { general: generalMessages } = getMessages(lang);
     try {
       await smartMessage.send(ctx, {
-        text: generalMessages.actionFailed,
-        keyboard: sellerMenu(0),
+        text: generalMessages.actionFailed(lang),
+        keyboard: sellerMenu(0, {}, lang),
       });
     } catch (replyError) {
       logger.error('Failed to send error message:', replyError);
@@ -606,10 +644,12 @@ const handleStartCreateShop = async (ctx) => {
     await ctx.scene.enter('createShop', { tier });
   } catch (error) {
     logger.error('Error in start create shop handler:', error);
+    const lang = getLangSafe(ctx);
+    const { general: generalMessages } = getMessages(lang);
     try {
       await smartMessage.send(ctx, {
-        text: generalMessages.actionFailed,
-        keyboard: sellerMenu(0),
+        text: generalMessages.actionFailed(lang),
+        keyboard: sellerMenu(0, {}, lang),
       });
     } catch (replyError) {
       logger.error('Failed to send error message:', replyError);

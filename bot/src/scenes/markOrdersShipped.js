@@ -2,9 +2,8 @@ import { Scenes, Markup } from 'telegraf';
 import { orderApi } from '../utils/api.js';
 import { parseOrderNumbers } from '../utils/orderParser.js';
 import logger from '../utils/logger.js';
-import { messages, buttons as buttonText } from '../texts/messages.js';
-
-const { seller: sellerMessages, general: generalMessages } = messages;
+import { getMessages } from '../texts/messages.js';
+import { t } from '../i18n/index.js';
 
 /**
  * Mark Orders Shipped Scene - Bulk management of order shipments
@@ -24,6 +23,9 @@ const showPrompt = async (ctx) => {
   try {
     logger.info('mark_orders_shipped:step:prompt', { userId: ctx.from.id });
 
+    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const { general: generalMessages } = getMessages(lang);
+
     // Validate session
     if (!ctx.session.shopId || !ctx.session.token) {
       await ctx.editMessageText(generalMessages.authorizationRequired);
@@ -42,8 +44,8 @@ const showPrompt = async (ctx) => {
 
     if (activeOrders.length === 0) {
       await ctx.editMessageText(
-        'Нет активных заказов для отметки.',
-        Markup.inlineKeyboard([[Markup.button.callback(buttonText.back, 'cancel_scene')]])
+        ctx.t('seller.noActiveOrders'),
+        Markup.inlineKeyboard([[Markup.button.callback(t('buttons.back', {}, lang), 'cancel_scene')]])
       );
       return;
     }
@@ -65,32 +67,30 @@ const showPrompt = async (ctx) => {
       .map((order, index) => {
         const buyer = order.buyer_username
           ? `@${order.buyer_username}`
-          : order.buyer_first_name || 'Покупатель';
-        const productName = order.product_name || order.productName || 'Товар';
+          : order.buyer_first_name || ctx.t('orders.buyerDefault');
+        const productName = order.product_name || order.productName || ctx.t('orders.productDefault');
         const quantity = order.quantity ?? 1;
         const totalPrice = formatPrice(order.total_price ?? order.totalPrice ?? 0);
-        return `${index + 1}. ${buyer} — ${productName} (${quantity} шт) — $${totalPrice}`;
+        return `${index + 1}. ${buyer} — ${productName} (${quantity} ${ctx.t('orders.pcs')}) — $${totalPrice}`;
       })
       .join('\n');
 
-    const message = `${sellerMessages.bulkShip.prompt}
-
-Активных заказов: ${activeOrders.length}
-
-${ordersList}
-
-Введите номера заказов через пробел.
-Пример: 1 3 5 или 1-5`;
+    const message = ctx.t('orders.bulkShipList', {
+      count: activeOrders.length,
+      list: ordersList,
+    });
 
     await ctx.editMessageText(
       message,
-      Markup.inlineKeyboard([[Markup.button.callback(buttonText.cancel, 'cancel_scene')]])
+      Markup.inlineKeyboard([[Markup.button.callback(t('buttons.cancel', {}, lang), 'cancel_scene')]])
     );
 
     return ctx.wizard.next();
   } catch (error) {
     logger.error('Error in markOrdersShipped showPrompt:', error);
-    await ctx.editMessageText(generalMessages.actionFailed);
+    const langErr = ctx.lang || ctx.session?.user?.language || 'ru';
+    const { general: generalMsgs } = getMessages(langErr);
+    await ctx.editMessageText(generalMsgs.actionFailed);
     return await ctx.scene.leave();
   }
 };
@@ -101,6 +101,9 @@ ${ordersList}
 
 const handleInput = async (ctx) => {
   try {
+    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const { seller: sellerMessages } = getMessages(lang);
+
     // Handle cancel button
     if (ctx.callbackQuery?.data === 'cancel_scene') {
       await ctx.answerCbQuery();
@@ -123,7 +126,7 @@ const handleInput = async (ctx) => {
     const activeOrders = ctx.wizard.state.activeOrders || [];
 
     if (activeOrders.length === 0) {
-      await ctx.reply('Нет активных заказов. Попробуйте обновить список.');
+      await ctx.reply(ctx.t('seller.noActiveOrders'));
       return await ctx.scene.leave();
     }
 
@@ -132,8 +135,8 @@ const handleInput = async (ctx) => {
 
     if (!parseResult.valid) {
       await ctx.reply(
-        `${sellerMessages.bulkShip.invalidInput}\n\nОшибка: ${parseResult.error}`,
-        Markup.inlineKeyboard([[Markup.button.callback(buttonText.cancel, 'cancel_scene')]])
+        `${sellerMessages.bulkShip.invalidInput}\n\n${ctx.t('orders.error')}: ${parseResult.error}`,
+        Markup.inlineKeyboard([[Markup.button.callback(t('buttons.cancel', {}, lang), 'cancel_scene')]])
       );
       return; // Stay in scene, let user try again
     }
@@ -145,8 +148,8 @@ const handleInput = async (ctx) => {
     const invalidIndexes = parseResult.numbers.filter((num) => num > activeOrders.length);
     if (invalidIndexes.length > 0) {
       await ctx.reply(
-        sellerMessages.bulkShip.invalidNumbers(invalidIndexes),
-        Markup.inlineKeyboard([[Markup.button.callback(buttonText.cancel, 'cancel_scene')]])
+        sellerMessages.bulkShip.invalidNumbers(invalidIndexes, lang),
+        Markup.inlineKeyboard([[Markup.button.callback(t('buttons.cancel', {}, lang), 'cancel_scene')]])
       );
       return;
     }
@@ -155,26 +158,25 @@ const handleInput = async (ctx) => {
     ctx.wizard.state.selectedOrders = selectedOrders;
 
     // Format confirmation message
-    const ordersList = sellerMessages.bulkShip.confirmList(selectedOrders);
-    const confirmMessage = `${sellerMessages.bulkShip.confirmTitle(selectedOrders.length)}
-
-${ordersList}
-
-Отметить эти заказы как отправленные?`;
+    const ordersList = sellerMessages.bulkShip.confirmList(selectedOrders, lang);
+    const confirmMessage = ctx.t('orders.confirmBulkShip', { count: selectedOrders.length }) +
+      '\n\n' + ordersList;
 
     // Show confirmation
     await ctx.reply(
       confirmMessage,
       Markup.inlineKeyboard([
-        [Markup.button.callback(buttonText.confirm, 'confirm_ship')],
-        [Markup.button.callback(buttonText.cancel, 'cancel_ship')],
+        [Markup.button.callback(t('buttons.confirm', {}, lang), 'confirm_ship')],
+        [Markup.button.callback(t('buttons.cancel', {}, lang), 'cancel_ship')],
       ])
     );
 
     return ctx.wizard.next();
   } catch (error) {
     logger.error('Error in markOrdersShipped handleInput:', error);
-    await ctx.reply(generalMessages.actionFailed);
+    const langErr = ctx.lang || ctx.session?.user?.language || 'ru';
+    const { general: generalMsgs } = getMessages(langErr);
+    await ctx.reply(generalMsgs.actionFailed);
     return await ctx.scene.leave();
   }
 };
@@ -185,6 +187,9 @@ ${ordersList}
 
 const handleConfirmation = async (ctx) => {
   try {
+    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const { seller: sellerMessages, general: generalMessages } = getMessages(lang);
+
     await ctx.answerCbQuery();
 
     const action = ctx.callbackQuery.data;
@@ -201,7 +206,7 @@ const handleConfirmation = async (ctx) => {
       const token = ctx.session.token;
 
       if (selectedOrders.length === 0) {
-        await ctx.editMessageText('Не выбрано заказов для отметки.');
+        await ctx.editMessageText(ctx.t('seller.noOrdersSelected'));
         return await ctx.scene.leave();
       }
 
@@ -223,10 +228,10 @@ const handleConfirmation = async (ctx) => {
 
         // Show success message with navigation buttons
         await ctx.editMessageText(
-          sellerMessages.bulkShip.success(selectedOrders.length),
+          sellerMessages.bulkShip.success(selectedOrders.length, lang),
           Markup.inlineKeyboard([
-            [Markup.button.callback('📦 Активные заказы', 'seller:active_orders')],
-            [Markup.button.callback('↩️ В меню', 'seller:menu')],
+            [Markup.button.callback(ctx.t('buttons.activeOrders'), 'seller:active_orders')],
+            [Markup.button.callback(ctx.t('buttons.backToMenu'), 'seller:menu')],
           ])
         );
 
@@ -240,7 +245,9 @@ const handleConfirmation = async (ctx) => {
     }
   } catch (error) {
     logger.error('Error in markOrdersShipped handleConfirmation:', error);
-    await ctx.editMessageText(generalMessages.actionFailed);
+    const langErr = ctx.lang || ctx.session?.user?.language || 'ru';
+    const { general: generalMsgs } = getMessages(langErr);
+    await ctx.editMessageText(generalMsgs.actionFailed);
     return await ctx.scene.leave();
   }
 };
@@ -259,15 +266,16 @@ async function sendBuyerNotifications(ctx, orders) {
         continue;
       }
 
-      const message = `📦 Заказ отправлен!
-
-Ваш заказ #${order.id} отправлен продавцом.
-
-Товар: ${order.product_name}
-Количество: ${order.quantity} шт
-Сумма: $${order.total_price}
-
-Магазин: ${order.shop_name || ctx.session.shopName || 'Магазин'}`;
+      // Get buyer's language preference (fallback to 'ru' if not set)
+      const buyerLang = order.buyer_language || 'ru';
+      const { t } = await import('../i18n/index.js');
+      const message = t('orders.shipConfirmation', {
+        orderId: order.id,
+        productName: order.product_name,
+        quantity: order.quantity,
+        totalPrice: order.total_price,
+        shopName: order.shop_name || ctx.session.shopName || t('ai.shopDefault', {}, buyerLang),
+      }, buyerLang);
 
       await bot.sendMessage(order.buyer_telegram_id, message);
 
@@ -315,7 +323,7 @@ markOrdersShippedScene.leave(async (ctx) => {
   }
   ctx.scene.state = {};
 
-  // Очистить __scenes из Redis сессии для предотвращения застревания
+  // Clear __scenes from Redis session to prevent scene sticking
   if (ctx.session && ctx.session.__scenes) {
     delete ctx.session.__scenes;
   }
@@ -326,6 +334,9 @@ markOrdersShippedScene.leave(async (ctx) => {
 // Handle cancel action within scene
 markOrdersShippedScene.action('cancel_scene', async (ctx) => {
   try {
+    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const { seller: sellerMessages } = getMessages(lang);
+
     await ctx.answerCbQuery();
     logger.info('mark_orders_shipped:cancelled', { userId: ctx.from.id });
 
@@ -334,9 +345,32 @@ markOrdersShippedScene.action('cancel_scene', async (ctx) => {
   } catch (error) {
     logger.error('Error in cancel_scene handler:', error);
     try {
+      const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+      const { general: generalMessages } = getMessages(lang);
       await ctx.editMessageText(generalMessages.actionFailed);
     } catch (replyError) {
       logger.error('Failed to send error message:', replyError);
+    }
+  }
+});
+
+// Also handle 'cancel' action (some buttons use this)
+markOrdersShippedScene.action('cancel', async (ctx) => {
+  try {
+    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const { seller: sellerMessages } = getMessages(lang);
+
+    await ctx.answerCbQuery();
+    logger.info('mark_orders_shipped:cancelled', { userId: ctx.from.id });
+
+    await ctx.editMessageText(sellerMessages.bulkShip.cancelled);
+    await ctx.scene.leave();
+  } catch (error) {
+    logger.error('Error in cancel handler:', error);
+    try {
+      await ctx.scene.leave();
+    } catch (leaveError) {
+      logger.error('Failed to leave scene:', leaveError);
     }
   }
 });

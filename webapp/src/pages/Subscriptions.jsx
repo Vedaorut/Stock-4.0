@@ -88,7 +88,7 @@ export default function Subscriptions() {
             if (import.meta.env.DEV) {
               console.error('[Subscriptions] Error loading buyer subscriptions:', subsError);
             }
-            return { status: 'error', error: 'Не удалось загрузить подписки' };
+            return { status: 'error', error: 'Failed to load subscriptions' };
           }
 
           const subsList = Array.isArray(subsData?.data) ? subsData.data : [];
@@ -107,7 +107,7 @@ export default function Subscriptions() {
           if (import.meta.env.DEV) {
             console.error('[Subscriptions] Error loading shops:', shopsError);
           }
-          return { status: 'error', error: 'Не удалось загрузить данные' };
+          return { status: 'error', error: 'Failed to load data' };
         }
 
         const shops = Array.isArray(shopsData?.data) ? shopsData.data : [];
@@ -578,7 +578,7 @@ export default function Subscriptions() {
                     </h3>
                     <div className="flex items-center gap-2">
                       <span className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-blue-500/20 text-blue-400">
-                        {follow.source_products_count || 0} товаров
+                        {follow.source_products_count || 0} {t('common.products')}
                       </span>
                     </div>
                   </div>

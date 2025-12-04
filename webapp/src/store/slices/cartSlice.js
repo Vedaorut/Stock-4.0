@@ -10,7 +10,7 @@ export const createCartSlice = (set, get) => ({
     const productShopId = currentShop?.id || product.shop_id || product.shopId || productsShopId;
     if (currentCart.length > 0 && currentCart[0].shopId !== productShopId) {
       const toast = useToastStore.getState().addToast;
-      toast({ type: 'warning', message: 'Очистите корзину для покупок в другом магазине', duration: 3000 });
+      toast({ type: 'warning', message: 'Clear the cart to shop from another store', duration: 3000 });
       if (import.meta.env.DEV) {
         console.error('[addToCart] Cannot add product from different shop. Cart shopId:', currentCart[0].shopId, 'Product shopId:', productShopId);
       }
@@ -38,7 +38,7 @@ export const createCartSlice = (set, get) => ({
         currentOrder: null,
       });
     } else {
-      // Сохраняем shopId вместе с товаром для восстановления currentShop при checkout
+      // Save shopId with the product for restoring currentShop at checkout
       const shopId = currentShop?.id || product.shop_id || product.shopId || productsShopId;
 
       if (!shopId) {

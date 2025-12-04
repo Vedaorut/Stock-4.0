@@ -1,12 +1,18 @@
 import { Markup } from 'telegraf';
 import { orderApi } from '../../utils/api.js';
-import { messages, buttons as buttonText } from '../../texts/messages.js';
+import { t } from '../../i18n/index.js';
 import logger from '../../utils/logger.js';
 
-const { general: generalMessages } = messages;
+/**
+ * Get language with fallback
+ */
+const getLangSafe = (ctx) => ctx.lang || ctx.session?.user?.language || 'ru';
 
-const backToMenuKeyboard = Markup.inlineKeyboard([
-  [Markup.button.callback(buttonText.backToMenu, 'seller:menu')],
+/**
+ * Get back to menu keyboard with localization
+ */
+const getBackToMenuKeyboard = (lang = 'ru') => Markup.inlineKeyboard([
+  [Markup.button.callback(t('buttons.backToMenu', {}, lang), 'seller:menu')],
 ]);
 
 const formatPrice = (value) => {
@@ -40,12 +46,12 @@ export const handleActiveOrders = async (ctx) => {
     const token = ctx.session.token;
 
     if (!shopId) {
-      await ctx.reply(generalMessages.shopRequired, backToMenuKeyboard);
+      await ctx.reply(ctx.t('general.shopRequired'), getBackToMenuKeyboard(getLangSafe(ctx)));
       return;
     }
 
     if (!token) {
-      await ctx.reply(generalMessages.authorizationRequired, backToMenuKeyboard);
+      await ctx.reply(ctx.t('general.authorizationRequired'), getBackToMenuKeyboard(getLangSafe(ctx)));
       return;
     }
 
@@ -55,12 +61,8 @@ export const handleActiveOrders = async (ctx) => {
     const activeOrders = result.success && Array.isArray(result.data) ? result.data : [];
 
     if (activeOrders.length === 0) {
-      const message = `📦 Активные заказы
-
-Нет активных заказов.
-
-Заказы появятся здесь после оплаты покупателем.`;
-      await ctx.reply(message, backToMenuKeyboard);
+      const message = ctx.t('orders.activeEmpty');
+      await ctx.reply(message, getBackToMenuKeyboard(getLangSafe(ctx)));
       logger.info(`User ${ctx.from.id} - no active orders for shop ${shopId}`);
       return;
     }
@@ -69,11 +71,11 @@ export const handleActiveOrders = async (ctx) => {
       .map((order, index) => {
         const buyer = order.buyer_username
           ? `@${order.buyer_username}`
-          : order.buyer_first_name || 'Покупатель';
-        const productName = order.product_name || order.productName || 'Товар';
+          : order.buyer_first_name || ctx.t('orders.buyerDefault');
+        const productName = order.product_name || order.productName || ctx.t('orders.productDefault');
         const quantity = order.quantity ?? 1;
         const totalPrice = formatPrice(order.total_price ?? order.totalPrice ?? 0);
-        return `${index + 1}. ${buyer} • ${productName} (${quantity} шт) • $${totalPrice}`;
+        return `${index + 1}. ${buyer} • ${productName} (${quantity} ${ctx.t('orders.pcs')}) • $${totalPrice}`;
       })
       .join('\n');
 
@@ -82,18 +84,17 @@ export const handleActiveOrders = async (ctx) => {
       return sum + (Number.isFinite(price) ? price : 0);
     }, 0);
 
-    const message = `📦 Активные заказы (${activeOrders.length})
+    const message = ctx.t('orders.activeList', {
+      count: activeOrders.length,
+      list: ordersList,
+      total: formatPrice(total),
+    });
 
-Заказы, ожидающие отправки:
-
-${ordersList}
-
-Итого: $${formatPrice(total)}`;
-
+    const lang = getLangSafe(ctx);
     const buttons = Markup.inlineKeyboard([
-      [Markup.button.callback('Отметить выдачу', 'seller:mark_shipped')],
-      [Markup.button.callback('Обновить', 'seller:active_orders')],
-      [Markup.button.callback(buttonText.backToMenu, 'seller:menu')],
+      [Markup.button.callback(ctx.t('orders.markShipped'), 'seller:mark_shipped')],
+      [Markup.button.callback(t('buttons.refresh', {}, lang), 'seller:active_orders')],
+      [Markup.button.callback(t('buttons.backToMenu', {}, lang), 'seller:menu')],
     ]);
 
     await ctx.reply(message, buttons);
@@ -112,18 +113,19 @@ ${ordersList}
     });
 
     // ✅ P1-3 FIX: No second answerCbQuery, just show error message
-    const errorMsg = 'Не удалось загрузить активные заказы. Попробуйте позже.';
+    const errorMsg = ctx.t('orders.loadActiveError');
+    const errorKeyboard = getBackToMenuKeyboard(getLangSafe(ctx));
     try {
       if (ctx.callbackQuery) {
-        await ctx.editMessageText(errorMsg, backToMenuKeyboard);
+        await ctx.editMessageText(errorMsg, errorKeyboard);
       } else {
-        await ctx.reply(errorMsg, backToMenuKeyboard);
+        await ctx.reply(errorMsg, errorKeyboard);
       }
     } catch (editError) {
       // Fallback to reply if edit fails
       logger.warn('Failed to edit message, falling back to reply:', { error: editError.message });
       try {
-        await ctx.reply(errorMsg, backToMenuKeyboard);
+        await ctx.reply(errorMsg, errorKeyboard);
       } catch (replyError) {
         logger.error('Failed to send error message:', replyError);
       }
@@ -134,33 +136,33 @@ ${ordersList}
 /**
  * Create order history keyboard with pagination
  */
-function createOrderHistoryKeyboard(page, totalPages) {
+function createOrderHistoryKeyboard(page, totalPages, lang = 'ru') {
   const buttons = [];
 
   // Row 1: Navigation (only if multiple pages)
   if (totalPages > 1) {
     const navRow = [];
     if (page > 1) {
-      navRow.push(Markup.button.callback('◀️ Назад', `seller:order_history:${page - 1}`));
+      navRow.push(Markup.button.callback(`◀️`, `seller:order_history:${page - 1}`));
     }
-    navRow.push(Markup.button.callback(`Стр. ${page}/${totalPages}`, 'seller:order_history:jump'));
+    navRow.push(Markup.button.callback(`${page}/${totalPages}`, 'seller:order_history:jump'));
     if (page < totalPages) {
-      navRow.push(Markup.button.callback('Вперед ▶️', `seller:order_history:${page + 1}`));
+      navRow.push(Markup.button.callback(`▶️`, `seller:order_history:${page + 1}`));
     }
     buttons.push(navRow);
   }
 
   // Row 2: Additional features (placeholders)
   buttons.push([
-    Markup.button.callback('📊 Статистика', 'seller:order_stats'),
-    Markup.button.callback('🔍 Поиск', 'seller:order_search'),
-    Markup.button.callback('📥 Экспорт', 'seller:order_export'),
+    Markup.button.callback('📊', 'seller:order_stats'),
+    Markup.button.callback('🔍', 'seller:order_search'),
+    Markup.button.callback('📥', 'seller:order_export'),
   ]);
 
-  // Row 3: Utilities
+  // Row 3: Utilities - localized buttons
   buttons.push([
-    Markup.button.callback('Обновить', `seller:order_history:${page}`),
-    Markup.button.callback(buttonText.backToMenu, 'seller:menu'),
+    Markup.button.callback(t('buttons.refresh', {}, lang), `seller:order_history:${page}`),
+    Markup.button.callback(t('buttons.backToMenu', {}, lang), 'seller:menu'),
   ]);
 
   return Markup.inlineKeyboard(buttons);
@@ -197,12 +199,12 @@ export const handleOrderHistory = async (ctx, page = 1) => {
           currentShopId: ctx.session?.currentShopId,
         },
       });
-      await ctx.reply(generalMessages.shopRequired, backToMenuKeyboard);
+      await ctx.reply(ctx.t('general.shopRequired'), getBackToMenuKeyboard(getLangSafe(ctx)));
       return;
     }
 
     if (!token) {
-      await ctx.reply(generalMessages.authorizationRequired, backToMenuKeyboard);
+      await ctx.reply(ctx.t('general.authorizationRequired'), getBackToMenuKeyboard(getLangSafe(ctx)));
       return;
     }
 
@@ -235,12 +237,8 @@ export const handleOrderHistory = async (ctx, page = 1) => {
     }
 
     if (!Array.isArray(deliveredOrders) || deliveredOrders.length === 0) {
-      const emptyMessage = `📋 История заказов
-
-Нет завершённых заказов.
-
-Как только заказ будет выдан, он появится в истории.`;
-      await ctx.reply(emptyMessage, backToMenuKeyboard);
+      const emptyMessage = ctx.t('orders.historyEmpty');
+      await ctx.reply(emptyMessage, getBackToMenuKeyboard(getLangSafe(ctx)));
       logger.info(`User ${ctx.from.id} - no delivered orders for shop ${shopId}`);
       return;
     }
@@ -254,14 +252,14 @@ export const handleOrderHistory = async (ctx, page = 1) => {
         const globalNum = startNum + index;
         const buyer = order.buyer_username
           ? `@${order.buyer_username}`
-          : order.buyer_first_name || 'Покупатель';
-        const productName = order.product_name || order.productName || 'Товар';
+          : order.buyer_first_name || ctx.t('orders.buyerDefault');
+        const productName = order.product_name || order.productName || ctx.t('orders.productDefault');
         const quantity = order.quantity ?? 1;
         const totalPrice = formatPrice(order.total_price ?? order.totalPrice ?? 0);
         const deliveredAt =
           order.updated_at || order.delivered_at || order.completed_at || order.paid_at;
         const dateLabel = deliveredAt ? new Date(deliveredAt).toLocaleDateString('ru-RU') : '';
-        return `${globalNum}. ${buyer} • ${productName} (${quantity} шт) • $${totalPrice} • ${dateLabel}`;
+        return `${globalNum}. ${buyer} • ${productName} (${quantity} ${ctx.t('orders.pcs')}) • $${totalPrice} • ${dateLabel}`;
       })
       .join('\n');
 
@@ -274,14 +272,16 @@ export const handleOrderHistory = async (ctx, page = 1) => {
     // Get total revenue (from meta or use page revenue as fallback)
     const totalRevenue = result.data?.totalRevenue || pageRevenue;
 
-    const historyMessage = `📋 История заказов (${startNum}-${endNum} из ${totalOrders})
+    const historyMessage = ctx.t('orders.historyList', {
+      start: startNum,
+      end: endNum,
+      total: totalOrders,
+      list: ordersList,
+      pageRevenue: formatPrice(pageRevenue),
+      totalRevenue: formatPrice(totalRevenue),
+    });
 
-${ordersList}
-
-Выручка на странице: $${formatPrice(pageRevenue)}
-Общая выручка: $${formatPrice(totalRevenue)}`;
-
-    const keyboard = createOrderHistoryKeyboard(page, totalPages);
+    const keyboard = createOrderHistoryKeyboard(page, totalPages, getLangSafe(ctx));
 
     // Use edit for callback queries, reply for initial call
     if (ctx.callbackQuery) {
@@ -305,18 +305,19 @@ ${ordersList}
     });
 
     // ✅ P1-3 FIX: No second answerCbQuery, just show error message
-    const errorMsg = 'Не удалось загрузить историю заказов. Попробуйте позже.';
+    const errorMsg = ctx.t('orders.loadHistoryError');
+    const errorKeyboard = getBackToMenuKeyboard(getLangSafe(ctx));
     try {
       if (ctx.callbackQuery) {
-        await ctx.editMessageText(errorMsg, backToMenuKeyboard);
+        await ctx.editMessageText(errorMsg, errorKeyboard);
       } else {
-        await ctx.reply(errorMsg, backToMenuKeyboard);
+        await ctx.reply(errorMsg, errorKeyboard);
       }
     } catch (editError) {
       // Fallback to reply if edit fails
       logger.warn('Failed to edit message, falling back to reply:', { error: editError.message });
       try {
-        await ctx.reply(errorMsg, backToMenuKeyboard);
+        await ctx.reply(errorMsg, errorKeyboard);
       } catch (replyError) {
         logger.error('Failed to send error message:', replyError);
       }
@@ -334,7 +335,7 @@ export const handleMarkShipped = async (ctx) => {
     const token = ctx.session.token;
 
     if (!token) {
-      await ctx.answerCbQuery('Требуется авторизация');
+      await ctx.answerCbQuery(ctx.t('errors.authRequired'));
       return;
     }
 
@@ -344,7 +345,7 @@ export const handleMarkShipped = async (ctx) => {
     } catch (error) {
       const status = error.response?.status;
       if (status === 401 || status === 403 || status === 404) {
-        await ctx.answerCbQuery('Заказ не найден или нет доступа');
+        await ctx.answerCbQuery(ctx.t('orders.orderNotFound'));
         return;
       }
       throw error;
@@ -352,19 +353,19 @@ export const handleMarkShipped = async (ctx) => {
 
     await orderApi.updateOrderStatus(orderId, 'shipped', token);
 
-    await ctx.answerCbQuery('✅ Заказ отмечен как отправленный');
+    await ctx.answerCbQuery(ctx.t('orders.orderShipped'));
 
     // Update message with new status
-    const newMessage = ctx.callbackQuery.message.text + '\n\n✅ Отправлено';
+    const newMessage = ctx.callbackQuery.message.text + '\n\n' + ctx.t('orders.shipped');
     await ctx.editMessageText(
       newMessage,
-      Markup.inlineKeyboard([[Markup.button.callback('✓ Доставлено', `order:deliver:${orderId}`)]])
+      Markup.inlineKeyboard([[Markup.button.callback(ctx.t('orders.delivered'), `order:deliver:${orderId}`)]])
     );
 
     logger.info(`Order ${orderId} marked as shipped by user ${ctx.from.id}`);
   } catch (error) {
     logger.error('Error marking order as shipped:', error);
-    await ctx.answerCbQuery('Не удалось обновить статус');
+    await ctx.answerCbQuery(ctx.t('orders.statusUpdateError'));
   }
 };
 
@@ -378,7 +379,7 @@ export const handleMarkDelivered = async (ctx) => {
     const token = ctx.session.token;
 
     if (!token) {
-      await ctx.answerCbQuery('Требуется авторизация');
+      await ctx.answerCbQuery(ctx.t('errors.authRequired'));
       return;
     }
 
@@ -388,7 +389,7 @@ export const handleMarkDelivered = async (ctx) => {
     } catch (error) {
       const status = error.response?.status;
       if (status === 401 || status === 403 || status === 404) {
-        await ctx.answerCbQuery('Заказ не найден или нет доступа');
+        await ctx.answerCbQuery(ctx.t('orders.orderNotFound'));
         return;
       }
       throw error;
@@ -396,17 +397,19 @@ export const handleMarkDelivered = async (ctx) => {
 
     await orderApi.updateOrderStatus(orderId, 'delivered', token);
 
-    await ctx.answerCbQuery('✅ Заказ завершён');
+    await ctx.answerCbQuery(ctx.t('orders.orderDelivered'));
 
     // Final message - no more buttons
+    const shippedText = ctx.t('orders.shipped');
+    const deliveredText = ctx.t('orders.delivered');
     const newMessage =
-      ctx.callbackQuery.message.text.replace('\n\n✅ Отправлено', '') + '\n\n✅ Доставлено';
+      ctx.callbackQuery.message.text.replace('\n\n' + shippedText, '') + '\n\n' + deliveredText;
     await ctx.editMessageText(newMessage);
 
     logger.info(`Order ${orderId} marked as delivered by user ${ctx.from.id}`);
   } catch (error) {
     logger.error('Error marking order as delivered:', error);
-    await ctx.answerCbQuery('Не удалось обновить статус');
+    await ctx.answerCbQuery(ctx.t('orders.statusUpdateError'));
   }
 };
 
@@ -420,7 +423,7 @@ export const handleCancelOrder = async (ctx) => {
     const token = ctx.session.token;
 
     if (!token) {
-      await ctx.answerCbQuery('Требуется авторизация');
+      await ctx.answerCbQuery(ctx.t('errors.authRequired'));
       return;
     }
 
@@ -430,7 +433,7 @@ export const handleCancelOrder = async (ctx) => {
     } catch (error) {
       const status = error.response?.status;
       if (status === 401 || status === 403 || status === 404) {
-        await ctx.answerCbQuery('Заказ не найден или нет доступа');
+        await ctx.answerCbQuery(ctx.t('orders.orderNotFound'));
         return;
       }
       throw error;
@@ -438,15 +441,15 @@ export const handleCancelOrder = async (ctx) => {
 
     await orderApi.updateOrderStatus(orderId, 'cancelled', token);
 
-    await ctx.answerCbQuery('❌ Заказ отменён');
+    await ctx.answerCbQuery(ctx.t('orders.orderCancelled'));
 
-    const newMessage = ctx.callbackQuery.message.text + '\n\n❌ Отменён';
+    const newMessage = ctx.callbackQuery.message.text + '\n\n' + ctx.t('orders.cancelled');
     await ctx.editMessageText(newMessage);
 
     logger.info(`Order ${orderId} cancelled by user ${ctx.from.id}`);
   } catch (error) {
     logger.error('Error cancelling order:', error);
-    await ctx.answerCbQuery('Не удалось отменить заказ');
+    await ctx.answerCbQuery(ctx.t('orders.cancelError'));
   }
 };
 
@@ -460,7 +463,7 @@ export const handleOrderHistoryPage = async (ctx) => {
 
     // Validate page number (M19 FIX: added upper limit)
     if (!page || page < 1 || page > MAX_PAGE) {
-      await ctx.answerCbQuery('❌ Некорректная страница');
+      await ctx.answerCbQuery(ctx.t('orders.invalidPage'));
       return;
     }
 
@@ -468,7 +471,7 @@ export const handleOrderHistoryPage = async (ctx) => {
     const now = Date.now();
     const lastClick = ctx.session.lastHistoryClick || 0;
     if (now - lastClick < 1000) {
-      await ctx.answerCbQuery('⏱️ Пожалуйста, подождите');
+      await ctx.answerCbQuery(ctx.t('orders.pleaseWait'));
       return;
     }
     ctx.session.lastHistoryClick = now;
@@ -486,7 +489,7 @@ export const handleOrderHistoryPage = async (ctx) => {
     return handleOrderHistory(ctx, page);
   } catch (error) {
     logger.error('Error in handleOrderHistoryPage:', error);
-    await ctx.answerCbQuery('❌ Ошибка загрузки страницы');
+    await ctx.answerCbQuery(ctx.t('orders.loadPageError'));
   }
 };
 
@@ -494,26 +497,26 @@ export const handleOrderHistoryPage = async (ctx) => {
  * Handle order statistics (placeholder)
  */
 export const handleOrderStats = async (ctx) => {
-  await ctx.answerCbQuery('📊 Статистика заказов в разработке');
+  await ctx.answerCbQuery(ctx.t('orders.statsInDev'));
 };
 
 /**
  * Handle order search (placeholder)
  */
 export const handleOrderSearch = async (ctx) => {
-  await ctx.answerCbQuery('🔍 Поиск по заказам в разработке');
+  await ctx.answerCbQuery(ctx.t('orders.searchInDev'));
 };
 
 /**
  * Handle order export (placeholder)
  */
 export const handleOrderExport = async (ctx) => {
-  await ctx.answerCbQuery('📥 Экспорт истории в разработке');
+  await ctx.answerCbQuery(ctx.t('orders.exportInDev'));
 };
 
 /**
  * Handle jump to page (placeholder)
  */
 export const handleOrderHistoryJump = async (ctx) => {
-  await ctx.answerCbQuery('🔢 Переход на страницу в разработке');
+  await ctx.answerCbQuery(ctx.t('orders.jumpInDev'));
 };

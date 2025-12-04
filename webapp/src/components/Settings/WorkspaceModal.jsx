@@ -12,7 +12,7 @@ function WorkerCard({ worker, onRemove, isOwner }) {
   const handleRemove = async () => {
     triggerHaptic('medium');
     const confirmed = await confirm(
-      `Удалить сотрудника @${worker.username || worker.telegram_id}?`
+      `Remove worker @${worker.username || worker.telegram_id}?`
     );
     if (confirmed) {
       triggerHaptic('success');
@@ -90,7 +90,7 @@ export default function WorkspaceModal({ isOpen, onClose }) {
   const [telegramId, setTelegramId] = useState('');
   const workerAbortController = useRef(null);
 
-  // Cleanup requests on unmount
+  // Cleanup requests on unmount (abort pending API calls)
   useEffect(() => {
     return () => {
       if (workerAbortController.current) {
@@ -215,18 +215,18 @@ export default function WorkspaceModal({ isOpen, onClose }) {
 
     try {
       if (!myShop) {
-        await alert('Сначала создайте магазин');
+        await alert('Create a shop first');
         return;
       }
 
       if (!isPro) {
-        await alert('Работники доступны только на тарифе PRO');
+        await alert('Workers are only available on the PRO plan');
         return;
       }
 
       const input = telegramId.trim();
       if (!input) {
-        await alert('Введите Telegram ID или @username');
+        await alert('Enter Telegram ID or @username');
         return;
       }
 
@@ -248,7 +248,7 @@ export default function WorkspaceModal({ isOpen, onClose }) {
       await loadData();
     } catch (error) {
       if (error.name === 'AbortError') return;
-      await alert(error.message || 'Ошибка добавления сотрудника');
+      await alert(error.message || 'Error adding worker');
     } finally {
       if (!workerAbortController.current?.signal.aborted) {
         setSaving(false);
@@ -273,7 +273,7 @@ export default function WorkspaceModal({ isOpen, onClose }) {
       await loadData();
     } catch (error) {
       if (error.name === 'AbortError') return;
-      await alert(error.message || 'Ошибка удаления сотрудника');
+      await alert(error.message || 'Error removing worker');
     }
   };
 
@@ -333,7 +333,7 @@ export default function WorkspaceModal({ isOpen, onClose }) {
                       d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
                     />
                   </svg>
-                  <h3 className="text-xl font-bold text-white mb-2">Ошибка загрузки</h3>
+                  <h3 className="text-xl font-bold text-white mb-2">Loading Error</h3>
                   <p className="text-red-400 text-sm mb-6">{error}</p>
                   <motion.button
                     onClick={() => {
@@ -347,7 +347,7 @@ export default function WorkspaceModal({ isOpen, onClose }) {
                     }}
                     whileTap={{ scale: 0.98 }}
                   >
-                    Повторить
+                    Retry
                   </motion.button>
                 </div>
               </div>
@@ -396,9 +396,9 @@ export default function WorkspaceModal({ isOpen, onClose }) {
                       d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
                     />
                   </svg>
-                  <h3 className="text-xl font-bold text-white mb-2">У вас еще нет магазина</h3>
+                  <h3 className="text-xl font-bold text-white mb-2">You don't have a shop yet</h3>
                   <p className="text-gray-400 text-sm">
-                    Создайте магазин для управления сотрудниками
+                    Create a shop to manage workers
                   </p>
                 </div>
               </div>
@@ -449,10 +449,10 @@ export default function WorkspaceModal({ isOpen, onClose }) {
                       />
                     </svg>
                     <div>
-                      <p className="text-sm text-white font-medium mb-1">Сотрудники могут</p>
+                      <p className="text-sm text-white font-medium mb-1">Workers can</p>
                       <p className="text-xs text-gray-400">
-                        Добавлять, редактировать и удалять товары в вашем магазине. Полные права
-                        администратора.
+                        Add, edit and delete products in your shop. Full administrator
+                        rights.
                       </p>
                     </div>
                   </div>
@@ -474,11 +474,11 @@ export default function WorkspaceModal({ isOpen, onClose }) {
                       />
                     </svg>
                     <div>
-                      <p className="text-sm text-white font-medium mb-1">Доступно только на PRO</p>
+                      <p className="text-sm text-white font-medium mb-1">Available only on PRO</p>
                       <p className="text-xs text-gray-400">
-                        Апгрейд до PRO откроет совместную работу: сотрудники смогут
-                        управлять товарами и продажами. Перейдите в раздел «Подписка», чтобы
-                        обновить тариф.
+                        Upgrade to PRO to unlock collaboration: workers will be able to
+                        manage products and sales. Go to the Subscription section to
+                        upgrade your plan.
                       </p>
                     </div>
                   </div>
@@ -499,7 +499,7 @@ export default function WorkspaceModal({ isOpen, onClose }) {
                   }}
                   whileTap={{ scale: 0.98 }}
                 >
-                  + Добавить сотрудника
+                  + Add Worker
                 </motion.button>
               )}
 
@@ -515,17 +515,17 @@ export default function WorkspaceModal({ isOpen, onClose }) {
                     >
                       <div>
                         <label className="text-sm text-gray-400 mb-2 block">
-                          Telegram ID сотрудника
+                          Worker Telegram ID
                         </label>
                         <input
                           type="text"
                           value={telegramId}
                           onChange={(e) => setTelegramId(e.target.value)}
-                          placeholder="@username или 123456789"
+                          placeholder="@username or 123456789"
                           className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white font-mono text-sm focus:outline-none focus:border-orange-primary transition-colors"
                         />
                         <p className="text-xs text-gray-500 mt-2">
-                          Укажите @username или ID сотрудника (через @userinfobot)
+                          Enter @username or user ID (via @userinfobot)
                         </p>
                       </div>
 
@@ -541,7 +541,7 @@ export default function WorkspaceModal({ isOpen, onClose }) {
                         }}
                         whileTap={telegramId.trim() ? { scale: 0.98 } : {}}
                       >
-                        {saving ? 'Добавление...' : 'Добавить'}
+                        {saving ? 'Adding...' : 'Add'}
                       </motion.button>
                     </motion.div>
                   )}
@@ -558,7 +558,7 @@ export default function WorkspaceModal({ isOpen, onClose }) {
                 (workers.length > 0 ? (
                   <div className="space-y-3">
                     <h3 className="text-sm font-semibold text-gray-400 px-2">
-                      Сотрудники ({workers.length})
+                      Workers ({workers.length})
                     </h3>
                     <AnimatePresence mode="popLayout">
                       {workers.map((worker) => (
@@ -587,7 +587,7 @@ export default function WorkspaceModal({ isOpen, onClose }) {
                           d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
                         />
                       </svg>
-                      <p className="text-gray-400 text-sm">Пока нет сотрудников</p>
+                      <p className="text-gray-400 text-sm">No workers yet</p>
                     </div>
                   )
                 ))

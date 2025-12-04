@@ -114,7 +114,7 @@ describe('useApi', () => {
           }
 
           const apiError = err.response?.data;
-          const errorMessage = apiError?.error || apiError?.message || err.message || 'Произошла ошибка';
+          const errorMessage = apiError?.error || apiError?.message || err.message || 'An error occurred';
           return { data: null, error: errorMessage };
         }
       };
@@ -253,7 +253,7 @@ describe('useApi', () => {
           }
 
           const apiError = err.response?.data;
-          const errorMessage = apiError?.error || apiError?.message || err.message || 'Произошла ошибка';
+          const errorMessage = apiError?.error || apiError?.message || err.message || 'An error occurred';
           return { data: null, error: errorMessage };
         }
       };
@@ -362,7 +362,7 @@ describe('useApi', () => {
           }
 
           const apiError = err.response?.data;
-          const errorMessage = apiError?.error || apiError?.message || err.message || 'Произошла ошибка';
+          const errorMessage = apiError?.error || apiError?.message || err.message || 'An error occurred';
           return { data: null, error: errorMessage };
         }
       };

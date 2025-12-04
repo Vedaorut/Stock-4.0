@@ -4,10 +4,10 @@ const IOS_THRESHOLD = window.innerHeight * 0.25;
 const ANDROID_THRESHOLD = window.innerHeight * 0.2;
 
 /**
- * Hook для управления viewport при открытии клавиатуры в Telegram Mini App
- * - Обновляет --vh-dynamic CSS переменную
- * - Добавляет класс .kb-open на <html> при открытии клавиатуры
- * - Поддержка: Telegram viewportChanged + fallback visualViewport (iOS)
+ * Hook for managing viewport when keyboard opens in Telegram Mini App
+ * - Updates --vh-dynamic CSS variable
+ * - Adds .kb-open class to <html> when keyboard opens
+ * - Support: Telegram viewportChanged + fallback visualViewport (iOS)
  */
 export function useKeyboardViewport() {
   const stableRef = useRef(null);

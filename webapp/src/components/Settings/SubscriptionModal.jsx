@@ -91,7 +91,7 @@ function PlanCard({ name, price, features, isActive, onSelect, delay = 0 }) {
         {/* Price */}
         <div className="mb-3">
           <span className="text-2xl font-black text-white">${price}</span>
-          <span className="text-xs text-gray-500 ml-1">/мес</span>
+          <span className="text-xs text-gray-500 ml-1">/mo</span>
         </div>
 
         {/* Features - compact */}
@@ -132,11 +132,11 @@ function PlanCard({ name, price, features, isActive, onSelect, delay = 0 }) {
             }`}
             whileTap={{ scale: 0.97 }}
           >
-            {isMax ? 'Перейти на MAX' : isPro ? 'Перейти на PRO' : 'Выбрать'}
+            {isMax ? 'Switch to MAX' : isPro ? 'Switch to PRO' : 'Select'}
           </motion.button>
         ) : (
           <div className="w-full py-2.5 rounded-xl text-xs font-bold text-center text-green-400 bg-green-500/10 border border-green-500/20">
-            Активный план
+            Active Plan
           </div>
         )}
       </div>
@@ -192,8 +192,8 @@ export default function SubscriptionModal({ isOpen, onClose }) {
 
   const handleSelectPlan = async (plan) => {
     await alert(plan === 'max'
-      ? 'Для перехода на MAX перейдите в бота'
-      : 'Для изменения плана перейдите в бота'
+      ? 'To switch to MAX, use the bot'
+      : 'To change plan, use the bot'
     );
   };
 
@@ -209,7 +209,7 @@ export default function SubscriptionModal({ isOpen, onClose }) {
             exit={{ x: '100%' }}
             transition={{ type: 'spring', damping: 30, stiffness: 300 }}
           >
-            <PageHeader title="Подписка" onBack={handleClose} variant="close" />
+            <PageHeader title="Subscription" onBack={handleClose} variant="close" />
             <div
               className="flex items-center justify-center"
               style={{ paddingTop: 'calc(env(safe-area-inset-top) + 80px)' }}
@@ -223,7 +223,7 @@ export default function SubscriptionModal({ isOpen, onClose }) {
                 >
                   <span className="text-3xl">🏪</span>
                 </motion.div>
-                <p className="text-gray-400 text-sm">Создайте магазин для доступа</p>
+                <p className="text-gray-400 text-sm">Create a shop to access</p>
               </div>
             </div>
           </motion.div>
@@ -247,7 +247,7 @@ export default function SubscriptionModal({ isOpen, onClose }) {
           exit={{ x: '100%' }}
           transition={{ type: 'spring', damping: 30, stiffness: 300 }}
         >
-          <PageHeader title="Подписка" onBack={handleClose} variant="close" />
+          <PageHeader title="Subscription" onBack={handleClose} variant="close" />
 
           <div
             className="flex-1 flex flex-col px-4"
@@ -278,7 +278,7 @@ export default function SubscriptionModal({ isOpen, onClose }) {
                     <div>
                       <span className="text-white font-semibold">{currentTier.toUpperCase()}</span>
                       {daysLeft !== null && (
-                        <span className="text-gray-500 text-xs ml-2">• {daysLeft} дн.</span>
+                        <span className="text-gray-500 text-xs ml-2">• {daysLeft}d</span>
                       )}
                     </div>
                   </div>
@@ -326,7 +326,7 @@ export default function SubscriptionModal({ isOpen, onClose }) {
                       onClick={() => setShowHistory(!showHistory)}
                       className="w-full flex items-center justify-between text-xs text-gray-500 py-2"
                     >
-                      <span>История платежей ({history.length})</span>
+                      <span>Payment history ({history.length})</span>
                       <motion.svg
                         className="w-4 h-4"
                         fill="none"
@@ -354,7 +354,7 @@ export default function SubscriptionModal({ isOpen, onClose }) {
                               </div>
                               <div className="flex items-center gap-3">
                                 <span className="text-gray-500">
-                                  {new Date(p.created_at).toLocaleDateString('ru-RU', { day: '2-digit', month: 'short' })}
+                                  {new Date(p.created_at).toLocaleDateString('en-US', { day: '2-digit', month: 'short' })}
                                 </span>
                                 <span className="text-white font-medium">${p.amount}</span>
                               </div>

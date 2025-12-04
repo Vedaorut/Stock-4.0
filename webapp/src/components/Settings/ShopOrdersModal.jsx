@@ -255,23 +255,38 @@ export default function ShopOrdersModal({ isOpen, onClose }) {
 
   useBackButton(isOpen ? handleClose : null);
 
-  const loadOrders = useCallback(async (signal) => {
-    if (!effectiveShopId) {
-      setError(t('shop.notSelected'));
+  const loadOrders = useCallback(async (signal, options = {}) => {
+    const { showLoading = false } = options;
+
+    try {
+      if (!effectiveShopId) {
+        setError(t('shop.notSelected'));
+        return { status: 'error' };
+      }
+
+      const { data, error: apiError } = await get(`/shops/${effectiveShopId}/orders`, { signal });
+      if (signal?.aborted) return { status: 'aborted' };
+
+      if (apiError) {
+        setError(apiError);
+        console.error('[ShopOrdersModal] Failed to load orders:', apiError);
+        return { status: 'error' };
+      }
+
+      const ordersList = Array.isArray(data?.data) ? data.data : [];
+      setOrders(ordersList);
+      setError(null);
+      return { status: 'success' };
+    } catch (err) {
+      if (signal?.aborted) return { status: 'aborted' };
+      console.error('[ShopOrdersModal] Unexpected error:', err);
+      setError(t('common.unexpectedError'));
       return { status: 'error' };
+    } finally {
+      if (showLoading && !signal?.aborted) {
+        setLoading(false);
+      }
     }
-
-    const { data, error: apiError } = await get(`/shops/${effectiveShopId}/orders`, { signal });
-    if (signal?.aborted) return { status: 'aborted' };
-
-    if (apiError) {
-      setError(apiError);
-      return { status: 'error' };
-    }
-
-    const ordersList = Array.isArray(data?.data) ? data.data : [];
-    setOrders(ordersList);
-    return { status: 'success' };
   }, [get, effectiveShopId, t]);
 
   useEffect(() => {
@@ -281,12 +296,15 @@ export default function ShopOrdersModal({ isOpen, onClose }) {
     setExpandedId(null);
 
     const controller = new AbortController();
-    loadOrders(controller.signal).finally(() => {
-      if (!controller.signal.aborted) setLoading(false);
-    });
 
-    // Auto-refresh every 30s
-    const interval = setInterval(() => loadOrders(controller.signal), 30000);
+    // Initial load with loading indicator
+    loadOrders(controller.signal, { showLoading: true });
+
+    // Auto-refresh every 30s (silent, no loading indicator)
+    const interval = setInterval(() => {
+      loadOrders(controller.signal, { showLoading: false });
+    }, 30000);
+
     return () => {
       controller.abort();
       clearInterval(interval);
@@ -431,7 +449,7 @@ export default function ShopOrdersModal({ isOpen, onClose }) {
                       triggerHaptic('light');
                       setLoading(true);
                       setError(null);
-                      loadOrders().finally(() => setLoading(false));
+                      loadOrders(null, { showLoading: true });
                     }}
                     className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-white/10 hover:bg-white/15 transition-colors"
                     whileTap={{ scale: 0.95 }}

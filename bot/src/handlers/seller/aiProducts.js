@@ -10,10 +10,6 @@ import { isNoiseCommand } from '../../utils/fuzzyMatch.js';
 import logger from '../../utils/logger.js';
 import { reply as cleanReply } from '../../utils/cleanReply.js';
 import * as smartMessage from '../../utils/smartMessage.js';
-import { messages } from '../../texts/messages.js';
-const {
-  seller: { aiProducts: aiMessages },
-} = messages;
 
 /**
  * AI Product Management Handler
@@ -41,7 +37,10 @@ export async function handleAIProductCommand(ctx) {
 
     const isWorker = ctx.session.role === 'worker';
     const shopId = ctx.session.shopId || ctx.session.workspaceShopId;
-    const shopName = ctx.session.shopName || ctx.session.workspaceShop?.name || 'Магазин';
+    const shopName =
+      ctx.session.shopName ||
+      ctx.session.workspaceShop?.name ||
+      ctx.t('general.shopFallbackName');
 
     // Only process if user is seller/worker with a shop
     if ((!isWorker && ctx.session.role !== 'seller') || !shopId) {
@@ -86,7 +85,7 @@ export async function handleAIProductCommand(ctx) {
 
     // Filter noise commands (greetings, thanks, etc.)
     if (isNoiseCommand(userMessage)) {
-      // Ignore silently - don't waste tokens on "привет" or "спасибо"
+      // Ignore silently - don't waste tokens on greetings or thanks
       logger.debug('ai_noise_filtered', {
         userId: ctx.from.id,
         message: userMessage.slice(0, 50),
@@ -100,7 +99,7 @@ export async function handleAIProductCommand(ctx) {
         userId: ctx.from.id,
         message: userMessage.slice(0, 50),
       });
-      await smartMessage.send(ctx, { text: aiMessages.processing });
+      await smartMessage.send(ctx, { text: ctx.t('aiProducts.processing') });
       return;
     }
 
@@ -119,7 +118,7 @@ export async function handleAIProductCommand(ctx) {
 
     // Check rate limit
     if (ctx.session.aiCommands.length >= 10) {
-      await smartMessage.send(ctx, { text: aiMessages.rateLimitReached });
+      await smartMessage.send(ctx, { text: ctx.t('aiProducts.rateLimitReached') });
       return;
     }
 
@@ -310,7 +309,10 @@ export async function handleAISelection(ctx) {
 
     const productId = parseInt(ctx.match[1]);
     const shopId = ctx.session.shopId || ctx.session.workspaceShopId;
-    const shopName = ctx.session.shopName || ctx.session.workspaceShop?.name || 'Магазин';
+    const shopName =
+      ctx.session.shopName ||
+      ctx.session.workspaceShop?.name ||
+      ctx.t('general.shopFallbackName');
 
     // Check if pending operation exists
     if (!ctx.session.pendingAI) {
@@ -512,10 +514,10 @@ export async function handleAIBackToSelection(ctx) {
 }
 
 const RANDOM_SELECTION_PATTERNS = [
-  /\bвыбери\s+люб\w+/iu,
-  /\bвыбери\s+(?:рандом\w*|случайн\w*)/iu,
-  /\bрандомн\w*\s+товар/iu,
-  /\bлюбой\s+товар/iu,
+  /\b\u0432\u044b\u0431\u0435\u0440\u0438\s+\u043b\u044e\u0431\w+/iu,
+  /\b\u0432\u044b\u0431\u0435\u0440\u0438\s+(?:\u0440\u0430\u043d\u0434\u043e\u043c\w*|\u0441\u043b\u0443\u0447\u0430\u0439\u043d\w*)/iu,
+  /\b\u0440\u0430\u043d\u0434\u043e\u043c\u043d\w*\s+\u0442\u043e\u0432\u0430\u0440/iu,
+  /\b\u043b\u044e\u0431\u043e\u0439\s+\u0442\u043e\u0432\u0430\u0440/iu,
   /\bchoose\s+(?:any|one)/i,
   /\bpick\s+(?:any|one|random)/i,
 ];
@@ -572,7 +574,8 @@ async function handleRandomProductSelection(ctx, userMessage, products) {
     (name) => ctx.t('ai.randomOpener3', { name }),
   ];
   const opener = openers[Math.floor(Math.random() * openers.length)](product.name);
-  const replyText = `${opener}${priceText ? ` ${ctx.lang === 'en' ? 'for' : 'за'} ${priceText}` : ''}${stockInfo}. ${ctx.t('ai.whatToDo')}`;
+  const priceConnector = ctx.t('ai.priceConnector');
+  const replyText = `${opener}${priceText ? ` ${priceConnector} ${priceText}` : ''}${stockInfo}. ${ctx.t('ai.whatToDo')}`;
 
   await cleanReply(ctx, replyText);
   saveToConversationHistory(ctx, [

@@ -1,15 +1,15 @@
 import { useState, useEffect, useRef, memo } from 'react';
 
 /**
- * Live countdown timer для временных скидок
+ * Live countdown timer for temporary discounts
  *
- * @param {string} expiresAt - ISO timestamp когда истекает скидка
- * @returns {JSX.Element|null} - Таймер с цветовым кодированием
+ * @param {string} expiresAt - ISO timestamp when discount expires
+ * @returns {JSX.Element|null} - Timer with color coding
  *
- * Цветовое кодирование:
- * - Оранжевый (>3 часа): спокойный цвет
- * - Красный (1-3 часа): более яркий
- * - Красный + пульсация (<1 час): срочность
+ * Color coding:
+ * - Orange (>3 hours): calm color
+ * - Red (1-3 hours): more vibrant
+ * - Red + pulse (<1 hour): urgency
  */
 const CountdownTimer = memo(function CountdownTimer({ expiresAt }) {
   const [timeLeft, setTimeLeft] = useState(null);
@@ -19,20 +19,20 @@ const CountdownTimer = memo(function CountdownTimer({ expiresAt }) {
     // Set mounted flag
     isMountedRef.current = true;
 
-    // Валидация входных данных
+    // Input validation
     if (!expiresAt) return;
 
     const calculateTimeLeft = () => {
       const now = new Date();
       const end = new Date(expiresAt);
-      const diff = end - now; // миллисекунды
+      const diff = end - now; // milliseconds
 
       // Check if component is still mounted before updating state
       if (!isMountedRef.current) {
         return;
       }
 
-      // Если время истекло - скрыть таймер
+      // If time expired - hide timer
       if (diff <= 0) {
         setTimeLeft(null);
         return;
@@ -47,40 +47,40 @@ const CountdownTimer = memo(function CountdownTimer({ expiresAt }) {
         hours,
         minutes,
         seconds,
-        totalHours: diff / (1000 * 60 * 60), // для цветового кодирования
+        totalHours: diff / (1000 * 60 * 60), // for color coding
       });
     };
 
-    // Начальный расчёт
+    // Initial calculation
     calculateTimeLeft();
 
-    // Обновление каждую секунду
+    // Update every second
     const interval = setInterval(calculateTimeLeft, 1000);
 
-    // Cleanup при unmount
+    // Cleanup on unmount
     return () => {
       isMountedRef.current = false;
       clearInterval(interval);
     };
   }, [expiresAt]);
 
-  // Если время истекло или данных нет - не показывать
+  // If time expired or no data - don't show
   if (!timeLeft) return null;
 
-  // Форматирование вывода
+  // Format output
   let displayText = '';
   if (timeLeft.hours > 0) {
-    displayText = `${timeLeft.hours}ч ${timeLeft.minutes}м`;
+    displayText = `${timeLeft.hours}h ${timeLeft.minutes}m`;
   } else if (timeLeft.minutes > 0) {
-    displayText = `${timeLeft.minutes}м ${timeLeft.seconds}с`;
+    displayText = `${timeLeft.minutes}m ${timeLeft.seconds}s`;
   } else {
-    displayText = `${timeLeft.seconds}с`;
+    displayText = `${timeLeft.seconds}s`;
   }
 
-  // Цветовое кодирование и пульсация
-  const isUrgent = timeLeft.totalHours < 1; // <1 час - красный + пульсация
-  const isWarning = timeLeft.totalHours >= 1 && timeLeft.totalHours < 3; // 1-3 часа - красный
-  // Note: isNormal = timeLeft.totalHours >= 3 (>3 часа - оранжевый)
+  // Color coding and pulsing
+  const isUrgent = timeLeft.totalHours < 1; // <1 hour - red + pulse
+  const isWarning = timeLeft.totalHours >= 1 && timeLeft.totalHours < 3; // 1-3 hours - red
+  // Note: isNormal = timeLeft.totalHours >= 3 (>3 hours - orange)
 
   let colorClass = 'text-orange-500';
   if (isWarning || isUrgent) {
@@ -92,7 +92,7 @@ const CountdownTimer = memo(function CountdownTimer({ expiresAt }) {
       className={`flex items-center gap-1 text-xs font-semibold ${colorClass} ${
         isUrgent ? 'animate-pulse' : ''
       }`}
-      aria-label={`Скидка истекает через ${displayText}`}
+      aria-label={`Discount expires in ${displayText}`}
       role="timer"
     >
       <svg

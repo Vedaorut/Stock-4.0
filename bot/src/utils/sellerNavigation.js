@@ -3,8 +3,11 @@ import { shopApi, orderApi, followApi } from './api.js';
 import * as smartMessage from './smartMessage.js';
 import logger from './logger.js';
 import { messages } from '../texts/messages.js';
+import { t } from '../i18n/index.js';
 
-const { seller: sellerMessages, general: generalMessages } = messages;
+const { seller: sellerMessages } = messages;
+
+const getLang = (ctx) => ctx.lang || ctx.session?.user?.language || 'ru';
 
 const formatDate = (dateValue) => {
   if (!dateValue) {
@@ -19,10 +22,12 @@ const formatDate = (dateValue) => {
 
 export const showSellerMainMenu = async (ctx) => {
   try {
-    if (!ctx.session.token) {
+    const lang = getLang(ctx);
+
+    if (!ctx.session?.token) {
       await smartMessage.send(ctx, {
-        text: generalMessages.authorizationRequired,
-        keyboard: sellerMenuNoShop,
+        text: t('general.authorizationRequired', {}, lang),
+        keyboard: sellerMenuNoShop(lang),
       });
       return false;
     }
@@ -34,8 +39,8 @@ export const showSellerMainMenu = async (ctx) => {
       const shops = await shopApi.getMyShop(ctx.session.token);
       if (!Array.isArray(shops) || shops.length === 0) {
         await smartMessage.send(ctx, {
-          text: sellerMessages.noShop,
-          keyboard: sellerMenuNoShop,
+          text: t('seller.noShop', {}, lang),
+          keyboard: sellerMenuNoShop(lang),
         });
         return false;
       }
@@ -89,20 +94,23 @@ export const showSellerMainMenu = async (ctx) => {
     ctx.session.hasFollows = hasFollows;
 
     const header = sellerMessages.shopPanelWithStats(
-      shopName || 'Магазин',
+      shopName || t('general.shopFallbackName', {}, lang),
       weekRevenue,
-      activeCount
+      activeCount,
+      null,
+      lang
     );
     await smartMessage.send(ctx, {
       text: header,
-      keyboard: sellerMenu(activeCount, { hasFollows }),
+      keyboard: sellerMenu(activeCount, { hasFollows }, lang),
     });
     return true;
   } catch (error) {
     logger.error('Error showing seller main menu:', error);
+    const lang = getLang(ctx);
     await smartMessage.send(ctx, {
-      text: generalMessages.actionFailed,
-      keyboard: sellerMenuNoShop,
+      text: t('general.actionFailed', {}, lang),
+      keyboard: sellerMenuNoShop(lang),
     });
     return false;
   }
@@ -110,17 +118,19 @@ export const showSellerMainMenu = async (ctx) => {
 
 export const showSellerToolsMenu = async (ctx, isOwnerOverride = null) => {
   try {
-    const isOwner = isOwnerOverride ?? ctx.session.isShopOwner ?? false;
+    const lang = getLang(ctx);
+    const isOwner = isOwnerOverride ?? ctx.session?.isShopOwner ?? false;
     await smartMessage.send(ctx, {
-      text: sellerMessages.toolsIntro,
-      keyboard: sellerToolsMenu(isOwner),
+      text: t('seller.toolsIntro', {}, lang),
+      keyboard: sellerToolsMenu(isOwner, lang),
     });
     return true;
   } catch (error) {
     logger.error('Error showing seller tools menu:', error);
+    const lang = getLang(ctx);
     await smartMessage.send(ctx, {
-      text: generalMessages.actionFailed,
-      keyboard: sellerMenuNoShop,
+      text: t('general.actionFailed', {}, lang),
+      keyboard: sellerMenuNoShop(lang),
     });
     return false;
   }

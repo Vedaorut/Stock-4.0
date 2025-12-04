@@ -43,7 +43,7 @@ function FollowCard({ follow, onModeSwitch, onDelete, t }) {
       <div className="flex items-start justify-between gap-3 mb-3">
         <div className="flex-1 min-w-0">
           <h3 className="text-white font-semibold mb-1 truncate">
-            {follow.source_shop_name || `Магазин #${follow.target_shop_id}`}
+            {follow.source_shop_name || `Shop #${follow.target_shop_id}`}
           </h3>
           {follow.source_shop_logo && (
             <p className="text-sm text-gray-400 truncate">@{follow.source_username || ''}</p>

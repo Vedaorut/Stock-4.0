@@ -1,11 +1,10 @@
 import { Scenes, Markup } from 'telegraf';
 import logger from '../utils/logger.js';
 import * as smartMessage from '../utils/smartMessage.js';
-import { messages, buttons as buttonText } from '../texts/messages.js';
+import { getMessages } from '../texts/messages.js';
 import { notificationApi, shopApi } from '../utils/api.js';
 import { showSellerToolsMenu } from '../utils/sellerNavigation.js';
-
-const { seller: sellerMessages, general: generalMessages } = messages;
+import { t } from '../i18n/index.js';
 
 const parseChannelInput = (input) => {
   if (!input) {
@@ -32,11 +31,14 @@ const migrateChannelScene = new Scenes.WizardScene(
   'migrate_channel',
   async (ctx) => {
     try {
+      const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+      const { seller: sellerMessages } = getMessages(lang);
+
       await smartMessage.send(ctx, {
         text: `${sellerMessages.migration.intro}\n\n${sellerMessages.migration.confirmPrompt}`,
         keyboard: Markup.inlineKeyboard([
-          [Markup.button.callback(buttonText.migrationConfirm, 'migrate:confirm')],
-          [Markup.button.callback(buttonText.backToTools, 'seller:tools')],
+          [Markup.button.callback(t('buttons.migrationConfirm', {}, lang), 'migrate:confirm')],
+          [Markup.button.callback(t('buttons.backToTools', {}, lang), 'seller:tools')],
         ]),
       });
     } catch (error) {
@@ -48,8 +50,11 @@ const migrateChannelScene = new Scenes.WizardScene(
     return ctx.wizard.next();
   },
   async (ctx) => {
+    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const { seller: sellerMessages } = getMessages(lang);
+
     if (!ctx.callbackQuery) {
-      await ctx.reply('Пожалуйста, используйте кнопки для подтверждения миграции.');
+      await ctx.reply(t('scenes.useButtonsForMigration', {}, lang));
       return;
     }
 
@@ -72,7 +77,7 @@ const migrateChannelScene = new Scenes.WizardScene(
       await smartMessage.send(ctx, {
         text: sellerMessages.migration.askChannel,
         keyboard: Markup.inlineKeyboard([
-          [Markup.button.callback(buttonText.backToTools, 'seller:tools')],
+          [Markup.button.callback(t('buttons.backToTools', {}, lang), 'seller:tools')],
         ]),
       });
     } catch (error) {
@@ -84,6 +89,9 @@ const migrateChannelScene = new Scenes.WizardScene(
     return ctx.wizard.next();
   },
   async (ctx) => {
+    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const { seller: sellerMessages } = getMessages(lang);
+
     if (ctx.callbackQuery?.data === 'seller:tools') {
       await ctx.answerCbQuery();
       await showSellerToolsMenu(ctx);
@@ -92,7 +100,7 @@ const migrateChannelScene = new Scenes.WizardScene(
 
     if (!ctx.message || !ctx.message.text) {
       await smartMessage.send(ctx, {
-        text: 'Пожалуйста, отправьте ссылку на канал или @username текстом.',
+        text: t('scenes.sendChannelText', {}, lang),
       });
       return;
     }
@@ -111,7 +119,7 @@ const migrateChannelScene = new Scenes.WizardScene(
       await smartMessage.send(ctx, {
         text: sellerMessages.migration.invalidChannel,
         keyboard: Markup.inlineKeyboard([
-          [Markup.button.callback(buttonText.backToTools, 'seller:tools')],
+          [Markup.button.callback(t('buttons.backToTools', {}, lang), 'seller:tools')],
         ]),
       });
       return;
@@ -119,7 +127,7 @@ const migrateChannelScene = new Scenes.WizardScene(
 
     const shopId = ctx.session.shopId;
     let buyersCount = 0;
-    let shopName = ctx.session.shopName || 'Магазин';
+    let shopName = ctx.session.shopName || ctx.t('general.shopFallbackName');
 
     if (shopId && ctx.session.token) {
       try {
@@ -156,16 +164,19 @@ const migrateChannelScene = new Scenes.WizardScene(
     await smartMessage.send(ctx, {
       text: confirmationMessage,
       keyboard: Markup.inlineKeyboard([
-        [Markup.button.callback(buttonText.sendNotifications, 'migrate:send')],
-        [Markup.button.callback(buttonText.backToTools, 'seller:tools')],
+        [Markup.button.callback(t('buttons.sendNotifications', {}, lang), 'migrate:send')],
+        [Markup.button.callback(t('buttons.backToTools', {}, lang), 'seller:tools')],
       ]),
     });
 
     return ctx.wizard.next();
   },
   async (ctx) => {
+    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const { seller: sellerMessages, general: generalMessages } = getMessages(lang);
+
     if (!ctx.callbackQuery) {
-      await ctx.reply('Пожалуйста, используйте кнопки для отправки уведомлений.');
+      await ctx.reply(t('scenes.useButtonsForNotifications', {}, lang));
       return;
     }
 
@@ -193,7 +204,7 @@ const migrateChannelScene = new Scenes.WizardScene(
       await smartMessage.send(ctx, {
         text: generalMessages.actionFailed,
         keyboard: Markup.inlineKeyboard([
-          [Markup.button.callback(buttonText.backToTools, 'seller:tools')],
+          [Markup.button.callback(t('buttons.backToTools', {}, lang), 'seller:tools')],
         ]),
       });
       return ctx.scene.leave();
@@ -214,8 +225,8 @@ const migrateChannelScene = new Scenes.WizardScene(
       await smartMessage.send(ctx, {
         text: sellerMessages.migration.success({ channel: newChannel, buyersCount: notified }),
         keyboard: Markup.inlineKeyboard([
-          [Markup.button.callback(buttonText.goToTools, 'seller:tools')],
-          [Markup.button.callback(buttonText.backToMenu, 'seller:menu')],
+          [Markup.button.callback(t('buttons.goToTools', {}, lang), 'seller:tools')],
+          [Markup.button.callback(t('buttons.backToMenu', {}, lang), 'seller:menu')],
         ]),
       });
     } catch (error) {
@@ -223,7 +234,7 @@ const migrateChannelScene = new Scenes.WizardScene(
       await smartMessage.send(ctx, {
         text: sellerMessages.migration.error,
         keyboard: Markup.inlineKeyboard([
-          [Markup.button.callback(buttonText.backToTools, 'seller:tools')],
+          [Markup.button.callback(t('buttons.backToTools', {}, lang), 'seller:tools')],
         ]),
       });
     } finally {
@@ -243,12 +254,46 @@ migrateChannelScene.leave(async (ctx) => {
   }
   ctx.scene.state = {};
 
-  // Очистить __scenes из Redis сессии для предотвращения застревания
+  // Clear __scenes from Redis session to prevent stuck state
   if (ctx.session && ctx.session.__scenes) {
     delete ctx.session.__scenes;
   }
 
   logger.info(`User ${ctx.from?.id} left migrateChannel scene`);
+});
+
+// Handle cancel button - prevents users from getting stuck in scene
+migrateChannelScene.action('cancel_scene', async (ctx) => {
+  try {
+    await ctx.answerCbQuery();
+    logger.info('migrate_channel_cancelled', { userId: ctx.from.id });
+    await ctx.scene.leave();
+    await showSellerToolsMenu(ctx);
+  } catch (error) {
+    logger.error('Error in cancel_scene handler:', error);
+    try {
+      await ctx.scene.leave();
+    } catch (leaveError) {
+      logger.error('Failed to leave scene:', leaveError);
+    }
+  }
+});
+
+// Also handle 'cancel' action (some buttons use this)
+migrateChannelScene.action('cancel', async (ctx) => {
+  try {
+    await ctx.answerCbQuery();
+    logger.info('migrate_channel_cancelled', { userId: ctx.from.id });
+    await ctx.scene.leave();
+    await showSellerToolsMenu(ctx);
+  } catch (error) {
+    logger.error('Error in cancel handler:', error);
+    try {
+      await ctx.scene.leave();
+    } catch (leaveError) {
+      logger.error('Failed to leave scene:', leaveError);
+    }
+  }
 });
 
 export default migrateChannelScene;

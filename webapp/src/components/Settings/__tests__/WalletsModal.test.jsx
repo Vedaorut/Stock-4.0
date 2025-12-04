@@ -1190,7 +1190,7 @@ describe('WalletsModal - All Wallets Configured', () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText(/Все доступные кошельки добавлены/i)
+        screen.getByText(/All available wallets added/i)
       ).toBeInTheDocument();
     });
   });

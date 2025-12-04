@@ -35,7 +35,7 @@ const SELLER_ONLY_ITEMS = [
 ];
 
 const getSettingsSections = (t, lang, viewMode) => {
-  const languageNames = { ru: 'Русский', en: 'English' };
+  const languageNames = { ru: 'Russian', en: 'English' };
 
   const allSections = [
     {
@@ -216,7 +216,7 @@ const getSettingsSections = (t, lang, viewMode) => {
               />
             </svg>
           ),
-          value: languageNames[lang] || 'Русский',
+          value: languageNames[lang] || 'Russian',
         },
         {
           id: 'switch-mode',

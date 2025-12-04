@@ -4,10 +4,10 @@ import { useTelegram } from '../../hooks/useTelegram';
 /**
  * PageHeader component
  *
- * @param {string} title - Заголовок страницы
- * @param {Function} onBack - Callback для кнопки назад (совместно с useBackButton)
- * @param {ReactNode} action - Опциональный элемент для правой стороны header
- * @param {'back'|'close'} variant - Тип кнопки: 'back' (стрелка назад) или 'close' (крестик)
+ * @param {string} title - Page title
+ * @param {Function} onBack - Callback for back button (used with useBackButton)
+ * @param {ReactNode} action - Optional element for right side of header
+ * @param {'back'|'close'} variant - Button type: 'back' (back arrow) or 'close' (x icon)
  */
 export default function PageHeader({ title, onBack, action, variant = 'back' }) {
   const { triggerHaptic } = useTelegram();
@@ -25,7 +25,7 @@ export default function PageHeader({ title, onBack, action, variant = 'back' }) 
       }}
     >
       <div className="flex items-center justify-between px-4" style={{ height: '56px' }}>
-        {/* Back/Close Button (только если передан onBack) */}
+        {/* Back/Close Button (only if onBack is provided) */}
         {onBack ? (
           <motion.button
             onClick={handleBack}

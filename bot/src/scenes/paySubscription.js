@@ -16,10 +16,9 @@ import { subscriptionApi, shopApi } from '../utils/api.js';
 import logger from '../utils/logger.js';
 import * as smartMessage from '../utils/smartMessage.js';
 import { reply as cleanReply, replyHTML as cleanReplyHTML } from '../utils/cleanReply.js';
-import { messages, buttons as buttonText } from '../texts/messages.js';
+import { getMessages } from '../texts/messages.js';
 import { showSellerMainMenu } from '../utils/sellerNavigation.js';
-
-const { general: generalMessages, subscription: subMessages } = messages;
+import { t } from '../i18n/index.js';
 
 // CrystalPay payment methods
 const PAYMENT_METHODS = {
@@ -38,6 +37,9 @@ const paySubscriptionScene = new Scenes.WizardScene(
   // Step 1: Show pricing and tier selection
   async (ctx) => {
     try {
+      const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+      const { general: generalMessages, subscription: subMessages } = getMessages(lang);
+
       // Check if tier was passed on scene entry (from chooseTier scene)
       const enteredWithTier = ctx.scene.state?.tier;
       const createShopAfter = ctx.scene.state?.createShopAfter;
@@ -52,7 +54,7 @@ const paySubscriptionScene = new Scenes.WizardScene(
             sceneState: ctx.scene.state,
           });
 
-          await cleanReply(ctx, '❌ Ошибка: не удалось создать подписку. Попробуйте снова.');
+          await cleanReply(ctx, t('subscription.invoiceError', {}, lang));
           return ctx.scene.leave();
         }
 
@@ -66,17 +68,16 @@ const paySubscriptionScene = new Scenes.WizardScene(
         ctx.wizard.state.createShopAfter = createShopAfter;
 
         // Skip to crypto selection (Step 3)
-        const message = `📦 <b>Подписка:</b> ${enteredWithTier === 'max' ? 'MAX' : 'PRO'}
-
-Выберите способ оплаты:`;
+        const tierLabel = enteredWithTier === 'max' ? 'MAX' : 'PRO';
+        const message = `${t('paySubscription.subscriptionLabel', {}, lang)} <b>${tierLabel}</b>\n\n${t('paySubscription.selectPaymentMethod', {}, lang)}`;
 
         await cleanReplyHTML(
           ctx,
           message,
           Markup.inlineKeyboard([
-            [Markup.button.callback('₿ Bitcoin (BTC)', 'subscription:method:BTC')],
-            [Markup.button.callback('Ł Litecoin (LTC)', 'subscription:method:LTC')],
-            [Markup.button.callback(buttonText.cancel, 'seller:menu')],
+            [Markup.button.callback('Bitcoin (BTC)', 'subscription:method:BTC')],
+            [Markup.button.callback('Litecoin (LTC)', 'subscription:method:LTC')],
+            [Markup.button.callback(t('buttons.cancel', {}, lang), 'seller:menu')],
           ])
         );
 
@@ -99,7 +100,7 @@ const paySubscriptionScene = new Scenes.WizardScene(
       }
 
       const statusResponse = await subscriptionApi.getStatus(shopId, token);
-      const shopName = ctx.session.shopName || 'Магазин';
+      const shopName = ctx.session.shopName || ctx.t('general.shopFallbackName');
 
       const message = [
         subMessages.chooseTierIntro,
@@ -111,9 +112,9 @@ const paySubscriptionScene = new Scenes.WizardScene(
         ctx,
         message,
         Markup.inlineKeyboard([
-          [Markup.button.callback(buttonText.tierPro, 'subscription:tier:pro')],
-          [Markup.button.callback(buttonText.tierMax, 'subscription:tier:max')],
-          [Markup.button.callback(buttonText.cancel, 'seller:menu')],
+          [Markup.button.callback(t('buttons.tierPro', {}, lang), 'subscription:tier:pro')],
+          [Markup.button.callback(t('buttons.tierMax', {}, lang), 'subscription:tier:max')],
+          [Markup.button.callback(t('buttons.cancel', {}, lang), 'seller:menu')],
         ])
       );
 
@@ -131,11 +132,12 @@ const paySubscriptionScene = new Scenes.WizardScene(
     } catch (error) {
       logger.error('[PaySubscription] Step 1 error:', error);
 
+      const langErr = ctx.lang || ctx.session?.user?.language || 'ru';
       const errorMsg = error.response?.data?.error || error.message;
       await cleanReply(
         ctx,
-        `❌ Ошибка: ${errorMsg}`,
-        Markup.inlineKeyboard([[Markup.button.callback(buttonText.backToMenu, 'seller:menu')]])
+        ctx.t('general.errorWithReason', { reason: errorMsg }),
+        Markup.inlineKeyboard([[Markup.button.callback(t('buttons.backToMenu', {}, langErr), 'seller:menu')]])
       );
 
       return ctx.scene.leave();
@@ -144,8 +146,11 @@ const paySubscriptionScene = new Scenes.WizardScene(
 
   // Step 2: Handle tier selection and show crypto options
   async (ctx) => {
+    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const { subscription: subMessages } = getMessages(lang);
+
     if (!ctx.callbackQuery) {
-      await ctx.reply('Пожалуйста, используйте кнопки для выбора тарифа.');
+      await ctx.reply(ctx.t('subscription.selectTierPrompt'));
       return;
     }
 
@@ -178,7 +183,7 @@ const paySubscriptionScene = new Scenes.WizardScene(
     // This happens for Trial shops that have no shop_subscriptions record
     if (!ctx.wizard.state.subscriptionId) {
       try {
-        await ctx.editMessageText('⏳ Создаём подписку...', { parse_mode: 'HTML' });
+        await ctx.editMessageText(ctx.t('subscription.creating'), { parse_mode: 'HTML' });
 
         const token = ctx.session.token;
         if (!token) {
@@ -197,27 +202,23 @@ const paySubscriptionScene = new Scenes.WizardScene(
         });
       } catch (error) {
         logger.error('[PaySubscription] Failed to create pending subscription:', error);
-        await ctx.editMessageText(
-          `❌ Ошибка создания подписки: ${error.message}`,
-          {
-            parse_mode: 'HTML',
-            ...Markup.inlineKeyboard([[Markup.button.callback(buttonText.back, 'subscription:back')]]),
-          }
-        );
+        await ctx.editMessageText(ctx.t('subscription.pendingCreationError', { error: error.message }), {
+          parse_mode: 'HTML',
+          ...Markup.inlineKeyboard([[Markup.button.callback(t('buttons.back', {}, lang), 'subscription:back')]]),
+        });
         return;
       }
     }
 
-    const message = `📦 <b>Подписка:</b> ${tier === 'max' ? 'MAX' : 'PRO'}
-
-Выберите способ оплаты:`;
+    const tierLabel = tier === 'max' ? 'MAX' : 'PRO';
+    const message = `${t('paySubscription.subscriptionLabel', {}, lang)} <b>${tierLabel}</b>\n\n${t('paySubscription.selectPaymentMethod', {}, lang)}`;
 
     await ctx.editMessageText(message, {
       parse_mode: 'HTML',
       ...Markup.inlineKeyboard([
-        [Markup.button.callback('₿ Bitcoin (BTC)', 'subscription:method:BTC')],
-        [Markup.button.callback('Ł Litecoin (LTC)', 'subscription:method:LTC')],
-        [Markup.button.callback(buttonText.back, 'subscription:back')],
+        [Markup.button.callback('Bitcoin (BTC)', 'subscription:method:BTC')],
+        [Markup.button.callback('Litecoin (LTC)', 'subscription:method:LTC')],
+        [Markup.button.callback(t('buttons.back', {}, lang), 'subscription:back')],
       ]),
     });
 
@@ -226,8 +227,11 @@ const paySubscriptionScene = new Scenes.WizardScene(
 
   // Step 3: Handle payment method selection and create CrystalPay invoice
   async (ctx) => {
+    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const { general: generalMessages, subscription: subMessages } = getMessages(lang);
+
     if (!ctx.callbackQuery) {
-      await ctx.reply('Пожалуйста, используйте кнопки для выбора способа оплаты.');
+      await ctx.reply(ctx.t('subscription.selectPaymentPrompt'));
       return;
     }
 
@@ -255,7 +259,7 @@ const paySubscriptionScene = new Scenes.WizardScene(
 
     const methodKey = data.replace('subscription:method:', '');
     if (!['BTC', 'LTC'].includes(methodKey)) {
-      await ctx.answerCbQuery('Неверный метод оплаты');
+      await ctx.answerCbQuery(ctx.t('errors.invalidPaymentMethod'));
       return;
     }
 
@@ -263,7 +267,7 @@ const paySubscriptionScene = new Scenes.WizardScene(
 
     try {
       // Show loading message
-      await ctx.editMessageText('⏳ Создаём счёт на оплату...', { parse_mode: 'HTML' });
+      await ctx.editMessageText(ctx.t('subscription.creatingInvoice'), { parse_mode: 'HTML' });
 
       const { tier, subscriptionId, createShopAfter } = ctx.wizard.state;
       const token = ctx.session.token;
@@ -277,7 +281,7 @@ const paySubscriptionScene = new Scenes.WizardScene(
         await ctx.editMessageText(generalMessages.authorizationRequired, {
           parse_mode: 'HTML',
           ...Markup.inlineKeyboard([
-            [Markup.button.callback(buttonText.cancel, 'seller:menu')],
+            [Markup.button.callback(t('buttons.cancel', {}, lang), 'seller:menu')],
           ]),
         });
         return;
@@ -305,22 +309,23 @@ const paySubscriptionScene = new Scenes.WizardScene(
 
       // Display payment method label
       const methodLabel = PAYMENT_METHOD_LABELS[methodKey];
+      const tierLabel = tier === 'max' ? 'MAX' : 'PRO';
 
       // Prepare message
       const message = [
-        `📦 <b>Подписка:</b> ${tier === 'max' ? 'MAX' : 'PRO'}`,
-        `💳 <b>Метод:</b> ${methodLabel}`,
+        `${t('paySubscription.subscriptionLabel', {}, lang)} <b>${tierLabel}</b>`,
+        `${t('paySubscription.methodLabel', {}, lang)} ${methodLabel}`,
         '',
-        '💡 <i>Поле "Email" — вводите что угодно, нам не нужен</i>',
+        `<i>${t('paySubscription.emailHint', {}, lang)}</i>`,
         '',
-        'Нажмите кнопку для оплаты:',
+        t('paySubscription.clickToPay', {}, lang),
       ].join('\n');
 
       await ctx.editMessageText(message, {
         parse_mode: 'HTML',
         ...Markup.inlineKeyboard([
-          [Markup.button.url('💳 Оплатить', invoiceResponse.paymentUrl)],
-          [Markup.button.callback(buttonText.cancel, 'seller:menu')],
+          [Markup.button.url(t('paySubscription.payButton', {}, lang), invoiceResponse.paymentUrl)],
+          [Markup.button.callback(t('buttons.cancel', {}, lang), 'seller:menu')],
         ]),
       });
 
@@ -329,7 +334,7 @@ const paySubscriptionScene = new Scenes.WizardScene(
       logger.error('[PaySubscription] CrystalPay invoice creation error:', error);
 
       const errorData = error.response?.data;
-      let errorMessage = '❌ Не удалось создать счёт на оплату.';
+      let errorMessage = t('subscription.invoiceError', {}, lang);
 
       if (errorData?.error) {
         errorMessage += `\n\n${errorData.error}`;
@@ -338,8 +343,8 @@ const paySubscriptionScene = new Scenes.WizardScene(
       await ctx.editMessageText(errorMessage, {
         parse_mode: 'HTML',
         ...Markup.inlineKeyboard([
-          [Markup.button.callback(buttonText.back, 'subscription:back')],
-          [Markup.button.callback(buttonText.cancel, 'seller:menu')],
+          [Markup.button.callback(t('buttons.back', {}, lang), 'subscription:back')],
+          [Markup.button.callback(t('buttons.cancel', {}, lang), 'seller:menu')],
         ]),
       });
 
@@ -349,8 +354,11 @@ const paySubscriptionScene = new Scenes.WizardScene(
 
   // Step 4: Handle payment status check via CrystalPay
   async (ctx) => {
+    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const { general: generalMessages, subscription: subMessages } = getMessages(lang);
+
     if (!ctx.callbackQuery) {
-      await ctx.reply('Пожалуйста, используйте кнопки для проверки статуса оплаты.');
+      await ctx.reply(ctx.t('subscription.checkStatusPrompt'));
       return;
     }
 
@@ -368,7 +376,7 @@ const paySubscriptionScene = new Scenes.WizardScene(
     if (data === 'subscription:check_payment') {
       // Answer callback immediately, ignore timeout errors
       try {
-        await ctx.answerCbQuery('Проверяем статус оплаты...');
+        await ctx.answerCbQuery(ctx.t('subscription.checkingStatus'));
       } catch (cbError) {
         // Ignore "query is too old" or timeout errors
         if (!cbError.message?.includes('query is too old')) {
@@ -389,7 +397,7 @@ const paySubscriptionScene = new Scenes.WizardScene(
           await ctx.editMessageText(generalMessages.authorizationRequired, {
             parse_mode: 'HTML',
             ...Markup.inlineKeyboard([
-              [Markup.button.callback(buttonText.cancel, 'seller:menu')],
+              [Markup.button.callback(t('buttons.cancel', {}, lang), 'seller:menu')],
             ]),
           });
           return;
@@ -418,7 +426,7 @@ const paySubscriptionScene = new Scenes.WizardScene(
           // If new shop creation flow
           if (createShopAfter && !hasShop) {
             await ctx.editMessageText(
-              '✅ Оплата получена! Магазин оплачен.\n\n📝 Введите название для вашего магазина:',
+              `${t('paySubscription.paymentReceived', {}, lang)}\n\n${t('paySubscription.enterShopName', {}, lang)}`,
               { parse_mode: 'HTML' }
             );
 
@@ -434,9 +442,9 @@ const paySubscriptionScene = new Scenes.WizardScene(
           }
 
           // Renewal / Existing Shop Flow
-          await ctx.editMessageText('✅ Подписка успешно продлена!', {
+          await ctx.editMessageText(ctx.t('subscription.renewedSuccessfully'), {
             parse_mode: 'HTML',
-            ...Markup.inlineKeyboard([[Markup.button.callback(buttonText.mainMenu, 'seller:menu')]]),
+            ...Markup.inlineKeyboard([[Markup.button.callback(t('buttons.mainMenu', {}, lang), 'seller:menu')]]),
           });
 
           await ctx.scene.leave();
@@ -446,13 +454,13 @@ const paySubscriptionScene = new Scenes.WizardScene(
         // EXPIRED FLOW
         if (status === 'expired') {
           await ctx.editMessageText(
-            '❌ Время на оплату истекло.\n\nВыберите метод оплаты заново:',
+            `${t('paySubscription.timeExpired', {}, lang)}\n\n${t('paySubscription.selectMethodAgain', {}, lang)}`,
             {
               parse_mode: 'HTML',
               ...Markup.inlineKeyboard([
-                [Markup.button.callback('₿ Bitcoin (BTC)', 'subscription:method:BTC')],
-                [Markup.button.callback('Ł Litecoin (LTC)', 'subscription:method:LTC')],
-                [Markup.button.callback(buttonText.cancel, 'seller:menu')],
+                [Markup.button.callback('Bitcoin (BTC)', 'subscription:method:BTC')],
+                [Markup.button.callback('Litecoin (LTC)', 'subscription:method:LTC')],
+                [Markup.button.callback(t('buttons.cancel', {}, lang), 'seller:menu')],
               ]),
             }
           );
@@ -463,21 +471,22 @@ const paySubscriptionScene = new Scenes.WizardScene(
         const methodLabel = PAYMENT_METHOD_LABELS[
           Object.keys(PAYMENT_METHODS).find(k => PAYMENT_METHODS[k] === paymentMethod) || 'BTC'
         ];
+        const tierLabel = tier === 'max' ? 'MAX' : 'PRO';
 
         await ctx.editMessageText(
           [
-            `📦 <b>Подписка:</b> ${tier === 'max' ? 'MAX' : 'PRO'}`,
-            `💳 <b>Метод:</b> ${methodLabel}`,
+            `${t('paySubscription.subscriptionLabel', {}, lang)} <b>${tierLabel}</b>`,
+            `${t('paySubscription.methodLabel', {}, lang)} ${methodLabel}`,
             '',
-            '⏳ <b>Оплата пока не получена.</b>',
+            `<b>${t('paySubscription.paymentNotReceived', {}, lang)}</b>`,
             '',
-            'Нажмите кнопку для оплаты:',
+            t('paySubscription.clickToPay', {}, lang),
           ].join('\n'),
           {
             parse_mode: 'HTML',
             ...Markup.inlineKeyboard([
-              [Markup.button.url('💳 Оплатить', crystalPayUrl)],
-              [Markup.button.callback(buttonText.cancel, 'seller:menu')],
+              [Markup.button.url(t('paySubscription.payButton', {}, lang), crystalPayUrl)],
+              [Markup.button.callback(t('buttons.cancel', {}, lang), 'seller:menu')],
             ]),
           }
         );
@@ -487,11 +496,11 @@ const paySubscriptionScene = new Scenes.WizardScene(
         logger.error('[PaySubscription] Status check error:', error);
 
         await ctx.editMessageText(
-          '❌ Не удалось проверить статус оплаты. Попробуйте позже.',
+          t('subscription.paymentStatusError', {}, lang),
           {
             parse_mode: 'HTML',
             ...Markup.inlineKeyboard([
-              [Markup.button.callback(buttonText.cancel, 'seller:menu')],
+              [Markup.button.callback(t('buttons.cancel', {}, lang), 'seller:menu')],
             ]),
           }
         );
@@ -515,12 +524,46 @@ paySubscriptionScene.leave(async (ctx) => {
   }
   ctx.scene.state = {};
 
-  // Очистить __scenes из Redis сессии для предотвращения застревания
+  // Clear __scenes from Redis session to prevent stuck state
   if (ctx.session && ctx.session.__scenes) {
     delete ctx.session.__scenes;
   }
 
   logger.info('[PaySubscription] Scene left');
+});
+
+// Handle cancel button - prevents users from getting stuck in scene
+paySubscriptionScene.action('cancel_scene', async (ctx) => {
+  try {
+    await ctx.answerCbQuery();
+    logger.info('[PaySubscription] Cancelled via cancel_scene', { userId: ctx.from.id });
+    await ctx.scene.leave();
+    await showSellerMainMenu(ctx);
+  } catch (error) {
+    logger.error('Error in cancel_scene handler:', error);
+    try {
+      await ctx.scene.leave();
+    } catch (leaveError) {
+      logger.error('Failed to leave scene:', leaveError);
+    }
+  }
+});
+
+// Also handle 'cancel' action (some buttons use this)
+paySubscriptionScene.action('cancel', async (ctx) => {
+  try {
+    await ctx.answerCbQuery();
+    logger.info('[PaySubscription] Cancelled via cancel', { userId: ctx.from.id });
+    await ctx.scene.leave();
+    await showSellerMainMenu(ctx);
+  } catch (error) {
+    logger.error('Error in cancel handler:', error);
+    try {
+      await ctx.scene.leave();
+    } catch (leaveError) {
+      logger.error('Failed to leave scene:', leaveError);
+    }
+  }
 });
 
 export default paySubscriptionScene;

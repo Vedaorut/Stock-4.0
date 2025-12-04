@@ -1,4 +1,5 @@
 import logger from './logger.js';
+import { t, getLang } from '../i18n/index.js';
 
 /**
  * P1-BOT-010: Timeout for Long Operations
@@ -8,18 +9,18 @@ import logger from './logger.js';
  * Usage:
  *   await withTimeout(ctx, async () => {
  *     // long operation
- *   }, { timeout: 30000, message: 'Синхронизация товаров...' })
+ *   }, { timeout: 30000, messageKey: 'general.processing' })
  */
 
 const DEFAULT_TIMEOUT = 30000; // 30 seconds
-const DEFAULT_MESSAGE = '⏳ Пожалуйста, подождите...';
 
 /**
  * Execute operation with timeout and loading message
  */
 export const withTimeout = async (ctx, operation, options = {}) => {
   const timeout = options.timeout || DEFAULT_TIMEOUT;
-  const loadingMessage = options.message || DEFAULT_MESSAGE;
+  const lang = getLang(ctx);
+  const loadingMessage = options.message || t('general.pleaseWait', {}, lang);
 
   // Send loading message
   let loadingMsg;
@@ -58,7 +59,7 @@ export const withTimeout = async (ctx, operation, options = {}) => {
             ctx.chat.id,
             loadingMsg.message_id,
             undefined,
-            '⚠️ Операция заняла слишком много времени.\nПопробуйте позже.'
+            t('friendlyErrors.operationTimeout', {}, lang)
           );
         } catch (editError) {
           logger.debug('Could not edit timeout message:', editError.message);

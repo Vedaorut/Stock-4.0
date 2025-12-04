@@ -156,8 +156,8 @@ export default function PaymentHashModal() {
                   >
                     <div className="flex flex-col items-center gap-3">
                       <div className="w-12 h-12 border-4 border-orange-primary border-t-transparent rounded-full animate-spin" />
-                      <p className="text-white font-semibold">Проверяем транзакцию...</p>
-                      <p className="text-gray-400 text-sm">Это может занять несколько секунд</p>
+                      <p className="text-white font-semibold">Verifying transaction...</p>
+                      <p className="text-gray-400 text-sm">This may take a few seconds</p>
                     </div>
                   </motion.div>
                 )}
@@ -188,7 +188,7 @@ export default function PaymentHashModal() {
                         />
                       </svg>
                       <div className="flex-1">
-                        <p className="text-red-400 font-semibold text-sm">Ошибка проверки</p>
+                        <p className="text-red-400 font-semibold text-sm">Verification Error</p>
                         <p className="text-gray-300 text-sm mt-1">{verifyError}</p>
                         <motion.button
                           onClick={handleRetry}
@@ -199,7 +199,7 @@ export default function PaymentHashModal() {
                           }}
                           whileTap={{ scale: 0.95 }}
                         >
-                          Попробовать снова
+                          Try Again
                         </motion.button>
                       </div>
                     </div>

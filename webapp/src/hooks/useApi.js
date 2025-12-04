@@ -4,13 +4,13 @@ import { useStore } from '../store/useStore';
 import { refreshAuthToken, isTokenRefreshInitialized } from '../utils/tokenRefresh';
 import { getApiBaseUrl } from '../utils/apiBase';
 
-// Базовый URL API (можно вынести в .env)
+// Base API URL (can be moved to .env)
 const API_BASE_URL = getApiBaseUrl();
 
 /**
- * Hook для API вызовов с stable reference
- * Использует useRef pattern чтобы возвращать ОДИНАКОВЫЙ объект на каждый render
- * @returns {Object} Объект с методами API (stable reference)
+ * Hook for API calls with stable reference
+ * Uses useRef pattern to return the SAME object on every render
+ * @returns {Object} Object with API methods (stable reference)
  */
 export function useApi() {
   // Create stable API reference with useRef
@@ -99,14 +99,14 @@ export function useApi() {
                 hint: 'initData may have expired. Restart the app from Telegram.',
               });
               // Token refresh failed - return user-friendly error
-              return { data: null, error: 'Сессия истекла. Перезапустите приложение из Telegram.' };
+              return { data: null, error: 'Session expired. Please restart the app from Telegram.' };
             }
           }
 
           // Regular errors
           const apiError = err.response?.data;
           const errorMessage =
-            apiError?.error || apiError?.message || err.message || 'Произошла ошибка';
+            apiError?.error || apiError?.message || err.message || 'An error occurred';
           return { data: null, error: errorMessage };
         }
       };
@@ -114,34 +114,34 @@ export function useApi() {
     // Create request function with token getter
     const request = createRequest(getToken);
 
-    // Create stable API methods - эти функции НИКОГДА не пересоздаются
+    // Create stable API methods - these functions are NEVER recreated
     apiRef.current = {
-      // GET запрос
+      // GET request
       get: async (endpoint, config = {}) => {
         return await request('GET', endpoint, null, config);
       },
 
-      // POST запрос
+      // POST request
       post: async (endpoint, data, config = {}) => {
         return await request('POST', endpoint, data, config);
       },
 
-      // PUT запрос
+      // PUT request
       put: async (endpoint, data, config = {}) => {
         return await request('PUT', endpoint, data, config);
       },
 
-      // DELETE запрос
+      // DELETE request
       delete: async (endpoint, config = {}) => {
         return await request('DELETE', endpoint, null, config);
       },
 
-      // PATCH запрос
+      // PATCH request
       patch: async (endpoint, data, config = {}) => {
         return await request('PATCH', endpoint, data, config);
       },
 
-      // Универсальный fetchApi wrapper (для совместимости с Settings modals)
+      // Universal fetchApi wrapper (for compatibility with Settings modals)
       fetchApi: async (endpoint, options = {}) => {
         const method = options.method?.toUpperCase() || 'GET';
         const data = options.body || null;
@@ -170,7 +170,7 @@ export function useApi() {
             throw new Error(`Unsupported HTTP method: ${method}`);
         }
 
-        // Возвращаем только data (для совместимости с fetch API)
+        // Return only data (for compatibility with fetch API)
         if (result.error) {
           throw new Error(result.error);
         }
@@ -179,53 +179,53 @@ export function useApi() {
     };
   }
 
-  // Return SAME reference every time - это ключевая фича
+  // Return SAME reference every time - this is the key feature
   return apiRef.current;
 }
 
 /**
- * Hook для конкретных API endpoints
+ * Hook for specific API endpoints
  */
 export function useShopApi() {
   const api = useApi();
 
-  // Используем useRef для stable methods reference
+  // Use useRef for stable methods reference
   const methodsRef = useRef(null);
-  const combinedRef = useRef(null); // ✅ FIX: stable combined reference
+  const combinedRef = useRef(null); // FIX: stable combined reference
 
   if (!methodsRef.current) {
     methodsRef.current = {
-      // Получить список магазинов
+      // Get list of shops
       getShops: async () => {
         return await api.get('/shops');
       },
 
-      // Получить магазин по ID
+      // Get shop by ID
       getShop: async (shopId) => {
         return await api.get(`/shops/${shopId}`);
       },
 
-      // Получить товары магазина
+      // Get shop products
       getShopProducts: async (shopId) => {
         return await api.get(`/shops/${shopId}/products`);
       },
 
-      // Получить подписки пользователя
+      // Get user subscriptions
       getSubscriptions: async () => {
         return await api.get('/subscriptions');
       },
 
-      // Создать заказ
+      // Create order
       createOrder: async (orderData) => {
         return await api.post('/orders', orderData);
       },
 
-      // Подтвердить оплату (submit transaction hash)
+      // Confirm payment (submit transaction hash)
       confirmPayment: async (orderId, paymentData) => {
         return await api.post(`/orders/${orderId}/submit-payment`, paymentData);
       },
 
-      // Получить заказы пользователя
+      // Get user orders
       getMyOrders: async () => {
         return await api.get('/orders/my');
       },
@@ -241,18 +241,18 @@ export function useShopApi() {
 }
 
 /**
- * Hook для API follows
+ * Hook for follows API
  */
 export function useFollowsApi() {
   const api = useApi();
 
-  // Используем useRef для stable methods reference
+  // Use useRef for stable methods reference
   const methodsRef = useRef(null);
-  const combinedRef = useRef(null); // ✅ FIX: stable combined reference
+  const combinedRef = useRef(null); // FIX: stable combined reference
 
   if (!methodsRef.current) {
     methodsRef.current = {
-      // Детали подписки
+      // Follow details
       getDetail: async (followId, options = {}) => {
         const response = await api.get(`/follows/${followId}`, { signal: options.signal });
         // api.get returns { data, error } - check for errors
@@ -265,7 +265,7 @@ export function useFollowsApi() {
         return response;
       },
 
-      // Товары подписки
+      // Follow products
       getProducts: async (followId, options = {}) => {
         const { signal, ...params } = options;
         const queryString = new URLSearchParams(params).toString();
@@ -281,7 +281,7 @@ export function useFollowsApi() {
         return response;
       },
 
-      // Изменить наценку
+      // Update markup
       updateMarkup: async (followId, markupData) => {
         try {
           // Support both old (number) and new (object) format for backward compatibility
@@ -302,7 +302,7 @@ export function useFollowsApi() {
         }
       },
 
-      // Сменить режим
+      // Switch mode
       switchMode: async (followId, mode, markupData = null) => {
         try {
           const body = { mode };
@@ -331,7 +331,7 @@ export function useFollowsApi() {
         }
       },
 
-      // Удалить подписку
+      // Delete follow
       deleteFollow: async (followId) => {
         try {
           await api.delete(`/follows/${followId}`);
@@ -344,7 +344,7 @@ export function useFollowsApi() {
         }
       },
 
-      // Per-product markup: установить индивидуальную наценку на товар
+      // Per-product markup: set individual product markup
       updateProductMarkup: async (followId, productId, markupData) => {
         try {
           const payload = {
@@ -362,7 +362,7 @@ export function useFollowsApi() {
         }
       },
 
-      // Per-product markup: сбросить наценку товара к глобальной
+      // Per-product markup: reset product markup to global
       resetProductMarkup: async (followId, productId) => {
         try {
           const response = await api.delete(`/follows/${followId}/products/${productId}/markup`);

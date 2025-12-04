@@ -6,7 +6,7 @@ import { useTelegram } from '../../hooks/useTelegram';
 import { useBackButton } from '../../hooks/useBackButton';
 import { useTranslation } from '../../i18n/useTranslation';
 
-// Компонент карточки заказа
+// Order card component
 function OrderCard({ order }) {
   const { t } = useTranslation();
 
@@ -55,7 +55,7 @@ function OrderCard({ order }) {
               {t('orders.order')} #{order.id}
             </p>
             <p className="text-white text-sm mt-1">
-              {orderDate.toLocaleDateString('ru-RU', {
+              {orderDate.toLocaleDateString('en-US', {
                 day: 'numeric',
                 month: 'long',
                 year: 'numeric',
@@ -112,7 +112,7 @@ function OrderCard({ order }) {
   );
 }
 
-// Основной компонент модалки
+// Main modal component
 export default function OrdersModal({ isOpen, onClose }) {
   const { get } = useApi();
   const { triggerHaptic } = useTelegram();
@@ -133,7 +133,7 @@ export default function OrdersModal({ isOpen, onClose }) {
     };
   }, []);
 
-  // Используем Telegram BackButton API для закрытия модалки
+  // Use Telegram BackButton API to close modal
   const handleClose = useCallback(() => {
     onClose();
   }, [onClose]);
@@ -153,15 +153,15 @@ export default function OrdersModal({ isOpen, onClose }) {
         setError(error);
         return { status: 'error' };
       } else {
-        // Backend возвращает { success: true, data: [...orders] }
-        // useApi оборачивает в { data: response.data, error: null }
-        // ✅ FIX: Safe array extraction with validation
+        // Backend returns { success: true, data: [...orders] }
+        // useApi wraps in { data: response.data, error: null }
+        // Safe array extraction with validation
         const ordersList = Array.isArray(data?.data) ? data.data : [];
         if (!Array.isArray(ordersList)) {
           if (import.meta.env.DEV) {
             console.error('[OrdersModal] Invalid data format:', data);
           }
-          setError('Неверный формат данных заказов');
+          setError('Invalid orders data format');
           setOrders([]);
           return { status: 'error' };
         }

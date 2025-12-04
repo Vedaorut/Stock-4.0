@@ -4,10 +4,8 @@ import { shopApi, authApi } from '../utils/api.js';
 import logger from '../utils/logger.js';
 import * as smartMessage from '../utils/smartMessage.js';
 import { reply as cleanReply } from '../utils/cleanReply.js';
-import { messages } from '../texts/messages.js';
+import { getMessages } from '../texts/messages.js';
 import { t } from '../i18n/index.js';
-
-const { seller: sellerMessages, general: generalMessages, start: startMessages } = messages;
 
 /**
  * Create Shop Scene - Simplified (NO PAYMENT)
@@ -19,6 +17,8 @@ const { seller: sellerMessages, general: generalMessages, start: startMessages }
 // Step 1: Enter shop name (with payment verification for paid subscriptions)
 const enterShopName = async (ctx) => {
   try {
+    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+
     // Get state from scene entry (passed from paySubscription or chooseTier)
     const sceneState = ctx.scene.state;
     const paidSubscription = sceneState?.paidSubscription || false;
@@ -48,8 +48,7 @@ const enterShopName = async (ctx) => {
       return ctx.wizard.next();
     }
 
-    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
-    await cleanReply(ctx, t('createShop.enterName', {}, lang), cancelButton);
+    await cleanReply(ctx, t('createShop.enterName', {}, lang), cancelButton(lang));
 
     return ctx.wizard.next();
   } catch (error) {
@@ -61,11 +60,14 @@ const enterShopName = async (ctx) => {
 // Step 2: Handle shop name and create shop immediately
 const handleShopNameAndCreate = async (ctx) => {
   try {
+    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const { seller: sellerMessages } = getMessages(lang);
+
     // Get shop name from message
     if (!ctx.message || !ctx.message.text) {
       await cleanReply(
         ctx,
-        'Пожалуйста, отправьте название магазина текстом.\n\n' + sellerMessages.createShopNamePrompt
+        `${t('scenes.sendShopNameText', {}, lang)}\n\n${sellerMessages.createShopNamePrompt}`
       );
       return;
     }
@@ -87,7 +89,7 @@ const handleShopNameAndCreate = async (ctx) => {
       return;
     }
 
-    const validNamePattern = /^[0-9A-Za-zА-Яа-яЁё _-]+$/u;
+    const validNamePattern = /^[\p{L}0-9 _-]+$/u;
     if (!validNamePattern.test(shopName)) {
       await cleanReply(
         ctx,
@@ -97,13 +99,15 @@ const handleShopNameAndCreate = async (ctx) => {
     }
 
     // Create shop immediately
-    await createShop(ctx, shopName);
+    await createShop(ctx, shopName, lang);
   } catch (error) {
     logger.error('Error creating shop:', error);
+    const langErr = ctx.lang || ctx.session?.user?.language || 'ru';
+    const { seller: sellerMsgs } = getMessages(langErr);
 
     await smartMessage.send(ctx, {
-      text: sellerMessages.createShopError,
-      keyboard: successButtons,
+      text: sellerMsgs.createShopError,
+      keyboard: successButtons(langErr),
     });
 
     return await ctx.scene.leave();
@@ -111,7 +115,8 @@ const handleShopNameAndCreate = async (ctx) => {
 };
 
 // Helper function to create shop
-const createShop = async (ctx, shopName) => {
+const createShop = async (ctx, shopName, lang = ctx.lang || ctx.session?.user?.language || 'ru') => {
+  const { seller: sellerMessages, general: generalMessages } = getMessages(lang);
   let loadingMsg = null;
   try {
     // Get tier, promo, subscriptionId, and trial from wizard state
@@ -127,7 +132,7 @@ const createShop = async (ctx, shopName) => {
         wizardState: ctx.wizard.state,
       });
       // Show user-friendly message and redirect to chooseTier
-      await cleanReply(ctx, 'Сначала выберите тариф подписки.');
+      await cleanReply(ctx, t('createShop.selectTierFirst', {}, lang));
       await ctx.scene.leave();
       await ctx.scene.enter('chooseTier');
       return;
@@ -148,7 +153,7 @@ const createShop = async (ctx, shopName) => {
         session: ctx.session,
       });
 
-      await cleanReply(ctx, generalMessages.authorizationRequired, successButtons);
+      await cleanReply(ctx, generalMessages.authorizationRequired, successButtons(lang));
       return await ctx.scene.leave();
     }
 
@@ -156,7 +161,7 @@ const createShop = async (ctx, shopName) => {
 
     const payload = {
       name: shopName,
-      description: `Магазин ${shopName}`,
+      description: t('createShop.defaultDescription', { shopName }, lang),
       tier: tier,
     };
 
@@ -252,40 +257,40 @@ const createShop = async (ctx, shopName) => {
 
     switch (errorCode) {
       case 'SUBSCRIPTION_NOT_PAID':
-        userMessage = '❌ Подписка ещё не оплачена. Завершите оплату сначала.';
+        userMessage = ctx.t('createShop.subscriptionNotPaid');
         break;
       case 'SUBSCRIPTION_ALREADY_USED':
-        userMessage = '❌ Эта подписка уже привязана к другому магазину.';
+        userMessage = ctx.t('createShop.subscriptionAlreadyUsed');
         break;
       case 'SUBSCRIPTION_NOT_FOUND':
-        userMessage = '❌ Подписка не найдена. Создайте новую подписку.';
+        userMessage = ctx.t('createShop.subscriptionNotFound');
         break;
       case 'SHOP_EXISTS':
-        userMessage = '❌ У вас уже есть магазин.';
+        userMessage = ctx.t('createShop.shopExists');
         break;
       case 'SHOP_NAME_TAKEN':
-        userMessage = '❌ Это название уже занято. Выберите другое.';
+        userMessage = ctx.t('createShop.nameTaken');
         // Don't leave scene - allow user to try again
-        await cleanReply(ctx, userMessage, cancelButton);
+        await cleanReply(ctx, userMessage, cancelButton(lang));
         return;
       default:
         // Handle "Shop name already taken" by error message text (fallback)
         if (
           errorMsg.toLowerCase().includes('already taken') ||
-          errorMsg.toLowerCase().includes('уже занято') ||
+          errorMsg.toLowerCase().includes('\u0443\u0436\u0435 \u0437\u0430\u043d\u044f\u0442\u043e') ||
           errorMsg.toLowerCase().includes('already exists')
         ) {
-          await cleanReply(ctx, sellerMessages.createShopNameTaken, cancelButton);
+          await cleanReply(ctx, sellerMessages.createShopNameTaken, cancelButton(lang));
           return;
         }
 
-        userMessage = `❌ ${errorMsg || 'Не удалось создать магазин'}`;
+        userMessage = `❌ ${errorMsg || ctx.t('createShop.genericError')}`;
     }
 
     // Generic error - leave scene
     await smartMessage.send(ctx, {
       text: userMessage,
-      keyboard: successButtons,
+      keyboard: successButtons(lang),
     });
 
     return await ctx.scene.leave();
@@ -318,7 +323,7 @@ createShopScene.leave(async (ctx) => {
   }
   ctx.scene.state = {};
 
-  // Очистить __scenes из Redis сессии для предотвращения застревания
+  // Clear __scenes from Redis session to prevent stuck state
   if (ctx.session && ctx.session.__scenes) {
     delete ctx.session.__scenes;
   }
@@ -332,20 +337,46 @@ createShopScene.action('cancel_scene', async (ctx) => {
     await ctx.answerCbQuery(); // Silent
     logger.info('shop_create_cancelled', { userId: ctx.from.id });
 
+    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const { start: startMessages } = getMessages(lang);
+
     await ctx.scene.leave();
 
-    // Silent transition - edit message without "Отменено" text
-    await ctx.editMessageText(startMessages.welcome, successButtons);
+    // Silent transition - edit message without cancelled text
+    await ctx.editMessageText(startMessages.welcome, successButtons(lang));
   } catch (error) {
     logger.error('Error in cancel_scene handler:', error);
     // Local error handling - don't throw to avoid infinite spinner
     try {
+      const langErr = ctx.lang || ctx.session?.user?.language || 'ru';
+      const { general: generalMessages } = getMessages(langErr);
       await smartMessage.send(ctx, {
         text: generalMessages.actionFailed,
-        keyboard: successButtons,
+        keyboard: successButtons(langErr),
       });
     } catch (replyError) {
       logger.error('Failed to send error message:', replyError);
+    }
+  }
+});
+
+// Also handle 'cancel' action (some buttons use this)
+createShopScene.action('cancel', async (ctx) => {
+  try {
+    await ctx.answerCbQuery();
+    logger.info('shop_create_cancelled', { userId: ctx.from.id });
+
+    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const { start: startMessages } = getMessages(lang);
+
+    await ctx.scene.leave();
+    await ctx.editMessageText(startMessages.welcome, successButtons(lang));
+  } catch (error) {
+    logger.error('Error in cancel handler:', error);
+    try {
+      await ctx.scene.leave();
+    } catch (leaveError) {
+      logger.error('Failed to leave scene:', leaveError);
     }
   }
 });

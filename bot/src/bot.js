@@ -187,8 +187,8 @@ bot.catch((err, ctx) => {
     }
   }
 
-  // Принудительно очистить __scenes из Redis сессии при любой ошибке
-  // ctx.scene.leave() может не удалить __scenes при crash сценария
+  // Force clear __scenes from Redis session on any error
+  // ctx.scene.leave() may not remove __scenes on scene crash
   if (ctx.session && ctx.session.__scenes) {
     delete ctx.session.__scenes;
     logger.info('Cleared __scenes from session after error', {
@@ -214,7 +214,7 @@ export async function startBot() {
     // Set bot commands for menu
     try {
       await bot.telegram.setMyCommands([
-        { command: 'start', description: 'Главное меню' },
+        { command: 'start', description: t('general.mainMenu') },
       ]);
       logger.info('Bot commands configured');
     } catch (cmdError) {
@@ -227,7 +227,7 @@ export async function startBot() {
       await bot.telegram.setChatMenuButton({
         menu_button: {
           type: 'web_app',
-          text: 'Меню',
+          text: t('general.menu'),
           web_app: { url: webappUrl },
         },
       });

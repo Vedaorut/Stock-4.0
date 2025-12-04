@@ -40,8 +40,8 @@ export const settingsMenu = (options = {}, lang = 'ru') => {
 export const languageSelectMenu = (lang = 'ru') =>
   Markup.inlineKeyboard([
     [
-      Markup.button.callback('🇷🇺 Русский', 'settings:lang:ru'),
-      Markup.button.callback('🇬🇧 English', 'settings:lang:en'),
+      Markup.button.callback(t('settings.languageOptionRu', {}, lang), 'settings:lang:ru'),
+      Markup.button.callback(t('settings.languageOptionEn', {}, lang), 'settings:lang:en'),
     ],
     [Markup.button.callback(t('buttons.back', {}, lang), 'settings:main')],
   ]);

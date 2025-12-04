@@ -5,6 +5,7 @@
  */
 
 import logger from '../utils/logger.js';
+import { t } from '../i18n/index.js';
 
 const DEBOUNCE_MS = 300; // 300ms between actions
 
@@ -37,7 +38,8 @@ const debounceMiddleware = async (ctx, next) => {
 
     // Answer callback query with "please wait" message
     try {
-      await ctx.answerCbQuery('⏳ Подождите...');
+      const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+      await ctx.answerCbQuery(t('general.pleaseWait', {}, lang));
     } catch (error) {
       logger.debug('Failed to answer debounced query', {
         error: error.message,

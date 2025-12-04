@@ -1,5 +1,5 @@
 /**
- * Seller Tips System - умные советы и предупреждения для продавцов
+ * Seller Tips System - smart tips and warnings for sellers
  */
 import { t } from '../i18n/index.js';
 
@@ -7,47 +7,47 @@ import { t } from '../i18n/index.js';
 const TIP_KEYS = ['follow', 'resell', 'ai', 'stats', 'workers'];
 
 /**
- * Получить следующий совет (избегая последнего показанного)
+ * Get next tip (avoiding the last shown one)
  */
 function getNextTipKey(lastTipKey) {
-  // Если советов мало или lastTipKey не задан, выбираем случайный
+  // If few tips or lastTipKey not set, choose random
   if (TIP_KEYS.length <= 1 || !lastTipKey) {
     return TIP_KEYS[Math.floor(Math.random() * TIP_KEYS.length)];
   }
 
-  // Фильтруем последний показанный совет
+  // Filter out last shown tip
   const availableTips = TIP_KEYS.filter((key) => key !== lastTipKey);
 
-  // Выбираем случайный из оставшихся
+  // Choose random from remaining
   return availableTips[Math.floor(Math.random() * availableTips.length)];
 }
 
 /**
- * Получить совет/предупреждение для магазина на основе его состояния
+ * Get tip/warning for shop based on its state
  * @param {Object} ctx - Telegraf context
- * @param {Object} shopHealth - Состояние магазина { hasWallets, productsCount, tier }
- * @returns {string|null} - Текст для показа или null
+ * @param {Object} shopHealth - Shop state { hasWallets, productsCount, tier }
+ * @returns {string|null} - Text to show or null
  */
 function getTipForShop(ctx, shopHealth) {
   const lang = ctx.lang || 'ru';
 
-  // Приоритет 1: Критичные предупреждения
+  // Priority 1: Critical warnings
 
-  // Проверка кошельков
+  // Check wallets
   if (!shopHealth.hasWallets) {
     return t('warnings.noWallets', {}, lang);
   }
 
-  // Проверка товаров
+  // Check products
   if (shopHealth.productsCount === 0) {
     return t('warnings.noProducts', {}, lang);
   }
 
-  // Приоритет 2: Полезные советы (ротация)
+  // Priority 2: Useful tips (rotation)
   const lastTipKey = ctx.session.lastTipShown || null;
   const nextTipKey = getNextTipKey(lastTipKey);
 
-  // Сохраняем key показанного совета в session
+  // Save shown tip key in session
   ctx.session.lastTipShown = nextTipKey;
   ctx.session.lastTipTimestamp = Date.now();
 

@@ -1,19 +1,19 @@
 /**
- * useTelegram hook - теперь использует TelegramProvider контекст
+ * useTelegram hook - now uses TelegramProvider context
  *
- * ✅ ИСПРАВЛЕНО: Больше НЕ создаёт новый экземпляр для каждого компонента
- * ✅ Инициализация происходит 1 раз в TelegramProvider
- * ✅ Все компоненты получают стабильные ссылки из контекста
+ * FIXED: No longer creates a new instance for each component
+ * - Initialization happens once in TelegramProvider
+ * - All components get stable references from context
  *
- * Старый подход (проблема):
- * - Каждый компонент вызывал useTelegram() → создавал новый хук
- * - 10+ компонентов = 10+ инициализаций Telegram SDK
- * - Бесконечные re-renders из-за нестабильных ссылок
+ * Old approach (problem):
+ * - Each component called useTelegram() -> created new hook
+ * - 10+ components = 10+ Telegram SDK initializations
+ * - Infinite re-renders due to unstable references
  *
- * Новый подход (решение):
- * - TelegramProvider инициализирует SDK 1 раз при mount
- * - useTelegram() возвращает контекст (стабильные ссылки)
- * - Все компоненты share одно состояние
+ * New approach (solution):
+ * - TelegramProvider initializes SDK once on mount
+ * - useTelegram() returns context (stable references)
+ * - All components share one state
  */
 
 export { useTelegram } from '../providers/TelegramProvider';

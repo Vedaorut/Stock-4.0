@@ -1,5 +1,6 @@
 import { authApi } from '../utils/api.js';
 import logger from '../utils/logger.js';
+import { t, getLang } from '../i18n/index.js';
 
 /**
  * Authentication middleware
@@ -78,7 +79,8 @@ const authMiddleware = async (ctx, next) => {
 
     // Surface a clear message without mutating token/user to null
     if (ctx.reply) {
-      await ctx.reply('⚠️ Не удалось авторизоваться. Попробуйте снова через /start.');
+      const lang = getLang(ctx);
+      await ctx.reply(t('errors.authenticationFailed', {}, lang));
     }
     return;
   }

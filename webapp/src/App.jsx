@@ -40,6 +40,7 @@ function App() {
   const followDetailId = useStore((state) => state.followDetailId);
   const token = useStore((state) => state.token);
   const hasFollows = useStore((state) => state.hasFollows);
+  const isI18nReady = useStore((state) => state.isI18nReady);
   const { user, isReady, isValidating, error } = useTelegram();
   const { isConnected } = useWebSocket();
   const platform = usePlatform();
@@ -47,16 +48,18 @@ function App() {
   const { get } = useApi();
   const [followsChecked, setFollowsChecked] = useState(false);
 
-  // Инициализация i18n - используем язык из backend (синхронизирован с ботом)
+  // Initialize i18n - use language from backend (synced with bot)
   useEffect(() => {
     const loadLanguage = async () => {
-      // Приоритет: user.language из backend > Telegram SDK
+      // Priority: user.language from backend > Telegram SDK
       const backendLang = user?.language;
       await initI18n(backendLang);
       const lang = backendLang || getLanguage();
       useStore.getState().setLanguage(lang);
+      // Mark i18n as ready AFTER translations are loaded
+      useStore.getState().setI18nReady(true);
     };
-    // Ждём пока user загрузится из backend
+    // Wait for user to load from backend
     if (isReady) {
       loadLanguage();
     }
@@ -70,14 +73,14 @@ function App() {
       // Otherwise (null, undefined, 'buyer') use buyer mode
       const mode = user.selected_role === 'seller' ? 'seller' : 'buyer';
       useStore.getState().setViewMode(mode);
-      // Buyer по умолчанию видит Catalog (не пустые Subscriptions)
+      // Buyer defaults to Catalog (not empty Subscriptions)
       if (mode === 'buyer') {
         useStore.getState().setActiveTab('catalog');
       }
     }
   }, [isReady, user]);
 
-  // Инициализация Telegram WebApp
+  // Initialize Telegram WebApp
   useEffect(() => {
     if (window.Telegram?.WebApp) {
       const tg = window.Telegram.WebApp;
@@ -171,7 +174,7 @@ function App() {
   };
 
   const renderPage = () => {
-    // Если открыт детальный просмотр подписки
+    // If follow detail view is open
     if (followDetailId) {
       return <FollowDetailPage />;
     }
@@ -190,13 +193,12 @@ function App() {
     }
   };
 
-  // Show loading state during validation
-  if (isValidating || !isReady) {
+  // Show loading state during validation or i18n loading
+  if (isValidating || !isReady || !isI18nReady) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#0A0A0A]">
         <div className="text-center">
           <div className="w-12 h-12 border-4 border-[#FF6B00] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-white/60 text-sm">Authenticating...</p>
         </div>
       </div>
     );

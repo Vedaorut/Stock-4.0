@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react';
 import { useTelegram } from './useTelegram';
 
 /**
- * Hook для отслеживания видимости клавиатуры в Telegram WebApp
- * @returns {boolean} keyboardVisible - true если клавиатура показана
+ * Hook for tracking keyboard visibility in Telegram WebApp
+ * @returns {boolean} keyboardVisible - true if keyboard is shown
  */
 export function useKeyboardVisibility() {
   const { tg } = useTelegram();
@@ -13,8 +13,8 @@ export function useKeyboardVisibility() {
     if (!tg?.onEvent) return;
 
     const handleViewportChanged = (data) => {
-      // Telegram API: когда клавиатура появляется, viewport.isExpanded === false
-      // isExpanded: true - полный viewport, false - клавиатура видна
+      // Telegram API: when keyboard appears, viewport.isExpanded === false
+      // isExpanded: true - full viewport, false - keyboard is visible
       setKeyboardVisible(!data.isExpanded);
     };
 

@@ -1,4 +1,4 @@
-// MSW Handlers - собираем все API handlers в один массив
+// MSW Handlers - collect all API handlers into one array
 import { shopsHandlers } from './shops.js';
 import { productsHandlers } from './products.js';
 import { ordersHandlers } from './orders.js';
@@ -8,7 +8,7 @@ import { analyticsHandlers } from './analytics.js';
 import { subscriptionsHandlers } from './subscriptions.js';
 import { authHandlers } from './auth.js';
 
-// Экспортируем все handlers одним массивом
+// Export all handlers as single array
 export const handlers = [
   ...shopsHandlers,
   ...productsHandlers,
@@ -20,7 +20,7 @@ export const handlers = [
   ...authHandlers,
 ];
 
-// Для удобства экспортируем и по отдельности
+// For convenience, also export individually
 export {
   shopsHandlers,
   productsHandlers,

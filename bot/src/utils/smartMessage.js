@@ -47,7 +47,8 @@ function truncateText(text, maxLength = MAX_MESSAGE_LENGTH) {
   const lastNewline = truncated.lastIndexOf('\n');
   const cutPoint = lastNewline > maxLength * 0.8 ? lastNewline : truncated.length;
 
-  return truncated.slice(0, cutPoint) + '\n\n... (список сокращён)';
+  // Note: truncation suffix is language-independent as it's internal formatting
+  return truncated.slice(0, cutPoint) + '\n\n... (truncated)';
 }
 
 /**

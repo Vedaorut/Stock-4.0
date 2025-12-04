@@ -1,4 +1,4 @@
-// In-memory storage для мутаций в mock режиме
+// In-memory storage for mutations in mock mode
 let mockStorage = {
   shops: [],
   products: [],
@@ -140,7 +140,7 @@ export const resetStorage = () => {
   };
 };
 
-// ===== ЭКСПОРТ STORAGE (для прямого доступа в handlers) =====
+// ===== EXPORT STORAGE (for direct access in handlers) =====
 export const storage = {
   addShop,
   updateShop,

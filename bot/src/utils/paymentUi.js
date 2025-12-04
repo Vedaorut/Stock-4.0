@@ -1,14 +1,19 @@
 import { Markup } from 'telegraf';
-import { buttons as buttonText } from '../texts/messages.js';
+import { t } from '../i18n/index.js';
 
-const STATE_LABELS = {
-  pending: '⏳ Ожидание подтверждения сети',
-  processing: '⏳ Проверяем транзакцию…',
-  confirmed: '✅ Оплата подтверждена',
-  paid: '✅ Оплата подтверждена',
-  failed: '❌ Оплата не подтверждена',
-  expired: '⏳ Счёт истёк',
-};
+/**
+ * Get payment state labels for a language
+ * @param {string} lang - Language code
+ * @returns {Object} State labels map
+ */
+const getStateLabels = (lang = 'ru') => ({
+  pending: t('paymentUi.pending', {}, lang),
+  processing: t('paymentUi.processing', {}, lang),
+  confirmed: t('paymentUi.confirmed', {}, lang),
+  paid: t('paymentUi.confirmed', {}, lang),
+  failed: t('paymentUi.failed', {}, lang),
+  expired: t('paymentUi.expired', {}, lang),
+});
 
 export function normalizePaymentState(result, fallback = 'pending') {
   if (!result) return fallback;
@@ -18,37 +23,38 @@ export function normalizePaymentState(result, fallback = 'pending') {
   return fallback;
 }
 
-export function paymentStateMessage(state, extra = {}) {
-  const label = STATE_LABELS[state] || STATE_LABELS.pending;
+export function paymentStateMessage(state, extra = {}, lang = 'ru') {
+  const stateLabels = getStateLabels(lang);
+  const label = stateLabels[state] || stateLabels.pending;
 
   switch (state) {
     case 'confirmed':
     case 'paid':
-      return `${label}\n\nВсе готово!`;
+      return `${label}\n\n${t('paymentUi.allDone', {}, lang)}`;
     case 'expired':
-      return `${label}\nСгенерируйте новый инвойс и отправьте новый TX hash.`;
+      return `${label}\n${t('paymentUi.expiredHint', {}, lang)}`;
     case 'failed':
-      return `${label}\nПроверьте сумму/сеть и отправьте корректный TX hash.`;
+      return `${label}\n${t('paymentUi.failedHint', {}, lang)}`;
     default:
-      return `${label}\n${extra.hint || 'Подождите подтверждения или отправьте корректный TX hash.'}`;
+      return `${label}\n${extra.hint || t('paymentUi.pendingHint', {}, lang)}`;
   }
 }
 
-export function paymentStateKeyboard(state, { retryCb = 'payment:retry', cancelCb = 'seller:menu' } = {}) {
+export function paymentStateKeyboard(state, { retryCb = 'payment:retry', cancelCb = 'seller:menu', lang = 'ru' } = {}) {
   switch (state) {
     case 'confirmed':
     case 'paid':
-      return Markup.inlineKeyboard([[Markup.button.callback(buttonText.mainMenu, 'seller:menu')]]);
+      return Markup.inlineKeyboard([[Markup.button.callback(t('buttons.mainMenu', {}, lang), 'seller:menu')]]);
     case 'expired':
     case 'failed':
       return Markup.inlineKeyboard([
         [
-          Markup.button.callback(buttonText.retry, retryCb),
-          Markup.button.callback(buttonText.cancel, cancelCb),
+          Markup.button.callback(t('buttons.retry', {}, lang), retryCb),
+          Markup.button.callback(t('buttons.cancel', {}, lang), cancelCb),
         ],
       ]);
     default:
-      return Markup.inlineKeyboard([[Markup.button.callback(buttonText.cancel, cancelCb)]]);
+      return Markup.inlineKeyboard([[Markup.button.callback(t('buttons.cancel', {}, lang), cancelCb)]]);
   }
 }
 

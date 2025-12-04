@@ -45,6 +45,7 @@ export function detectJSONInMessage(text) {
 
 /**
  * Clean product candidate name from noise words
+ * Removes common words in Russian and English that are not part of product names
  * @param {string} raw - Raw product name candidate
  * @returns {string} Cleaned product name
  */
@@ -53,6 +54,12 @@ export function cleanProductCandidate(raw) {
     return '';
   }
 
+  // Noise words to filter out (Russian + English):
+  // для/по/на = for/by/on (prepositions)
+  // шт/штук/ед/единиц = pcs/pieces/units (quantity units)
+  // товара/товар = product/item
+  // количество = quantity
+  // наличие/остаток = stock/availability
   return raw
     .replace(/["'«»]/g, '')
     .replace(

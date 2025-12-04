@@ -4,9 +4,7 @@ import { followApi, shopApi } from '../utils/api.js';
 import logger from '../utils/logger.js';
 import * as smartMessage from '../utils/smartMessage.js';
 import { reply as _cleanReply } from '../utils/cleanReply.js';
-import { messages } from '../texts/messages.js';
-
-const { general: generalMessages, follows: followMessages } = messages;
+import { getMessages } from '../texts/messages.js';
 
 /**
  * Create Follow Scene - Multi-step wizard
@@ -22,9 +20,12 @@ const enterShopName = async (ctx) => {
   try {
     logger.info('follow_create_step:shop_name', { userId: ctx.from.id });
 
+    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const { general: generalMessages, follows: followMessages } = getMessages(lang);
+
     // Check token first
     if (!ctx.session.token) {
-      await ctx.reply(generalMessages.authorizationRequired, successButtons);
+      await ctx.reply(generalMessages.authorizationRequired, successButtons(lang));
       return ctx.scene.leave();
     }
 
@@ -34,8 +35,8 @@ const enterShopName = async (ctx) => {
       const limit = await followApi.checkFollowLimit(ctx.session.shopId, ctx.session.token);
       if (limit.reached) {
         await smartMessage.send(ctx, {
-          text: followMessages.createLimitReached(limit.count, limit.limit),
-          keyboard: successButtons,
+          text: followMessages.createLimitReached(limit.count, limit.limit, lang),
+          keyboard: successButtons(lang),
         });
         logger.warn('follow_create_limit_reached_early', {
           userId: ctx.from.id,
@@ -52,7 +53,7 @@ const enterShopName = async (ctx) => {
 
     await smartMessage.send(ctx, {
       text: followMessages.createEnterName,
-      keyboard: cancelButton,
+      keyboard: cancelButton(lang),
     });
 
     return ctx.wizard.next();
@@ -65,6 +66,9 @@ const enterShopName = async (ctx) => {
 // Step 2: Show search results
 const showSearchResults = async (ctx) => {
   try {
+    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const { general: generalMessages, follows: followMessages } = getMessages(lang);
+
     // Get shop name from message
     if (!ctx.message || !ctx.message.text) {
       await smartMessage.send(ctx, {
@@ -75,7 +79,7 @@ const showSearchResults = async (ctx) => {
 
     // Check token first
     if (!ctx.session.token) {
-      await ctx.reply(generalMessages.authorizationRequired, successButtons);
+      await ctx.reply(generalMessages.authorizationRequired, successButtons(lang));
       return ctx.scene.leave();
     }
 
@@ -91,7 +95,7 @@ const showSearchResults = async (ctx) => {
     if (query.length < 2) {
       await smartMessage.send(ctx, {
         text: followMessages.createQueryTooShort,
-        keyboard: cancelButton,
+        keyboard: cancelButton(lang),
       });
       return;
     }
@@ -108,7 +112,7 @@ const showSearchResults = async (ctx) => {
       logger.error('Error searching shops:', error);
       await smartMessage.send(ctx, {
         text: followMessages.createSearchError,
-        keyboard: successButtons,
+        keyboard: successButtons(lang),
       });
       return ctx.scene.leave();
     }
@@ -121,13 +125,13 @@ const showSearchResults = async (ctx) => {
         // Only own shop found
         await smartMessage.send(ctx, {
           text: followMessages.createOnlyOwnShop,
-          keyboard: successButtons,
+          keyboard: successButtons(lang),
         });
       } else {
         // No shops found
         await smartMessage.send(ctx, {
           text: followMessages.createNoResults,
-          keyboard: cancelButton,
+          keyboard: cancelButton(lang),
         });
       }
       return ctx.scene.leave();
@@ -140,10 +144,10 @@ const showSearchResults = async (ctx) => {
     const buttons = filteredShops.slice(0, 10).map((shop) => [
       Markup.button.callback(shop.name, `select_shop:${shop.id}`),
     ]);
-    buttons.push([Markup.button.callback('❌ Отмена', 'cancel_scene')]);
+    buttons.push([Markup.button.callback(ctx.t('buttons.cancel'), 'cancel_scene')]);
 
     await smartMessage.send(ctx, {
-      text: followMessages.createSelectShop(filteredShops.length),
+      text: followMessages.createSelectShop(filteredShops.length, lang),
       keyboard: Markup.inlineKeyboard(buttons),
     });
 
@@ -157,10 +161,13 @@ const showSearchResults = async (ctx) => {
 // Step 3: Validate shop ID and ask mode
 const selectMode = async (ctx) => {
   try {
+    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const { general: generalMessages, follows: followMessages } = getMessages(lang);
+
     // Get shop ID from callback query
     if (!ctx.callbackQuery || !ctx.callbackQuery.data) {
       await smartMessage.send(ctx, {
-        text: 'Пожалуйста, выберите магазин с помощью кнопок выше.',
+        text: ctx.t('follows.selectShopPrompt'),
       });
       return;
     }
@@ -169,7 +176,7 @@ const selectMode = async (ctx) => {
 
     // Check token first
     if (!ctx.session.token) {
-      await ctx.reply(generalMessages.authorizationRequired, successButtons);
+      await ctx.reply(generalMessages.authorizationRequired, successButtons(lang));
       return ctx.scene.leave();
     }
 
@@ -177,7 +184,7 @@ const selectMode = async (ctx) => {
     const sourceShopId = parseInt(ctx.callbackQuery.data.replace('select_shop:', ''), 10);
 
     if (Number.isNaN(sourceShopId) || sourceShopId <= 0) {
-      await ctx.editMessageText(followMessages.createIdInvalid, successButtons);
+      await ctx.editMessageText(followMessages.createIdInvalid, successButtons(lang));
       return ctx.scene.leave();
     }
 
@@ -186,16 +193,16 @@ const selectMode = async (ctx) => {
       await shopApi.getShop(sourceShopId, ctx.session.token);
     } catch (error) {
       if (error.response?.status === 404) {
-        await ctx.editMessageText(followMessages.createShopNotFound, successButtons);
+        await ctx.editMessageText(followMessages.createShopNotFound, successButtons(lang));
       } else {
         logger.error('Error checking shop existence:', error);
-        await ctx.editMessageText(followMessages.createCheckError, successButtons);
+        await ctx.editMessageText(followMessages.createCheckError, successButtons(lang));
       }
       return ctx.scene.leave();
     }
 
     if (sourceShopId === ctx.session.shopId) {
-      await ctx.editMessageText(followMessages.createSelfFollow, successButtons);
+      await ctx.editMessageText(followMessages.createSelfFollow, successButtons(lang));
       return ctx.scene.leave();
     }
 
@@ -212,7 +219,7 @@ const selectMode = async (ctx) => {
           followerShopId: ctx.session.shopId,
           sourceShopId,
         });
-        await ctx.editMessageText(followMessages.createCircularDetailed, successButtons);
+        await ctx.editMessageText(followMessages.createCircularDetailed, successButtons(lang));
         return ctx.scene.leave();
       }
     } catch (error) {
@@ -231,21 +238,21 @@ const selectMode = async (ctx) => {
     });
 
     // Get source shop name
-    let sourceShopName = 'Магазин';
+    let sourceShopName = ctx.t('formatters.followShop');
     try {
       const shopData = await shopApi.getShop(sourceShopId);
-      sourceShopName = shopData.name || 'Магазин';
+      sourceShopName = shopData.name || ctx.t('formatters.followShop');
     } catch (error) {
       logger.error('Error fetching shop name:', error);
     }
 
-    const message = followMessages.createModePromptDetailed(sourceShopName);
+    const message = followMessages.createModePromptDetailed(sourceShopName, lang);
     await ctx.editMessageText(
       message,
       Markup.inlineKeyboard([
-        [Markup.button.callback('🔍 Мониторинг', 'mode:monitor')],
-        [Markup.button.callback('💰 Перепродажа', 'mode:resell')],
-        [Markup.button.callback('❌ Отмена', 'cancel_scene')],
+        [Markup.button.callback(ctx.t('buttons.modeMonitor'), 'mode:monitor')],
+        [Markup.button.callback(ctx.t('buttons.modeResell'), 'mode:resell')],
+        [Markup.button.callback(ctx.t('buttons.cancel'), 'cancel_scene')],
       ])
     );
 
@@ -259,9 +266,12 @@ const selectMode = async (ctx) => {
 // Step 4: Handle mode selection
 const handleModeSelection = async (ctx) => {
   try {
+    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const { follows: followMessages } = getMessages(lang);
+
     if (!ctx.callbackQuery) {
       await smartMessage.send(ctx, {
-        text: 'Пожалуйста, выберите режим с помощью кнопок выше.\n\n' + followMessages.createModePrompt,
+        text: ctx.t('follows.selectModePrompt') + '\n\n' + followMessages.createModePrompt,
       });
       return;
     }
@@ -296,25 +306,25 @@ const handleModeSelection = async (ctx) => {
           sourceShopId: ctx.wizard.state.sourceShopId,
         });
 
-        await ctx.editMessageText(followMessages.createMonitorSuccess, successButtons);
+        await ctx.editMessageText(followMessages.createMonitorSuccess, successButtons(lang));
         return ctx.scene.leave();
       } catch (error) {
         logger.error('Error creating follow:', error);
 
         if (error.response?.status === 402) {
-          await ctx.editMessageText(followMessages.limitReachedBasicToPro, successButtons);
+          await ctx.editMessageText(followMessages.limitReachedBasicToPro, successButtons(lang));
         } else if (error.response?.status === 400) {
           const errorMsg = error.response?.data?.error || '';
           const errorLower = errorMsg.toLowerCase();
           if (errorLower.includes('circular')) {
-            await ctx.editMessageText(followMessages.createCircular, successButtons);
+            await ctx.editMessageText(followMessages.createCircular, successButtons(lang));
           } else if (errorLower.includes('already exists')) {
-            await ctx.editMessageText(followMessages.createExists, successButtons);
+            await ctx.editMessageText(followMessages.createExists, successButtons(lang));
           } else {
-            await ctx.editMessageText(followMessages.createError, successButtons);
+            await ctx.editMessageText(followMessages.createError, successButtons(lang));
           }
         } else {
-          await ctx.editMessageText(followMessages.createError, successButtons);
+          await ctx.editMessageText(followMessages.createError, successButtons(lang));
         }
 
         return ctx.scene.leave();
@@ -323,7 +333,7 @@ const handleModeSelection = async (ctx) => {
       // Ask for markup for resell mode
       await ctx.editMessageText(
         followMessages.markupPrompt,
-        Markup.inlineKeyboard([[Markup.button.callback('❌ Отмена', 'cancel_scene')]])
+        Markup.inlineKeyboard([[Markup.button.callback(ctx.t('buttons.cancel'), 'cancel_scene')]])
       );
       return ctx.wizard.next();
     }
@@ -336,10 +346,13 @@ const handleModeSelection = async (ctx) => {
 // Step 5: Handle markup input (only for resell mode)
 const handleMarkup = async (ctx) => {
   try {
+    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const { general: generalMessages, follows: followMessages } = getMessages(lang);
+
     if (!ctx.message || !ctx.message.text) {
       await smartMessage.send(ctx, {
-        text: 'Пожалуйста, отправьте наценку текстом (только число).\n\n' + followMessages.createResellPrompt,
-        keyboard: cancelButton,
+        text: ctx.t('follows.enterMarkupPrompt') + '\n\n' + followMessages.createResellPrompt,
+        keyboard: cancelButton(lang),
       });
       return;
     }
@@ -354,9 +367,9 @@ const handleMarkup = async (ctx) => {
     const markup = parseFloat(markupText);
 
     if (isNaN(markup) || markup < 1 || markup > 500) {
-      await smartMessage.send(ctx, { 
+      await smartMessage.send(ctx, {
         text: followMessages.createMarkupInvalid,
-        keyboard: cancelButton,
+        keyboard: cancelButton(lang),
       });
       return;
     }
@@ -374,7 +387,7 @@ const handleMarkup = async (ctx) => {
       });
       await smartMessage.send(ctx, {
         text: generalMessages.shopRequired,
-        keyboard: successButtons,
+        keyboard: successButtons(lang),
       });
       return await ctx.scene.leave();
     }
@@ -384,7 +397,7 @@ const handleMarkup = async (ctx) => {
         userId: ctx.from.id,
         session: ctx.session,
       });
-      await ctx.reply(generalMessages.authorizationRequired, successButtons);
+      await ctx.reply(generalMessages.authorizationRequired, successButtons(lang));
       return await ctx.scene.leave();
     }
 
@@ -410,8 +423,8 @@ const handleMarkup = async (ctx) => {
       });
 
       await smartMessage.send(ctx, {
-        text: `✅ Подписка создана (Resell)\n\nНаценка: +${markup}%`,
-        keyboard: successButtons,
+        text: ctx.t('follows.createResellSuccess', { markup }),
+        keyboard: successButtons(lang),
       });
       return ctx.scene.leave();
     } catch (error) {
@@ -420,7 +433,7 @@ const handleMarkup = async (ctx) => {
       if (error.response?.status === 402) {
         await smartMessage.send(ctx, {
           text: followMessages.limitReachedBasicToPro,
-          keyboard: successButtons,
+          keyboard: successButtons(lang),
         });
       } else if (error.response?.status === 400) {
         const errorMsg = error.response?.data?.error || '';
@@ -428,23 +441,23 @@ const handleMarkup = async (ctx) => {
         if (errorLower.includes('circular')) {
           await smartMessage.send(ctx, {
             text: followMessages.createCircularDetailed,
-            keyboard: successButtons,
+            keyboard: successButtons(lang),
           });
         } else if (errorLower.includes('already exists')) {
           await smartMessage.send(ctx, {
             text: followMessages.createExists,
-            keyboard: successButtons,
+            keyboard: successButtons(lang),
           });
         } else {
           await smartMessage.send(ctx, {
             text: followMessages.createError,
-            keyboard: successButtons,
+            keyboard: successButtons(lang),
           });
         }
       } else {
         await smartMessage.send(ctx, {
           text: followMessages.createError,
-          keyboard: successButtons,
+          keyboard: successButtons(lang),
         });
       }
 
@@ -452,9 +465,11 @@ const handleMarkup = async (ctx) => {
     }
   } catch (error) {
     logger.error('Error in handleMarkup step:', error);
+    const langErr = ctx.lang || ctx.session?.user?.language || 'ru';
+    const { follows: followMsgs } = getMessages(langErr);
     await smartMessage.send(ctx, {
-      text: followMessages.createError,
-      keyboard: successButtons,
+      text: followMsgs.createError,
+      keyboard: successButtons(langErr),
     });
     return ctx.scene.leave();
   }
@@ -479,7 +494,7 @@ createFollowScene.action(/^select_shop:(\d+)$/, async (ctx) => {
 createFollowScene.action(/^mode:(monitor|resell)$/, async (ctx) => {
   if (!ctx.wizard || !ctx.wizard.steps) {
     await ctx.answerCbQuery();
-    await ctx.reply('Произошла ошибка. Попробуйте снова.');
+    await ctx.reply(ctx.t('general.errorOccurred'));
     return ctx.scene.leave();
   }
   await ctx.wizard.steps[ctx.wizard.cursor](ctx);
@@ -504,7 +519,7 @@ createFollowScene.leave(async (ctx) => {
   }
   ctx.scene.state = {};
 
-  // Очистить __scenes из Redis сессии для предотвращения застревания
+  // Clear __scenes from Redis session to prevent getting stuck
   if (ctx.session && ctx.session.__scenes) {
     delete ctx.session.__scenes;
   }
@@ -515,20 +530,25 @@ createFollowScene.leave(async (ctx) => {
 // Handle cancel command
 createFollowScene.command('cancel', async (ctx) => {
   try {
+    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const { follows: followMessages } = getMessages(lang);
+
     logger.info('follow_create_cancelled', { userId: ctx.from.id });
     await ctx.scene.leave();
-    // Silent transition - show menu without "Отменено" text
+    // Silent transition - show menu without "Cancelled" text
     await smartMessage.send(ctx, {
       text: followMessages.createCancelled,
-      keyboard: successButtons,
+      keyboard: successButtons(lang),
     });
   } catch (error) {
     logger.error('Error in cancel command handler:', error);
     // Local error handling
     try {
+      const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+      const { follows: followMessages } = getMessages(lang);
       await smartMessage.send(ctx, {
         text: followMessages.cancelOperationError,
-        keyboard: successButtons,
+        keyboard: successButtons(lang),
       });
     } catch (replyError) {
       logger.error('Failed to send error message:', replyError);
@@ -549,9 +569,30 @@ createFollowScene.action('cancel_scene', async (ctx) => {
     logger.error('Error in cancel_scene handler:', error);
     // Local error handling
     try {
+      const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+      const { general: generalMessages } = getMessages(lang);
       await ctx.reply(generalMessages.actionFailed);
     } catch (replyError) {
       logger.error('Failed to send error message:', replyError);
+    }
+  }
+});
+
+// Also handle 'cancel' action (some buttons use this)
+createFollowScene.action('cancel', async (ctx) => {
+  try {
+    await ctx.answerCbQuery();
+    logger.info('follow_create_cancelled', { userId: ctx.from.id });
+    await ctx.scene.leave();
+
+    const { showSellerToolsMenu } = await import('../utils/sellerNavigation.js');
+    await showSellerToolsMenu(ctx);
+  } catch (error) {
+    logger.error('Error in cancel handler:', error);
+    try {
+      await ctx.scene.leave();
+    } catch (leaveError) {
+      logger.error('Failed to leave scene:', leaveError);
     }
   }
 });
@@ -568,6 +609,8 @@ createFollowScene.action('seller:menu', async (ctx) => {
   } catch (error) {
     logger.error('Error in seller:menu handler:', error);
     try {
+      const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+      const { general: generalMessages } = getMessages(lang);
       await ctx.reply(generalMessages.actionFailed);
     } catch (replyError) {
       logger.error('Failed to send error message:', replyError);

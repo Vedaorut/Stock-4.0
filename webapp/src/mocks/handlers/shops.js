@@ -4,7 +4,7 @@ import shopsData from '../data/shops.json';
 const BASE_URL = 'http://localhost:3000';
 
 export const shopsHandlers = [
-  // GET /api/shops - список всех магазинов
+  // GET /api/shops - list of all shops
   http.get(`${BASE_URL}/api/shops`, () => {
     return HttpResponse.json({
       success: true,
@@ -12,7 +12,7 @@ export const shopsHandlers = [
     });
   }),
 
-  // GET /api/shops/active - список активных магазинов
+  // GET /api/shops/active - list of active shops
   http.get(`${BASE_URL}/api/shops/active`, () => {
     return HttpResponse.json({
       success: true,
@@ -20,7 +20,7 @@ export const shopsHandlers = [
     });
   }),
 
-  // GET /api/shops/search - поиск магазинов
+  // GET /api/shops/search - search shops
   http.get(`${BASE_URL}/api/shops/search`, ({ request }) => {
     const url = new URL(request.url);
     const query = url.searchParams.get('q')?.toLowerCase() || '';
@@ -34,13 +34,13 @@ export const shopsHandlers = [
     return HttpResponse.json({ success: true, data: filtered });
   }),
 
-  // GET /api/shops/my - мои магазины (owner_id === 1)
+  // GET /api/shops/my - my shops (owner_id === 1)
   http.get(`${BASE_URL}/api/shops/my`, () => {
     const myShops = shopsData.filter((s) => s.owner_id === 1);
     return HttpResponse.json({ success: true, data: myShops });
   }),
 
-  // GET /api/shops/:id - один магазин
+  // GET /api/shops/:id - single shop
   http.get(`${BASE_URL}/api/shops/:id`, ({ params }) => {
     const shop = shopsData.find((s) => s.id === Number(params.id));
 
@@ -51,7 +51,7 @@ export const shopsHandlers = [
     return HttpResponse.json({ success: true, data: shop });
   }),
 
-  // POST /api/shops - создать магазин
+  // POST /api/shops - create shop
   http.post(`${BASE_URL}/api/shops`, async ({ request }) => {
     const body = await request.json();
 
@@ -73,7 +73,7 @@ export const shopsHandlers = [
     return HttpResponse.json({ success: true, data: newShop }, { status: 201 });
   }),
 
-  // PUT /api/shops/:id - обновить магазин
+  // PUT /api/shops/:id - update shop
   http.put(`${BASE_URL}/api/shops/:id`, async ({ params, request }) => {
     const body = await request.json();
     const shopIndex = shopsData.findIndex((s) => s.id === Number(params.id));
@@ -84,12 +84,12 @@ export const shopsHandlers = [
 
     const shop = shopsData[shopIndex];
 
-    // Проверка прав (только владелец)
+    // Check permissions (owner only)
     if (shop.owner_id !== 1) {
       return HttpResponse.json({ error: 'Not authorized' }, { status: 403 });
     }
 
-    // Обновляем поля
+    // Update fields
     const updatedShop = {
       ...shop,
       name: body.name !== undefined ? body.name : shop.name,
@@ -103,7 +103,7 @@ export const shopsHandlers = [
     return HttpResponse.json({ success: true, data: updatedShop });
   }),
 
-  // DELETE /api/shops/:id - удалить магазин (мягкое удаление)
+  // DELETE /api/shops/:id - delete shop (soft delete)
   http.delete(`${BASE_URL}/api/shops/:id`, ({ params }) => {
     const shopIndex = shopsData.findIndex((s) => s.id === Number(params.id));
 
@@ -113,12 +113,12 @@ export const shopsHandlers = [
 
     const shop = shopsData[shopIndex];
 
-    // Проверка прав
+    // Check permissions
     if (shop.owner_id !== 1) {
       return HttpResponse.json({ error: 'Not authorized' }, { status: 403 });
     }
 
-    // Мягкое удаление
+    // Soft delete
     shopsData[shopIndex] = {
       ...shop,
       is_active: false,
@@ -131,7 +131,7 @@ export const shopsHandlers = [
     });
   }),
 
-  // GET /api/shops/:id/wallets - кошельки магазина
+  // GET /api/shops/:id/wallets - shop wallets
   http.get(`${BASE_URL}/api/shops/:id/wallets`, ({ params }) => {
     const shop = shopsData.find((s) => s.id === Number(params.id));
 
@@ -139,12 +139,12 @@ export const shopsHandlers = [
       return HttpResponse.json({ error: 'Shop not found' }, { status: 404 });
     }
 
-    // Проверка прав
+    // Check permissions
     if (shop.owner_id !== 1) {
       return HttpResponse.json({ error: 'Not authorized' }, { status: 403 });
     }
 
-    // Временно возвращаем пустые кошельки (синхронно)
+    // Temporarily return empty wallets (synchronously)
     return HttpResponse.json({
       success: true,
       data: {
@@ -156,7 +156,7 @@ export const shopsHandlers = [
     });
   }),
 
-  // PUT /api/shops/:id/wallets - обновить кошельки
+  // PUT /api/shops/:id/wallets - update wallets
   http.put(`${BASE_URL}/api/shops/:id/wallets`, async ({ params, request }) => {
     const body = await request.json();
     const shop = shopsData.find((s) => s.id === Number(params.id));
@@ -165,12 +165,12 @@ export const shopsHandlers = [
       return HttpResponse.json({ error: 'Shop not found' }, { status: 404 });
     }
 
-    // Проверка прав
+    // Check permissions
     if (shop.owner_id !== 1) {
       return HttpResponse.json({ error: 'Not authorized' }, { status: 403 });
     }
 
-    // В реальности здесь обновление через storage
+    // In reality, this would be updated via storage
     return HttpResponse.json({
       success: true,
       data: body,

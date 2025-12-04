@@ -5,17 +5,17 @@ import logger from '../utils/logger.js';
 import { validateCryptoAddress, detectCryptoType } from '../utils/validation.js';
 import * as smartMessage from '../utils/smartMessage.js';
 import { reply as cleanReply, replyPhoto as cleanReplyPhoto } from '../utils/cleanReply.js';
-import { messages, buttons as buttonText } from '../texts/messages.js';
+import { getMessages } from '../texts/messages.js';
 import { showSellerToolsMenu } from '../utils/sellerNavigation.js';
 import { generateQRWithTimeout, getQRErrorMessage } from '../utils/qrHelper.js';
-
-const { seller: sellerMessages, general: generalMessages } = messages;
+import { t } from '../i18n/index.js';
+const LEGACY_EMPTY_ADDRESS = '\u043d\u0435 \u0443\u043a\u0430\u0437\u0430\u043d';
 
 /**
  * Manage Wallets Scene - Redesigned with logical flow
  *
- * STATE 0 (no wallets): Show "Send wallet address" + [Назад]
- * STATE 1 (has wallets): Show wallet buttons + "Send to add more" + [Назад]
+ * STATE 0 (no wallets): Show "Send wallet address" + [Back]
+ * STATE 1 (has wallets): Show wallet buttons + "Send to add more" + [Back]
  * STATE 2 (wallet detail): Show QR/Edit/Delete/Back options
  */
 
@@ -29,7 +29,7 @@ const SUPPORTED_CRYPTOS = ['BTC', 'ETH', 'USDT', 'LTC'];
  * Format wallet address for display (short version)
  */
 function formatAddress(address) {
-  if (!address || address === 'не указан') return null;
+  if (!address || address === LEGACY_EMPTY_ADDRESS) return null;
   if (address.length > 15) {
     return `${address.substring(0, 8)}...${address.substring(address.length - 6)}`;
   }
@@ -43,6 +43,9 @@ function formatAddress(address) {
 async function showQRCode(ctx, crypto) {
   try {
     await ctx.answerCbQuery();
+
+    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const { seller: sellerMessages } = getMessages(lang);
 
     // Get wallet address
     const shop = await walletApi.getWallets(ctx.session.shopId, ctx.session.token);
@@ -74,7 +77,8 @@ async function showQRCode(ctx, crypto) {
     );
 
     if (!response.success) {
-      await cleanReply(ctx, sellerMessages.walletsQrError);
+      const { seller: sellerMsgs } = getMessages(lang);
+      await cleanReply(ctx, sellerMsgs.walletsQrError);
       return;
     }
 
@@ -87,7 +91,7 @@ async function showQRCode(ctx, crypto) {
       ctx,
       { source: buffer },
       {
-        caption: `${crypto} кошелёк\n\n\`${address}\``,
+        caption: `${t('wallets.walletTitle', { crypto }, ctx.lang || 'ru')}\n\n\`${address}\``,
         parse_mode: 'Markdown',
       }
     );
@@ -100,7 +104,9 @@ async function showQRCode(ctx, crypto) {
     logger.error('Error showing QR code:', error);
 
     // Provide user-friendly error message based on error type
-    const errorMessage = getQRErrorMessage(error, sellerMessages.walletsQrError);
+    const langErr = ctx.lang || ctx.session?.user?.language || 'ru';
+    const { seller: sellerMsgs } = getMessages(langErr);
+    const errorMessage = getQRErrorMessage(error, sellerMsgs.walletsQrError);
     await cleanReply(ctx, errorMessage);
   }
 }
@@ -120,6 +126,9 @@ const showWalletsSilent = async (ctx) => {
     if (!ctx.session.shopId || !ctx.session.token) {
       return; // Silently fail
     }
+
+    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const { seller: sellerMessages } = getMessages(lang);
 
     const shop = await walletApi.getWallets(ctx.session.shopId, ctx.session.token);
 
@@ -141,7 +150,7 @@ const showWalletsSilent = async (ctx) => {
       return [Markup.button.callback(`${crypto} • ${status}`, action)];
     });
 
-    buttons.push([Markup.button.callback(buttonText.backToTools, 'seller:tools')]);
+    buttons.push([Markup.button.callback(t('buttons.backToTools', {}, lang), 'seller:tools')]);
 
     await ctx.editMessageText(message, Markup.inlineKeyboard(buttons));
   } catch (error) {
@@ -155,11 +164,14 @@ const showWallets = async (ctx) => {
   try {
     logger.info('wallet_manage_step:show', { userId: ctx.from.id });
 
+    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const { seller: sellerMessages, general: generalMessages } = getMessages(lang);
+
     // Validate session
     if (!ctx.session.shopId) {
       await smartMessage.send(ctx, {
         text: generalMessages.shopRequired,
-        keyboard: successButtons,
+        keyboard: successButtons(lang),
       });
       return await ctx.scene.leave();
     }
@@ -167,7 +179,7 @@ const showWallets = async (ctx) => {
     if (!ctx.session.token) {
       await smartMessage.send(ctx, {
         text: generalMessages.authorizationRequired,
-        keyboard: successButtons,
+        keyboard: successButtons(lang),
       });
       return await ctx.scene.leave();
     }
@@ -193,16 +205,18 @@ const showWallets = async (ctx) => {
       return [Markup.button.callback(`${crypto} • ${status}`, action)];
     });
 
-    buttons.push([Markup.button.callback(buttonText.backToTools, 'seller:tools')]);
+    buttons.push([Markup.button.callback(t('buttons.backToTools', {}, lang), 'seller:tools')]);
 
     await ctx.editMessageText(message, Markup.inlineKeyboard(buttons));
 
     return ctx.wizard.next();
   } catch (error) {
     logger.error('Error showing wallets:', error);
+    const langErr = ctx.lang || ctx.session?.user?.language || 'ru';
+    const { seller: sellerMessages } = getMessages(langErr);
     await smartMessage.send(ctx, {
       text: sellerMessages.walletsLoadError,
-      keyboard: successButtons,
+      keyboard: successButtons(langErr),
     });
     return await ctx.scene.leave();
   }
@@ -214,6 +228,9 @@ const showWallets = async (ctx) => {
 
 const handleInput = async (ctx) => {
   try {
+    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const { seller: sellerMessages } = getMessages(lang);
+
     // Handle callback query (button click)
     if (ctx.callbackQuery) {
       const action = ctx.callbackQuery.data;
@@ -232,9 +249,9 @@ const handleInput = async (ctx) => {
         if (!SUPPORTED_CRYPTOS.includes(crypto)) {
           logger.warn('Invalid crypto type in wallet:add action', { crypto, userId: ctx.from.id });
           await ctx.editMessageText(
-            'Неподдерживаемый тип кошелька.',
+            t('wallets.unsupportedType', {}, lang),
             Markup.inlineKeyboard([
-              [Markup.button.callback(buttonText.backToWallets, 'wallet:back')],
+              [Markup.button.callback(t('buttons.backToWallets', {}, lang), 'wallet:back')],
             ])
           );
           return;
@@ -243,10 +260,10 @@ const handleInput = async (ctx) => {
         ctx.wizard.state.editingWallet = crypto;
 
         await ctx.editMessageText(
-          sellerMessages.walletsAddPromptSpecific(crypto),
+          sellerMessages.walletsAddPromptSpecific(crypto, lang),
           Markup.inlineKeyboard([
-            [Markup.button.callback(buttonText.backToWallets, 'wallet:back')],
-            [Markup.button.callback(buttonText.backToTools, 'seller:tools')],
+            [Markup.button.callback(t('buttons.backToWallets', {}, lang), 'wallet:back')],
+            [Markup.button.callback(t('buttons.backToTools', {}, lang), 'seller:tools')],
           ])
         );
         return;
@@ -265,23 +282,23 @@ const handleInput = async (ctx) => {
           await ctx.editMessageText(
             sellerMessages.walletsNotFound,
             Markup.inlineKeyboard([
-              [Markup.button.callback(buttonText.backToWallets, 'wallet:back')],
-              [Markup.button.callback(buttonText.backToTools, 'seller:tools')],
+              [Markup.button.callback(t('buttons.backToWallets', {}, lang), 'wallet:back')],
+              [Markup.button.callback(t('buttons.backToTools', {}, lang), 'seller:tools')],
             ])
           );
           return;
         }
 
         // STATE 2: Wallet detail menu
-        await ctx.editMessageText(`${crypto} кошелёк.\n\nАдрес:\n\`${address}\``, {
+        await ctx.editMessageText(`${t('wallets.walletTitle', { crypto }, lang)}\n\n${t('wallets.addressLabel', {}, lang)}\n\`${address}\``, {
           parse_mode: 'Markdown',
           reply_markup: {
             inline_keyboard: [
-              [Markup.button.callback(buttonText.viewQr, `wallet:qr:${crypto}`)],
-              [Markup.button.callback(buttonText.changeWallet, `wallet:change:${crypto}`)],
-              [Markup.button.callback(buttonText.deleteWallet, `wallet:delete:${crypto}`)],
-              [Markup.button.callback(buttonText.backToWallets, 'wallet:back')],
-              [Markup.button.callback(buttonText.backToTools, 'seller:tools')],
+              [Markup.button.callback(t('buttons.viewQr', {}, lang), `wallet:qr:${crypto}`)],
+              [Markup.button.callback(t('buttons.changeWallet', {}, lang), `wallet:change:${crypto}`)],
+              [Markup.button.callback(t('buttons.deleteWallet', {}, lang), `wallet:delete:${crypto}`)],
+              [Markup.button.callback(t('buttons.backToWallets', {}, lang), 'wallet:back')],
+              [Markup.button.callback(t('buttons.backToTools', {}, lang), 'seller:tools')],
             ],
           },
         });
@@ -294,8 +311,8 @@ const handleInput = async (ctx) => {
         await ctx.editMessageText(
           sellerMessages.walletsAddPrompt,
           Markup.inlineKeyboard([
-            [Markup.button.callback(buttonText.backToWallets, 'wallet:back')],
-            [Markup.button.callback(buttonText.backToTools, 'seller:tools')],
+            [Markup.button.callback(t('buttons.backToWallets', {}, lang), 'wallet:back')],
+            [Markup.button.callback(t('buttons.backToTools', {}, lang), 'seller:tools')],
           ])
         );
         return;
@@ -317,9 +334,9 @@ const handleInput = async (ctx) => {
         if (!SUPPORTED_CRYPTOS.includes(crypto)) {
           logger.warn('Invalid crypto type in wallet:change action', { crypto, userId: ctx.from.id });
           await ctx.editMessageText(
-            'Неподдерживаемый тип кошелька.',
+            t('wallets.unsupportedType', {}, lang),
             Markup.inlineKeyboard([
-              [Markup.button.callback(buttonText.backToWallets, 'wallet:back')],
+              [Markup.button.callback(t('buttons.backToWallets', {}, lang), 'wallet:back')],
             ])
           );
           return;
@@ -335,11 +352,12 @@ const handleInput = async (ctx) => {
           LTC: 'LfzDoLYCJD4gYckYDqnNV1RWdY21VyPDqy',
         };
 
+        const placeholder = t('wallets.addressPlaceholder', {}, lang);
         await ctx.editMessageText(
-          sellerMessages.walletsPromptReplace(crypto, examples[crypto] || 'адрес кошелька'),
+          sellerMessages.walletsPromptReplace(crypto, examples[crypto] || placeholder, lang),
           Markup.inlineKeyboard([
-            [Markup.button.callback(buttonText.backToWallets, 'wallet:back')],
-            [Markup.button.callback(buttonText.backToTools, 'seller:tools')],
+            [Markup.button.callback(t('buttons.backToWallets', {}, lang), 'wallet:back')],
+            [Markup.button.callback(t('buttons.backToTools', {}, lang), 'seller:tools')],
           ])
         );
         return;
@@ -351,11 +369,11 @@ const handleInput = async (ctx) => {
         await ctx.answerCbQuery();
 
         await ctx.editMessageText(
-          sellerMessages.walletsDeleteConfirm(crypto),
+          sellerMessages.walletsDeleteConfirm(crypto, lang),
           Markup.inlineKeyboard([
-            [Markup.button.callback(buttonText.delete, `wallet:delete_confirm:${crypto}`)],
-            [Markup.button.callback(buttonText.backToWallets, 'wallet:back')],
-            [Markup.button.callback(buttonText.backToTools, 'seller:tools')],
+            [Markup.button.callback(t('buttons.delete', {}, lang), `wallet:delete_confirm:${crypto}`)],
+            [Markup.button.callback(t('buttons.backToWallets', {}, lang), 'wallet:back')],
+            [Markup.button.callback(t('buttons.backToTools', {}, lang), 'seller:tools')],
           ])
         );
         return;
@@ -380,10 +398,10 @@ const handleInput = async (ctx) => {
         });
 
         await ctx.editMessageText(
-          sellerMessages.walletsDeleted(crypto),
+          sellerMessages.walletsDeleted(crypto, lang),
           Markup.inlineKeyboard([
-            [Markup.button.callback(buttonText.backToWallets, 'wallet:back')],
-            [Markup.button.callback('↩️ В меню', 'seller:menu')],
+            [Markup.button.callback(t('buttons.backToWallets', {}, lang), 'wallet:back')],
+            [Markup.button.callback(t('buttons.backToMenu', {}, lang), 'seller:menu')],
           ])
         );
 
@@ -439,8 +457,8 @@ const handleInput = async (ctx) => {
           ctx,
           `${sellerMessages.walletsUnknownAddress}\n${sellerMessages.walletsUseButtons}`,
           Markup.inlineKeyboard([
-            [Markup.button.callback(buttonText.backToWallets, 'wallet:back')],
-            [Markup.button.callback(buttonText.backToTools, 'seller:tools')],
+            [Markup.button.callback(t('buttons.backToWallets', {}, lang), 'wallet:back')],
+            [Markup.button.callback(t('buttons.backToTools', {}, lang), 'seller:tools')],
           ])
         );
         return;
@@ -453,10 +471,10 @@ const handleInput = async (ctx) => {
         await deleteUserInput();
         await cleanReply(
           ctx,
-          sellerMessages.walletsInvalidAddress(detectedType),
+          sellerMessages.walletsInvalidAddress(detectedType, lang),
           Markup.inlineKeyboard([
-            [Markup.button.callback(buttonText.backToWallets, 'wallet:back')],
-            [Markup.button.callback(buttonText.backToTools, 'seller:tools')],
+            [Markup.button.callback(t('buttons.backToWallets', {}, lang), 'wallet:back')],
+            [Markup.button.callback(t('buttons.backToTools', {}, lang), 'seller:tools')],
           ])
         );
         return;
@@ -483,8 +501,8 @@ const handleInput = async (ctx) => {
 
       const formatted = formatAddress(address) || address;
       const successMessage = ctx.wizard.state.editingWallet
-        ? sellerMessages.walletsUpdated(crypto)
-        : sellerMessages.walletsSaved(crypto);
+        ? sellerMessages.walletsUpdated(crypto, lang)
+        : sellerMessages.walletsSaved(crypto, lang);
       await smartMessage.send(ctx, {
         text: `${successMessage}
 ${formatted}`,
@@ -523,13 +541,15 @@ ${formatted}`,
 
     // No input - user sent non-text message
     await smartMessage.send(ctx, {
-      text: 'Пожалуйста, отправьте адрес кошелька текстом.\n\n' + sellerMessages.walletsUseButtons,
+      text: t('scenes.sendWalletAddress', {}, lang) + '\n\n' + sellerMessages.walletsUseButtons,
     });
   } catch (error) {
     logger.error('Error in handleInput:', error);
+    const langErr = ctx.lang || ctx.session?.user?.language || 'ru';
+    const { seller: sellerMsgs } = getMessages(langErr);
     await smartMessage.send(ctx, {
-      text: sellerMessages.walletsLoadError,
-      keyboard: successButtons,
+      text: sellerMsgs.walletsLoadError,
+      keyboard: successButtons(langErr),
     });
     return await ctx.scene.leave();
   }
@@ -552,7 +572,7 @@ manageWalletsScene.leave(async (ctx) => {
   // Clean up wizard state
   ctx.wizard.state = {};
 
-  // Очистить __scenes из Redis сессии для предотвращения застревания
+  // Clear __scenes from Redis session to prevent stuck state
   if (ctx.session && ctx.session.__scenes) {
     delete ctx.session.__scenes;
   }
@@ -574,9 +594,28 @@ manageWalletsScene.action('cancel_scene', async (ctx) => {
   } catch (error) {
     logger.error('Error in cancel_scene handler:', error);
     try {
-      await ctx.editMessageText(generalMessages.actionFailed, successButtons);
+      const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+      const { general: generalMessages } = getMessages(lang);
+      const langErr = ctx.lang || ctx.session?.user?.language || 'ru';
+      await ctx.editMessageText(generalMessages.actionFailed, successButtons(langErr));
     } catch (replyError) {
       logger.error('Failed to send error message:', replyError);
+    }
+  }
+});
+
+// Also handle 'cancel' action (some buttons use this)
+manageWalletsScene.action('cancel', async (ctx) => {
+  try {
+    await ctx.answerCbQuery();
+    logger.info('wallet_manage_cancelled', { userId: ctx.from.id });
+    await exitToTools(ctx);
+  } catch (error) {
+    logger.error('Error in cancel handler:', error);
+    try {
+      await ctx.scene.leave();
+    } catch (leaveError) {
+      logger.error('Failed to leave scene:', leaveError);
     }
   }
 });

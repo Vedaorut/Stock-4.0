@@ -13,11 +13,9 @@
 import { Scenes, Markup } from 'telegraf';
 import logger from '../utils/logger.js';
 import { reply as cleanReply, replyHTML as cleanReplyHTML } from '../utils/cleanReply.js';
-import { messages, buttons as buttonText } from '../texts/messages.js';
+import { getMessages } from '../texts/messages.js';
 import { subscriptionApi } from '../utils/api.js';
 import { t } from '../i18n/index.js';
-
-const { subscription: subMessages } = messages;
 
 const chooseTierScene = new Scenes.WizardScene(
   'chooseTier',
@@ -61,6 +59,9 @@ const chooseTierScene = new Scenes.WizardScene(
 
   // Step 2: Handle tier/promo selection
   async (ctx) => {
+    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const { subscription: subMessages } = getMessages(lang);
+
     // Handle callback queries
     if (ctx.callbackQuery) {
       const action = ctx.callbackQuery.data;
@@ -95,15 +96,15 @@ const chooseTierScene = new Scenes.WizardScene(
 
           // Get price from wizard state (fetched in step 1)
           const pricing = ctx.wizard.state.pricing || { pro: 25, max: 35 };
-          const tierPrice = `$${pricing[tier] || (tier === 'max' ? 35 : 25)}`;
+          const tierPrice = pricing[tier] || (tier === 'max' ? 35 : 25);
           const tierName = tier.toUpperCase();
-          const message = `Вы выбрали ${tierName} (${tierPrice}/мес)\n\nДля создания магазина необходимо оплатить подписку.`;
+          const message = t('chooseTier.tierSelected', { tier: tierName, price: tierPrice }, lang);
 
           await ctx.editMessageText(message, {
             parse_mode: 'HTML',
             ...Markup.inlineKeyboard([
-              [Markup.button.callback('💳 Оплатить подписку', `pay_tier:${tier}`)],
-              [Markup.button.callback(buttonText.back, 'choose_tier:back')],
+              [Markup.button.callback(t('chooseTier.paySubscriptionButton', {}, lang), `pay_tier:${tier}`)],
+              [Markup.button.callback(t('buttons.back', {}, lang), 'choose_tier:back')],
             ]),
           });
 
@@ -123,7 +124,7 @@ const chooseTierScene = new Scenes.WizardScene(
 
           try {
             // Show loading
-            await ctx.editMessageText('⏳ Создаём подписку...', { parse_mode: 'HTML' });
+            await ctx.editMessageText(t('subscription.creating', {}, lang), { parse_mode: 'HTML' });
 
             // Import API
             const { subscriptionApi } = await import('../utils/api.js');
@@ -162,12 +163,12 @@ const chooseTierScene = new Scenes.WizardScene(
 
             // Show detailed error to user
             const errorDetails = error.response?.data?.error || error.message || 'Unknown error';
-            const errorMessage = `❌ Ошибка при создании подписки:\n\n${errorDetails}\n\nПопробуйте снова.`;
+            const errorMessage = ctx.t('subscription.pendingCreationError', { error: errorDetails });
 
             await ctx.editMessageText(errorMessage, {
               parse_mode: 'HTML',
               ...Markup.inlineKeyboard([
-                [Markup.button.callback(buttonText.back, 'choose_tier:back')],
+                [Markup.button.callback(t('buttons.back', {}, lang), 'choose_tier:back')],
               ]),
             });
             return;
@@ -188,7 +189,7 @@ const chooseTierScene = new Scenes.WizardScene(
 
           await ctx.editMessageText(subMessages.promoPrompt, {
             parse_mode: 'HTML',
-            ...Markup.inlineKeyboard([[Markup.button.callback(buttonText.back, 'tier_back')]]),
+            ...Markup.inlineKeyboard([[Markup.button.callback(t('buttons.back', {}, lang), 'tier_back')]]),
           });
 
           return ctx.wizard.next();
@@ -210,6 +211,9 @@ const chooseTierScene = new Scenes.WizardScene(
 
   // Step 3: Handle promo code input
   async (ctx) => {
+    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const { subscription: subMessages } = getMessages(lang);
+
     // Handle back button
     if (ctx.callbackQuery?.data === 'tier_back') {
       await ctx.answerCbQuery();
@@ -220,7 +224,7 @@ const chooseTierScene = new Scenes.WizardScene(
 
     // Wait for text message with promo code
     if (!ctx.message?.text) {
-      await cleanReply(ctx, 'Пожалуйста, отправьте промокод текстом.\n\n' + subMessages.promoTextPrompt);
+      await cleanReply(ctx, t('scenes.sendPromoText', {}, lang) + '\n\n' + subMessages.promoTextPrompt);
       return;
     }
 
@@ -272,7 +276,7 @@ chooseTierScene.leave(async (ctx) => {
   }
   ctx.scene.state = {};
 
-  // Очистить __scenes из Redis сессии для предотвращения застревания
+  // Clear __scenes from Redis session to prevent stuck state
   if (ctx.session && ctx.session.__scenes) {
     delete ctx.session.__scenes;
   }
@@ -291,6 +295,22 @@ chooseTierScene.action('cancel_scene', async (ctx) => {
     // Don't send additional message - just leave and let handler take over
   } catch (error) {
     logger.error('Error in cancel_scene handler:', error);
+  }
+});
+
+// Also handle 'cancel' action (some buttons use this)
+chooseTierScene.action('cancel', async (ctx) => {
+  try {
+    await ctx.answerCbQuery();
+    logger.info('choose_tier_cancelled', { userId: ctx.from.id });
+    await ctx.scene.leave();
+  } catch (error) {
+    logger.error('Error in cancel handler:', error);
+    try {
+      await ctx.scene.leave();
+    } catch (leaveError) {
+      logger.error('Failed to leave scene:', leaveError);
+    }
   }
 });
 

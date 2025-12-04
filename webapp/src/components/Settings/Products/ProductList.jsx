@@ -7,7 +7,7 @@ import ProductCard from './ProductCard';
 function ProductList({ products, onEdit, onDelete, t }) {
   return (
     <div className="space-y-3">
-      <h3 className="text-sm font-semibold text-gray-400 px-2">Список товаров</h3>
+      <h3 className="text-sm font-semibold text-gray-400 px-2">Product List</h3>
       <AnimatePresence mode="popLayout">
         {products.map((product) => (
           <ProductCard

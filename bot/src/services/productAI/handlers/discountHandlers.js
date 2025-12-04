@@ -20,22 +20,22 @@ export async function handleApplyDiscount(args, shopId, token, products) {
   const { productName, percentage, duration } = args;
 
   if (!productName || !percentage) {
-    return { success: false, message: 'Не указано название товара или процент скидки' };
+    return { success: false, message: 'Product name or discount percentage not specified' };
   }
 
   if (percentage < 1 || percentage > 99) {
-    return { success: false, message: 'Скидка должна быть от 1% до 99%' };
+    return { success: false, message: 'Discount must be between 1% and 99%' };
   }
 
   try {
-    // Найти товар через fuzzy search
+    // Find product via fuzzy search
     const fuzzyMatches = fuzzySearchProducts(productName, products, 0.6);
     const matches = fuzzyMatches.map((m) => m.product);
 
     if (matches.length === 0) {
       return {
         success: false,
-        message: `Товар "${productName}" не найден. Доступные товары: ${products.map((p) => p.name).join(', ')}`,
+        message: `Product "${productName}" not found. Available products: ${products.map((p) => p.name).join(', ')}`,
       };
     }
 
@@ -58,7 +58,7 @@ export async function handleApplyDiscount(args, shopId, token, products) {
 
     const product = matches[0];
 
-    // Парсить duration в timestamp
+    // Parse duration to timestamp
     let expiresAt = null;
     if (duration) {
       const durationMs = parseDurationToMs(duration);
@@ -67,7 +67,7 @@ export async function handleApplyDiscount(args, shopId, token, products) {
       }
     }
 
-    // Применить скидку через API
+    // Apply discount via API
     const originalPrice = product.price;
     const discountedPrice = originalPrice * (1 - percentage / 100);
 
@@ -134,18 +134,18 @@ export async function handleRemoveDiscount(args, shopId, token, products) {
   const { productName } = args;
 
   if (!productName) {
-    return { success: false, message: 'Не указано название товара' };
+    return { success: false, message: 'Product name not specified' };
   }
 
   try {
-    // Найти товар через fuzzy search
+    // Find product via fuzzy search
     const fuzzyMatches = fuzzySearchProducts(productName, products, 0.6);
     const matches = fuzzyMatches.map((m) => m.product);
 
     if (matches.length === 0) {
       return {
         success: false,
-        message: `Товар "${productName}" не найден`,
+        message: `Product "${productName}" not found`,
       };
     }
 
@@ -168,7 +168,7 @@ export async function handleRemoveDiscount(args, shopId, token, products) {
 
     const product = matches[0];
 
-    // Убрать скидку
+    // Remove discount
     const updateData = {
       discountPercentage: 0,
       originalPrice: null,
@@ -369,7 +369,7 @@ export async function handleBulkUpdatePrices(args, shopId, token, products) {
   const multiplier = operation === 'decrease' ? 1 - percentage / 100 : 1 + percentage / 100;
 
   const operationSymbol = operation === 'decrease' ? '-' : '+';
-  const operationText = operation === 'decrease' ? 'Скидка' : 'Наценка';
+  const operationText = operation === 'decrease' ? 'Discount' : 'Markup';
 
   const productsToUpdate = products.filter((p) => !excludedProductIds.includes(p.id));
   if (productsToUpdate.length === 0) {

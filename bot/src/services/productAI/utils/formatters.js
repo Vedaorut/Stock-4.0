@@ -3,6 +3,8 @@
  * Functions for formatting prices, products, and durations
  */
 
+import { t } from '../../../i18n/index.js';
+
 /**
  * Format price in USD
  * @param {number} price - Price value
@@ -21,9 +23,10 @@ export function formatUsd(price) {
  * Format product line for display
  * @param {Object} product - Product object
  * @param {number|null} index - Product index (optional, for numbered lists)
+ * @param {string} lang - Language code ('ru' or 'en')
  * @returns {string} Formatted product line
  */
-export function formatProductLine(product, index = null) {
+export function formatProductLine(product, index = null, lang = 'ru') {
   const prefix = index !== null ? `${index + 1}. ` : '';
   let line = `${prefix}**${product.name}**`;
 
@@ -37,15 +40,16 @@ export function formatProductLine(product, index = null) {
     // Discount expiration date
     if (product.discount_expires_at) {
       const expiresDate = new Date(product.discount_expires_at);
-      const formatted = expiresDate.toLocaleString('ru-RU', {
+      const locale = lang === 'en' ? 'en-US' : 'ru-RU';
+      const formatted = expiresDate.toLocaleString(locale, {
         day: '2-digit',
         month: '2-digit',
         hour: '2-digit',
         minute: '2-digit',
       });
-      line += `, до ${formatted}`;
+      line += `, ${t('aiProducts.until', {}, lang)} ${formatted}`;
     } else {
-      line += `, постоянная`;
+      line += `, ${t('aiProducts.permanent', {}, lang)}`;
     }
 
     line += `)`;
@@ -53,7 +57,7 @@ export function formatProductLine(product, index = null) {
 
   // Stock quantity
   const stock = product.stock_quantity ?? product.stock ?? 0;
-  line += ` — остаток ${stock} шт`;
+  line += ` — ${t('aiProducts.remaining', {}, lang)} ${stock} ${t('aiProducts.pcs', {}, lang)}`;
 
   return line;
 }
@@ -61,30 +65,31 @@ export function formatProductLine(product, index = null) {
 /**
  * Format duration from milliseconds to human-readable string
  * @param {number} ms - Duration in milliseconds
- * @returns {string} Human-readable duration (e.g., "6 часов", "3 дня")
+ * @param {string} lang - Language code ('ru' or 'en')
+ * @returns {string} Human-readable duration (e.g., "6 hours", "3 days")
  */
-export function formatDuration(ms) {
+export function formatDuration(ms, lang = 'ru') {
   if (!ms || !Number.isFinite(ms)) {
-    return 'постоянная';
+    return t('aiProducts.permanent', {}, lang);
   }
 
   const hours = ms / (60 * 60 * 1000);
   const days = ms / (24 * 60 * 60 * 1000);
 
   if (days >= 1 && days % 1 === 0) {
-    // Days
-    if (days === 1) return '1 день';
-    if (days >= 2 && days <= 4) return `${days} дня`;
-    return `${days} дней`;
+    // Days - pluralization
+    if (days === 1) return t('aiProducts.day1', { count: 1 }, lang);
+    if (days >= 2 && days <= 4) return t('aiProducts.day24', { count: days }, lang);
+    return t('aiProducts.day5', { count: days }, lang);
   }
 
   if (hours >= 1 && hours % 1 === 0) {
-    // Hours
-    if (hours === 1) return '1 час';
-    if (hours >= 2 && hours <= 4) return `${hours} часа`;
-    return `${hours} часов`;
+    // Hours - pluralization
+    if (hours === 1) return t('aiProducts.hour1', { count: 1 }, lang);
+    if (hours >= 2 && hours <= 4) return t('aiProducts.hour24', { count: hours }, lang);
+    return t('aiProducts.hour5', { count: hours }, lang);
   }
 
   // Fallback
-  return `${Math.round(hours)} часов`;
+  return t('aiProducts.hour5', { count: Math.round(hours) }, lang);
 }

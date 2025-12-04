@@ -3,7 +3,7 @@ import { http, HttpResponse } from 'msw';
 const BASE_URL = 'http://localhost:3000';
 
 export const authHandlers = [
-  // POST /api/auth/telegram-validate - Telegram WebApp авторизация
+  // POST /api/auth/telegram-validate - Telegram WebApp authorization
   http.post(`${BASE_URL}/api/auth/telegram-validate`, async ({ request }) => {
     await request.json();
 

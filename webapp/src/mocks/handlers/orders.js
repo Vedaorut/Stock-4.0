@@ -8,7 +8,7 @@ const BASE_URL = 'http://localhost:3000';
 const TEST_USER_TELEGRAM_ID = 123456789;
 
 export const ordersHandlers = [
-  // GET /api/orders - текущие заказы пользователя (buyer по умолчанию)
+  // GET /api/orders - user orders (buyer by default)
   http.get(`${BASE_URL}/api/orders`, ({ request }) => {
     const url = new URL(request.url);
     const type = url.searchParams.get('type') || 'buyer';
@@ -17,10 +17,10 @@ export const ordersHandlers = [
     let filtered = [...ordersData];
 
     if (type === 'buyer') {
-      // Заказы как покупатель
+      // Orders as buyer
       filtered = filtered.filter((o) => o.buyer_telegram_id === TEST_USER_TELEGRAM_ID);
     } else if (type === 'seller') {
-      // Заказы как продавец - требуется импортировать shopsData
+      // Orders as seller - requires shopsData import
       if (shopId) {
         filtered = filtered.filter((o) => o.shop_id === Number(shopId));
       }
@@ -29,7 +29,7 @@ export const ordersHandlers = [
     return HttpResponse.json({ success: true, data: filtered });
   }),
 
-  // GET /api/orders/my - мои заказы (buyer или seller)
+  // GET /api/orders/my - my orders (buyer or seller)
   http.get(`${BASE_URL}/api/orders/my`, ({ request }) => {
     const url = new URL(request.url);
     const type = url.searchParams.get('type') || 'buyer';
@@ -48,7 +48,7 @@ export const ordersHandlers = [
     return HttpResponse.json({ success: true, data: filtered });
   }),
 
-  // GET /api/orders/sales - продажи (seller)
+  // GET /api/orders/sales - sales (seller)
   http.get(`${BASE_URL}/api/orders/sales`, ({ request }) => {
     const url = new URL(request.url);
     const shopId = url.searchParams.get('shop_id');
@@ -58,7 +58,7 @@ export const ordersHandlers = [
     if (shopId) {
       filtered = filtered.filter((o) => o.shop_id === Number(shopId));
     } else {
-      // Все заказы по моим магазинам
+      // All orders from my shops
       import('../data/shops.json').then((module) => {
         const myShops = module.default.filter((s) => s.owner_id === 1);
         const myShopIds = myShops.map((s) => s.id);
@@ -69,7 +69,7 @@ export const ordersHandlers = [
     return HttpResponse.json({ orders: filtered });
   }),
 
-  // GET /api/orders/active/count - количество активных заказов
+  // GET /api/orders/active/count - count of active orders
   http.get(`${BASE_URL}/api/orders/active/count`, ({ request }) => {
     const url = new URL(request.url);
     const shopId = url.searchParams.get('shop_id');
@@ -88,7 +88,7 @@ export const ordersHandlers = [
     });
   }),
 
-  // GET /api/orders/analytics - аналитика продаж
+  // GET /api/orders/analytics - sales analytics
   http.get(`${BASE_URL}/api/orders/analytics`, ({ request }) => {
     const url = new URL(request.url);
     const shopId = url.searchParams.get('shop_id');
@@ -101,7 +101,7 @@ export const ordersHandlers = [
 
     let filtered = ordersData.filter((o) => o.shop_id === Number(shopId));
 
-    // Фильтрация по датам
+    // Filter by dates
     if (from) {
       filtered = filtered.filter((o) => new Date(o.created_at) >= new Date(from));
     }
@@ -109,7 +109,7 @@ export const ordersHandlers = [
       filtered = filtered.filter((o) => new Date(o.created_at) <= new Date(to));
     }
 
-    // Расчет аналитики
+    // Calculate analytics
     const totalOrders = filtered.length;
     const deliveredOrders = filtered.filter((o) => o.status === 'delivered');
     const pendingOrders = filtered.filter((o) => o.status === 'pending').length;
@@ -132,7 +132,7 @@ export const ordersHandlers = [
     });
   }),
 
-  // GET /api/orders/:id - один заказ
+  // GET /api/orders/:id - single order
   http.get(`${BASE_URL}/api/orders/:id`, ({ params }) => {
     const order = ordersData.find((o) => o.id === Number(params.id));
 
@@ -143,7 +143,7 @@ export const ordersHandlers = [
     return HttpResponse.json({ success: true, data: order });
   }),
 
-  // POST /api/orders - создать заказ
+  // POST /api/orders - create order
   http.post(`${BASE_URL}/api/orders`, async ({ request }) => {
     const body = await request.json();
 
@@ -171,7 +171,7 @@ export const ordersHandlers = [
     return HttpResponse.json({ success: true, data: newOrder }, { status: 201 });
   }),
 
-  // PUT /api/orders/:id/status - обновить статус заказа
+  // PUT /api/orders/:id/status - update order status
   http.put(`${BASE_URL}/api/orders/:id/status`, async ({ params, request }) => {
     const body = await request.json();
     const orderIndex = ordersData.findIndex((o) => o.id === Number(params.id));
@@ -182,7 +182,7 @@ export const ordersHandlers = [
 
     const order = ordersData[orderIndex];
 
-    // Валидные статусы: pending, confirmed, shipped, delivered, cancelled
+    // Valid statuses: pending, confirmed, shipped, delivered, cancelled
     const validStatuses = ['pending', 'confirmed', 'shipped', 'delivered', 'cancelled'];
     if (!validStatuses.includes(body.status)) {
       return HttpResponse.json({ error: 'Invalid status' }, { status: 400 });
@@ -200,7 +200,7 @@ export const ordersHandlers = [
     return HttpResponse.json({ success: true, data: updatedOrder });
   }),
 
-  // POST /api/orders/bulk-status - массовое обновление статусов
+  // POST /api/orders/bulk-status - bulk status update
   http.post(`${BASE_URL}/api/orders/bulk-status`, async ({ request }) => {
     const body = await request.json();
     const orderIds = body.order_ids || [];
@@ -230,7 +230,7 @@ export const ordersHandlers = [
       success: true,
       data: {
         updated_count: updatedCount,
-        orders: [], // В mock не возвращаем детали
+        orders: [], // Not returning details in mock
       },
     });
   }),

@@ -93,8 +93,8 @@ export const validateToken = async (ctx, next) => {
     // Try to authenticate
     const regenerated = await regenerateToken(ctx);
     if (!regenerated) {
-      await ctx.answerCbQuery?.('⚠️ Необходима авторизация');
-      await ctx.reply('⚠️ Сессия истекла. Пожалуйста, нажмите /start для повторной авторизации.');
+      await ctx.answerCbQuery?.(ctx.t('errors.authRequired'));
+      await ctx.reply(ctx.t('errors.sessionExpired'));
       return; // Block further execution
     }
   }
@@ -105,8 +105,8 @@ export const validateToken = async (ctx, next) => {
 
     const regenerated = await regenerateToken(ctx);
     if (!regenerated) {
-      await ctx.answerCbQuery?.('⚠️ Необходима повторная авторизация');
-      await ctx.reply('⚠️ Сессия истекла. Пожалуйста, нажмите /start для повторной авторизации.');
+      await ctx.answerCbQuery?.(ctx.t('errors.authRequired'));
+      await ctx.reply(ctx.t('errors.sessionExpired'));
       return; // Block further execution
     }
   }

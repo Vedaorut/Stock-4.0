@@ -1,11 +1,11 @@
 /**
- * Утилиты для форматирования цен и чисел
+ * Utilities for formatting prices and numbers
  */
 
 /**
- * Экранирует специальные HTML-символы для безопасной отправки с parse_mode HTML
- * @param {string} value - Произвольная строка
- * @returns {string} Экранированная строка
+ * Escapes special HTML characters for safe sending with parse_mode HTML
+ * @param {string} value - Arbitrary string
+ * @returns {string} Escaped string
  */
 export const escapeHtml = (value = '') =>
   String(value)
@@ -16,9 +16,9 @@ export const escapeHtml = (value = '') =>
     .replace(/'/g, '&#39;');
 
 /**
- * Форматирует цену в USD
- * @param {number|string} price - Цена
- * @returns {string} Отформатированная цена с символом $ (например "$25" или "$25.50")
+ * Formats price in USD
+ * @param {number|string} price - Price
+ * @returns {string} Formatted price with $ symbol (e.g., "$25" or "$25.50")
  */
 export const formatPrice = (price) => {
   const num = parseFloat(price);
@@ -27,22 +27,22 @@ export const formatPrice = (price) => {
     return '$0';
   }
 
-  // Всегда 2 знака после запятой для USD
+  // Always 2 decimal places for USD
   const formatted = num.toFixed(2);
 
-  // Убираем .00 если це число целое
+  // Remove .00 if the number is integer
   if (formatted.endsWith('.00')) {
     return `$${parseInt(num)}`;
   }
 
-  // Убираем trailing zero если есть (25.50 → 25.5)
+  // Remove trailing zero if present (25.50 -> 25.5)
   return `$${parseFloat(formatted)}`;
 };
 
 /**
- * Форматирует цену в USD (всегда с 2 decimals)
- * @param {number|string} price - Цена
- * @returns {string} Отформатированная цена (например "$25.00" или "$25.50")
+ * Formats price in USD (always with 2 decimals)
+ * @param {number|string} price - Price
+ * @returns {string} Formatted price (e.g., "$25.00" or "$25.50")
  */
 export const formatPriceFixed = (price) => {
   const num = parseFloat(price);
@@ -55,10 +55,10 @@ export const formatPriceFixed = (price) => {
 };
 
 /**
- * Форматирует число, убирая trailing zeros
- * @param {number|string} value - Число
- * @param {number} maxDecimals - Максимум знаков после запятой
- * @returns {string} Отформатированное число
+ * Formats number, removing trailing zeros
+ * @param {number|string} value - Number
+ * @param {number} maxDecimals - Maximum decimal places
+ * @returns {string} Formatted number
  */
 export const formatNumber = (value, maxDecimals = 2) => {
   const num = parseFloat(value);
@@ -71,9 +71,9 @@ export const formatNumber = (value, maxDecimals = 2) => {
 };
 
 /**
- * Форматирует статус заказа в эмодзи
- * @param {string} status - Статус заказа
- * @returns {string} Эмодзи статуса
+ * Formats order status to emoji
+ * @param {string} status - Order status
+ * @returns {string} Status emoji
  */
 export const formatOrderStatus = (status) => {
   const statusMap = {

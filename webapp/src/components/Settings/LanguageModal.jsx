@@ -9,7 +9,7 @@ import { useApi } from '../../hooks/useApi';
 const LANGUAGES = [
   {
     id: 'ru',
-    name: 'Русский',
+    name: 'Russian',
     flag: '🇷🇺',
     enabled: true,
   },
@@ -26,7 +26,7 @@ export default function LanguageModal({ isOpen, onClose }) {
   const { t, lang, setLanguage } = useTranslation();
   const { fetchApi } = useApi();
 
-  // Используем Telegram BackButton API для закрытия модалки
+  // Use Telegram BackButton API to close the modal
   const handleClose = useCallback(() => {
     onClose();
   }, [onClose]);
@@ -41,10 +41,10 @@ export default function LanguageModal({ isOpen, onClose }) {
       return;
     }
 
-    // Применить новый язык локально
+    // Apply new language locally
     await setLanguage(languageId);
 
-    // Сохранить выбор языка на сервере
+    // Save language choice on server
     try {
       await fetchApi('/auth/language', {
         method: 'PATCH',

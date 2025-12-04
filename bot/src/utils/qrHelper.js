@@ -5,6 +5,8 @@
  * when backend API is unresponsive
  */
 
+import { t } from '../i18n/index.js';
+
 const QR_TIMEOUT = 10000; // 10 seconds
 
 /**
@@ -43,27 +45,27 @@ function isQRTimeout(error) {
  * Get user-friendly error message for QR generation error
  *
  * @param {Error} error - Error from QR generation
- * @param {string} defaultMessage - Fallback message
+ * @param {string} lang - Language code
  * @returns {string} - User-friendly error message
  */
-function getQRErrorMessage(error, defaultMessage = 'Не удалось сформировать QR-код') {
+function getQRErrorMessage(error, lang = 'ru') {
   if (isQRTimeout(error)) {
-    return 'QR код генерируется слишком долго. Попробуйте позже.';
+    return t('qrHelper.timeout', {}, lang);
   }
 
   if (error?.response?.status === 400) {
-    return 'Некорректные данные для QR кода. Проверьте адрес кошелька.';
+    return t('qrHelper.invalidData', {}, lang);
   }
 
   if (error?.response?.status === 401) {
-    return 'Вы не авторизованы. Попробуйте позже.';
+    return t('qrHelper.unauthorized', {}, lang);
   }
 
   if (error?.response?.status >= 500) {
-    return 'Сервер недоступен. Попробуйте позже.';
+    return t('qrHelper.serverUnavailable', {}, lang);
   }
 
-  return defaultMessage;
+  return t('qrHelper.defaultError', {}, lang);
 }
 
 export { generateQRWithTimeout, isQRTimeout, getQRErrorMessage, QR_TIMEOUT };

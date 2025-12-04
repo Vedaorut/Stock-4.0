@@ -14,7 +14,7 @@ import { fuzzySearchProducts } from '../../../utils/fuzzyMatch.js';
 
 /**
  * Detect stock update intent from user command
- * Fast-path for commands like "iPhone 50 штук", "остаток VPN 100"
+ * Fast-path for commands like "iPhone 50 pcs", "stock VPN 100"
  *
  * @param {string} command - User command text
  * @returns {Object|null} { productName, quantity } or null if not detected
@@ -89,7 +89,7 @@ export function detectStockUpdateIntent(command) {
 
 /**
  * Detect single product discount intent from user command
- * Fast-path for commands like "скидка 20% на iPhone", "VPN -15%"
+ * Fast-path for commands like "discount 20% on iPhone", "VPN -15%"
  *
  * @param {string} command - User command text
  * @param {Array} products - Available products array
@@ -119,7 +119,7 @@ export function detectSingleProductDiscountIntent(command, products, ctx) {
   if (percentage <= 0) {
     return {
       error: {
-        message: 'Скидка должна быть больше 0%. Укажи корректное значение.',
+        message: 'Discount must be greater than 0%. Please specify a valid value.',
       },
     };
   }
@@ -127,7 +127,7 @@ export function detectSingleProductDiscountIntent(command, products, ctx) {
   if (percentage > 100) {
     return {
       error: {
-        message: 'Скидка не может быть больше 100%. Сколько поставить?',
+        message: 'Discount cannot exceed 100%. What value should be set?',
         value: percentage,
       },
     };

@@ -27,7 +27,7 @@ function AIChatInput({ disabled, onSend }) {
         rows={1}
         value={value}
         onChange={(e) => setValue(e.target.value)}
-        placeholder="Напишите, что нужно сделать..."
+        placeholder="Describe what needs to be done..."
         className="flex-1 resize-none bg-transparent text-base text-white focus:outline-none placeholder:text-gray-400"
         disabled={disabled}
         autoFocus
@@ -69,7 +69,7 @@ function AIChatPanel({
       exit={{ x: '100%' }}
       transition={{ type: 'spring', damping: 32, stiffness: 300 }}
     >
-      <PageHeader title="AI ассистент" onBack={onClose} variant="close" />
+      <PageHeader title="AI Assistant" onBack={onClose} variant="close" />
       <div
         className="flex flex-col min-h-screen"
         style={{ paddingTop: 'calc(env(safe-area-inset-top) + 56px)' }}
@@ -100,7 +100,7 @@ function AIChatPanel({
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-primary opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-orange-primary"></span>
               </span>
-              Думаю над ответом...
+              Thinking...
             </motion.div>
           )}
 
@@ -110,14 +110,14 @@ function AIChatPanel({
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
             >
-              <p className="text-xs text-red-400">Ошибка: {aiError}</p>
+              <p className="text-xs text-red-400">Error: {aiError}</p>
               <motion.button
                 onClick={onRetry}
                 disabled={aiLoading}
                 className="w-full px-3 py-2 rounded-lg text-xs font-medium bg-red-500/20 text-red-300 hover:bg-red-500/30 disabled:opacity-50 transition-colors"
                 whileTap={!aiLoading ? { scale: 0.98 } : {}}
               >
-                {aiLoading ? 'Повторная попытка...' : 'Повторить запрос'}
+                {aiLoading ? 'Retrying...' : 'Retry'}
               </motion.button>
             </motion.div>
           )}

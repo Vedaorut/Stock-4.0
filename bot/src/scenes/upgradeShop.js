@@ -16,7 +16,7 @@ import api, { subscriptionApi, walletApi } from '../utils/api.js';
 import logger from '../utils/logger.js';
 import * as smartMessage from '../utils/smartMessage.js';
 import { reply as cleanReply, replyHTML as cleanReplyHTML } from '../utils/cleanReply.js';
-import { messages, buttons as buttonText } from '../texts/messages.js';
+import { getMessages } from '../texts/messages.js';
 import { showSellerMainMenu } from '../utils/sellerNavigation.js';
 import { generateQRWithTimeout } from '../utils/qrHelper.js';
 import {
@@ -24,12 +24,14 @@ import {
   paymentStateKeyboard,
   paymentStateMessage,
 } from '../utils/paymentUi.js';
-const { seller: sellerMessages, general: generalMessages } = messages;
+import { t } from '../i18n/index.js';
 
-// Cancel button for TX Hash input
-const cancelButtonHashInput = Markup.inlineKeyboard([
-  [Markup.button.callback(buttonText.cancel, 'seller:menu')],
-]);
+// Cancel button for TX Hash input - function to get localized button
+const getCancelButtonHashInput = (lang = 'ru') => {
+  return Markup.inlineKeyboard([
+    [Markup.button.callback(t('buttons.cancel', {}, lang), 'seller:menu')],
+  ]);
+};
 
 const CHAIN_MAPPINGS = {
   BTC: 'BTC',
@@ -44,10 +46,13 @@ const upgradeShopScene = new Scenes.WizardScene(
   // Step 1: Show current subscription and upgrade cost
   async (ctx) => {
     try {
+      const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+      const { seller: sellerMessages, general: generalMessages } = getMessages(lang);
+
       const shopId = ctx.session.shopId;
 
       if (!shopId) {
-        await smartMessage.send(ctx, { text: '❌ Магазин не найден.' });
+        await smartMessage.send(ctx, { text: ctx.t('general.shopNotFound') });
         return ctx.scene.leave();
       }
 
@@ -67,7 +72,7 @@ const upgradeShopScene = new Scenes.WizardScene(
         await cleanReply(
           ctx,
           sellerMessages.upgrade.alreadyMax,
-          Markup.inlineKeyboard([[Markup.button.callback(buttonText.backToMenu, 'seller:menu')]])
+          Markup.inlineKeyboard([[Markup.button.callback(t('buttons.backToMenu', {}, lang), 'seller:menu')]])
         );
         return ctx.scene.leave();
       }
@@ -82,8 +87,8 @@ const upgradeShopScene = new Scenes.WizardScene(
           ctx,
           sellerMessages.upgrade.notEligible,
           Markup.inlineKeyboard([
-            [Markup.button.callback(buttonText.paySubscription, 'subscription:pay')],
-            [Markup.button.callback(buttonText.backToMenu, 'seller:menu')],
+            [Markup.button.callback(t('buttons.paySubscription', {}, lang), 'subscription:pay')],
+            [Markup.button.callback(t('buttons.backToMenu', {}, lang), 'seller:menu')],
           ])
         );
         return ctx.scene.leave();
@@ -99,35 +104,35 @@ const upgradeShopScene = new Scenes.WizardScene(
         throw new Error('Upgrade cost unavailable');
       }
 
-      const message = `👑 Улучшить до MAX
+      const message = `${t('upgradeShop.upgradeToMax', {}, lang)}
 
-Сейчас: PRO
-Доплата: $${upgradeCost.toFixed(2)}
+${t('upgradeShop.currentTier', {}, lang)}
+${t('upgradeShop.upgradeCost', { cost: upgradeCost.toFixed(2) }, lang)}
 
-Получите:
-• Безлимит товаров и фолловов
-• До 5 сотрудников (Workspace)
-• Миграция канала с подписчиками
-• 365 дней аналитики`;
+${t('upgradeShop.youWillGet', {}, lang)}
+${t('upgradeShop.benefitUnlimited', {}, lang)}
+${t('upgradeShop.benefitWorkers', {}, lang)}
+${t('upgradeShop.benefitMigration', {}, lang)}
+${t('upgradeShop.benefitAnalytics', {}, lang)}`;
 
       await cleanReplyHTML(
         ctx,
         message,
         Markup.inlineKeyboard([
-          [Markup.button.callback(buttonText.confirm, 'upgrade:confirm')],
-          [Markup.button.callback(buttonText.cancel, 'seller:menu')],
+          [Markup.button.callback(t('buttons.confirm', {}, lang), 'upgrade:confirm')],
+          [Markup.button.callback(t('buttons.cancel', {}, lang), 'seller:menu')],
         ])
       );
 
       // Save data for next steps
       ctx.wizard.state.shopId = shopId;
       ctx.wizard.state.subscriptionId = currentSubscription?.id;
-      ctx.wizard.state.shopName = ctx.session.shopName || 'Магазин';
+      ctx.wizard.state.shopName = ctx.session.shopName || ctx.t('general.shopFallbackName');
       if (!ctx.wizard.state.subscriptionId) {
         await cleanReply(
           ctx,
-          sellerMessages.upgrade.error('Не найдена активная подписка для апгрейда.'),
-          Markup.inlineKeyboard([[Markup.button.callback(buttonText.backToMenu, 'seller:menu')]])
+          sellerMessages.upgrade.error(ctx.t('upgradeShop.subscriptionNotFound')),
+          Markup.inlineKeyboard([[Markup.button.callback(t('buttons.backToMenu', {}, lang), 'seller:menu')]])
         );
         return ctx.scene.leave();
       }
@@ -138,11 +143,13 @@ const upgradeShopScene = new Scenes.WizardScene(
     } catch (error) {
       logger.error('[UpgradeShop] Step 1 error:', error);
 
+      const langErr = ctx.lang || ctx.session?.user?.language || 'ru';
+      const { seller: sellerMsgs } = getMessages(langErr);
       const errorMsg = error.response?.data?.error || error.message;
       await cleanReply(
         ctx,
-        sellerMessages.upgrade.error(errorMsg),
-        Markup.inlineKeyboard([[Markup.button.callback(buttonText.backToMenu, 'seller:menu')]])
+        sellerMsgs.upgrade.error(errorMsg),
+        Markup.inlineKeyboard([[Markup.button.callback(t('buttons.backToMenu', {}, langErr), 'seller:menu')]])
       );
 
       return ctx.scene.leave();
@@ -151,8 +158,11 @@ const upgradeShopScene = new Scenes.WizardScene(
 
   // Step 2: Handle confirmation and show crypto options
   async (ctx) => {
+    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const { seller: sellerMessages, general: generalMessages } = getMessages(lang);
+
     if (!ctx.callbackQuery) {
-      await ctx.reply('Пожалуйста, используйте кнопки для подтверждения.');
+      await ctx.reply(ctx.t('general.useButtons'));
       return;
     }
 
@@ -180,12 +190,12 @@ const upgradeShopScene = new Scenes.WizardScene(
     await ctx.editMessageText(message, {
       parse_mode: 'HTML',
       ...Markup.inlineKeyboard([
-        [Markup.button.callback(buttonText.cryptoBTC, 'upgrade:crypto:BTC')],
-        [Markup.button.callback(buttonText.cryptoETH, 'upgrade:crypto:ETH')],
-        [Markup.button.callback(buttonText.cryptoUSDT, 'upgrade:crypto:USDT')],
-        [Markup.button.callback(buttonText.cryptoLTC, 'upgrade:crypto:LTC')],
-        [Markup.button.callback(buttonText.back, 'upgrade:back')],
-        [Markup.button.callback(buttonText.cancel, 'seller:menu')],
+        [Markup.button.callback(t('buttons.cryptoBTC', {}, lang), 'upgrade:crypto:BTC')],
+        [Markup.button.callback(t('buttons.cryptoETH', {}, lang), 'upgrade:crypto:ETH')],
+        [Markup.button.callback(t('buttons.cryptoUSDT', {}, lang), 'upgrade:crypto:USDT')],
+        [Markup.button.callback(t('buttons.cryptoLTC', {}, lang), 'upgrade:crypto:LTC')],
+        [Markup.button.callback(t('buttons.back', {}, lang), 'upgrade:back')],
+        [Markup.button.callback(t('buttons.cancel', {}, lang), 'seller:menu')],
       ]),
     });
 
@@ -194,8 +204,11 @@ const upgradeShopScene = new Scenes.WizardScene(
 
   // Step 3: Handle crypto selection and generate upgrade invoice
   async (ctx) => {
+    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const { seller: sellerMessages } = getMessages(lang);
+
     if (!ctx.callbackQuery) {
-      await ctx.reply('Пожалуйста, используйте кнопки для выбора криптовалюты.');
+      await ctx.reply(ctx.t('general.selectCrypto'));
       return;
     }
 
@@ -240,13 +253,14 @@ const upgradeShopScene = new Scenes.WizardScene(
         response: error.response?.data,
       });
 
-      const errorMsg = error.response?.data?.error || error.message || 'Не удалось создать инвойс';
+      const errorMsg =
+        error.response?.data?.error || error.message || ctx.t('upgradeShop.invoiceErrorDefault');
 
       await ctx.editMessageText(sellerMessages.upgrade.error(errorMsg), {
         parse_mode: 'HTML',
         ...Markup.inlineKeyboard([
-          [Markup.button.callback(buttonText.back, 'upgrade:back')],
-          [Markup.button.callback(buttonText.cancel, 'seller:menu')],
+          [Markup.button.callback(t('buttons.back', {}, lang), 'upgrade:back')],
+          [Markup.button.callback(t('buttons.cancel', {}, lang), 'seller:menu')],
         ]),
       });
 
@@ -256,10 +270,13 @@ const upgradeShopScene = new Scenes.WizardScene(
 
   // Step 4: Handle tx_hash and verify upgrade payment
   async (ctx) => {
+    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const { seller: sellerMessages } = getMessages(lang);
+
     const { subscriptionId, currency, shopId } = ctx.wizard.state;
 
     if (!subscriptionId) {
-      await smartMessage.send(ctx, { text: sellerMessages.upgrade.error('Нет подписки для апгрейда') });
+      await smartMessage.send(ctx, { text: sellerMessages.upgrade.error(ctx.t('errors.noSubscriptionToUpgrade')) });
       return ctx.scene.leave();
     }
 
@@ -295,8 +312,8 @@ const upgradeShopScene = new Scenes.WizardScene(
           });
           await cleanReplyHTML(
             ctx,
-            sellerMessages.upgrade.error('Не удалось проверить статус. Попробуйте позже.'),
-            Markup.inlineKeyboard([[Markup.button.callback(buttonText.cancel, 'seller:menu')]])
+            sellerMessages.upgrade.error(ctx.t('upgradeShop.statusCheckError')),
+            Markup.inlineKeyboard([[Markup.button.callback(t('buttons.cancel', {}, lang), 'seller:menu')]])
           );
         }
         return;
@@ -317,8 +334,8 @@ const upgradeShopScene = new Scenes.WizardScene(
           });
           await cleanReplyHTML(
             ctx,
-            sellerMessages.upgrade.error('Не удалось создать новый счёт.'),
-            Markup.inlineKeyboard([[Markup.button.callback(buttonText.cancel, 'seller:menu')]])
+            sellerMessages.upgrade.error(ctx.t('upgradeShop.invoiceRetryError')),
+            Markup.inlineKeyboard([[Markup.button.callback(t('buttons.cancel', {}, lang), 'seller:menu')]])
           );
         }
         return;
@@ -327,7 +344,7 @@ const upgradeShopScene = new Scenes.WizardScene(
       if (data === 'upgrade:paid') {
         await ctx.answerCbQuery();
         ctx.wizard.state.awaitingTxHash = true;
-        await smartMessage.send(ctx, { text: sellerMessages.upgrade.sendHashPrompt, keyboard: cancelButtonHashInput });
+        await smartMessage.send(ctx, { text: sellerMessages.upgrade.sendHashPrompt, keyboard: getCancelButtonHashInput(lang) });
         return;
       }
 
@@ -338,8 +355,8 @@ const upgradeShopScene = new Scenes.WizardScene(
     if (!ctx.message?.text) {
       if (ctx.wizard.state.awaitingTxHash) {
         await smartMessage.send(ctx, {
-          text: 'Пожалуйста, отправьте TX Hash текстом.\n\n' + sellerMessages.upgrade.sendHashPrompt,
-          keyboard: cancelButtonHashInput,
+          text: ctx.t('seller.enterTxHash') + '\n\n' + sellerMessages.upgrade.sendHashPrompt,
+          keyboard: getCancelButtonHashInput(lang),
         });
       }
       return;
@@ -394,12 +411,12 @@ const upgradeShopScene = new Scenes.WizardScene(
 
         const successText = endDateLabel
           ? sellerMessages.upgrade.success(endDateLabel)
-          : '✅ Апгрейд на MAX подтверждён.';
+          : ctx.t('upgradeShop.successNoDate');
 
         await cleanReplyHTML(
           ctx,
           `${successText}\n\n${sellerMessages.upgrade.benefits}`,
-          Markup.inlineKeyboard([[Markup.button.callback(buttonText.mainMenu, 'seller:menu')]])
+          Markup.inlineKeyboard([[Markup.button.callback(t('buttons.mainMenu', {}, lang), 'seller:menu')]])
         );
 
         await ctx.scene.leave();
@@ -455,12 +472,46 @@ const upgradeShopScene = new Scenes.WizardScene(
 upgradeShopScene.leave(async (ctx) => {
   ctx.wizard.state = {};
 
-  // Очистить __scenes из Redis сессии для предотвращения застревания
+  // Clear __scenes from Redis session to prevent stuck state
   if (ctx.session && ctx.session.__scenes) {
     delete ctx.session.__scenes;
   }
 
   logger.info('[UpgradeShop] Scene left');
+});
+
+// Handle cancel button - prevents users from getting stuck in scene
+upgradeShopScene.action('cancel_scene', async (ctx) => {
+  try {
+    await ctx.answerCbQuery();
+    logger.info('[UpgradeShop] Cancelled via cancel_scene', { userId: ctx.from.id });
+    await ctx.scene.leave();
+    await showSellerMainMenu(ctx);
+  } catch (error) {
+    logger.error('Error in cancel_scene handler:', error);
+    try {
+      await ctx.scene.leave();
+    } catch (leaveError) {
+      logger.error('Failed to leave scene:', leaveError);
+    }
+  }
+});
+
+// Also handle 'cancel' action (some buttons use this)
+upgradeShopScene.action('cancel', async (ctx) => {
+  try {
+    await ctx.answerCbQuery();
+    logger.info('[UpgradeShop] Cancelled via cancel', { userId: ctx.from.id });
+    await ctx.scene.leave();
+    await showSellerMainMenu(ctx);
+  } catch (error) {
+    logger.error('Error in cancel handler:', error);
+    try {
+      await ctx.scene.leave();
+    } catch (leaveError) {
+      logger.error('Failed to leave scene:', leaveError);
+    }
+  }
 });
 
 async function createUpgradeInvoiceAndShow(ctx, currency) {
@@ -472,7 +523,7 @@ async function createUpgradeInvoiceAndShow(ctx, currency) {
     throw new Error(`Unsupported currency: ${currency}`);
   }
 
-  await ctx.editMessageText('⏳ Генерируем счёт...', { parse_mode: 'HTML' }).catch(() => {});
+  await ctx.editMessageText(ctx.t('general.generatingInvoice'), { parse_mode: 'HTML' }).catch(() => {});
 
   const invoice = await subscriptionApi.generateUpgradeInvoice(subscriptionId, chain, token);
 
@@ -495,24 +546,26 @@ async function createUpgradeInvoiceAndShow(ctx, currency) {
     10000
   );
 
+  const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+
   if (!qrResponse || !qrResponse.success || !qrResponse.data?.qrCode) {
-    throw new Error('Не удалось сформировать QR код для оплаты');
+    throw new Error(t('seller.walletsQrError', {}, lang));
   }
 
   const base64Data = qrResponse.data.qrCode.replace(/^data:image\/png;base64,/, '');
   const qrCodeBuffer = Buffer.from(base64Data, 'base64');
 
   const expiresLabel = invoice.expiresAt
-    ? new Date(invoice.expiresAt).toLocaleString('ru-RU')
-    : '30 минут';
+    ? new Date(invoice.expiresAt).toLocaleString(lang === 'en' ? 'en-US' : 'ru-RU')
+    : t('upgradeShop.defaultExpiry', {}, lang);
 
-  const message = `👑 Апгрейд до MAX
+  const message = `${t('upgradeShop.upgradeToMax', {}, lang)}
 
-Сумма: $${upgradeCost.toFixed(2)} (~${ctx.wizard.state.cryptoAmount} ${currency})
-Адрес: ${invoice.address}
-Счёт действует до: ${expiresLabel}
+${t('upgradeShop.invoiceAmount', { cost: upgradeCost.toFixed(2), cryptoAmount: ctx.wizard.state.cryptoAmount, currency }, lang)}
+${t('upgradeShop.invoiceAddress', { address: invoice.address }, lang)}
+${t('upgradeShop.invoiceExpires', { expires: expiresLabel }, lang)}
 
-После отправки нажмите «Ввести TX Hash» или «Проверить статус».`;
+${t('upgradeShop.afterPaymentHint', {}, lang)}`;
 
   await ctx.replyWithPhoto(
     { source: qrCodeBuffer },
@@ -520,9 +573,9 @@ async function createUpgradeInvoiceAndShow(ctx, currency) {
       caption: message,
       parse_mode: 'HTML',
       ...Markup.inlineKeyboard([
-        [Markup.button.callback('🔗 Ввести TX Hash', 'upgrade:paid')],
-        [Markup.button.callback('🔄 Проверить статус', 'upgrade:status')],
-        [Markup.button.callback(buttonText.cancel, 'seller:menu')],
+        [Markup.button.callback(t('upgradeShop.enterTxHash', {}, lang), 'upgrade:paid')],
+        [Markup.button.callback(t('upgradeShop.checkStatus', {}, lang), 'upgrade:status')],
+        [Markup.button.callback(t('buttons.cancel', {}, lang), 'seller:menu')],
       ]),
     }
   );

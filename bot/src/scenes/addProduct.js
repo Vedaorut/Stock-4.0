@@ -4,9 +4,8 @@ import { productApi } from '../utils/api.js';
 import { formatPrice } from '../utils/format.js';
 import logger from '../utils/logger.js';
 import * as smartMessage from '../utils/smartMessage.js';
-import { messages } from '../texts/messages.js';
-
-const { seller: sellerMessages, general: generalMessages } = messages;
+import { getMessages } from '../texts/messages.js';
+import { t } from '../i18n/index.js';
 
 /**
  * Add Product Scene - Multi-step wizard
@@ -21,9 +20,12 @@ const enterName = async (ctx) => {
   try {
     logger.info('product_add_step:name', { userId: ctx.from.id });
 
+    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const { seller: sellerMessages } = getMessages(lang);
+
     await smartMessage.send(ctx, {
       text: sellerMessages.addProductNamePrompt,
-      keyboard: cancelButton,
+      keyboard: cancelButton(lang),
     });
 
     return ctx.wizard.next();
@@ -36,11 +38,14 @@ const enterName = async (ctx) => {
 // Step 2: Enter price
 const enterPrice = async (ctx) => {
   try {
+    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const { seller: sellerMessages } = getMessages(lang);
+
     // Get product name from message
     if (!ctx.message || !ctx.message.text) {
       await smartMessage.send(ctx, {
-        text: 'Пожалуйста, отправьте название товара текстом.\n\n' + sellerMessages.addProductNamePrompt,
-        keyboard: cancelButton,
+        text: t('scenes.sendProductName', {}, lang) + '\n\n' + sellerMessages.addProductNamePrompt,
+        keyboard: cancelButton(lang),
       });
       return;
     }
@@ -50,7 +55,7 @@ const enterPrice = async (ctx) => {
     if (productName.length < 3) {
       await smartMessage.send(ctx, {
         text: sellerMessages.addProductNamePrompt,
-        keyboard: cancelButton,
+        keyboard: cancelButton(lang),
       });
       return;
     }
@@ -70,7 +75,7 @@ const enterPrice = async (ctx) => {
 
     await smartMessage.send(ctx, {
       text: sellerMessages.addProductPricePrompt,
-      keyboard: cancelButton,
+      keyboard: cancelButton(lang),
     });
 
     return ctx.wizard.next();
@@ -83,11 +88,14 @@ const enterPrice = async (ctx) => {
 // Step 3: Complete
 const complete = async (ctx) => {
   try {
+    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const { seller: sellerMessages, general: generalMessages } = getMessages(lang);
+
     // Get price from message
     if (!ctx.message || !ctx.message.text) {
       await smartMessage.send(ctx, {
-        text: 'Пожалуйста, отправьте цену текстом (только число).\n\n' + sellerMessages.addProductPricePrompt,
-        keyboard: cancelButton,
+        text: t('scenes.sendPriceText', {}, lang) + '\n\n' + sellerMessages.addProductPricePrompt,
+        keyboard: cancelButton(lang),
       });
       return;
     }
@@ -98,7 +106,7 @@ const complete = async (ctx) => {
     if (isNaN(price) || price <= 0) {
       await smartMessage.send(ctx, {
         text: sellerMessages.addProductPriceInvalid,
-        keyboard: cancelButton,
+        keyboard: cancelButton(lang),
       });
       return;
     }
@@ -126,7 +134,7 @@ const complete = async (ctx) => {
       });
       await smartMessage.send(ctx, {
         text: generalMessages.shopRequired,
-        keyboard: successButtons,
+        keyboard: successButtons(lang),
       });
       return await ctx.scene.leave();
     }
@@ -138,7 +146,7 @@ const complete = async (ctx) => {
       });
       await smartMessage.send(ctx, {
         text: generalMessages.authorizationRequired,
-        keyboard: successButtons,
+        keyboard: successButtons(lang),
       });
       return await ctx.scene.leave();
     }
@@ -171,17 +179,19 @@ const complete = async (ctx) => {
     });
 
     await smartMessage.send(ctx, {
-      text: sellerMessages.addProductSuccess(name, formatPrice(price)),
-      keyboard: successButtons,
+      text: sellerMessages.addProductSuccess(name, formatPrice(price), lang),
+      keyboard: successButtons(lang),
     });
 
     // Leave scene
     return await ctx.scene.leave();
   } catch (error) {
     logger.error('Error creating product:', error);
+    const langErr = ctx.lang || ctx.session?.user?.language || 'ru';
+    const { seller: sellerMsgs } = getMessages(langErr);
     await smartMessage.send(ctx, {
-      text: sellerMessages.addProductError,
-      keyboard: successButtons,
+      text: sellerMsgs.addProductError,
+      keyboard: successButtons(langErr),
     });
     return await ctx.scene.leave();
   }
@@ -209,7 +219,7 @@ addProductScene.leave(async (ctx) => {
   }
   ctx.scene.state = {};
 
-  // Очистить __scenes из Redis сессии для предотвращения застревания
+  // Clear __scenes from Redis session to prevent stuck state
   if (ctx.session && ctx.session.__scenes) {
     delete ctx.session.__scenes;
   }
@@ -223,18 +233,39 @@ addProductScene.action('cancel_scene', async (ctx) => {
     await ctx.answerCbQuery(); // Silent
     logger.info('product_add_cancelled', { userId: ctx.from.id });
     await ctx.scene.leave();
-    
+
     // Return to Seller Main Menu
     const { showSellerMainMenu } = await import('../utils/sellerNavigation.js');
     await showSellerMainMenu(ctx);
-    
+
   } catch (error) {
     logger.error('Error in cancel_scene handler:', error);
     // Local error handling
     try {
+      const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+      const { general: generalMessages } = getMessages(lang);
       await ctx.reply(generalMessages.actionFailed);
     } catch (replyError) {
       logger.error('Failed to send error message:', replyError);
+    }
+  }
+});
+
+// Also handle 'cancel' action (some buttons use this)
+addProductScene.action('cancel', async (ctx) => {
+  try {
+    await ctx.answerCbQuery();
+    logger.info('product_add_cancelled', { userId: ctx.from.id });
+    await ctx.scene.leave();
+
+    const { showSellerMainMenu } = await import('../utils/sellerNavigation.js');
+    await showSellerMainMenu(ctx);
+  } catch (error) {
+    logger.error('Error in cancel handler:', error);
+    try {
+      await ctx.scene.leave();
+    } catch (leaveError) {
+      logger.error('Failed to leave scene:', leaveError);
     }
   }
 });

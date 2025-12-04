@@ -5,18 +5,9 @@ import { followDetailMenu, followsMenu } from '../keyboards/seller.js';
 import { cancelButton } from '../keyboards/common.js';
 import { reply as cleanReply } from '../utils/cleanReply.js';
 import logger from '../utils/logger.js';
-import { messages } from '../texts/messages.js';
+import { getMessages } from '../texts/messages.js';
 
-const { general: generalMessages, follows: followMessages } = messages;
-
-// Markup type selection keyboard
-const markupTypeKeyboard = Markup.inlineKeyboard([
-  [
-    Markup.button.callback('% Процент', 'markup_type:percentage'),
-    Markup.button.callback('$ Фиксированная', 'markup_type:fixed'),
-  ],
-  [Markup.button.callback('❌ Отмена', 'cancel_scene')],
-]);
+// Markup type selection keyboard is created dynamically in showMarkupTypeSelection to use ctx.t()
 
 /**
  * Edit Follow Markup Scene
@@ -35,6 +26,9 @@ const markupTypeKeyboard = Markup.inlineKeyboard([
 // Step 1: Show markup type selection
 const showMarkupTypeSelection = async (ctx) => {
   try {
+    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const { follows: followMessages } = getMessages(lang);
+
     // P1-BOT-003 FIX: Validate and set lock (moved from enter() hook)
     const followId = ctx.scene.state.followId;
     if (!followId) {
@@ -58,7 +52,7 @@ const showMarkupTypeSelection = async (ctx) => {
         lockTimeout: LOCK_TIMEOUT_MS,
       });
       // Notify user that operation is blocked
-      await ctx.answerCbQuery('Операция уже выполняется, подождите...').catch(() => {});
+      await ctx.answerCbQuery(ctx.t('general.operationInProgress')).catch(() => {});
       return ctx.scene.leave();
     }
 
@@ -85,7 +79,16 @@ const showMarkupTypeSelection = async (ctx) => {
       pendingModeSwitch,
     });
 
-    await ctx.reply(followMessages.markupTypePrompt, markupTypeKeyboard);
+    // Create keyboard dynamically to use ctx.t()
+    const dynamicMarkupTypeKeyboard = Markup.inlineKeyboard([
+      [
+        Markup.button.callback(ctx.t('follows.markupTypePercent'), 'markup_type:percentage'),
+        Markup.button.callback(ctx.t('follows.markupTypeFixed'), 'markup_type:fixed'),
+      ],
+      [Markup.button.callback(ctx.t('buttons.cancel'), 'cancel_scene')],
+    ]);
+
+    await ctx.reply(followMessages.markupTypePrompt, dynamicMarkupTypeKeyboard);
 
     return ctx.wizard.next();
   } catch (error) {
@@ -98,7 +101,9 @@ const showMarkupTypeSelection = async (ctx) => {
 const waitForMarkupType = async (ctx) => {
   // This step is handled by action handlers, just wait
   if (ctx.message?.text) {
-    await cleanReply(ctx, followMessages.markupTypeRequired, cancelButton);
+    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const { follows: followMessages } = getMessages(lang);
+    await cleanReply(ctx, followMessages.markupTypeRequired, cancelButton(lang));
   }
   return;
 };
@@ -106,9 +111,12 @@ const waitForMarkupType = async (ctx) => {
 // Step 3: Handle markup value input
 const handleMarkupInput = async (ctx) => {
   try {
+    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const { general: generalMessages, follows: followMessages } = getMessages(lang);
+
     const markupType = ctx.scene.state.markupType;
     if (!markupType) {
-      await cleanReply(ctx, followMessages.markupTypeRequired, cancelButton);
+      await cleanReply(ctx, followMessages.markupTypeRequired, cancelButton(lang));
       return;
     }
 
@@ -116,7 +124,7 @@ const handleMarkupInput = async (ctx) => {
       const prompt = markupType === 'fixed'
         ? followMessages.markupFixedPrompt
         : followMessages.markupPercentagePrompt;
-      await cleanReply(ctx, 'Пожалуйста, отправьте наценку текстом (только число).\n\n' + prompt, cancelButton);
+      await cleanReply(ctx, ctx.t('follows.enterMarkupPrompt') + '\n\n' + prompt, cancelButton(lang));
       return;
     }
 
@@ -139,7 +147,7 @@ const handleMarkupInput = async (ctx) => {
     }
 
     if (!isValid) {
-      await cleanReply(ctx, invalidMessage, cancelButton);
+      await cleanReply(ctx, invalidMessage, cancelButton(lang));
       // Delete invalid input message (M20 FIX: improved error logging)
       await ctx.deleteMessage(userMsgId).catch((err) => {
         // Log WARN for unexpected errors (not 400 Bad Request or 429 rate limit)
@@ -174,7 +182,7 @@ const handleMarkupInput = async (ctx) => {
     const token = ctx.session.token;
 
     if (!token) {
-      await cleanReply(ctx, generalMessages.authorizationRequired, cancelButton);
+      await cleanReply(ctx, generalMessages.authorizationRequired, cancelButton(lang));
       return ctx.scene.leave();
     }
 
@@ -206,13 +214,13 @@ const handleMarkupInput = async (ctx) => {
 
       // Fetch updated follow detail
       const follow = await followApi.getFollowDetail(followId, token);
-      const message = formatFollowDetail(follow, ctx.lang);
+      const message = formatFollowDetail(follow, lang);
 
       await cleanReply(ctx, message, followDetailMenu(followId, follow.mode));
 
       const _successMsg = markupType === 'fixed'
-        ? followMessages.markupFixedUpdated(markup)
-        : followMessages.markupUpdated(markup);
+        ? followMessages.markupFixedUpdated(markup, lang)
+        : followMessages.markupUpdated(markup, lang);
 
       logger.info('markup_updated', {
         userId: ctx.from.id,
@@ -242,7 +250,9 @@ const handleMarkupInput = async (ctx) => {
     }
   } catch (error) {
     logger.error('Error in handleMarkupInput step:', error);
-    await cleanReply(ctx, followMessages.switchError, followsMenu(Boolean(ctx.session?.hasFollows)));
+    const langErr = ctx.lang || ctx.session?.user?.language || 'ru';
+    const { follows: followMsgs } = getMessages(langErr);
+    await cleanReply(ctx, followMsgs.switchError, followsMenu(Boolean(ctx.session?.hasFollows)));
     return ctx.scene.leave();
   }
 };
@@ -271,7 +281,7 @@ editFollowMarkupScene.leave(async (ctx) => {
   }
   ctx.scene.state = {};
 
-  // Очистить __scenes из Redis сессии для предотвращения застревания
+  // Clear __scenes from Redis session to prevent getting stuck
   if (ctx.session && ctx.session.__scenes) {
     delete ctx.session.__scenes;
   }
@@ -286,6 +296,9 @@ editFollowMarkupScene.action(/^markup_type:(percentage|fixed)$/, async (ctx) => 
     const markupType = ctx.match[1];
     ctx.scene.state.markupType = markupType;
 
+    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const { follows: followMessages } = getMessages(lang);
+
     logger.info('edit_markup_type_selected', {
       userId: ctx.from.id,
       followId: ctx.scene.state.followId,
@@ -299,13 +312,15 @@ editFollowMarkupScene.action(/^markup_type:(percentage|fixed)$/, async (ctx) => 
 
     await ctx.editMessageText(
       prompt,
-      Markup.inlineKeyboard([[Markup.button.callback('❌ Отмена', 'cancel_scene')]])
+      Markup.inlineKeyboard([[Markup.button.callback(ctx.t('buttons.cancel'), 'cancel_scene')]])
     );
 
     // Move to value input step
     return ctx.wizard.next();
   } catch (error) {
     logger.error('Error in markup_type handler:', error);
+    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const { follows: followMessages } = getMessages(lang);
     await cleanReply(ctx, followMessages.switchError, followsMenu(Boolean(ctx.session?.hasFollows)));
     return ctx.scene.leave();
   }
@@ -314,6 +329,9 @@ editFollowMarkupScene.action(/^markup_type:(percentage|fixed)$/, async (ctx) => 
 // Handle cancel action within scene
 editFollowMarkupScene.action('cancel_scene', async (ctx) => {
   try {
+    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const { follows: followMessages } = getMessages(lang);
+
     await ctx.answerCbQuery();
     logger.info('edit_markup_cancelled', { userId: ctx.from.id });
     await ctx.scene.leave();
@@ -321,9 +339,31 @@ editFollowMarkupScene.action('cancel_scene', async (ctx) => {
   } catch (error) {
     logger.error('Error in cancel_scene handler:', error);
     try {
+      const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+      const { follows: followMessages } = getMessages(lang);
       await cleanReply(ctx, followMessages.cancelOperationError, followsMenu(Boolean(ctx.session?.hasFollows)));
     } catch (replyError) {
       logger.error('Failed to send error message:', replyError);
+    }
+  }
+});
+
+// Also handle 'cancel' action (some buttons use this)
+editFollowMarkupScene.action('cancel', async (ctx) => {
+  try {
+    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const { follows: followMessages } = getMessages(lang);
+
+    await ctx.answerCbQuery();
+    logger.info('edit_markup_cancelled', { userId: ctx.from.id });
+    await ctx.scene.leave();
+    await cleanReply(ctx, followMessages.createCancelled, followsMenu(Boolean(ctx.session?.hasFollows)));
+  } catch (error) {
+    logger.error('Error in cancel handler:', error);
+    try {
+      await ctx.scene.leave();
+    } catch (leaveError) {
+      logger.error('Failed to leave scene:', leaveError);
     }
   }
 });

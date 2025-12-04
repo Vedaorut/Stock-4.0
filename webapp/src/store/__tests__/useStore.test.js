@@ -543,7 +543,7 @@ describe('Cart Operations', () => {
         expect(result).toBe(false);
         expect(mockAddToast).toHaveBeenCalledWith({
           type: 'warning',
-          message: expect.stringContaining('Очистите корзину'),
+          message: expect.stringContaining('Clear the cart'),
           duration: 3000,
         });
       });
@@ -1006,7 +1006,7 @@ describe('Payment Flow', () => {
 
       await expect(useStore.getState().createOrder()).rejects.toThrow();
 
-      expect(mockAddToast).toHaveBeenCalledWith('Ошибка данных заказа', 'error');
+      expect(mockAddToast).toHaveBeenCalledWith('Order data error', 'error');
       expect(useStore.getState().isCreatingOrder).toBe(false);
     });
 
@@ -1017,7 +1017,7 @@ describe('Payment Flow', () => {
 
       await expect(useStore.getState().createOrder()).rejects.toThrow();
 
-      expect(mockAddToast).toHaveBeenCalledWith('Нельзя заказывать свои товары', 'warning');
+      expect(mockAddToast).toHaveBeenCalledWith('Cannot order your own products', 'warning');
     });
 
     it('should always reset isCreatingOrder flag on error', async () => {
@@ -1103,7 +1103,7 @@ describe('Payment Flow', () => {
 
       expect(mockAddToast).toHaveBeenCalledWith({
         type: 'error',
-        message: 'Некорректная сумма от сервера',
+        message: 'Invalid amount from server',
         duration: 3000,
       });
     });

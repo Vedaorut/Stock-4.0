@@ -62,7 +62,7 @@ export const createPaymentSlice = (set, get) => ({
       return;
     }
 
-    // Получить shopId из первого товара в корзине
+    // Get shopId from first cart item
     const shopId = cart[0]?.shopId;
 
     if (!shopId) {
@@ -71,7 +71,7 @@ export const createPaymentSlice = (set, get) => ({
         console.error('[startCheckout] Cart item:', cart[0]);
       }
 
-      // Открыть обратно корзину, чтобы пользователь мог что-то сделать
+      // Reopen cart so user can take action
       set({ isCartOpen: true });
       return;
     }
@@ -207,22 +207,22 @@ export const createPaymentSlice = (set, get) => ({
         const toast = useToastStore.getState().addToast;
 
         if (errorData?.error === 'Malformed JSON payload') {
-          toast('Ошибка данных заказа', 'error');
+          toast('Order data error', 'error');
         } else if (errorData?.error?.includes('cannot order your own')) {
           // User trying to order their own products
-          toast('Нельзя заказывать свои товары', 'warning');
+          toast('Cannot order your own products', 'warning');
         } else if (errorData?.error?.includes('Insufficient stock')) {
           // Extract product name and show specific error
-          toast('Недостаточно товара на складе', 'error');
+          toast('Insufficient stock available', 'error');
         } else if (errorData?.error) {
           // Show backend error message if available
           toast(errorData.error, 'error');
         } else {
-          toast('Ошибка создания заказа', 'error');
+          toast('Order creation error', 'error');
         }
       } else {
         const toast = useToastStore.getState().addToast;
-        toast('Ошибка соединения', 'error');
+        toast('Connection error', 'error');
       }
 
       throw error;
@@ -317,7 +317,7 @@ export const createPaymentSlice = (set, get) => ({
           if (import.meta.env.DEV) {
             console.error('[selectCrypto] Invalid amount:', { paymentInfo, cryptoAmount });
           }
-          toast({ type: 'error', message: 'Некорректная сумма от сервера', duration: 3000 });
+          toast({ type: 'error', message: 'Invalid amount from server', duration: 3000 });
           throw new Error('Invalid amount from API');
         }
 
@@ -355,30 +355,30 @@ export const createPaymentSlice = (set, get) => ({
         // FIX: Show error toast to user with specific messages
         const errorMsg = error.response?.data?.error || error.message;
         if (errorMsg?.includes('price_service_error') || errorMsg?.includes('exchange rate')) {
-          toast({ type: 'error', message: 'Сервис курсов временно недоступен. Попробуйте через минуту.', duration: 4000 });
+          toast({ type: 'error', message: 'Exchange rate service temporarily unavailable. Try again in a minute.', duration: 4000 });
         } else if (errorMsg?.includes('Invalid currency')) {
-          toast({ type: 'error', message: 'Неподдерживаемая валюта', duration: 3000 });
+          toast({ type: 'error', message: 'Unsupported currency', duration: 3000 });
         } else if (errorMsg?.includes('does not accept')) {
-          toast({ type: 'error', message: 'Продавец не принимает эту криптовалюту', duration: 3000 });
+          toast({ type: 'error', message: 'Seller does not accept this cryptocurrency', duration: 3000 });
         } else if (errorMsg?.includes('order')) {
-          toast({ type: 'error', message: 'Ошибка создания заказа', duration: 3000 });
+          toast({ type: 'error', message: 'Order creation error', duration: 3000 });
         } else if (errorMsg?.includes('wallet') || errorMsg?.includes('address')) {
-          toast({ type: 'error', message: 'Ошибка генерации адреса', duration: 3000 });
+          toast({ type: 'error', message: 'Address generation error', duration: 3000 });
         } else if (errorMsg?.includes('timeout') || errorMsg?.includes('network')) {
-          toast({ type: 'error', message: 'Timeout: попробуйте снова', duration: 3000 });
+          toast({ type: 'error', message: 'Timeout: please try again', duration: 3000 });
         } else if (errorMsg?.includes('expired')) {
-          toast({ type: 'error', message: 'Invoice истёк, создайте новый', duration: 3000 });
+          toast({ type: 'error', message: 'Invoice expired, create a new one', duration: 3000 });
         } else {
           // Log unknown errors for debugging
           if (import.meta.env.DEV) {
             console.error('[selectCrypto] Unknown error type:', errorMsg);
           }
-          toast({ type: 'error', message: 'Ошибка генерации invoice. Попробуйте снова.', duration: 3000 });
+          toast({ type: 'error', message: 'Invoice generation error. Please try again.', duration: 3000 });
         }
 
         set({
-          paymentStep: 'method', // Вернуть на выбор метода при ошибке
-          verifyError: error.response?.data?.error || 'Ошибка генерации invoice',
+          paymentStep: 'method', // Return to method selection on error
+          verifyError: error.response?.data?.error || 'Invoice generation error',
         });
         throw error;
       } finally {
@@ -455,13 +455,13 @@ export const createPaymentSlice = (set, get) => ({
         return; // Don't throw, just return
       }
 
-      // Детальные toast сообщения для разных ошибок
+      // Detailed toast messages for different errors
       const errorMsg = error.response?.data?.error || error.message;
       const statusCode = error.response?.status;
 
       if (statusCode === 404) {
       } else if (errorMsg?.includes('confirmation')) {
-      } else if (errorMsg?.includes('amount') || errorMsg?.includes('сумма')) {
+      } else if (errorMsg?.includes('amount')) {
       } else if (errorMsg?.includes('address') || errorMsg?.includes('wallet')) {
       } else if (errorMsg?.includes('expired')) {
       } else if (errorMsg?.includes('timeout') || errorMsg?.includes('network')) {
@@ -470,7 +470,7 @@ export const createPaymentSlice = (set, get) => ({
       }
 
       set({
-        verifyError: error.response?.data?.error || 'Ошибка проверки платежа',
+        verifyError: error.response?.data?.error || 'Payment verification error',
       });
     } finally {
       // CRITICAL: Always reset loading state

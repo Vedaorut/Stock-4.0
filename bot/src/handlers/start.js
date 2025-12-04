@@ -103,14 +103,14 @@ export const handleStart = async (ctx) => {
       ctx.session.pendingDeepLink = deepLink;
     }
 
-    // КРИТИЧНО: Выйти из любой активной сцены
+    // CRITICAL: Leave any active scene
     if (ctx.scene && ctx.scene.current) {
       logger.info(`User ${ctx.from.id} forced to leave scene ${ctx.scene.current} via /start`);
       await ctx.scene.leave();
     }
 
-    // Принудительно очистить __scenes из Redis сессии
-    // ctx.scene.leave() не всегда удаляет __scenes при ошибках
+    // Force clear __scenes from Redis session
+    // ctx.scene.leave() doesn't always remove __scenes on errors
     if (ctx.session && ctx.session.__scenes) {
       delete ctx.session.__scenes;
       logger.info(`Cleared __scenes from session for user ${ctx.from.id}`);
@@ -124,8 +124,8 @@ export const handleStart = async (ctx) => {
     if (!ctx.session.user?.language) {
       logger.info(`User ${ctx.from.id} has no language set, showing language selection`);
       await smartMessage.send(ctx, {
-        text: 'Choose your language:',
-        keyboard: languageMenu(),
+        text: t('settings.selectLanguage', {}, 'en'),
+        keyboard: languageMenu('en'),
       });
       return;
     }

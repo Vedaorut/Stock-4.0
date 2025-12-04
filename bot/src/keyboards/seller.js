@@ -50,7 +50,7 @@ export const sellerToolsMenu = (isOwner = false, lang = 'ru') => {
   return Markup.inlineKeyboard(buttons);
 };
 
-// Products menu (inside "Товары" screen) - minimalist
+// Products menu (inside "Products" screen) - minimalist
 export const productsMenu = (lang = 'ru') =>
   Markup.inlineKeyboard([
     [Markup.button.callback(t('buttons.addProduct', {}, lang), 'seller:add_product')],

@@ -201,35 +201,35 @@ describe('PaymentDetailsModal', () => {
       updateMockStore({ isGeneratingInvoice: true });
       render(<PaymentDetailsModal />);
 
-      expect(screen.getByText(/Загрузка деталей платежа/i)).toBeInTheDocument();
+      expect(screen.getByText(/Loading payment details/i)).toBeInTheDocument();
     });
 
     it('renders error state for unknown cryptocurrency', () => {
       updateMockStore({ selectedCrypto: 'UNKNOWN_CRYPTO' });
       render(<PaymentDetailsModal />);
 
-      expect(screen.getByText('Неизвестная криптовалюта')).toBeInTheDocument();
+      expect(screen.getByText('Unknown cryptocurrency')).toBeInTheDocument();
     });
 
     it('renders error state when payment wallet is missing', () => {
       updateMockStore({ paymentWallet: null });
       render(<PaymentDetailsModal />);
 
-      expect(screen.getByText('Ошибка загрузки')).toBeInTheDocument();
+      expect(screen.getByText('Loading error')).toBeInTheDocument();
     });
 
     it('renders error state when crypto amount is zero', () => {
       updateMockStore({ cryptoAmount: 0 });
       render(<PaymentDetailsModal />);
 
-      expect(screen.getByText('Ошибка загрузки')).toBeInTheDocument();
+      expect(screen.getByText('Loading error')).toBeInTheDocument();
     });
 
     it('renders error state when crypto amount is negative', () => {
       updateMockStore({ cryptoAmount: -1 });
       render(<PaymentDetailsModal />);
 
-      expect(screen.getByText('Ошибка загрузки')).toBeInTheDocument();
+      expect(screen.getByText('Loading error')).toBeInTheDocument();
     });
 
     it('returns null when currentOrder is missing', () => {
@@ -620,14 +620,14 @@ describe('PaymentDetailsModal', () => {
       updateMockStore({ selectedCrypto: 'UNKNOWN' });
       render(<PaymentDetailsModal />);
 
-      expect(screen.getByText('Закрыть')).toBeInTheDocument();
+      expect(screen.getByText('Close')).toBeInTheDocument();
     });
 
     it('renders back button in error state for missing payment data', () => {
       updateMockStore({ paymentWallet: null });
       render(<PaymentDetailsModal />);
 
-      expect(screen.getByText('Назад')).toBeInTheDocument();
+      expect(screen.getByText('Back')).toBeInTheDocument();
     });
 
     it('closes error modal when close button is clicked', async () => {
@@ -635,7 +635,7 @@ describe('PaymentDetailsModal', () => {
       const user = userEvent.setup();
       render(<PaymentDetailsModal />);
 
-      const closeButton = screen.getByText('Закрыть');
+      const closeButton = screen.getByText('Close');
       await user.click(closeButton);
 
       expect(mockSetPaymentStep).toHaveBeenCalledWith('method');
@@ -646,7 +646,7 @@ describe('PaymentDetailsModal', () => {
       const user = userEvent.setup();
       render(<PaymentDetailsModal />);
 
-      const backButton = screen.getByText('Назад');
+      const backButton = screen.getByText('Back');
       await user.click(backButton);
 
       expect(mockSetPaymentStep).toHaveBeenCalledWith('method');

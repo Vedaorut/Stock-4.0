@@ -19,6 +19,25 @@ try {
   console.error('[i18n] Failed to load en.json:', error.message);
 }
 
+let langOverride = null;
+
+/**
+ * Execute a function with a temporary language override.
+ * Useful for building localized message maps without mutating global state.
+ * @param {string} lang - Language code
+ * @param {Function} fn - Callback to execute with override applied
+ * @returns {*}
+ */
+export function withLang(lang, fn) {
+  const prev = langOverride;
+  langOverride = lang;
+  try {
+    return fn();
+  } finally {
+    langOverride = prev;
+  }
+}
+
 /**
  * Translate a key with optional parameter interpolation
  * @param {string} key - Dot-notation key (e.g., 'buyer.panel')
@@ -26,9 +45,10 @@ try {
  * @param {string} lang - Language code ('ru' or 'en')
  * @returns {string} Translated string or key if not found
  */
-export function t(key, params = {}, lang = 'ru') {
+export function t(key, params = {}, lang) {
+  const effectiveLang = lang || langOverride || 'ru';
   const keys = key.split('.');
-  let value = locales[lang] || locales.ru;
+  let value = locales[effectiveLang] || locales.ru;
 
   for (const k of keys) {
     if (!value) break;
@@ -36,7 +56,7 @@ export function t(key, params = {}, lang = 'ru') {
   }
 
   // Fallback to Russian if not found in target language
-  if (!value && lang !== 'ru') {
+  if (!value && effectiveLang !== 'ru') {
     value = locales.ru;
     for (const k of keys) {
       if (!value) break;

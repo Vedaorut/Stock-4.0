@@ -1,10 +1,13 @@
 import { motion } from 'framer-motion';
 import PageHeader from '../../common/PageHeader';
+import { useTranslation } from '../../../i18n/useTranslation';
 
 /**
  * NoShopState - State when user has no shop
  */
 function NoShopState({ onClose, onCreateShop, triggerHaptic }) {
+  const { t } = useTranslation();
+
   return (
     <motion.div
       className="fixed inset-0 z-50 bg-dark-bg"
@@ -13,7 +16,7 @@ function NoShopState({ onClose, onCreateShop, triggerHaptic }) {
       exit={{ x: '100%' }}
       transition={{ type: 'spring', damping: 30, stiffness: 300 }}
     >
-      <PageHeader title="Мои товары" onBack={onClose} variant="close" />
+      <PageHeader title={t('products.title')} onBack={onClose} variant="close" />
       <div
         className="flex-1 overflow-y-auto"
         style={{
@@ -39,8 +42,8 @@ function NoShopState({ onClose, onCreateShop, triggerHaptic }) {
                 d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
               />
             </svg>
-            <h3 className="text-xl font-bold text-white mb-2">У вас еще нет магазина</h3>
-            <p className="text-gray-400 text-sm mb-6">Создайте магазин для продажи товаров</p>
+            <h3 className="text-xl font-bold text-white mb-2">{t('products.noShop')}</h3>
+            <p className="text-gray-400 text-sm mb-6">{t('products.noShopDesc')}</p>
             <motion.button
               onClick={() => {
                 triggerHaptic('medium');
@@ -53,7 +56,7 @@ function NoShopState({ onClose, onCreateShop, triggerHaptic }) {
               }}
               whileTap={{ scale: 0.98 }}
             >
-              Создать магазин
+              {t('products.createShop')}
             </motion.button>
           </div>
         </div>

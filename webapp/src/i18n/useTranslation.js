@@ -4,7 +4,7 @@ import { useStore } from '../store/useStore';
 export function useTranslation() {
   const language = useStore((state) => state.language);
 
-  // Передаем текущий язык из Zustand в функцию перевода
+  // Pass current language from Zustand to translation function
   const t = (key, params) => translate(key, params, language);
 
   const setLanguage = async (newLang) => {

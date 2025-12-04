@@ -11,7 +11,7 @@ export function parseChannelInput(input) {
     return {
       isValid: false,
       cleaned: '',
-      error: 'Введите название канала',
+      error: 'Enter channel name',
     };
   }
 
@@ -25,14 +25,14 @@ export function parseChannelInput(input) {
   const channelRegex = /^[a-zA-Z0-9_]{5,32}$/;
 
   if (!channelRegex.test(cleaned)) {
-    let error = 'Неверный формат канала';
+    let error = 'Invalid channel format';
 
     if (cleaned.length < 5) {
-      error = 'Telegram требует минимум 5 символов для канала';
+      error = 'Telegram requires minimum 5 characters for channel';
     } else if (cleaned.length > 32) {
-      error = 'Максимум 32 символа';
+      error = 'Maximum 32 characters';
     } else {
-      error = 'Только латиница, цифры и _';
+      error = 'Only latin letters, numbers and _';
     }
 
     return {
@@ -50,27 +50,15 @@ export function parseChannelInput(input) {
 }
 
 /**
- * Get proper Russian declension for "days"
+ * Get proper label for "days"
  * @param {number} count - Number of days
  * @returns {string} - Proper word form
  */
 export function getDaysLabel(count) {
-  const lastDigit = count % 10;
-  const lastTwoDigits = count % 100;
-
-  if (lastTwoDigits >= 11 && lastTwoDigits <= 14) {
-    return 'дней';
+  if (count === 1) {
+    return 'day';
   }
-
-  if (lastDigit === 1) {
-    return 'день';
-  }
-
-  if (lastDigit >= 2 && lastDigit <= 4) {
-    return 'дня';
-  }
-
-  return 'дней';
+  return 'days';
 }
 
 /**
@@ -146,7 +134,7 @@ export function useMigration({ isOpen, onClose, triggerHaptic, confirm, alert })
       if (signal?.aborted) return { status: 'aborted' };
 
       if (shopsError) {
-        setErrorMessage('Ошибка загрузки магазина. Попробуйте позже.');
+        setErrorMessage('Failed to load shop. Please try again later.');
         setStep(1);
         return { status: 'error' };
       }
@@ -154,7 +142,7 @@ export function useMigration({ isOpen, onClose, triggerHaptic, confirm, alert })
       const shops = Array.isArray(shopsResponse?.data) ? shopsResponse.data : [];
 
       if (!shops.length) {
-        setErrorMessage('У вас нет магазина. Создайте магазин через бота.');
+        setErrorMessage('You don\'t have a shop. Create a shop via the bot.');
         setStep(1);
         return { status: 'error' };
       }
@@ -178,7 +166,7 @@ export function useMigration({ isOpen, onClose, triggerHaptic, confirm, alert })
       setEligibility(eligibilityData);
 
       if (!eligibilityData?.eligible) {
-        const reason = eligibilityData?.reason || eligibilityData?.message || 'Миграция недоступна';
+        const reason = eligibilityData?.reason || eligibilityData?.message || 'Migration unavailable';
         setErrorMessage(reason);
         setStep(1);
         return { status: 'error' };
@@ -191,7 +179,7 @@ export function useMigration({ isOpen, onClose, triggerHaptic, confirm, alert })
       if (import.meta.env.DEV) {
         console.error('Eligibility check failed:', err);
       }
-      const message = err?.message || 'Ошибка проверки прав. Попробуйте позже.';
+      const message = err?.message || 'Permission check error. Please try again later.';
       setErrorMessage(message);
       setStep(1);
       return { status: 'error' };
@@ -256,12 +244,12 @@ export function useMigration({ isOpen, onClose, triggerHaptic, confirm, alert })
 
     if (!isValid) {
       setChannelError(error);
-      await alert(error || 'Неверный формат канала');
+      await alert(error || 'Invalid channel format');
       return;
     }
 
     const confirmed = await confirm(
-      `Отправить уведомления всем ${eligibility?.subscriberCount || 0} подписчикам о миграции на новый канал?`
+      `Notify all ${eligibility?.subscriberCount || 0} subscribers about migration to the new channel?`
     );
 
     if (!confirmed) return;
@@ -283,7 +271,7 @@ export function useMigration({ isOpen, onClose, triggerHaptic, confirm, alert })
       if (migrateAbortControllerRef.current?.signal.aborted) return;
 
       if (postError) {
-        setMigrationError(postError || 'Ошибка миграции');
+        setMigrationError(postError || 'Migration error');
         setLoading(false);
         return;
       }
@@ -313,7 +301,7 @@ export function useMigration({ isOpen, onClose, triggerHaptic, confirm, alert })
       if (import.meta.env.DEV) {
         console.error('Migration failed:', err);
       }
-      setMigrationError('Ошибка миграции. Попробуйте позже.');
+      setMigrationError('Migration error. Please try again later.');
     } finally {
       setLoading(false);
     }

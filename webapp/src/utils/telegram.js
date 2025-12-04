@@ -1,6 +1,6 @@
 /**
- * Инициализация Telegram WebApp
- * @returns {Object|null} Объект с user и tg или null
+ * Initialize Telegram WebApp
+ * @returns {Object|null} Object with user and tg or null
  */
 export function initTelegramApp() {
   const tg = window.Telegram?.WebApp;
@@ -9,11 +9,11 @@ export function initTelegramApp() {
   }
 
   try {
-    // Инициализация приложения
+    // Initialize app
     tg.ready();
     tg.expand();
 
-    // ✅ Check platform before requesting fullscreen (not supported on web)
+    // Check platform before requesting fullscreen (not supported on web)
     if (tg.requestFullscreen && tg.platform !== 'web') {
       try {
         tg.requestFullscreen();
@@ -23,33 +23,33 @@ export function initTelegramApp() {
     } else {
     }
 
-    // Проверка fullscreen режима
+    // Check fullscreen mode
 
-    // Настройка цветов
+    // Set colors
     tg.setHeaderColor('#0A0A0A');
     tg.setBackgroundColor('#0A0A0A');
 
-    // Отключаем вертикальные свайпы (важно для iOS)
+    // Disable vertical swipes (important for iOS)
     if (tg.disableVerticalSwipes) {
       tg.disableVerticalSwipes();
     }
 
-    // Включаем подтверждение закрытия
+    // Enable closing confirmation
     if (tg.enableClosingConfirmation) {
       tg.enableClosingConfirmation();
     }
 
-    // Подписка на viewport события для адаптивности
+    // Subscribe to viewport events for responsiveness
     if (tg.onEvent) {
       tg.onEvent('viewportChanged', (data) => {
-        // Принудительно установить высоту при изменении viewport
+        // Force set height on viewport change
         if (data.isExpanded) {
           document.documentElement.style.height = '100vh';
           document.body.style.height = '100vh';
         }
       });
 
-      // Обработчики fullscreen событий (Mini Apps 2.0)
+      // Fullscreen event handlers (Mini Apps 2.0)
       tg.onEvent('fullscreenChanged', (_data) => {
         // Handle fullscreen change if needed
       });
@@ -77,9 +77,9 @@ export function initTelegramApp() {
 }
 
 /**
- * Показать Main Button
- * @param {string} text - Текст кнопки
- * @param {Function} onClick - Обработчик клика
+ * Show Main Button
+ * @param {string} text - Button text
+ * @param {Function} onClick - Click handler
  */
 export function showMainButton(text, onClick) {
   const tg = window.Telegram?.WebApp;
@@ -91,7 +91,7 @@ export function showMainButton(text, onClick) {
 }
 
 /**
- * Скрыть Main Button
+ * Hide Main Button
  */
 export function hideMainButton() {
   const tg = window.Telegram?.WebApp;
@@ -126,8 +126,8 @@ export function hapticFeedback(type = 'light') {
 }
 
 /**
- * Показать Back Button
- * @param {Function} onClick - Обработчик клика
+ * Show Back Button
+ * @param {Function} onClick - Click handler
  */
 export function showBackButton(onClick) {
   const tg = window.Telegram?.WebApp;
@@ -138,7 +138,7 @@ export function showBackButton(onClick) {
 }
 
 /**
- * Скрыть Back Button
+ * Hide Back Button
  */
 export function hideBackButton() {
   const tg = window.Telegram?.WebApp;
@@ -149,8 +149,8 @@ export function hideBackButton() {
 }
 
 /**
- * Показать popup
- * @param {Object} params - Параметры popup
+ * Show popup
+ * @param {Object} params - Popup parameters
  */
 export function showPopup(params) {
   const tg = window.Telegram?.WebApp;
@@ -164,7 +164,7 @@ export function showPopup(params) {
 }
 
 /**
- * Закрыть WebApp
+ * Close WebApp
  */
 export function closeApp() {
   const tg = window.Telegram?.WebApp;
@@ -174,8 +174,8 @@ export function closeApp() {
 }
 
 /**
- * Открыть ссылку
- * @param {string} url - URL для открытия
+ * Open link
+ * @param {string} url - URL to open
  */
 export function openLink(url) {
   const tg = window.Telegram?.WebApp;
@@ -188,7 +188,7 @@ export function openLink(url) {
 }
 
 /**
- * Открыть Telegram ссылку
+ * Open Telegram link
  * @param {string} url - Telegram URL
  */
 export function openTelegramLink(url) {

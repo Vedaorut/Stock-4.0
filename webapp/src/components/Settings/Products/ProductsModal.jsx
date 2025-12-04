@@ -121,7 +121,7 @@ export default function ProductsModal({ isOpen, onClose }) {
         {
           role: 'assistant',
           content:
-            'Привет! Я AI-ассистент магазина. Напишите, какие товары нужно добавить или изменить - все сделаю за вас.',
+            'Hi! I am the shop AI assistant. Tell me what products to add or edit - I will handle it for you.',
         },
       ]);
     }
@@ -265,16 +265,16 @@ export default function ProductsModal({ isOpen, onClose }) {
           await loadData();
         }
       } else {
-        throw new Error('Пустой ответ AI-сервиса');
+        throw new Error('Empty response from AI service');
       }
     } catch (err) {
-      const errorMessage = err.message || 'Не удалось обработать запрос. Попробуйте позже.';
+      const errorMessage = err.message || 'Failed to process request. Please try again later.';
       setAiError(errorMessage);
       setAiHistory((current) => [
         ...current,
         {
           role: 'assistant',
-          content: 'Не получилось обработать команду. Попробуйте еще раз или сформулируйте иначе.',
+          content: 'Could not process the command. Please try again or rephrase.',
         },
       ]);
     } finally {
@@ -327,7 +327,7 @@ export default function ProductsModal({ isOpen, onClose }) {
         });
       } else {
         if (!myShop?.id) {
-          await alert('Не удалось определить магазин');
+          await alert('Could not identify shop');
           return;
         }
         await fetchApi('/products', {
@@ -344,7 +344,7 @@ export default function ProductsModal({ isOpen, onClose }) {
       setFormData({ name: '', description: '', price: '', stock: '', is_available: true });
     } catch (err) {
       if (err.name === 'AbortError') return;
-      await alert(err.message || 'Ошибка сохранения товара');
+      await alert(err.message || 'Error saving product');
     } finally {
       setSaving(false);
     }
@@ -366,7 +366,7 @@ export default function ProductsModal({ isOpen, onClose }) {
       await loadData();
     } catch (err) {
       if (err.name === 'AbortError') return;
-      await alert(err.message || 'Ошибка удаления товара');
+      await alert(err.message || 'Error deleting product');
     }
   };
 
@@ -418,12 +418,12 @@ export default function ProductsModal({ isOpen, onClose }) {
         is_preorder: false,
       });
     } else {
-      alert(`Лимит достигнут! Доступно: ${limitStatus?.tier}`);
+      alert(`Limit reached! Available: ${limitStatus?.tier}`);
     }
   };
 
   const handleCreateShop = () => {
-    alert('Создание магазина через бота');
+    alert('Create a shop via the bot');
   };
 
   // Error state
@@ -468,7 +468,7 @@ export default function ProductsModal({ isOpen, onClose }) {
           exit={{ x: '100%' }}
           transition={{ type: 'spring', damping: 30, stiffness: 300 }}
         >
-          <PageHeader title="Мои товары" onBack={handleClose} variant="close" />
+          <PageHeader title="My Products" onBack={handleClose} variant="close" />
           <div
             className="flex-1 overflow-y-auto"
             style={{

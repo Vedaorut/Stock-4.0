@@ -9,8 +9,8 @@ const ConfirmDialog = ({
   onConfirm,
   title,
   message,
-  confirmText = 'Подтвердить',
-  cancelText = 'Отмена',
+  confirmText = 'Confirm',
+  cancelText = 'Cancel',
   danger = false,
 }) => {
   const controlSpring = { type: 'spring', stiffness: 350, damping: 30 };

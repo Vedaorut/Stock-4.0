@@ -1,35 +1,35 @@
 import logger from './logger.js';
 
 /**
- * Безопасная обёртка для вызовов Backend API
+ * Safe wrapper for Backend API calls
  *
- * Гарантирует корректную обработку:
- * - 200 OK с success: false в теле ответа
- * - HTTP 4xx/5xx ошибок
- * - Сетевых ошибок (timeout, connection refused)
+ * Guarantees correct handling of:
+ * - 200 OK with success: false in response body
+ * - HTTP 4xx/5xx errors
+ * - Network errors (timeout, connection refused)
  *
- * @param {Function} apiFunction - Функция API для вызова
- * @param {...any} args - Аргументы для передачи в apiFunction
+ * @param {Function} apiFunction - API function to call
+ * @param {...any} args - Arguments to pass to apiFunction
  * @returns {Promise<{success: boolean, data?: any, error?: string}>}
  */
 export async function safeApiCall(apiFunction, ...args) {
   try {
     const response = await apiFunction(...args);
 
-    // API client может вернуть два формата:
-    // 1. Wrapper: { success: true, data: ... } или { success: false, error: ... }
-    // 2. Unwrapped: просто данные (product, shop, etc.) - уже распакованные api.js
+    // API client can return two formats:
+    // 1. Wrapper: { success: true, data: ... } or { success: false, error: ... }
+    // 2. Unwrapped: just data (product, shop, etc.) - already unpacked by api.js
 
-    // Проверка что response - объект
+    // Check that response is an object
     if (!response || typeof response !== 'object') {
       logger.warn('API call returned non-object response:', response);
       return {
         success: false,
-        error: 'Неожиданный формат ответа от сервера',
+        error: 'Unexpected response format from server',
       };
     }
 
-    // Проверяем wrapper format (есть поле 'success')
+    // Check wrapper format (has 'success' field)
     if ('success' in response) {
       // Wrapper: { success: true, data: ... }
       if (response.success && 'data' in response) {
@@ -41,7 +41,7 @@ export async function safeApiCall(apiFunction, ...args) {
 
       // Wrapper: { success: false, error: ... }
       if (response.success === false) {
-        const errorMessage = response.error || response.message || 'Неизвестная ошибка API';
+        const errorMessage = response.error || response.message || 'Unknown API error';
         logger.warn('API call returned failure status:', {
           error: errorMessage,
           response,
@@ -52,16 +52,16 @@ export async function safeApiCall(apiFunction, ...args) {
         };
       }
 
-      // Wrapper format но странный (success: true без data)
+      // Wrapper format but strange (success: true without data)
       logger.warn('API call returned wrapper without data field:', response);
       return {
         success: false,
-        error: 'Неожиданный формат ответа от сервера',
+        error: 'Unexpected response format from server',
       };
     }
 
-    // Unwrapped format: API client вернул данные напрямую (product, shop, etc.)
-    // Это успешный ответ, т.к. не было thrown exception
+    // Unwrapped format: API client returned data directly (product, shop, etc.)
+    // This is a successful response since no exception was thrown
     logger.debug('API call returned unwrapped data (success):', {
       hasId: !!response.id,
       hasName: !!response.name,
@@ -72,43 +72,43 @@ export async function safeApiCall(apiFunction, ...args) {
       data: response,
     };
   } catch (error) {
-    // Обработка сетевых ошибок и HTTP ошибок (4xx, 5xx)
+    // Handle network errors and HTTP errors (4xx, 5xx)
     logger.error('API call exception:', {
       message: error.message,
       stack: error.stack,
       response: error.response?.data,
     });
 
-    let errorMessage = 'Ошибка сети или сервера';
+    let errorMessage = 'Network or server error';
 
     if (error.response) {
-      // HTTP ошибка (4xx, 5xx)
+      // HTTP error (4xx, 5xx)
       const status = error.response.status;
       const backendError = error.response.data?.error || error.response.data?.message;
 
       if (status === 400) {
-        errorMessage = `Неверные данные: ${backendError || 'проверьте параметры'}`;
+        errorMessage = `Invalid data: ${backendError || 'check parameters'}`;
       } else if (status === 401) {
-        errorMessage = 'Ошибка авторизации';
+        errorMessage = 'Authorization error';
       } else if (status === 403) {
-        errorMessage = 'Доступ запрещён';
+        errorMessage = 'Access denied';
       } else if (status === 404) {
-        errorMessage = `Не найдено: ${backendError || 'ресурс не существует'}`;
+        errorMessage = `Not found: ${backendError || 'resource does not exist'}`;
       } else if (status === 409) {
-        errorMessage = `Конфликт: ${backendError || 'данные уже существуют'}`;
+        errorMessage = `Conflict: ${backendError || 'data already exists'}`;
       } else if (status === 422) {
-        errorMessage = `Ошибка валидации: ${backendError || 'проверьте данные'}`;
+        errorMessage = `Validation error: ${backendError || 'check data'}`;
       } else if (status >= 500) {
-        errorMessage = `Ошибка сервера (${status}): ${backendError || 'попробуйте позже'}`;
+        errorMessage = `Server error (${status}): ${backendError || 'try again later'}`;
       } else {
-        errorMessage = `Ошибка ${status}: ${backendError || 'неизвестная ошибка'}`;
+        errorMessage = `Error ${status}: ${backendError || 'unknown error'}`;
       }
     } else if (error.code === 'ECONNREFUSED') {
-      errorMessage = 'Сервер недоступен (ECONNREFUSED)';
+      errorMessage = 'Server unavailable (ECONNREFUSED)';
     } else if (error.code === 'ETIMEDOUT') {
-      errorMessage = 'Превышено время ожидания ответа от сервера';
+      errorMessage = 'Server response timeout exceeded';
     } else if (error.code === 'ENOTFOUND') {
-      errorMessage = 'Сервер не найден (проверьте BACKEND_URL)';
+      errorMessage = 'Server not found (check BACKEND_URL)';
     }
 
     return {
@@ -119,8 +119,8 @@ export async function safeApiCall(apiFunction, ...args) {
 }
 
 /**
- * Форматирует результат для AI
- * Преобразует ошибку в структуру понятную для AI response generation
+ * Format result for AI
+ * Transforms error into structure understandable for AI response generation
  */
 export function formatResultForAI(result, actionType) {
   if (!result.success) {

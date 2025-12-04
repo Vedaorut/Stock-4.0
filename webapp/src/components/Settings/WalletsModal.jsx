@@ -9,7 +9,7 @@ import { useApi } from '../../hooks/useApi';
 const WALLET_PATTERNS = {
   BTC: /^(1|3|bc1)[a-zA-HJ-NP-Z0-9]{25,62}$/,
   ETH: /^0x[a-fA-F0-9]{40}$/,
-  USDT: /^T[a-zA-Z0-9]{33}$/, // USDT (TRC-20) использует TRON адреса
+  USDT: /^T[a-zA-Z0-9]{33}$/, // USDT (TRC-20) uses TRON addresses
   LTC: /^(L|M|ltc1)[a-zA-HJ-NP-Z0-9]{26,42}$/,
 };
 
@@ -217,7 +217,7 @@ export default function WalletsModal({ isOpen, onClose }) {
   const [ltcAddress, setLtcAddress] = useState('');
   const [editingWalletType, setEditingWalletType] = useState(null);
 
-  // useRef-based lock для предотвращения race condition
+  // useRef-based lock to prevent race condition
   const savingLockRef = useRef(false);
 
   const isValidBTC = btcAddress ? WALLET_PATTERNS.BTC.test(btcAddress.trim()) : false;
@@ -383,11 +383,11 @@ export default function WalletsModal({ isOpen, onClose }) {
       .filter(Boolean);
   }, [walletMap, walletMeta.updatedAt]);
 
-  // Доступные типы для добавления (те, которых ещё нет)
+  // Available types to add (those not yet added)
   const availableWalletTypes = useMemo(() => {
     return orderedWalletTypes.filter((type) => {
       const mapping = walletFieldMap[type];
-      return !walletMap[mapping.key]; // Показываем только если кошелёк ещё не добавлен
+      return !walletMap[mapping.key]; // Show only if wallet not yet added
     });
   }, [walletMap]);
 
@@ -457,7 +457,7 @@ export default function WalletsModal({ isOpen, onClose }) {
   );
 
   const handleSaveWallets = useCallback(async () => {
-    // ✅ useRef-based lock для предотвращения race condition при двойном клике
+    // useRef-based lock to prevent race condition on double click
     if (savingLockRef.current) {
       return;
     }
@@ -512,7 +512,7 @@ export default function WalletsModal({ isOpen, onClose }) {
       await alert(t('wallet.saveError'));
     } finally {
       setSaving(false);
-      savingLockRef.current = false; // ✅ Всегда сбрасывается в finally
+      savingLockRef.current = false; // Always reset in finally
     }
   }, [
     alert,
@@ -578,15 +578,15 @@ export default function WalletsModal({ isOpen, onClose }) {
                   </div>
                   <div className="flex-1">
                     <h3 className="text-white font-semibold mb-1">
-                      💼 Кошельки для получения оплаты
+                      Payment Wallets
                     </h3>
                     <p className="text-gray-400 text-sm mb-2">
-                      Укажите адреса для приёма криптовалюты от покупателей.
+                      Enter addresses for receiving cryptocurrency from buyers.
                     </p>
                     <p className="text-gray-500 text-xs">{t('wallet.supported')}</p>
                     {shop && (
                       <p className="text-gray-500 text-xs mt-2">
-                        Магазин: <span className="text-white">{shop.name}</span>
+                        Shop: <span className="text-white">{shop.name}</span>
                       </p>
                     )}
                   </div>
@@ -654,14 +654,14 @@ export default function WalletsModal({ isOpen, onClose }) {
                     </motion.button>
                   )}
 
-                  {/* Сообщение когда все кошельки добавлены */}
+                  {/* Message when all wallets are added */}
                   {!showForm && availableWalletTypes.length === 0 && walletList.length > 0 && (
                     <motion.div
                       className="glass-card rounded-2xl p-4 text-center text-gray-400 text-sm"
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                     >
-                      ✅ Все доступные кошельки добавлены
+                      All available wallets added
                     </motion.div>
                   )}
 
@@ -673,7 +673,7 @@ export default function WalletsModal({ isOpen, onClose }) {
                         animate={{ opacity: 1, height: 'auto' }}
                         exit={{ opacity: 0, height: 0 }}
                       >
-                        {/* Показываем только поля для доступных типов */}
+                        {/* Show only fields for available types */}
                         {availableWalletTypes.includes('BTC') && (
                           <div>
                             <label className="text-sm text-gray-400 mb-2 block">

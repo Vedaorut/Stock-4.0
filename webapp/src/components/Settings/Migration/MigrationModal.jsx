@@ -87,7 +87,7 @@ export default function MigrationModal({ isOpen, onClose }) {
           exit={{ opacity: 0 }}
         >
           <PageHeader
-            title={step === 3 ? 'Готово' : 'Миграция'}
+            title={step === 3 ? 'Done' : 'Migration'}
             onBack={step === 1 || step === 3 ? onClose : () => setStep(step - 1)}
             variant="close"
           />

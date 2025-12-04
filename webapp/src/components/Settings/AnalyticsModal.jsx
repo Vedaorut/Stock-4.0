@@ -88,7 +88,7 @@ export default function AnalyticsModal({ isOpen, onClose }) {
             if (import.meta.env.DEV) {
               console.error('Invalid analytics data format:', analyticsData);
             }
-            return { status: 'error', error: 'Неверный формат данных статистики' };
+            return { status: 'error', error: 'Invalid analytics data format' };
           }
 
           setAnalytics(analyticsData);
@@ -97,7 +97,7 @@ export default function AnalyticsModal({ isOpen, onClose }) {
           if (import.meta.env.DEV) {
             console.error('Unexpected API response:', data);
           }
-          return { status: 'error', error: 'Не удалось загрузить статистику' };
+          return { status: 'error', error: 'Failed to load analytics' };
         }
       } catch (err) {
         if (signal?.aborted) return { status: 'aborted' };
@@ -105,7 +105,7 @@ export default function AnalyticsModal({ isOpen, onClose }) {
         if (import.meta.env.DEV) {
           console.error('[AnalyticsModal] fetch exception', err);
         }
-        return { status: 'error', error: err.message || 'Ошибка загрузки данных' };
+        return { status: 'error', error: err.message || 'Data loading error' };
       }
     },
     [get, getDateRange] // period and customRange are read via getDateRange
@@ -172,7 +172,7 @@ export default function AnalyticsModal({ isOpen, onClose }) {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           >
-            <PageHeader title="Статистика" onBack={handleClose} variant="close" />
+            <PageHeader title="Analytics" onBack={handleClose} variant="close" />
             <div
               style={{
                 paddingTop: 'calc(env(safe-area-inset-top) + 56px)',
@@ -220,7 +220,7 @@ export default function AnalyticsModal({ isOpen, onClose }) {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           >
-            <PageHeader title="Статистика" onBack={handleClose} variant="close" />
+            <PageHeader title="Analytics" onBack={handleClose} variant="close" />
             <div
               style={{ paddingTop: 'calc(env(safe-area-inset-top) + 56px)' }}
               className="px-4 py-8 text-center"
@@ -230,7 +230,7 @@ export default function AnalyticsModal({ isOpen, onClose }) {
                 onClick={fetchAnalytics}
                 className="bg-orange-primary text-white px-6 py-3 rounded-xl"
               >
-                Попробовать снова
+                Try Again
               </button>
             </div>
           </motion.div>
@@ -252,7 +252,7 @@ export default function AnalyticsModal({ isOpen, onClose }) {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           >
-            <PageHeader title="Статистика" onBack={handleClose} variant="close" />
+            <PageHeader title="Analytics" onBack={handleClose} variant="close" />
 
             <div
               style={{
@@ -268,12 +268,12 @@ export default function AnalyticsModal({ isOpen, onClose }) {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 }}
               >
-                <p className="text-sm text-gray-400 mb-2">Общие продажи</p>
+                <p className="text-sm text-gray-400 mb-2">Total Sales</p>
                 <h1 className="text-4xl font-bold text-orange-primary mb-1">
                   {formatUSD(summary?.totalRevenue)}
                 </h1>
                 <p className="text-sm text-gray-400">
-                  {summary?.completedOrders || 0} заказов • Средний чек:{' '}
+                  {summary?.completedOrders || 0} orders - Avg order:{' '}
                   {formatUSD(summary?.avgOrderValue)}
                 </p>
               </motion.div>
@@ -284,25 +284,25 @@ export default function AnalyticsModal({ isOpen, onClose }) {
                   onClick={() => handlePeriodChange('7d')}
                   className={`period-btn flex-1 ${period === '7d' ? 'active' : ''}`}
                 >
-                  7 дней
+                  7 Days
                 </button>
                 <button
                   onClick={() => handlePeriodChange('1m')}
                   className={`period-btn flex-1 ${period === '1m' ? 'active' : ''}`}
                 >
-                  Месяц
+                  Month
                 </button>
                 <button
                   onClick={() => handlePeriodChange('custom')}
                   className={`period-btn flex-1 ${period === 'custom' ? 'active' : ''}`}
                 >
-                  Период ▼
+                  Custom
                 </button>
               </div>
 
               {/* Top Products */}
               <div className="mt-6 mb-4">
-                <h2 className="text-lg font-semibold text-white mb-4">Топ товары</h2>
+                <h2 className="text-lg font-semibold text-white mb-4">Top Products</h2>
 
                 {topProducts && topProducts.length > 0 ? (
                   <div className="space-y-3">
@@ -331,13 +331,13 @@ export default function AnalyticsModal({ isOpen, onClose }) {
                           />
                         </div>
 
-                        <p className="text-xs text-gray-400">{product.quantity} шт продано</p>
+                        <p className="text-xs text-gray-400">{product.quantity} sold</p>
                       </motion.div>
                     ))}
                   </div>
                 ) : (
                   <div className="glass-card p-8 text-center">
-                    <p className="text-gray-400">Нет данных за выбранный период</p>
+                    <p className="text-gray-400">No data for selected period</p>
                   </div>
                 )}
               </div>
@@ -361,11 +361,11 @@ export default function AnalyticsModal({ isOpen, onClose }) {
                 exit={{ y: '100%' }}
                 onClick={(e) => e.stopPropagation()}
               >
-                <h3 className="text-lg font-semibold text-white mb-4">Выбор периода</h3>
+                <h3 className="text-lg font-semibold text-white mb-4">Select Period</h3>
 
                 <div className="space-y-4 w-full min-w-0">
                   <div>
-                    <label className="text-sm text-gray-400 mb-1 block">С</label>
+                    <label className="text-sm text-gray-400 mb-1 block">From</label>
                     <input
                       type="date"
                       value={customRange.from}
@@ -377,7 +377,7 @@ export default function AnalyticsModal({ isOpen, onClose }) {
                   </div>
 
                   <div>
-                    <label className="text-sm text-gray-400 mb-1 block">До</label>
+                    <label className="text-sm text-gray-400 mb-1 block">To</label>
                     <input
                       type="date"
                       value={customRange.to}
@@ -392,14 +392,14 @@ export default function AnalyticsModal({ isOpen, onClose }) {
                     onClick={() => setShowCustomPicker(false)}
                     className="flex-1 bg-dark-bg text-white px-4 py-3 sm:py-4 rounded-xl font-medium min-h-[44px]"
                   >
-                    Отмена
+                    Cancel
                   </button>
                   <button
                     onClick={handleCustomRangeApply}
                     className="flex-1 bg-orange-primary text-white px-4 py-3 sm:py-4 rounded-xl font-medium min-h-[44px]"
                     disabled={!customRange.from || !customRange.to}
                   >
-                    Применить
+                    Apply
                   </button>
                 </div>
               </motion.div>

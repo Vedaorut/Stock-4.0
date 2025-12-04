@@ -4,7 +4,7 @@ import productsData from '../data/products.json';
 const BASE_URL = 'http://localhost:3000';
 
 export const productsHandlers = [
-  // GET /api/products - список товаров с фильтрами
+  // GET /api/products - product list with filters
   http.get(`${BASE_URL}/api/products`, ({ request }) => {
     const url = new URL(request.url);
     const shopId = url.searchParams.get('shopId');
@@ -12,12 +12,12 @@ export const productsHandlers = [
 
     let filtered = [...productsData];
 
-    // Фильтр по shopId
+    // Filter by shopId
     if (shopId) {
       filtered = filtered.filter((p) => p.shop_id === Number(shopId));
     }
 
-    // Фильтр по isActive
+    // Filter by isActive
     if (isActive !== null && isActive !== undefined) {
       const activeValue = isActive === 'true' || isActive === '1';
       filtered = filtered.filter((p) => p.is_active === activeValue);
@@ -26,19 +26,19 @@ export const productsHandlers = [
     return HttpResponse.json({ success: true, data: filtered });
   }),
 
-  // GET /api/products/limit-status/:shopId - статус лимитов товаров
+  // GET /api/products/limit-status/:shopId - product limit status
   http.get(`${BASE_URL}/api/products/limit-status/:shopId`, ({ params }) => {
     const shopId = Number(params.shopId);
     const shopProducts = productsData.filter((p) => p.shop_id === shopId && p.is_active);
 
-    // Лимиты по тирам (из backend)
+    // Limits by tier (from backend)
     const limits = {
       FREE: 10,
       PRO: 100,
       ENTERPRISE: 999999,
     };
 
-    // Mock tier detection (чередуем для примера)
+    // Mock tier detection (alternating for example)
     const tier = shopId % 2 === 0 ? 'PRO' : 'FREE';
     const limit = limits[tier] ?? limits.FREE;
 
@@ -51,7 +51,7 @@ export const productsHandlers = [
     });
   }),
 
-  // GET /api/products/:id - один товар
+  // GET /api/products/:id - single product
   http.get(`${BASE_URL}/api/products/:id`, ({ params }) => {
     const product = productsData.find((p) => p.id === Number(params.id));
 
@@ -62,7 +62,7 @@ export const productsHandlers = [
     return HttpResponse.json({ success: true, data: product });
   }),
 
-  // POST /api/products - создать товар
+  // POST /api/products - create product
   http.post(`${BASE_URL}/api/products`, async ({ request }) => {
     const body = await request.json();
 
@@ -86,7 +86,7 @@ export const productsHandlers = [
     return HttpResponse.json({ success: true, data: newProduct }, { status: 201 });
   }),
 
-  // PUT /api/products/:id - обновить товар
+  // PUT /api/products/:id - update product
   http.put(`${BASE_URL}/api/products/:id`, async ({ params, request }) => {
     const body = await request.json();
     const productIndex = productsData.findIndex((p) => p.id === Number(params.id));
@@ -97,7 +97,7 @@ export const productsHandlers = [
 
     const product = productsData[productIndex];
 
-    // Обновляем поля
+    // Update fields
     const updatedProduct = {
       ...product,
       name: body.name !== undefined ? body.name : product.name,
@@ -116,7 +116,7 @@ export const productsHandlers = [
     return HttpResponse.json({ success: true, data: updatedProduct });
   }),
 
-  // DELETE /api/products/:id - удалить товар (мягкое удаление)
+  // DELETE /api/products/:id - delete product (soft delete)
   http.delete(`${BASE_URL}/api/products/:id`, ({ params }) => {
     const productIndex = productsData.findIndex((p) => p.id === Number(params.id));
 
@@ -124,7 +124,7 @@ export const productsHandlers = [
       return HttpResponse.json({ error: 'Product not found' }, { status: 404 });
     }
 
-    // Мягкое удаление - is_active = false
+    // Soft delete - is_active = false
     productsData[productIndex] = {
       ...productsData[productIndex],
       is_active: false,
@@ -137,7 +137,7 @@ export const productsHandlers = [
     });
   }),
 
-  // POST /api/products/bulk-delete-all - удалить все товары магазина
+  // POST /api/products/bulk-delete-all - delete all shop products
   http.post(`${BASE_URL}/api/products/bulk-delete-all`, async ({ request }) => {
     const body = await request.json();
     const shopId = body.shop_id;
@@ -146,7 +146,7 @@ export const productsHandlers = [
       return HttpResponse.json({ error: 'shop_id is required' }, { status: 400 });
     }
 
-    // Помечаем все товары магазина как неактивные
+    // Mark all shop products as inactive
     let deletedCount = 0;
     productsData.forEach((product, index) => {
       if (product.shop_id === shopId && product.is_active) {
@@ -163,13 +163,13 @@ export const productsHandlers = [
       success: true,
       data: {
         deletedCount: deletedCount,
-        deletedProducts: [], // В mock не возвращаем список
+        deletedProducts: [], // Not returning list in mock
       },
       message: `${deletedCount} product(s) deleted successfully`,
     });
   }),
 
-  // POST /api/products/bulk-delete-by-ids - удалить несколько товаров по ID
+  // POST /api/products/bulk-delete-by-ids - delete multiple products by ID
   http.post(`${BASE_URL}/api/products/bulk-delete-by-ids`, async ({ request }) => {
     const body = await request.json();
     const productIds = body.product_ids || [];
@@ -194,7 +194,7 @@ export const productsHandlers = [
       success: true,
       data: {
         deletedCount: deletedCount,
-        deletedProducts: [], // В mock не возвращаем список
+        deletedProducts: [], // Not returning list in mock
       },
       message: `${deletedCount} product(s) deleted successfully`,
     });

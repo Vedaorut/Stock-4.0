@@ -5,7 +5,7 @@
 
 /**
  * Parse duration string to milliseconds
- * Supports: "6 часов", "3 дня", "12h", "24 hours", "1 week", etc.
+ * Supports Russian and English: "6 hours", "3 days", "12h", "24 hours", "1 week", etc.
  * @param {string} text - Duration string
  * @returns {number|null} Duration in milliseconds or null if invalid
  */
@@ -16,19 +16,19 @@ export function parseDurationToMs(text) {
 
   const normalized = text.toLowerCase().trim();
 
-  // Patterns: "6 часов", "3 дня", "12h", "24 hours", etc.
+  // Duration patterns for Russian and English
   const patterns = [
-    // Russian hours
+    // Russian hours (e.g., "6 часов", "1 час")
     { regex: /(\d+)\s*(?:часов|часа|час)/i, multiplier: 60 * 60 * 1000 },
-    // Russian days
+    // Russian days (e.g., "3 дня", "1 день")
     { regex: /(\d+)\s*(?:дней|дня|день)/i, multiplier: 24 * 60 * 60 * 1000 },
-    // Russian weeks
+    // Russian weeks (e.g., "2 недели", "1 неделя")
     { regex: /(\d+)\s*(?:недель|недели|неделя)/i, multiplier: 7 * 24 * 60 * 60 * 1000 },
-    // English hours
+    // English hours (e.g., "6 hours", "12h")
     { regex: /(\d+)\s*(?:hours?|hrs?|h)/i, multiplier: 60 * 60 * 1000 },
-    // English days
+    // English days (e.g., "3 days", "1d")
     { regex: /(\d+)\s*(?:days?|d)/i, multiplier: 24 * 60 * 60 * 1000 },
-    // English weeks
+    // English weeks (e.g., "2 weeks", "1w")
     { regex: /(\d+)\s*(?:weeks?|w)/i, multiplier: 7 * 24 * 60 * 60 * 1000 },
   ];
 

@@ -5,6 +5,7 @@ import { shopApi, productApi, orderApi } from '../../utils/api.js';
 import * as smartMessage from '../../utils/smartMessage.js';
 import logger from '../../utils/logger.js';
 import { messages } from '../../texts/messages.js';
+import { t } from '../../i18n/index.js';
 
 // Note: orderApi kept for handleWorkerStats (revenue calculation)
 
@@ -24,10 +25,11 @@ const setWorkspaceSession = (ctx, shop) => {
 };
 
 const ensureWorkspaceShop = async (ctx) => {
+  const lang = ctx.lang || ctx.session?.user?.language || 'ru';
   if (!ctx.session.token) {
     await smartMessage.send(ctx, {
-      text: generalMessages.authorizationRequired,
-      keyboard: mainMenu(false, ctx.lang),
+      text: generalMessages.authorizationRequired(lang),
+      keyboard: mainMenu(false, lang),
     });
     return null;
   }
@@ -56,7 +58,7 @@ const formatProductsList = (products, lang = 'ru') => {
     return null; // Return null so caller can use localized string
   }
 
-  const pcsLabel = lang === 'ru' ? 'шт' : 'pcs';
+  const pcsLabel = t('orders.pcs', {}, lang);
   return products
     .slice(0, 20)
     .map((p, idx) => {
@@ -80,10 +82,11 @@ export const handleWorkerDashboard = async (ctx) => {
       }
     }
 
+    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
     if (!ctx.session.token) {
       await smartMessage.send(ctx, {
-        text: generalMessages.authorizationRequired,
-        keyboard: mainMenu(false, ctx.lang),
+        text: generalMessages.authorizationRequired(lang),
+        keyboard: mainMenu(false, lang),
       });
       return;
     }
@@ -108,9 +111,10 @@ export const handleWorkerDashboard = async (ctx) => {
     });
   } catch (error) {
     logger.error('handleWorkerDashboard error:', error);
+    const langErr = ctx.lang || ctx.session?.user?.language || 'ru';
     await smartMessage.send(ctx, {
-      text: generalMessages.actionFailed,
-      keyboard: mainMenu(false, ctx.lang),
+      text: generalMessages.actionFailed(langErr),
+      keyboard: mainMenu(false, langErr),
     });
   }
 };
@@ -140,9 +144,10 @@ export const handleWorkerProducts = async (ctx) => {
     });
   } catch (error) {
     logger.error('handleWorkerProducts error:', error);
+    const langErr = ctx.lang || ctx.session?.user?.language || 'ru';
     await smartMessage.send(ctx, {
-      text: generalMessages.actionFailed,
-      keyboard: workerMenu(undefined, ctx.lang),
+      text: generalMessages.actionFailed(langErr),
+      keyboard: workerMenu(undefined, langErr),
     });
   }
 };
@@ -170,9 +175,10 @@ export const handleWorkerStats = async (ctx) => {
     });
   } catch (error) {
     logger.error('handleWorkerStats error:', error);
+    const langErr = ctx.lang || ctx.session?.user?.language || 'ru';
     await smartMessage.send(ctx, {
-      text: generalMessages.actionFailed,
-      keyboard: workerMenu(undefined, ctx.lang),
+      text: generalMessages.actionFailed(langErr),
+      keyboard: workerMenu(undefined, langErr),
     });
   }
 };

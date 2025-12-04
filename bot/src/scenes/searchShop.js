@@ -4,9 +4,8 @@ import { cancelButton } from '../keyboards/common.js';
 import { shopApi } from '../utils/api.js';
 import logger from '../utils/logger.js';
 import * as smartMessage from '../utils/smartMessage.js';
-import { messages, formatters } from '../texts/messages.js';
-
-const { buyer: buyerMessages, search: searchMessages, general: generalMessages } = messages;
+import { getMessages, getFormatters } from '../texts/messages.js';
+import { t } from '../i18n/index.js';
 
 /**
  * Search Shop Scene - Clean chat implementation
@@ -20,9 +19,12 @@ const enterShopName = async (ctx) => {
   try {
     logger.info('shop_search_step:name', { userId: ctx.from.id });
 
+    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const { search: searchMessages } = getMessages(lang);
+
     await smartMessage.send(ctx, {
-      text: searchMessages.prompt,
-      keyboard: cancelButton,
+      text: searchMessages.prompt(lang),
+      keyboard: cancelButton(lang),
     });
 
     return ctx.wizard.next();
@@ -35,10 +37,14 @@ const enterShopName = async (ctx) => {
 // Step 2: Show results
 const showResults = async (ctx) => {
   try {
+    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const { buyer: buyerMessages, search: searchMessages } = getMessages(lang);
+    const formatters = getFormatters(lang);
+
     // Get shop name from message
     if (!ctx.message || !ctx.message.text) {
       await smartMessage.send(ctx, {
-        text: 'Пожалуйста, отправьте название магазина текстом.\n\n' + searchMessages.inputRequired,
+        text: t('scenes.sendShopNameText', {}, lang) + '\n\n' + searchMessages.inputRequired(lang),
       });
       return;
     }
@@ -54,7 +60,7 @@ const showResults = async (ctx) => {
 
     if (query.length < 2) {
       await smartMessage.send(ctx, {
-        text: searchMessages.tooShort,
+        text: searchMessages.tooShort(lang),
       });
       return;
     }
@@ -65,7 +71,7 @@ const showResults = async (ctx) => {
     });
 
     await smartMessage.send(ctx, {
-      text: searchMessages.searching,
+      text: searchMessages.searching(lang),
     });
 
     // Search shops via backend
@@ -73,8 +79,8 @@ const showResults = async (ctx) => {
 
     if (!shops || shops.length === 0) {
       await smartMessage.send(ctx, {
-        text: searchMessages.noResults,
-        keyboard: buyerMenu(ctx.lang),
+        text: searchMessages.noResults(lang),
+        keyboard: buyerMenu(lang),
       });
       return await ctx.scene.leave();
     }
@@ -89,10 +95,10 @@ const showResults = async (ctx) => {
     });
 
     // Show results (limited to 10 for clean UI)
-    const moreInfo = shops.length > 10 ? `\n\n_Показаны первые 10 из ${shops.length}_` : '';
+    const moreInfo = shops.length > 10 ? `\n\n_${t('search.showingFirstN', { total: shops.length }, lang)}_` : '';
 
     await smartMessage.send(ctx, {
-      text: `${buyerMessages.searchResultsTitle(shops.length)}\n${shopList}${moreInfo}`,
+      text: `${buyerMessages.searchResultsTitle(shops.length, lang)}\n${shopList}${moreInfo}`,
       keyboard: shopResultsKeyboard(shops),
     });
 
@@ -100,9 +106,11 @@ const showResults = async (ctx) => {
     return await ctx.scene.leave();
   } catch (error) {
     logger.error('Error searching shops:', error);
+    const langErr = ctx.lang || ctx.session?.user?.language || 'ru';
+    const { search: searchMsgs } = getMessages(langErr);
     await smartMessage.send(ctx, {
-      text: searchMessages.error,
-      keyboard: buyerMenu(ctx.lang),
+      text: searchMsgs.error,
+      keyboard: buyerMenu(langErr),
     });
     return await ctx.scene.leave();
   }
@@ -119,7 +127,7 @@ searchShopScene.leave(async (ctx) => {
   }
   ctx.scene.state = {};
 
-  // Очистить __scenes из Redis сессии для предотвращения застревания
+  // Clear __scenes from Redis session to prevent getting stuck
   if (ctx.session && ctx.session.__scenes) {
     delete ctx.session.__scenes;
   }
@@ -127,25 +135,40 @@ searchShopScene.leave(async (ctx) => {
   logger.info(`User ${ctx.from?.id} left searchShop scene`);
 });
 
-// Handle cancel action within scene
+// Handle cancel button - prevents users from getting stuck in scene
 searchShopScene.action('cancel_scene', async (ctx) => {
   try {
-    await ctx.answerCbQuery(); // Silent
-    logger.info('shop_search_cancelled', { userId: ctx.from.id });
+    await ctx.answerCbQuery();
+    logger.info('search_shop_cancelled', { userId: ctx.from.id });
     await ctx.scene.leave();
 
-    // Silent transition - edit message without "Отменено" text
-    await ctx.editMessageText(buyerMessages.panel, buyerMenu(ctx.lang));
+    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    await ctx.editMessageText(t('general.actionCancelled', {}, lang), buyerMenu(lang));
   } catch (error) {
     logger.error('Error in cancel_scene handler:', error);
-    // Local error handling - don't throw to avoid infinite spinner
     try {
-      await smartMessage.send(ctx, {
-        text: generalMessages.actionFailed,
-        keyboard: buyerMenu(ctx.lang),
-      });
-    } catch (replyError) {
-      logger.error('Failed to send error message:', replyError);
+      await ctx.scene.leave();
+    } catch (leaveError) {
+      logger.error('Failed to leave scene:', leaveError);
+    }
+  }
+});
+
+// Also handle 'cancel' action (some buttons use this)
+searchShopScene.action('cancel', async (ctx) => {
+  try {
+    await ctx.answerCbQuery();
+    logger.info('search_shop_cancelled', { userId: ctx.from.id });
+    await ctx.scene.leave();
+
+    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    await ctx.editMessageText(t('general.actionCancelled', {}, lang), buyerMenu(lang));
+  } catch (error) {
+    logger.error('Error in cancel handler:', error);
+    try {
+      await ctx.scene.leave();
+    } catch (leaveError) {
+      logger.error('Failed to leave scene:', leaveError);
     }
   }
 });

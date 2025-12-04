@@ -45,7 +45,7 @@ export default function Follows() {
           if (import.meta.env.DEV) {
             console.error('[Follows] Error loading shops:', shopsError);
           }
-          return { status: 'error', error: 'Не удалось загрузить данные' };
+          return { status: 'error', error: 'Failed to load data' };
         }
 
         const shops = Array.isArray(shopsResponse?.data) ? shopsResponse.data : [];
@@ -71,7 +71,7 @@ export default function Follows() {
         if (import.meta.env.DEV) {
           console.error('[Follows] Error loading follows:', followsError);
         }
-        return { status: 'error', error: 'Не удалось загрузить подписки' };
+        return { status: 'error', error: 'Failed to load subscriptions' };
       }
 
       const list = Array.isArray(followsResponse?.data)
@@ -150,7 +150,7 @@ export default function Follows() {
   const handleAddShop = () => {
     triggerHaptic('light');
     if (window.Telegram?.WebApp?.showAlert) {
-      window.Telegram.WebApp.showAlert('Используйте команду /follow в боте для добавления магазинов');
+      window.Telegram.WebApp.showAlert('Use the /follow command in the bot to add shops');
     }
   };
 
@@ -210,7 +210,7 @@ export default function Follows() {
               className="mt-4 px-6 py-3 bg-[#FF6B00] text-white font-semibold rounded-xl shadow-lg shadow-[#FF6B00]/20"
               whileTap={{ scale: 0.95 }}
             >
-              Попробовать снова
+              {t('common.retry')}
             </motion.button>
           </div>
         ) : follows.length === 0 ? (
@@ -233,9 +233,9 @@ export default function Follows() {
                   </svg>
                 </div>
             </div>
-            <h3 className="text-xl font-bold text-white mb-2">Нет подписок</h3>
+            <h3 className="text-xl font-bold text-white mb-2">{t('follows.empty')}</h3>
             <p className="text-white/50 text-sm max-w-[240px] leading-relaxed">
-              Добавьте магазины через бота командой <span className="text-[#FF6B00] font-mono bg-[#FF6B00]/10 px-1 rounded">/follow</span>
+              Add shops via the bot using <span className="text-[#FF6B00] font-mono bg-[#FF6B00]/10 px-1 rounded">/follow</span> command
             </p>
           </div>
         ) : (

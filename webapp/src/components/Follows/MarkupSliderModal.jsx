@@ -100,7 +100,7 @@ const MarkupSliderModal = ({
             <div className="px-5">
               {/* Header + Toggle row */}
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-white text-lg font-bold">Наценка</h3>
+                <h3 className="text-white text-lg font-bold">Markup</h3>
                 <div className="flex bg-black/30 p-0.5 rounded-lg border border-white/5">
                   <button
                     onClick={() => setMarkupType('percentage')}
@@ -186,12 +186,12 @@ const MarkupSliderModal = ({
               {/* Preview - compact inline */}
               <div className="bg-[#141414] rounded-xl p-3 border border-white/5 flex items-center justify-between mb-4">
                 <div>
-                  <div className="text-white/40 text-[10px] uppercase tracking-wider">Цена</div>
+                  <div className="text-white/40 text-[10px] uppercase tracking-wider">Price</div>
                   <div className="text-base font-semibold text-white">${examplePrice}</div>
                 </div>
                 <div className="text-white/20 text-lg">→</div>
                 <div className="text-right">
-                  <div className="text-[#FF6B00] text-[10px] uppercase tracking-wider font-bold">Продажа</div>
+                  <div className="text-[#FF6B00] text-[10px] uppercase tracking-wider font-bold">Sale</div>
                   <div className="text-2xl font-bold text-[#FF6B00]">${calculatedPrice}</div>
                 </div>
               </div>
@@ -201,7 +201,7 @@ const MarkupSliderModal = ({
                 onClick={handleConfirm}
                 className="w-full py-3.5 bg-[#FF6B00] hover:bg-[#FF8F00] text-white font-bold text-base rounded-xl shadow-lg shadow-[#FF6B00]/25 transition-all active:scale-[0.98] mb-4"
               >
-                Применить
+                Apply
               </button>
             </div>
           </motion.div>

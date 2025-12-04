@@ -33,15 +33,15 @@ const formatUptime = (ms) => {
   const days = Math.floor(hours / 24);
 
   if (days > 0) {
-    return `${days}д ${hours % 24}ч`;
+    return `${days}d ${hours % 24}h`;
   }
   if (hours > 0) {
-    return `${hours}ч ${minutes % 60}м`;
+    return `${hours}h ${minutes % 60}m`;
   }
   if (minutes > 0) {
-    return `${minutes}м ${seconds % 60}с`;
+    return `${minutes}m ${seconds % 60}s`;
   }
-  return `${seconds}с`;
+  return `${seconds}s`;
 };
 
 /**
@@ -61,7 +61,7 @@ export const handleHealthCommand = async (ctx) => {
 
     // Check if user is admin
     if (ADMIN_IDS.length === 0 || !ADMIN_IDS.includes(userId)) {
-      await ctx.reply('⛔ Эта команда доступна только администраторам.');
+      await ctx.reply('This command is only available to administrators.');
       logger.warn('Unauthorized /health command attempt', { userId });
       return;
     }
@@ -78,58 +78,58 @@ export const handleHealthCommand = async (ctx) => {
     // Build health report
     const lines = [];
 
-    lines.push('🏥 BOT HEALTH CHECK\n');
+    lines.push('BOT HEALTH CHECK\n');
 
     // System info
-    lines.push('📊 Система:');
+    lines.push('System:');
     lines.push(`Uptime: ${formatUptime(uptime)}`);
     lines.push(`Memory: ${formatMemory(memUsage.heapUsed)} / ${formatMemory(memUsage.heapTotal)}`);
     lines.push(`Node.js: ${process.version}`);
     lines.push('');
 
     // Commands
-    lines.push('💬 Команды (топ-5):');
+    lines.push('Commands (top 5):');
     analytics.commands.slice(0, 5).forEach((cmd) => {
-      lines.push(`${cmd.command}: ${cmd.count} раз, ${cmd.uniqueUsers} польз.`);
+      lines.push(`${cmd.command}: ${cmd.count} times, ${cmd.uniqueUsers} users`);
     });
     if (analytics.commands.length === 0) {
-      lines.push('Нет данных');
+      lines.push('No data');
     }
     lines.push('');
 
     // Scenes
-    lines.push('🎭 Сцены:');
+    lines.push('Scenes:');
     analytics.scenes.forEach((scene) => {
       if (scene.activeNow > 0) {
-        lines.push(`${scene.scene}: ${scene.activeNow} активных`);
+        lines.push(`${scene.scene}: ${scene.activeNow} active`);
       }
     });
     if (analytics.scenes.filter((s) => s.activeNow > 0).length === 0) {
-      lines.push('Нет активных');
+      lines.push('No active scenes');
     }
     lines.push('');
 
     // Errors
-    lines.push('❌ Ошибки (топ-3):');
+    lines.push('Errors (top 3):');
     analytics.errors.slice(0, 3).forEach((err) => {
-      lines.push(`${err.handler}: ${err.errorCount} ошибок`);
+      lines.push(`${err.handler}: ${err.errorCount} errors`);
     });
     if (analytics.errors.length === 0) {
-      lines.push('✅ Нет ошибок');
+      lines.push('No errors');
     }
     lines.push('');
 
     // Performance
-    lines.push('⚡ Производительность:');
-    lines.push(`Среднее время отклика: ${analytics.performance.avgResponseTime}ms`);
-    lines.push(`Запросов отслежено: ${analytics.performance.requestsTracked}`);
+    lines.push('Performance:');
+    lines.push(`Average response time: ${analytics.performance.avgResponseTime}ms`);
+    lines.push(`Requests tracked: ${analytics.performance.requestsTracked}`);
 
     const healthReport = lines.join('\n');
 
     await ctx.reply(healthReport);
   } catch (error) {
     logger.error('Error in /health command:', error);
-    await ctx.reply('❌ Ошибка при получении статуса бота.');
+    await ctx.reply('Error getting bot status.');
   }
 };
 

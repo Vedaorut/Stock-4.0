@@ -10,7 +10,7 @@ function ProductCard({ product, onEdit, onDelete, t }) {
 
   const handleDelete = async () => {
     triggerHaptic('medium');
-    const confirmed = await confirm(`Удалить "${product.name}"?`);
+    const confirmed = await confirm(`Delete "${product.name}"?`);
     if (confirmed) {
       triggerHaptic('success');
       onDelete(product.id);
@@ -31,13 +31,13 @@ function ProductCard({ product, onEdit, onDelete, t }) {
             <h3 className="text-white font-semibold">{product.name}</h3>
             {!product.is_available && (
               <span className="text-xs text-red-400 bg-red-500/10 px-2 py-0.5 rounded-full">
-                Недоступен
+                Unavailable
               </span>
             )}
             {(product.is_preorder || product.availability === 'preorder') && (
               <span className="inline-flex items-center gap-1 text-xs text-blue-200 bg-blue-500/15 px-2 py-0.5 rounded-full border border-blue-400/50">
                 <span>🔖</span>
-                <span>Предзаказ</span>
+                <span>Pre-order</span>
               </span>
             )}
             {product.is_synced && (
@@ -49,7 +49,7 @@ function ProductCard({ product, onEdit, onDelete, t }) {
           )}
           <div className="flex items-center gap-3 text-sm">
             <span className="text-orange-primary font-bold">${Math.floor(parseFloat(product.price || 0))}</span>
-            <span className="text-gray-500">В наличии: {product.stock || 0}</span>
+            <span className="text-gray-500">In stock: {product.stock || 0}</span>
           </div>
         </div>
         <div className="flex gap-2">

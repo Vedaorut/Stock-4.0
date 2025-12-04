@@ -4,7 +4,7 @@ import followsData from '../data/follows.json';
 const BASE_URL = 'http://localhost:3000';
 
 export const subscriptionsHandlers = [
-  // GET /api/subscriptions - alias для /api/follows/my
+  // GET /api/subscriptions - alias for /api/follows/my
   http.get(`${BASE_URL}/api/subscriptions`, ({ request }) => {
     const url = new URL(request.url);
     const shopId = url.searchParams.get('shop_id');
@@ -20,7 +20,7 @@ export const subscriptionsHandlers = [
       (f) => f.follower_shop_id === shopId && f.status === 'active'
     ).length;
 
-    // Mock tier limits (из backend логики)
+    // Mock tier limits (from backend logic)
     const tiers = {
       FREE: { maxFollows: 3, maxProducts: 10 },
       PRO: { maxFollows: 10, maxProducts: 100 },
@@ -37,12 +37,12 @@ export const subscriptionsHandlers = [
     });
   }),
 
-  // GET /api/subscriptions/history/:shopId - история изменений
+  // GET /api/subscriptions/history/:shopId - change history
   http.get(`${BASE_URL}/api/subscriptions/history/:shopId`, ({ request, params }) => {
     const url = new URL(request.url);
     const limit = Number(url.searchParams.get('limit')) || 10;
 
-    // Mock history данные
+    // Mock history data
     const history = [
       {
         id: 1,
@@ -63,7 +63,7 @@ export const subscriptionsHandlers = [
     return HttpResponse.json({ success: true, data: history.slice(0, limit) });
   }),
 
-  // GET /api/subscriptions/pricing - тарифы
+  // GET /api/subscriptions/pricing - pricing tiers
   http.get(`${BASE_URL}/api/subscriptions/pricing`, () => {
     return HttpResponse.json({
       success: true,

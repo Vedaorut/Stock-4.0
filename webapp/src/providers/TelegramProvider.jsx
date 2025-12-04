@@ -28,8 +28,8 @@ import { t } from '../i18n';
 const TelegramContext = createContext(null);
 
 /**
- * TelegramProvider - единый контекст для Telegram WebApp
- * Инициализируется ОДИН РАЗ на весь app, вместо создания хука в каждом компоненте
+ * TelegramProvider - unified context for Telegram WebApp
+ * Initializes ONCE for the entire app, instead of creating a hook in each component
  */
 export function TelegramProvider({ children }) {
   const [telegramData, setTelegramData] = useState(null);
@@ -279,8 +279,8 @@ export function TelegramProvider({ children }) {
 }
 
 /**
- * useTelegram hook - теперь использует контекст вместо создания нового экземпляра
- * Возвращает стабильные ссылки на весь app
+ * useTelegram hook - now uses context instead of creating a new instance
+ * Returns stable references for the entire app
  */
 export function useTelegram() {
   const context = useContext(TelegramContext);

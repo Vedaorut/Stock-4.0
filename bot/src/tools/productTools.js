@@ -12,25 +12,25 @@ export const productTools = [
       name: 'addProduct',
       description: `Add a single product instantly.
 
-Use it for commands вида «добавь iPhone 15 за 999», «появился новый чехол 20$». Если нужно несколько товаров сразу — выбирай bulkAddProducts.
+Use it for commands like "add iPhone 15 for 999", "new case arrived $20". If you need multiple products at once - use bulkAddProducts.
 
-Примеры:
-- "добавь iPhone 15 999" → addProduct({ name: "iPhone 15", price: 999, stock: 1 })
-- "создай MacBook Air 1299, 3 штуки" → addProduct({ name: "MacBook Air", price: 1299, stock: 3 })
+Examples:
+- "add iPhone 15 999" → addProduct({ name: "iPhone 15", price: 999, stock: 1 })
+- "create MacBook Air 1299, 3 pieces" → addProduct({ name: "MacBook Air", price: 1299, stock: 3 })
 
-Правила:
-- Цена обязательна — если её нет, спроси «Сколько поставить?»
-- КРИТИЧНО: Цена ДОЛЖНА быть > 0, НИКОГДА не используй 0 или отрицательные значения
-- Минимальная цена: 0.01 USD
-- Сток по умолчанию = 1, если пользователь не уточнил (без вопросов).
-- Имя должно быть осмысленным (не короче 3 символов).`,
+Rules:
+- Price is required - if missing, ask "What price should I set?"
+- CRITICAL: Price MUST be > 0, NEVER use 0 or negative values
+- Minimum price: 0.01 USD
+- Default stock = 1, if user didn't specify (no questions needed).
+- Name must be meaningful (at least 3 characters).`,
       parameters: {
         type: 'object',
         properties: {
           name: {
             type: 'string',
             description:
-              'Product name (minimum 3 characters). Examples: "iPhone 15 Pro", "Samsung Galaxy S24", "Наушники AirPods". Must be specified by user.',
+              'Product name (minimum 3 characters). Examples: "iPhone 15 Pro", "Samsung Galaxy S24", "AirPods Headphones". Must be specified by user.',
           },
           price: {
             type: 'number',
@@ -56,25 +56,25 @@ Use it for commands вида «добавь iPhone 15 за 999», «появил
       name: 'bulkAddProducts',
       description: `Add multiple products at once (2+ items).
 
-УСЛОВИЯ ВЫЗОВА:
+CALL CONDITIONS:
 - User lists 2 or more products in one message → CALL THIS FUNCTION IMMEDIATELY
-- User says "добавь: X, Y, Z" → CALL bulkAddProducts, DON'T describe action in text
-- User says "добавь Чехол 20 5шт, Наушники 150 10шт" → CALL bulkAddProducts({products: [...]})
+- User says "add: X, Y, Z" → CALL bulkAddProducts, DON'T describe action in text
+- User says "add Case 20 5pcs, Headphones 150 10pcs" → CALL bulkAddProducts({products: [...]})
 
-КОГДА ИСПОЛЬЗОВАТЬ:
-✅ "добавь: iPhone 999 3шт, Samsung 799 5шт, Xiaomi 399" → CALL bulkAddProducts
-✅ "добавь Чехол 20 5шт, Наушники 150 10шт, Зарядка 30" → CALL bulkAddProducts
-✅ "новинки: красная кружка $10, зелёная $12" → CALL bulkAddProducts
-❌ "добавь iPhone за 999" → use addProduct (single item)
+WHEN TO USE:
+✅ "add: iPhone 999 3pcs, Samsung 799 5pcs, Xiaomi 399" → CALL bulkAddProducts
+✅ "add Case 20 5pcs, Headphones 150 10pcs, Charger 30" → CALL bulkAddProducts
+✅ "new arrivals: red mug $10, green one $12" → CALL bulkAddProducts
+❌ "add iPhone for 999" → use addProduct (single item)
 
-КРИТИЧНО - ANTI-HALLUCINATION:
-- НИКОГДА не придумывай товары которые пользователь НЕ просил
-- Если пользователь сказал "2 товара" → добавь РОВНО 2 товара
-- Если пользователь сказал "iPhone и Samsung" → добавь РОВНО эти 2 товара
-- ЗАПРЕЩЕНО добавлять "похожие", "дополнительные" или "рекомендованные" товары
-- Только ТЕ товары что пользователь ЯВНО перечислил
+CRITICAL - ANTI-HALLUCINATION:
+- NEVER invent products that user did NOT request
+- If user said "2 products" → add EXACTLY 2 products
+- If user said "iPhone and Samsung" → add EXACTLY these 2 products
+- FORBIDDEN to add "similar", "additional" or "recommended" products
+- Only THOSE products that user EXPLICITLY listed
 
-КРИТИЧНО - EXECUTION:
+CRITICAL - EXECUTION:
 - NEVER respond with text when user lists multiple products
 - ALWAYS call this function immediately when 2+ products detected
 - Extract all product data from user message and call function
@@ -93,18 +93,18 @@ Use it for commands вида «добавь iPhone 15 за 999», «появил
                 name: {
                   type: 'string',
                   description:
-                    'Product name (minimum 3 characters). Extract from user message. Examples: "iPhone 15", "Чехол", "red car"',
+                    'Product name (minimum 3 characters). Extract from user message. Examples: "iPhone 15", "Case", "red car"',
                 },
                 price: {
                   type: 'number',
                   description:
-                    'Product price in USD (must be > 0). Extract from user message: "$500", "1000$", "цена 999". Examples: 999, 49.90, 0.01 (minimum). NEVER use 0 or negative values.',
+                    'Product price in USD (must be > 0). Extract from user message: "$500", "1000$", "price 999". Examples: 999, 49.90, 0.01 (minimum). NEVER use 0 or negative values.',
                   minimum: 0.01,
                 },
                 stock: {
                   type: 'number',
                   description:
-                    'Stock quantity. Defaults to 1 if не указано. Extract from: "5шт", "10 pcs", "2 штуки". Must be >= 0.',
+                    'Stock quantity. Defaults to 1 if not specified. Extract from: "5pcs", "10 pcs", "2 pieces". Must be >= 0.',
                 },
               },
               required: ['name', 'price'],
@@ -127,14 +127,14 @@ Use it for commands вида «добавь iPhone 15 за 999», «появил
 
 Use this when:
 - User wants to remove one specific product
-- User says "удали iPhone", "delete Samsung", "убери товар"
+- User says "delete iPhone", "delete Samsung", "remove product"
 
 Don't use if:
 - User wants to delete multiple specific products (use bulkDeleteByNames)
 - User wants to delete ALL products (use bulkDeleteAll)
 
 IMPORTANT:
-- If user didn't specify product name, ask "Какой товар удалить?" BEFORE calling
+- If user didn't specify product name, ask "Which product to delete?" BEFORE calling
 - If search returns multiple matches, ask user to clarify which one`,
       parameters: {
         type: 'object',
@@ -142,7 +142,7 @@ IMPORTANT:
           productName: {
             type: 'string',
             description:
-              'Product name to delete (fuzzy match supported). REQUIRED: If user didn\'t mention product name, ask before calling. Examples: "iPhone" will match "iPhone 15 Pro", "Чехол" will find "Чехол для Samsung"',
+              'Product name to delete (fuzzy match supported). REQUIRED: If user didn\'t mention product name, ask before calling. Examples: "iPhone" will match "iPhone 15 Pro", "Case" will find "Case for Samsung"',
           },
         },
         required: ['productName'],
@@ -159,7 +159,7 @@ IMPORTANT:
 
 Use this when:
 - User wants to see all products
-- User says "покажи товары", "list products", "что в магазине?", "show all items"
+- User says "show products", "list products", "what's in the store?", "show all items"
 
 Don't use if:
 - User wants to find specific product (use searchProduct)
@@ -183,22 +183,22 @@ No parameters needed - returns all products automatically.`,
 Use this when:
 - User asks about specific product but name is partial/unclear
 - You need to confirm which product user means (multiple possible matches)
-- User says "найди iPhone", "search for Samsung", "есть ли Чехол?"
+- User says "find iPhone", "search for Samsung", "do you have a Case?"
 
 Don't use if:
 - User wants to see ALL products (use listProducts)
 - You already know exact product name (use getProductInfo)
 
 Fuzzy match examples:
-- Query "iPhone" will find: "iPhone 15 Pro", "iPhone 14", "Чехол для iPhone"
-- Query "Чехол" will find: "Чехол для Samsung", "Чехол кожаный"`,
+- Query "iPhone" will find: "iPhone 15 Pro", "iPhone 14", "Case for iPhone"
+- Query "Case" will find: "Case for Samsung", "Leather Case"`,
       parameters: {
         type: 'object',
         properties: {
           query: {
             type: 'string',
             description:
-              'Search query (partial match supported). Examples: "iPhone" will match "iPhone 15 Pro Max", "чехол" will match "Чехол для Samsung". Can be in any language.',
+              'Search query (partial match supported). Examples: "iPhone" will match "iPhone 15 Pro Max", "case" will match "Case for Samsung". Can be in any language.',
           },
         },
         required: ['query'],
@@ -213,20 +213,20 @@ Fuzzy match examples:
       name: 'bulkUpdateProducts',
       description: `Update MULTIPLE SPECIFIC products (2-5 products) at once by their names.
 
-КОГДА ИСПОЛЬЗОВАТЬ:
+WHEN TO USE:
 ✅ User mentions 2+ specific product names → CALL THIS FUNCTION (not updateProduct multiple times)
-✅ "скидка 20% на iPhone и MacBook" → bulkUpdateProducts([{productName:"iPhone",updates:{discount_percentage:20}},{productName:"MacBook",updates:{discount_percentage:20}}])
-✅ "установи цену 100 для iPhone, iPad, MacBook" → bulkUpdateProducts with 3 products
-✅ "переименуй iPhone в iPhone 15 и MacBook в MacBook Pro" → bulkUpdateProducts with name updates
-❌ "скидка на всё" → use bulkUpdatePrices (all products)
-❌ "скидка на iPhone" → use updateProduct or applyDiscount (single product)
+✅ "20% discount on iPhone and MacBook" → bulkUpdateProducts([{productName:"iPhone",updates:{discount_percentage:20}},{productName:"MacBook",updates:{discount_percentage:20}}])
+✅ "set price 100 for iPhone, iPad, MacBook" → bulkUpdateProducts with 3 products
+✅ "rename iPhone to iPhone 15 and MacBook to MacBook Pro" → bulkUpdateProducts with name updates
+❌ "discount on everything" → use bulkUpdatePrices (all products)
+❌ "discount on iPhone" → use updateProduct or applyDiscount (single product)
 
-IMPORTANT: When user lists multiple products with same operation (e.g., "скидка 20% на iPhone и MacBook"), DO NOT call updateProduct/applyDiscount multiple times. Instead, call bulkUpdateProducts ONCE with ALL products.
+IMPORTANT: When user lists multiple products with same operation (e.g., "20% discount on iPhone and MacBook"), DO NOT call updateProduct/applyDiscount multiple times. Instead, call bulkUpdateProducts ONCE with ALL products.
 
 Examples:
-- "скидка 20% на iPhone и MacBook" → bulkUpdateProducts({products:[{productName:"iPhone",updates:{discount_percentage:20}},{productName:"MacBook",updates:{discount_percentage:20}}]})
-- "установи остаток 5 для iPhone и iPad" → bulkUpdateProducts({products:[{productName:"iPhone",updates:{stock_quantity:5}},{productName:"iPad",updates:{stock_quantity:5}}]})
-- "цена 999 для iPhone, 1299 для MacBook" → bulkUpdateProducts({products:[{productName:"iPhone",updates:{price:999}},{productName:"MacBook",updates:{price:1299}}]})`,
+- "20% discount on iPhone and MacBook" → bulkUpdateProducts({products:[{productName:"iPhone",updates:{discount_percentage:20}},{productName:"MacBook",updates:{discount_percentage:20}}]})
+- "set stock 5 for iPhone and iPad" → bulkUpdateProducts({products:[{productName:"iPhone",updates:{stock_quantity:5}},{productName:"iPad",updates:{stock_quantity:5}}]})
+- "price 999 for iPhone, 1299 for MacBook" → bulkUpdateProducts({products:[{productName:"iPhone",updates:{price:999}},{productName:"MacBook",updates:{price:1299}}]})`,
       parameters: {
         type: 'object',
         properties: {
@@ -282,28 +282,28 @@ Examples:
     strict: true,
     function: {
       name: 'updateProduct',
-      description: `Modify an existing product: имя, цена, остаток, скидка.
+      description: `Modify an existing product: name, price, stock, discount.
 
-Применяй при командах "переименуй", "поставь цену", "выстави остаток", "скидка 15%", "сделай нет в наличии".
+Use for commands "rename", "set price", "set stock", "15% discount", "make out of stock".
 
-Примеры:
-- "поставь цену 1299" (после обсуждения MacBook) → updateProduct({ productName: "MacBook...", updates: { price: 1299 } })
-- "выстави остаток 0" → updates.stock_quantity = 0
-- "скидка 25% на iPhone на 3 дня" → updates.discount_percentage = 25, updates.discount_expires_at = "3 дня"
-- "отмени скидку на AirPods" → discount_percentage = 0 (backend вернёт цену из original_price)
+Examples:
+- "set price 1299" (after discussing MacBook) → updateProduct({ productName: "MacBook...", updates: { price: 1299 } })
+- "set stock 0" → updates.stock_quantity = 0
+- "25% discount on iPhone for 3 days" → updates.discount_percentage = 25, updates.discount_expires_at = "3 days"
+- "cancel discount on AirPods" → discount_percentage = 0 (backend will restore price from original_price)
 
-Правила:
-- Если товар не указан и невозможно однозначно понять из контекста — уточни какой именно.
-- Если товар единственный или только что обсуждался — используй его без вопросов.
-- discount_percentage 0–100. Для таймера можно передать ISO дату или фразу «6 часов».
-- Если пользователь даёт несколько изменений сразу, объедини их в один вызов.`,
+Rules:
+- If product is not specified and cannot be clearly understood from context - ask which one.
+- If product is the only one or was just discussed - use it without questions.
+- discount_percentage 0-100. For timer you can pass ISO date or phrase like "6 hours".
+- If user gives multiple changes at once, combine them into one call.`,
       parameters: {
         type: 'object',
         properties: {
           productName: {
             type: 'string',
             description:
-              'Current product name to search (fuzzy match supported). REQUIRED: If user didn\'t mention product name, ask "Какой товар обновить?" before calling. Examples: "iPhone" will match "iPhone 15 Pro", "Чехол" will match "Чехол для Samsung"',
+              'Current product name to search (fuzzy match supported). REQUIRED: If user didn\'t mention product name, ask "Which product to update?" before calling. Examples: "iPhone" will match "iPhone 15 Pro", "Case" will match "Case for Samsung"',
           },
           updates: {
             type: 'object',
@@ -313,17 +313,17 @@ Examples:
               name: {
                 type: 'string',
                 description:
-                  'New product name. Only include if user wants to rename. Example: user says "переименуй iPhone в iPhone 15 Pro Max" → extract "iPhone 15 Pro Max"',
+                  'New product name. Only include if user wants to rename. Example: user says "rename iPhone to iPhone 15 Pro Max" → extract "iPhone 15 Pro Max"',
               },
               price: {
                 type: 'number',
                 description:
-                  'New price in USD. Only include if user wants to change price. Must be positive. Examples: user says "поставь цену 999" → 999, "change price to $1299" → 1299',
+                  'New price in USD. Only include if user wants to change price. Must be positive. Examples: user says "set price 999" → 999, "change price to $1299" → 1299',
               },
               stock_quantity: {
                 type: 'number',
                 description:
-                  'New stock count. Use when user says "выстави наличие 10", "поставь остаток 5", "set stock to 20". Must be >= 0. Examples: "5 штук" → 5, "нет в наличии" → 0, "100 pcs" → 100',
+                  'New stock count. Use when user says "set stock 10", "set availability 5", "set stock to 20". Must be >= 0. Examples: "5 pieces" → 5, "out of stock" → 0, "100 pcs" → 100',
               },
               discount_percentage: {
                 type: 'number',
@@ -333,7 +333,7 @@ Examples:
               discount_expires_at: {
                 type: 'string',
                 description:
-                  'Discount expiry for the product. ISO datetime or duration phrase like "6 часов", "24h". Leave empty/null for permanent discount.',
+                  'Discount expiry for the product. ISO datetime or duration phrase like "6 hours", "24h". Leave empty/null for permanent discount.',
               },
             },
             additionalProperties: false,
@@ -353,7 +353,7 @@ Examples:
 
 Use this when:
 - User explicitly wants to delete ALL products
-- User says "удали все товары", "delete all products", "очисти магазин"
+- User says "delete all products", "delete all products", "clear the store"
 
 Don't use if:
 - User wants to delete specific products (use deleteProduct or bulkDeleteByNames)
@@ -362,20 +362,20 @@ DANGEROUS OPERATION!
 - NEVER call this function directly when user first asks
 - ALWAYS return error asking for confirmation first (call with confirm: false or without confirm parameter)
 - Function will show confirmation buttons to user
-- ONLY call with confirm: true after user clicked confirmation button (you'll see "подтвердил" in next message)
+- ONLY call with confirm: true after user clicked confirmation button (you'll see "confirmed" in next message)
 
 Critical rules:
 - First call: bulkDeleteAll({ confirm: false }) - shows buttons, returns needsConfirmation: true
-- User confirms by clicking button (not by text "да")
+- User confirms by clicking button (not by text "yes")
 - After button click: function executes automatically
 - DO NOT call this function multiple times in one conversation
 - If function returns needsConfirmation: true - tell user to click button
 
 Example flow:
-1. User: "удали все товары"
+1. User: "delete all products"
 2. You: Call bulkDeleteAll({ confirm: false })
 3. Function: Returns { needsConfirmation: true, message: "..." }
-4. You: Tell user "Нажми кнопку для подтверждения"
+4. You: Tell user "Click the button to confirm"
 5. User: *clicks button*
 6. System: Executes deletion automatically (you don't call function again)`,
       parameters: {
@@ -401,7 +401,7 @@ Example flow:
 
 Use this when:
 - User wants to delete 2 or more specific products
-- User says "удали iPhone и Samsung", "delete MacBook, iPad, AirPods"
+- User says "delete iPhone and Samsung", "delete MacBook, iPad, AirPods"
 - User provides a list of products to remove
 
 Don't use if:
@@ -433,20 +433,20 @@ IMPORTANT: DO NOT respond with text explanation. Extract product names from user
       name: 'bulkDeleteExcept',
       description: `Delete all products EXCEPT specified ones.
 
-УСЛОВИЯ ВЫЗОВА:
-- User says "удали всё кроме iPad", "delete all except iPhone", "убери всё кроме MacBook и AirPods" → CALL THIS FUNCTION IMMEDIATELY
+CALL CONDITIONS:
+- User says "delete everything except iPad", "delete all except iPhone", "remove everything except MacBook and AirPods" → CALL THIS FUNCTION IMMEDIATELY
 - User wants to keep specific products and delete the rest → CALL bulkDeleteExcept
 - Extract product names to KEEP from user message → CALL function with excludedProducts
 
-КОГДА ИСПОЛЬЗОВАТЬ:
-✅ "удали всё кроме iPad" → CALL bulkDeleteExcept({ excludedProducts: ["iPad"] })
+WHEN TO USE:
+✅ "delete everything except iPad" → CALL bulkDeleteExcept({ excludedProducts: ["iPad"] })
 ✅ "delete all except iPhone and Samsung" → CALL bulkDeleteExcept({ excludedProducts: ["iPhone", "Samsung"] })
-✅ "очисти магазин кроме MacBook" → CALL bulkDeleteExcept({ excludedProducts: ["MacBook"] })
-❌ "удали все товары" → use bulkDeleteAll (no exceptions)
-❌ "удали iPhone и Samsung" → use bulkDeleteByNames (specific products)
+✅ "clear store except MacBook" → CALL bulkDeleteExcept({ excludedProducts: ["MacBook"] })
+❌ "delete all products" → use bulkDeleteAll (no exceptions)
+❌ "delete iPhone and Samsung" → use bulkDeleteByNames (specific products)
 
-КРИТИЧНО:
-- NEVER respond with text when user says "всё кроме X"
+CRITICAL:
+- NEVER respond with text when user says "everything except X"
 - ALWAYS call this function immediately
 - Extract names of products to KEEP (not to delete)
 - DO NOT ask confirmation - just CALL the function`,
@@ -459,7 +459,7 @@ IMPORTANT: DO NOT respond with text explanation. Extract product names from user
               type: 'string',
             },
             description:
-              'Array of product names to KEEP (not delete). All other products will be deleted. Fuzzy match supported. Examples: ["iPad"] will keep "iPad Pro", ["iPhone", "MacBook"] will keep both. Extract from "кроме X" or "except Y".',
+              'Array of product names to KEEP (not delete). All other products will be deleted. Fuzzy match supported. Examples: ["iPad"] will keep "iPad Pro", ["iPhone", "MacBook"] will keep both. Extract from "except X" or "except Y".',
           },
         },
         required: ['excludedProducts'],
@@ -474,18 +474,18 @@ IMPORTANT: DO NOT respond with text explanation. Extract product names from user
       name: 'recordSale',
       description: `Record a sale - decrease stock quantity.
 
-УСЛОВИЯ ВЫЗОВА:
-- User says "купили iPhone", "продали 3 AirPods", "bought 5 Samsung" → CALL THIS FUNCTION IMMEDIATELY
+CALL CONDITIONS:
+- User says "sold iPhone", "sold 3 AirPods", "bought 5 Samsung" → CALL THIS FUNCTION IMMEDIATELY
 - User reports any sale → CALL recordSale, DON'T respond with text
 - Extract product name and quantity from user message → CALL function
 
-КОГДА ИСПОЛЬЗОВАТЬ:
-✅ "купили iPhone" → CALL recordSale({ productName: "iPhone", quantity: 1 })
-✅ "продали 3 MacBook" → CALL recordSale({ productName: "MacBook", quantity: 3 })
+WHEN TO USE:
+✅ "sold iPhone" → CALL recordSale({ productName: "iPhone", quantity: 1 })
+✅ "sold 3 MacBook" → CALL recordSale({ productName: "MacBook", quantity: 3 })
 ✅ "bought 2 AirPods" → CALL recordSale({ productName: "AirPods", quantity: 2 })
-❌ "установи остаток 5" → use updateProduct (manual stock change)
+❌ "set stock 5" → use updateProduct (manual stock change)
 
-КРИТИЧНО:
+CRITICAL:
 - NEVER respond with text when user reports a sale
 - ALWAYS call this function immediately when sale is mentioned
 - Default quantity = 1 if not specified
@@ -496,12 +496,12 @@ IMPORTANT: DO NOT respond with text explanation. Extract product names from user
           productName: {
             type: 'string',
             description:
-              'Product name (fuzzy match supported). REQUIRED: If user didn\'t mention product, ask before calling. Examples: "iPhone" will match "iPhone 15 Pro", "Чехол" will match "Чехол для Samsung"',
+              'Product name (fuzzy match supported). REQUIRED: If user didn\'t mention product, ask before calling. Examples: "iPhone" will match "iPhone 15 Pro", "Case" will match "Case for Samsung"',
           },
           quantity: {
             type: 'number',
             description:
-              'Number of items sold. If omitted, assume 1 автоматически. Examples: "продал 5 штук" → 5, "продали iPhone" → 1. Must be positive number.',
+              'Number of items sold. If omitted, assume 1 automatically. Examples: "sold 5 pieces" → 5, "sold iPhone" → 1. Must be positive number.',
           },
         },
         required: ['productName'],
@@ -518,21 +518,21 @@ IMPORTANT: DO NOT respond with text explanation. Extract product names from user
 
 Use this when:
 - User asks about specific product details
-- User says "сколько стоит iPhone?", "what's the price of Samsung?"
-- User says "сколько осталось Чехлов?", "how many AirPods left?"
+- User says "how much is iPhone?", "what's the price of Samsung?"
+- User says "how many Cases left?", "how many AirPods left?"
 
 Don't use if:
 - User wants to see all products (use listProducts)
 - User wants to search/find products (use searchProduct)
 
-IMPORTANT: If user didn't specify product name, ask "О каком товаре?" before calling.`,
+IMPORTANT: If user didn't specify product name, ask "Which product?" before calling.`,
       parameters: {
         type: 'object',
         properties: {
           productName: {
             type: 'string',
             description:
-              'Product name to get info about (fuzzy match supported). REQUIRED: If user didn\'t mention product, ask before calling. Examples: "iPhone" will find "iPhone 15 Pro", "Наушники" will find "Наушники AirPods"',
+              'Product name to get info about (fuzzy match supported). REQUIRED: If user didn\'t mention product, ask before calling. Examples: "iPhone" will find "iPhone 15 Pro", "Headphones" will find "AirPods Headphones"',
           },
         },
         required: ['productName'],
@@ -548,9 +548,9 @@ IMPORTANT: If user didn't specify product name, ask "О каком товаре?
       description: `Apply discount to a specific product.
 
 Examples:
-- User: "скидка 30% на iPhone" → applyDiscount({ productName: "iPhone", percentage: 30 })
-- User: "скидка 15% на AirPods на 6 часов" → applyDiscount({ productName: "AirPods", percentage: 15, duration: "6h" })
-- User: "скидка 20% на MacBook на 2 дня" → applyDiscount({ productName: "MacBook", percentage: 20, duration: "2d" })
+- User: "30% discount on iPhone" → applyDiscount({ productName: "iPhone", percentage: 30 })
+- User: "15% discount on AirPods for 6 hours" → applyDiscount({ productName: "AirPods", percentage: 15, duration: "6h" })
+- User: "20% discount on MacBook for 2 days" → applyDiscount({ productName: "MacBook", percentage: 20, duration: "2d" })
 
 Duration format:
 - "6h" or "6 hours" - expires in 6 hours
@@ -587,8 +587,8 @@ Duration format:
       description: `Remove discount from a product.
 
 Examples:
-- User: "убери скидку с iPhone" → removeDiscount({ productName: "iPhone" })
-- User: "удали скидку MacBook" → removeDiscount({ productName: "MacBook" })`,
+- User: "remove discount from iPhone" → removeDiscount({ productName: "iPhone" })
+- User: "delete discount MacBook" → removeDiscount({ productName: "MacBook" })`,
       parameters: {
         type: 'object',
         properties: {
@@ -609,25 +609,25 @@ Examples:
       name: 'bulkUpdatePrices',
       description: `Apply discount or markup to the whole catalog.
 
-Используй, когда пользователь явно говорит «скидка 15% на всё», «подними цены на 5%», «распродажа 20% кроме MacBook». Для одного товара выбирай updateProduct.
+Use when user explicitly says "15% discount on everything", "raise prices by 5%", "20% sale except MacBook". For single product use updateProduct.
 
-Примеры:
-- "скидка 20% на все" → bulkUpdatePrices({ percentage: 20, operation: 'decrease', discount_type: 'permanent' })
-- "-15% на каталог на 6 часов" → percentage: 15, operation: 'decrease', discount_type: 'timer', duration: '6 часов'
-- "подними цены на 7%, кроме аксессуаров" → operation: 'increase', excludedProducts: ['аксессуар']
+Examples:
+- "20% discount on everything" → bulkUpdatePrices({ percentage: 20, operation: 'decrease', discount_type: 'permanent' })
+- "-15% on catalog for 6 hours" → percentage: 15, operation: 'decrease', discount_type: 'timer', duration: '6 hours'
+- "raise prices by 7%, except accessories" → operation: 'increase', excludedProducts: ['accessory']
 
-Правила:
-- Процент обязателен (0.1–100). Значения >100 отвергни с подсказкой.
-- Если тип не указан, по умолчанию делай постоянную скидку. Таймер требуй только когда пользователь его упоминает.
-- excludedProducts — список названий или их частей, которые нужно пропустить.
-- Маркап (increase) всегда постоянный, duration в этом случае не отправляй.`,
+Rules:
+- Percentage is required (0.1-100). Reject values >100 with a hint.
+- If type not specified, default to permanent discount. Only require timer when user mentions it.
+- excludedProducts - list of names or parts thereof to skip.
+- Markup (increase) is always permanent, don't send duration in this case.`,
       parameters: {
         type: 'object',
         properties: {
           percentage: {
             type: 'number',
             description:
-              'Percentage to change (positive number, 0.1 to 100). Examples: user says "скидка 10%" → 10, "increase by 5%" → 5, "накрутка 15%" → 15. Extract ONLY the number.',
+              'Percentage to change (positive number, 0.1 to 100). Examples: user says "10% discount" → 10, "increase by 5%" → 5, "markup 15%" → 15. Extract ONLY the number.',
             minimum: 0.1,
             maximum: 100,
           },
@@ -635,7 +635,7 @@ Examples:
             type: 'string',
             enum: ['increase', 'decrease'],
             description:
-              'Operation type. "decrease" = discount/скидка (lower prices). "increase" = накрутка/markup (raise prices). Examples: "скидка" → decrease, "подними цены" → increase, "discount" → decrease.',
+              'Operation type. "decrease" = discount (lower prices). "increase" = markup (raise prices). Examples: "discount" → decrease, "raise prices" → increase, "discount" → decrease.',
           },
           discount_type: {
             type: 'string',
@@ -646,13 +646,13 @@ Examples:
           duration: {
             type: 'string',
             description:
-              'Duration for timer discount in human-readable format. Examples: "6 часов", "3 дня", "12h", "2 days", "24 hours". Заполняй только если пользователь дал длительность.',
+              'Duration for timer discount in human-readable format. Examples: "6 hours", "3 days", "12h", "2 days", "24 hours". Only fill if user provided duration.',
           },
           excludedProducts: {
             type: 'array',
             items: { type: 'string' },
             description:
-              'Product names to EXCLUDE from discount. Use when user says "кроме X", "except Y", "всем кроме Z", "без X". Example: ["MacBook", "iPhone"]. Supports partial names - "iPhone" will exclude "iPhone 12 Pro", "iPhone 13", etc. Case insensitive.',
+              'Product names to EXCLUDE from discount. Use when user says "except X", "except Y", "all except Z", "without X". Example: ["MacBook", "iPhone"]. Supports partial names - "iPhone" will exclude "iPhone 12 Pro", "iPhone 13", etc. Case insensitive.',
           },
         },
         required: ['percentage', 'operation'],

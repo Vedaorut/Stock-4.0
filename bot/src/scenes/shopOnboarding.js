@@ -239,7 +239,8 @@ shopOnboardingScene.action('onboarding:next', async (ctx) => {
   } catch (error) {
     logger.error('Error in onboarding:next:', error);
     try {
-      await ctx.answerCbQuery('Ошибка. Попробуйте снова.');
+      const lang = ctx.wizard?.state?.lang || ctx.lang || ctx.session?.user?.language || 'ru';
+      await ctx.answerCbQuery(t('general.errorRetry', {}, lang));
     } catch {
       /* ignored */
     }
@@ -272,7 +273,8 @@ shopOnboardingScene.action('onboarding:skip', async (ctx) => {
   } catch (error) {
     logger.error('Error in onboarding:skip:', error);
     try {
-      await ctx.answerCbQuery('Ошибка. Попробуйте снова.');
+      const lang = ctx.wizard?.state?.lang || ctx.lang || ctx.session?.user?.language || 'ru';
+      await ctx.answerCbQuery(t('general.errorRetry', {}, lang));
     } catch {
       /* ignored */
     }
@@ -301,7 +303,8 @@ shopOnboardingScene.action('onboarding:open_shop', async (ctx) => {
   } catch (error) {
     logger.error('Error in onboarding:open_shop:', error);
     try {
-      await ctx.answerCbQuery('Ошибка. Попробуйте снова.');
+      const lang = ctx.wizard?.state?.lang || ctx.lang || ctx.session?.user?.language || 'ru';
+      await ctx.answerCbQuery(t('general.errorRetry', {}, lang));
     } catch {
       /* ignored */
     }
@@ -315,7 +318,8 @@ shopOnboardingScene.action('onboarding:finish', async (ctx) => {
     await markOnboardingCompleted(ctx);
 
     const lang = ctx.wizard.state.lang || ctx.lang || ctx.session?.user?.language || 'ru';
-    const shopName = ctx.wizard.state.shopName || ctx.session?.shopName || 'Магазин';
+    const shopName =
+      ctx.wizard.state.shopName || ctx.session?.shopName || ctx.t('general.shopFallbackName');
 
     logger.info('onboarding_finished', {
       userId: ctx.from?.id,
@@ -339,7 +343,8 @@ shopOnboardingScene.action('onboarding:finish', async (ctx) => {
   } catch (error) {
     logger.error('Error in onboarding:finish:', error);
     try {
-      await ctx.answerCbQuery('Ошибка. Попробуйте снова.');
+      const lang = ctx.wizard?.state?.lang || ctx.lang || ctx.session?.user?.language || 'ru';
+      await ctx.answerCbQuery(t('general.errorRetry', {}, lang));
     } catch {
       /* ignored */
     }
@@ -371,6 +376,64 @@ shopOnboardingScene.leave((ctx) => {
   }
 
   logger.info(`User ${ctx.from?.id} left shopOnboarding scene`);
+});
+
+// Handle cancel button - prevents users from getting stuck in scene
+shopOnboardingScene.action('cancel_scene', async (ctx) => {
+  try {
+    await ctx.answerCbQuery();
+    logger.info('shop_onboarding_cancelled', { userId: ctx.from.id });
+    await markOnboardingCompleted(ctx);
+    await ctx.scene.leave();
+
+    // Show seller menu
+    const lang = ctx.wizard?.state?.lang || ctx.lang || ctx.session?.user?.language || 'ru';
+    const shopName = ctx.wizard?.state?.shopName || ctx.session?.shopName || t('general.shopFallbackName', {}, lang);
+    const menu = sellerMenu(0, { hasFollows: false }, lang);
+    const message = t('seller.shopPanel', { shop: shopName }, lang);
+
+    try {
+      await ctx.deleteMessage();
+    } catch { /* ignore */ }
+
+    await ctx.reply(message, { parse_mode: 'HTML', ...menu });
+  } catch (error) {
+    logger.error('Error in cancel_scene handler:', error);
+    try {
+      await ctx.scene.leave();
+    } catch (leaveError) {
+      logger.error('Failed to leave scene:', leaveError);
+    }
+  }
+});
+
+// Also handle 'cancel' action (some buttons use this)
+shopOnboardingScene.action('cancel', async (ctx) => {
+  try {
+    await ctx.answerCbQuery();
+    logger.info('shop_onboarding_cancelled', { userId: ctx.from.id });
+    await markOnboardingCompleted(ctx);
+    await ctx.scene.leave();
+
+    // Show seller menu
+    const lang = ctx.wizard?.state?.lang || ctx.lang || ctx.session?.user?.language || 'ru';
+    const shopName = ctx.wizard?.state?.shopName || ctx.session?.shopName || t('general.shopFallbackName', {}, lang);
+    const menu = sellerMenu(0, { hasFollows: false }, lang);
+    const message = t('seller.shopPanel', { shop: shopName }, lang);
+
+    try {
+      await ctx.deleteMessage();
+    } catch { /* ignore */ }
+
+    await ctx.reply(message, { parse_mode: 'HTML', ...menu });
+  } catch (error) {
+    logger.error('Error in cancel handler:', error);
+    try {
+      await ctx.scene.leave();
+    } catch (leaveError) {
+      logger.error('Failed to leave scene:', leaveError);
+    }
+  }
 });
 
 export default shopOnboardingScene;

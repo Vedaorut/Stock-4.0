@@ -2,33 +2,33 @@ import { walletApi, productApi } from './api.js';
 import logger from './logger.js';
 
 /**
- * Проверить состояние магазина (для статус-бара)
- * @param {number} shopId - ID магазина
- * @param {string} token - JWT токен
+ * Check shop state (for status bar)
+ * @param {number} shopId - Shop ID
+ * @param {string} token - JWT token
  * @returns {Promise<Object>} - { hasWallets: boolean, productsCount: number, tier: string }
  */
 async function checkShopHealth(shopId, token) {
   try {
-    // Проверка кошельков
+    // Check wallets
     let hasWallets = false;
     try {
       const wallets = await walletApi.getWallets(shopId, token);
-      // Проверяем есть ли хотя бы один непустой кошелек
+      // Check if there's at least one non-empty wallet
       hasWallets = Object.values(wallets).some((addr) => addr && addr.trim() !== '');
     } catch (err) {
       logger.warn('Wallet health check failed', { error: err.message });
-      // Если endpoint недоступен, считаем что кошельков нет
+      // If endpoint unavailable, assume no wallets
       hasWallets = false;
     }
 
-    // Проверка товаров
+    // Check products
     let productsCount = 0;
     try {
       const products = await productApi.getShopProducts(shopId);
       productsCount = Array.isArray(products) ? products.length : 0;
     } catch (err) {
       logger.warn('Product health check failed', { error: err.message });
-      // Если endpoint недоступен, считаем что товаров нет
+      // If endpoint unavailable, assume no products
       productsCount = 0;
     }
 
@@ -38,10 +38,10 @@ async function checkShopHealth(shopId, token) {
     };
   } catch (error) {
     logger.error('Error checking shop health', { error: error.message, stack: error.stack });
-    // В случае ошибки возвращаем безопасные значения
+    // In case of error return safe values
     return {
-      hasWallets: true, // Не показываем предупреждение если не уверены
-      productsCount: 1, // Не показываем предупреждение если не уверены
+      hasWallets: true, // Don't show warning if uncertain
+      productsCount: 1, // Don't show warning if uncertain
     };
   }
 }

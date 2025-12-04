@@ -5,7 +5,7 @@ import productsData from '../data/products.json';
 const BASE_URL = 'http://localhost:3000';
 
 export const analyticsHandlers = [
-  // GET /api/analytics/dashboard - общая статистика магазина
+  // GET /api/analytics/dashboard - shop general statistics
   http.get(`${BASE_URL}/api/analytics/dashboard`, ({ request }) => {
     const url = new URL(request.url);
     const shopId = url.searchParams.get('shopId') || url.searchParams.get('shop_id');
@@ -16,36 +16,36 @@ export const analyticsHandlers = [
 
     const id = Number(shopId);
 
-    // Заказы магазина
+    // Shop orders
     const shopOrders = ordersData.filter((o) => o.shop_id === id);
 
-    // Товары магазина
+    // Shop products
     const shopProducts = productsData.filter((p) => p.shop_id === id);
 
-    // Активные товары
+    // Active products
     const activeProducts = shopProducts.filter((p) => p.is_active);
 
-    // Общая выручка (только delivered заказы)
+    // Total revenue (delivered orders only)
     const totalRevenue = shopOrders
       .filter((o) => o.status === 'delivered')
       .reduce((sum, o) => sum + o.total_price, 0);
 
-    // Pending заказы
+    // Pending orders
     const pendingOrders = shopOrders.filter((o) => o.status === 'pending').length;
 
-    // Confirmed заказы
+    // Confirmed orders
     const confirmedOrders = shopOrders.filter((o) => o.status === 'confirmed').length;
 
-    // Shipped заказы
+    // Shipped orders
     const shippedOrders = shopOrders.filter((o) => o.status === 'shipped').length;
 
-    // Delivered заказы
+    // Delivered orders
     const deliveredOrders = shopOrders.filter((o) => o.status === 'delivered').length;
 
-    // Cancelled заказы
+    // Cancelled orders
     const cancelledOrders = shopOrders.filter((o) => o.status === 'cancelled').length;
 
-    // Топ 5 товаров по продажам
+    // Top 5 products by sales
     const productSales = {};
     shopOrders
       .filter((o) => o.status === 'delivered')
@@ -66,7 +66,7 @@ export const analyticsHandlers = [
       .sort((a, b) => b.revenue - a.revenue)
       .slice(0, 5);
 
-    // Выручка за последние 7 дней (по дням)
+    // Revenue for the last 7 days (by day)
     const last7Days = [];
     for (let i = 6; i >= 0; i--) {
       const date = new Date();
@@ -86,7 +86,7 @@ export const analyticsHandlers = [
       });
     }
 
-    // Валюта (берем из первого заказа)
+    // Currency (taken from first order)
     const currency = shopOrders[0]?.currency || 'USD';
 
     return HttpResponse.json({
@@ -109,7 +109,7 @@ export const analyticsHandlers = [
     });
   }),
 
-  // GET /api/analytics/sales - детальная аналитика продаж
+  // GET /api/analytics/sales - detailed sales analytics
   http.get(`${BASE_URL}/api/analytics/sales`, ({ request }) => {
     const url = new URL(request.url);
     const shopId = url.searchParams.get('shopId') || url.searchParams.get('shop_id');
@@ -124,7 +124,7 @@ export const analyticsHandlers = [
     const id = Number(shopId);
     let filtered = ordersData.filter((o) => o.shop_id === id && o.status === 'delivered');
 
-    // Фильтрация по датам
+    // Filter by dates
     if (from) {
       filtered = filtered.filter((o) => new Date(o.created_at) >= new Date(from));
     }
@@ -132,7 +132,7 @@ export const analyticsHandlers = [
       filtered = filtered.filter((o) => new Date(o.created_at) <= new Date(to));
     }
 
-    // Группировка
+    // Grouping
     const grouped = {};
     filtered.forEach((order) => {
       let key;
@@ -179,7 +179,7 @@ export const analyticsHandlers = [
     });
   }),
 
-  // GET /api/analytics/products - аналитика по товарам
+  // GET /api/analytics/products - product analytics
   http.get(`${BASE_URL}/api/analytics/products`, ({ request }) => {
     const url = new URL(request.url);
     const shopId = url.searchParams.get('shopId') || url.searchParams.get('shop_id');
@@ -192,7 +192,7 @@ export const analyticsHandlers = [
     const shopProducts = productsData.filter((p) => p.shop_id === id);
     const shopOrders = ordersData.filter((o) => o.shop_id === id && o.status === 'delivered');
 
-    // Статистика по каждому товару
+    // Statistics for each product
     const productStats = shopProducts.map((product) => {
       const productOrders = shopOrders.filter((o) => o.product_id === product.id);
       const totalSold = productOrders.reduce((sum, o) => sum + o.quantity, 0);
@@ -212,7 +212,7 @@ export const analyticsHandlers = [
       };
     });
 
-    // Сортировка по выручке
+    // Sort by revenue
     productStats.sort((a, b) => b.total_revenue - a.total_revenue);
 
     return HttpResponse.json({

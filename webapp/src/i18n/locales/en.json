@@ -23,7 +23,8 @@
     "active": "Active",
     "done": "Done",
     "attention": "Attention",
-    "copy": "Copy"
+    "copy": "Copy",
+    "products": "products"
   },
 
   "product": {
@@ -355,6 +356,12 @@
 
   "products": {
     "title": "My Products",
+    "noShop": "You don't have a shop yet",
+    "noShopDesc": "Create a shop to sell products",
+    "createShop": "Create Shop",
+    "management": "Product Management",
+    "addEditHere": "Add and edit products here.",
+    "buyersWillSee": "After adding, buyers will see them in the catalog.",
     "addProduct": "+ Add product",
     "nameLabel": "Product name *",
     "namePlaceholder": "Windows 11 Pro",
@@ -405,6 +412,7 @@
 
   "follows": {
     "title": "Follows",
+    "empty": "No subscriptions",
     "searchShop": "Search shop",
     "searchPlaceholder": "Name or @username",
     "clearResults": "Clear results",

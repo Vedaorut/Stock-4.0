@@ -4,7 +4,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import { TelegramProvider } from './providers/TelegramProvider';
 import { enableMocking } from './mocks';
 
-// Запуск MSW перед рендером приложения
+// Start MSW before rendering the application
 enableMocking().then(() => {
   ReactDOM.createRoot(document.getElementById('root')).render(
     <ErrorBoundary>

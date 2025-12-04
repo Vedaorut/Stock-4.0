@@ -2,9 +2,9 @@
  * Parse order numbers from user input
  *
  * Supports formats:
- * - "1 3 5" → [1, 3, 5]
- * - "1-5" → [1, 2, 3, 4, 5]
- * - "1 3-5 7" → [1, 3, 4, 5, 7]
+ * - "1 3 5" -> [1, 3, 5]
+ * - "1-5" -> [1, 2, 3, 4, 5]
+ * - "1 3-5 7" -> [1, 3, 4, 5, 7]
  *
  * @param {string} input - User input string
  * @param {number} maxNumber - Maximum valid order number
@@ -14,14 +14,14 @@ export function parseOrderNumbers(input, maxNumber) {
   if (!input || typeof input !== 'string') {
     return {
       valid: false,
-      error: 'Не указан ввод',
+      error: 'No input provided',
     };
   }
 
   if (!maxNumber || typeof maxNumber !== 'number' || maxNumber < 1) {
     return {
       valid: false,
-      error: 'Неверный максимальный номер',
+      error: 'Invalid maximum number',
     };
   }
 
@@ -29,7 +29,7 @@ export function parseOrderNumbers(input, maxNumber) {
   if (!trimmed) {
     return {
       valid: false,
-      error: 'Пустой ввод',
+      error: 'Empty input',
     };
   }
 
@@ -45,7 +45,7 @@ export function parseOrderNumbers(input, maxNumber) {
         if (rangeParts.length !== 2) {
           return {
             valid: false,
-            error: `Неверный формат диапазона: "${part}". Используйте формат "1-5"`,
+            error: `Invalid range format: "${part}". Use format "1-5"`,
           };
         }
 
@@ -55,28 +55,28 @@ export function parseOrderNumbers(input, maxNumber) {
         if (!Number.isInteger(start) || !Number.isInteger(end)) {
           return {
             valid: false,
-            error: `Диапазон должен содержать числа: "${part}"`,
+            error: `Range must contain numbers: "${part}"`,
           };
         }
 
         if (start < 1 || end < 1) {
           return {
             valid: false,
-            error: `Номера должны быть положительными: "${part}"`,
+            error: `Numbers must be positive: "${part}"`,
           };
         }
 
         if (start > end) {
           return {
             valid: false,
-            error: `Начало диапазона больше конца: "${part}"`,
+            error: `Range start is greater than end: "${part}"`,
           };
         }
 
         if (start > maxNumber || end > maxNumber) {
           return {
             valid: false,
-            error: `Номера вне диапазона (1-${maxNumber}): "${part}"`,
+            error: `Numbers out of range (1-${maxNumber}): "${part}"`,
           };
         }
 
@@ -91,21 +91,21 @@ export function parseOrderNumbers(input, maxNumber) {
         if (!Number.isInteger(num)) {
           return {
             valid: false,
-            error: `Неверное число: "${part}"`,
+            error: `Invalid number: "${part}"`,
           };
         }
 
         if (num < 1) {
           return {
             valid: false,
-            error: `Номер должен быть положительным: "${part}"`,
+            error: `Number must be positive: "${part}"`,
           };
         }
 
         if (num > maxNumber) {
           return {
             valid: false,
-            error: `Номер вне диапазона (1-${maxNumber}): "${part}"`,
+            error: `Number out of range (1-${maxNumber}): "${part}"`,
           };
         }
 
@@ -116,7 +116,7 @@ export function parseOrderNumbers(input, maxNumber) {
     if (numbers.size === 0) {
       return {
         valid: false,
-        error: 'Не найдено допустимых номеров',
+        error: 'No valid numbers found',
       };
     }
 
@@ -130,7 +130,7 @@ export function parseOrderNumbers(input, maxNumber) {
   } catch (error) {
     return {
       valid: false,
-      error: `Ошибка парсинга: ${error.message}`,
+      error: `Parsing error: ${error.message}`,
     };
   }
 }

@@ -8,7 +8,7 @@ const BASE_URL = 'http://localhost:3000';
 export const settingsHandlers = [
   // ===== WALLETS =====
 
-  // GET /api/wallets/:shopId - кошельки магазина
+  // GET /api/wallets/:shopId - shop wallets
   http.get(`${BASE_URL}/api/wallets/:shopId`, ({ params }) => {
     const shopId = Number(params.shopId);
     const wallets = walletsData.filter((w) => w.shop_id === shopId && w.is_active);
@@ -16,13 +16,13 @@ export const settingsHandlers = [
     return HttpResponse.json({ success: true, data: wallets });
   }),
 
-  // PUT /api/wallets/:shopId - обновить кошельки магазина
+  // PUT /api/wallets/:shopId - update shop wallets
   http.put(`${BASE_URL}/api/wallets/:shopId`, async ({ params, request }) => {
     const body = await request.json();
     const shopId = Number(params.shopId);
 
-    // В реальности обновление через storage
-    // Пока возвращаем то, что пришло
+    // In reality, this would be updated via storage
+    // For now, return what was sent
     const updatedWallets = body.wallets || [];
 
     return HttpResponse.json({
@@ -32,7 +32,7 @@ export const settingsHandlers = [
     });
   }),
 
-  // PATCH /api/wallets/:shopId - обновить кошельки (alias для PUT)
+  // PATCH /api/wallets/:shopId - update wallets (alias for PUT)
   http.patch(`${BASE_URL}/api/wallets/:shopId`, async ({ params, request }) => {
     const body = await request.json();
     const shopId = Number(params.shopId);
@@ -46,7 +46,7 @@ export const settingsHandlers = [
     });
   }),
 
-  // POST /api/wallets - добавить кошелек (если нужен отдельный endpoint)
+  // POST /api/wallets - add wallet (if separate endpoint needed)
   http.post(`${BASE_URL}/api/wallets`, async ({ request }) => {
     const body = await request.json();
 
@@ -66,7 +66,7 @@ export const settingsHandlers = [
     return HttpResponse.json({ success: true, data: newWallet }, { status: 201 });
   }),
 
-  // DELETE /api/wallets/:id - удалить кошелек
+  // DELETE /api/wallets/:id - delete wallet
   http.delete(`${BASE_URL}/api/wallets/:id`, ({ params }) => {
     const walletIndex = walletsData.findIndex((w) => w.id === Number(params.id));
 
@@ -76,7 +76,7 @@ export const settingsHandlers = [
 
     const wallet = walletsData[walletIndex];
 
-    // Мягкое удаление
+    // Soft delete
     walletsData[walletIndex] = {
       ...wallet,
       is_active: false,
@@ -93,7 +93,7 @@ export const settingsHandlers = [
 
   // ===== WORKERS =====
 
-  // GET /api/workers - работники магазина
+  // GET /api/workers - shop workers
   http.get(`${BASE_URL}/api/workers`, ({ request }) => {
     const url = new URL(request.url);
     const shopId = url.searchParams.get('shopId') || url.searchParams.get('shop_id');
@@ -107,7 +107,7 @@ export const settingsHandlers = [
     return HttpResponse.json({ success: true, data: workers });
   }),
 
-  // POST /api/workers - добавить работника
+  // POST /api/workers - add worker
   http.post(`${BASE_URL}/api/workers`, async ({ request }) => {
     const body = await request.json();
 
@@ -131,7 +131,7 @@ export const settingsHandlers = [
     return HttpResponse.json({ success: true, data: newWorker }, { status: 201 });
   }),
 
-  // PUT /api/workers/:id - обновить работника
+  // PUT /api/workers/:id - update worker
   http.put(`${BASE_URL}/api/workers/:id`, async ({ params, request }) => {
     const body = await request.json();
     const workerIndex = workersData.findIndex((w) => w.id === Number(params.id));
@@ -155,7 +155,7 @@ export const settingsHandlers = [
     return HttpResponse.json({ success: true, data: updatedWorker });
   }),
 
-  // DELETE /api/workers/:id - удалить работника
+  // DELETE /api/workers/:id - delete worker
   http.delete(`${BASE_URL}/api/workers/:id`, ({ params }) => {
     const workerIndex = workersData.findIndex((w) => w.id === Number(params.id));
 
@@ -163,7 +163,7 @@ export const settingsHandlers = [
       return HttpResponse.json({ error: 'Worker not found' }, { status: 404 });
     }
 
-    // Удаляем работника (hard delete в данном случае)
+    // Delete worker (hard delete in this case)
     const worker = workersData[workerIndex];
     workersData.splice(workerIndex, 1);
     storage.removeWorker(worker.id);

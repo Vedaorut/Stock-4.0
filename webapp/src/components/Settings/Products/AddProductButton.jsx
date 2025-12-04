@@ -19,7 +19,7 @@ function AddProductButton({ onClick, disabled, canAdd }) {
       }}
       whileTap={canAdd ? { scale: 0.98 } : {}}
     >
-      + Добавить товар
+      + Add Product
     </motion.button>
   );
 }

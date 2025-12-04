@@ -67,16 +67,16 @@ export default function PaymentMethodModal() {
     setGeneratingStartTime(Date.now());
 
     try {
-      // Вызываем selectCrypto из store - создаёт order + invoice + переход к details
+      // Call selectCrypto from store - creates order + invoice + transition to details
       await selectCrypto(cryptoId);
-      // Store автоматически выставит paymentStep = 'details'
+      // Store will automatically set paymentStep = 'details'
     } catch (error) {
       if (import.meta.env.DEV) {
         console.error('[PaymentMethodModal] Failed to select crypto:', error);
       }
       triggerHaptic('error');
 
-      // Детальные toast сообщения
+      // Detailed toast messages
       const errorMsg = error.response?.data?.error || error.message;
       if (errorMsg?.includes('order')) {
         toast.error(t('payment.createOrderError'));
@@ -94,7 +94,7 @@ export default function PaymentMethodModal() {
 
   useBackButton(isOpen ? handleClose : null);
 
-  // Fallback: если модалка открыта но shop отсутствует
+  // Fallback: if modal is open but shop is missing
   useEffect(() => {
     if (isOpen && !currentShop?.id) {
       const timeout = setTimeout(() => {

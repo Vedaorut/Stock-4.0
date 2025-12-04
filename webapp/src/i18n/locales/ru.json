@@ -23,7 +23,8 @@
     "active": "Активных",
     "done": "Готово",
     "attention": "Внимание",
-    "copy": "Скопировать"
+    "copy": "Скопировать",
+    "products": "товаров"
   },
 
   "product": {
@@ -355,6 +356,12 @@
 
   "products": {
     "title": "Мои товары",
+    "noShop": "У вас пока нет магазина",
+    "noShopDesc": "Создайте магазин, чтобы продавать товары",
+    "createShop": "Создать магазин",
+    "management": "Управление товарами",
+    "addEditHere": "Добавляйте и редактируйте товары здесь.",
+    "buyersWillSee": "После добавления покупатели увидят их в каталоге.",
     "addProduct": "+ Добавить товар",
     "nameLabel": "Название товара *",
     "namePlaceholder": "Windows 11 Pro",
@@ -405,6 +412,7 @@
 
   "follows": {
     "title": "Follows",
+    "empty": "Нет подписок",
     "searchShop": "Поиск магазина",
     "searchPlaceholder": "Название или @username",
     "clearResults": "Очистить результаты",

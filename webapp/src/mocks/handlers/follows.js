@@ -8,7 +8,7 @@ import { storage } from '../utils/storage.js';
 const BASE_URL = 'http://localhost:3000';
 
 export const followsHandlers = [
-  // GET /api/follows - мои подписки
+  // GET /api/follows - my follows
   http.get(`${BASE_URL}/api/follows`, ({ request }) => {
     const url = new URL(request.url);
     const shopId = url.searchParams.get('shopId') || url.searchParams.get('shop_id');
@@ -18,7 +18,7 @@ export const followsHandlers = [
     if (shopId) {
       filtered = filtered.filter((f) => f.follower_shop_id === Number(shopId));
     } else {
-      // Все подписки по моим магазинам (owner_id === 1)
+      // All follows from my shops (owner_id === 1)
       const myShops = shopsData.filter((s) => s.owner_id === 1);
       const myShopIds = myShops.map((s) => s.id);
       filtered = filtered.filter((f) => myShopIds.includes(f.follower_shop_id));
@@ -27,7 +27,7 @@ export const followsHandlers = [
     return HttpResponse.json({ data: filtered });
   }),
 
-  // GET /api/follows/my - мои подписки (alias)
+  // GET /api/follows/my - my follows (alias)
   http.get(`${BASE_URL}/api/follows/my`, ({ request }) => {
     const url = new URL(request.url);
     const shopId = url.searchParams.get('shopId') || url.searchParams.get('shop_id');
@@ -41,7 +41,7 @@ export const followsHandlers = [
     return HttpResponse.json({ data: filtered });
   }),
 
-  // GET /api/follows/check-limit - проверка лимита подписок
+  // GET /api/follows/check-limit - check follows limit
   http.get(`${BASE_URL}/api/follows/check-limit`, ({ request }) => {
     const url = new URL(request.url);
     const shopId = url.searchParams.get('shopId') || url.searchParams.get('shop_id');
@@ -54,14 +54,14 @@ export const followsHandlers = [
       (f) => f.follower_shop_id === Number(shopId) && f.status === 'active'
     );
 
-    // Лимиты по тирам
+    // Limits by tier
     const limits = {
       FREE: 3,
       PRO: 10,
       ENTERPRISE: 50,
     };
 
-    // Получаем тир магазина
+    // Get shop tier
     const shop = shopsData.find((s) => s.id === Number(shopId));
     const tier = shop?.tier || 'FREE';
     const limit = limits[tier];
@@ -78,7 +78,7 @@ export const followsHandlers = [
     });
   }),
 
-  // GET /api/follows/:id - одна подписка
+  // GET /api/follows/:id - single follow
   http.get(`${BASE_URL}/api/follows/:id`, ({ params }) => {
     const follow = followsData.find((f) => f.id === Number(params.id));
 
@@ -89,7 +89,7 @@ export const followsHandlers = [
     return HttpResponse.json({ data: follow });
   }),
 
-  // GET /api/follows/:id/products - товары подписки
+  // GET /api/follows/:id/products - follow products
   http.get(`${BASE_URL}/api/follows/:id/products`, ({ params }) => {
     const follow = followsData.find((f) => f.id === Number(params.id));
 
@@ -100,10 +100,10 @@ export const followsHandlers = [
     let products = [];
 
     if (follow.mode === 'monitor') {
-      // Monitor режим - возвращаем source products
+      // Monitor mode - return source products
       products = productsData.filter((p) => p.shop_id === follow.source_shop_id && p.is_active);
     } else if (follow.mode === 'resell') {
-      // Resell режим - возвращаем synced products с разметкой
+      // Resell mode - return synced products with markup
       const syncedForThisFollow = syncedProductsData.filter(
         (sp) => sp.follow_id === Number(params.id)
       );
@@ -130,7 +130,7 @@ export const followsHandlers = [
     });
   }),
 
-  // POST /api/follows - создать подписку
+  // POST /api/follows - create follow
   http.post(`${BASE_URL}/api/follows`, async ({ request }) => {
     const body = await request.json();
 
@@ -142,7 +142,7 @@ export const followsHandlers = [
       markup_percentage: body.markup_percentage || 0,
       status: 'active',
       synced_products_count: 0,
-      source_products_count: 0, // Будет заполнено из products
+      source_products_count: 0, // Will be populated from products
       source_shop_name: body.source_shop_name || 'Unknown Shop',
       source_shop_logo: body.source_shop_logo || null,
       follower_shop_name: body.follower_shop_name || 'My Shop',
@@ -155,7 +155,7 @@ export const followsHandlers = [
     return HttpResponse.json({ data: newFollow }, { status: 201 });
   }),
 
-  // PUT /api/follows/:id - обновить подписку (общее)
+  // PUT /api/follows/:id - update follow (general)
   http.put(`${BASE_URL}/api/follows/:id`, async ({ params, request }) => {
     const body = await request.json();
     const followIndex = followsData.findIndex((f) => f.id === Number(params.id));
@@ -181,7 +181,7 @@ export const followsHandlers = [
     return HttpResponse.json({ data: updatedFollow });
   }),
 
-  // PUT /api/follows/:id/markup - обновить наценку
+  // PUT /api/follows/:id/markup - update markup
   http.put(`${BASE_URL}/api/follows/:id/markup`, async ({ params, request }) => {
     const body = await request.json();
     const followIndex = followsData.findIndex((f) => f.id === Number(params.id));
@@ -204,7 +204,7 @@ export const followsHandlers = [
     return HttpResponse.json({ data: updatedFollow });
   }),
 
-  // PUT /api/follows/:id/mode - переключить режим
+  // PUT /api/follows/:id/mode - switch mode
   http.put(`${BASE_URL}/api/follows/:id/mode`, async ({ params, request }) => {
     const body = await request.json();
     const followIndex = followsData.findIndex((f) => f.id === Number(params.id));
@@ -215,7 +215,7 @@ export const followsHandlers = [
 
     const follow = followsData[followIndex];
 
-    // Валидация режима
+    // Mode validation
     if (!['monitor', 'resell'].includes(body.mode)) {
       return HttpResponse.json(
         { error: 'Invalid mode. Use "monitor" or "resell"' },
@@ -235,7 +235,7 @@ export const followsHandlers = [
     return HttpResponse.json({ data: updatedFollow });
   }),
 
-  // DELETE /api/follows/:id - удалить подписку
+  // DELETE /api/follows/:id - delete follow
   http.delete(`${BASE_URL}/api/follows/:id`, ({ params }) => {
     const followIndex = followsData.findIndex((f) => f.id === Number(params.id));
 
@@ -243,7 +243,7 @@ export const followsHandlers = [
       return HttpResponse.json({ error: 'Follow not found' }, { status: 404 });
     }
 
-    // Удаляем подписку
+    // Delete follow
     followsData.splice(followIndex, 1);
     storage.deleteFollowById(Number(params.id));
 
@@ -252,7 +252,7 @@ export const followsHandlers = [
     });
   }),
 
-  // GET /api/shop-follows - alias для /api/follows/my
+  // GET /api/shop-follows - alias for /api/follows/my
   http.get(`${BASE_URL}/api/shop-follows`, ({ request }) => {
     const url = new URL(request.url);
     const shopId = url.searchParams.get('shop_id');

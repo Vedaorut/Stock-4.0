@@ -2,12 +2,12 @@ import { useEffect, useRef } from 'react';
 import { useTelegram } from './useTelegram';
 
 /**
- * Hook для управления Telegram BackButton API
+ * Hook for managing Telegram BackButton API
  *
- * Автоматически показывает BackButton при монтировании компонента
- * и скрывает при размонтировании. Вызывает callback при клике.
+ * Automatically shows BackButton when component mounts
+ * and hides it when unmounting. Calls callback on click.
  *
- * @param {Function} onBack - Callback функция для обработки клика на BackButton
+ * @param {Function} onBack - Callback function to handle BackButton click
  *
  * @example
  * ```jsx

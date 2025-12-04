@@ -115,14 +115,14 @@ export function isNoiseCommand(text) {
 
   // Common noise patterns (Russian and English)
   const noisePatterns = [
-    /^(привет|hello|hi|hey|здравствуй|добрый день|доброе утро|добрый вечер)$/i,
-    /^(спасибо|thanks|thank you|thx|благодарю)$/i,
-    /^(пока|bye|goodbye|до свидания)$/i,
-    /^(да|нет|yes|no|ок|ok|okay)$/i,
-    /^(как дела|how are you|что нового)$/i,
-    /^(ты тут|you there|есть кто|кто здесь)$/i,
-    /^(помощь|help|справка|\?)$/i,
-    /^(хм+|ммм+|эм+|um+|uh+)$/i,
+    /^(hello|hi|hey|good morning|good afternoon|good evening)$/i,
+    /^(thanks|thank you|thx)$/i,
+    /^(bye|goodbye|see you)$/i,
+    /^(yes|no|ok|okay)$/i,
+    /^(how are you|what's up|what's new)$/i,
+    /^(are you there|anyone there|who's here)$/i,
+    /^(help|\?)$/i,
+    /^(hm+|mmm+|um+|uh+)$/i,
   ];
 
   return noisePatterns.some((pattern) => pattern.test(normalized));
@@ -131,8 +131,7 @@ export function isNoiseCommand(text) {
 /**
  * Extract product names from bulk delete command
  * Examples:
- *   "удали iPhone, Samsung и Xiaomi" -> ["iPhone", "Samsung", "Xiaomi"]
- *   "delete iPhone, Samsung, Xiaomi" -> ["iPhone", "Samsung", "Xiaomi"]
+ *   "delete iPhone, Samsung and Xiaomi" -> ["iPhone", "Samsung", "Xiaomi"]
  * @param {string} text - Command text
  * @returns {Array<string>} - Extracted product names
  */
@@ -141,13 +140,13 @@ export function extractProductNames(text) {
 
   // Remove common verbs
   const cleaned = text
-    .replace(/^(удали|delete|убери|remove|удалить)\s+/i, '')
-    .replace(/\s+(товар|товары|product|products)\s*/gi, ' ')
+    .replace(/^(delete|remove)\s+/i, '')
+    .replace(/\s+(product|products)\s*/gi, ' ')
     .trim();
 
   // Split by common separators
   const names = cleaned
-    .split(/[,;\n]|\s+и\s+|\s+and\s+/)
+    .split(/[,;\n]|\s+and\s+/)
     .map((name) => name.trim())
     .filter((name) => name.length > 0);
 
