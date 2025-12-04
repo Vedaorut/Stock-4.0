@@ -8,7 +8,7 @@ import { getMessages, formatters } from '../../texts/messages.js';
 /**
  * Get language with fallback (C5 fix: ctx.lang undefined)
  */
-const getLangSafe = (ctx) => ctx.lang || ctx.session?.user?.language || 'ru';
+const getLangSafe = (ctx) => ctx.lang || ctx.session?.language || 'ru';
 
 /**
  * Setup buyer-related handlers
@@ -109,18 +109,11 @@ export const handleBuyerRole = async (ctx, options = {}) => {
       try {
         if (ctx.session.token) {
           await authApi.updateRole('buyer', ctx.session.token);
-          if (ctx.session.user) {
-            ctx.session.user.selectedRole = 'buyer'; // Update session cache
-          }
+
           logger.info(`Saved buyer role for user ${ctx.from.id}`);
         }
       } catch (error) {
         logger.error('Failed to save role:', error);
-      }
-    } else {
-      // Just update session cache
-      if (ctx.session.user) {
-        ctx.session.user.selectedRole = 'buyer';
       }
     }
 
@@ -260,7 +253,7 @@ const handleSubscribe = async (ctx) => {
 
       await smartMessage.send(ctx, {
         text: buyerMessages.subscriptionActive(lang),
-        keyboard: shopActionsKeyboard(shopId, true, counts),
+        keyboard: shopActionsKeyboard(shopId, true, counts, lang),
       });
 
       logger.info(`User ${ctx.from.id} already subscribed to shop ${shopId}`);
@@ -283,7 +276,7 @@ const handleSubscribe = async (ctx) => {
 
     await smartMessage.send(ctx, {
       text: buyerMessages.subscriptionAdded(shop.name, lang),
-      keyboard: shopActionsKeyboard(shopId, true, counts),
+      keyboard: shopActionsKeyboard(shopId, true, counts, lang),
     });
 
     logger.info(`User ${ctx.from.id} subscribed to shop ${shopId}`);
@@ -335,7 +328,7 @@ const handleUnsubscribe = async (ctx) => {
 
     await smartMessage.send(ctx, {
       text: buyerMessages.subscriptionRemoved(shop.name, lang),
-      keyboard: shopActionsKeyboard(shopId, false, counts),
+      keyboard: shopActionsKeyboard(shopId, false, counts, lang),
     });
 
     logger.info(`User ${ctx.from.id} unsubscribed from shop ${shopId}`);
@@ -441,7 +434,7 @@ const handleShopView = async (ctx) => {
       keyboard: shopActionsKeyboard(shopId, isSubscribed, {
         stock: sectioned.stock.length,
         preorder: sectioned.preorder.length,
-      }),
+      }, lang),
     });
 
     logger.info(`User ${ctx.from.id} viewed shop ${shopId} details`);
@@ -493,7 +486,7 @@ const handleShopSection = async (ctx, section) => {
       keyboard: shopActionsKeyboard(shopId, isSubscribed, {
         stock: sectioned.stock.length,
         preorder: sectioned.preorder.length,
-      }),
+      }, lang),
     });
 
     logger.info(`User ${ctx.from.id} viewed section ${section} for shop ${shopId}`);

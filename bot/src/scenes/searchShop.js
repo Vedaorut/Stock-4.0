@@ -19,7 +19,7 @@ const enterShopName = async (ctx) => {
   try {
     logger.info('shop_search_step:name', { userId: ctx.from.id });
 
-    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const lang = ctx.lang || ctx.session?.language || 'ru';
     const { search: searchMessages } = getMessages(lang);
 
     await smartMessage.send(ctx, {
@@ -37,7 +37,7 @@ const enterShopName = async (ctx) => {
 // Step 2: Show results
 const showResults = async (ctx) => {
   try {
-    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const lang = ctx.lang || ctx.session?.language || 'ru';
     const { buyer: buyerMessages, search: searchMessages } = getMessages(lang);
     const formatters = getFormatters(lang);
 
@@ -106,7 +106,7 @@ const showResults = async (ctx) => {
     return await ctx.scene.leave();
   } catch (error) {
     logger.error('Error searching shops:', error);
-    const langErr = ctx.lang || ctx.session?.user?.language || 'ru';
+    const langErr = ctx.lang || ctx.session?.language || 'ru';
     const { search: searchMsgs } = getMessages(langErr);
     await smartMessage.send(ctx, {
       text: searchMsgs.error,
@@ -142,7 +142,7 @@ searchShopScene.action('cancel_scene', async (ctx) => {
     logger.info('search_shop_cancelled', { userId: ctx.from.id });
     await ctx.scene.leave();
 
-    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const lang = ctx.lang || ctx.session?.language || 'ru';
     await ctx.editMessageText(t('general.actionCancelled', {}, lang), buyerMenu(lang));
   } catch (error) {
     logger.error('Error in cancel_scene handler:', error);
@@ -161,7 +161,7 @@ searchShopScene.action('cancel', async (ctx) => {
     logger.info('search_shop_cancelled', { userId: ctx.from.id });
     await ctx.scene.leave();
 
-    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const lang = ctx.lang || ctx.session?.language || 'ru';
     await ctx.editMessageText(t('general.actionCancelled', {}, lang), buyerMenu(lang));
   } catch (error) {
     logger.error('Error in cancel handler:', error);

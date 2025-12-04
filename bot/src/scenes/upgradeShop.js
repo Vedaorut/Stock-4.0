@@ -46,7 +46,7 @@ const upgradeShopScene = new Scenes.WizardScene(
   // Step 1: Show current subscription and upgrade cost
   async (ctx) => {
     try {
-      const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+      const lang = ctx.lang || ctx.session?.language || 'ru';
       const { seller: sellerMessages, general: generalMessages } = getMessages(lang);
 
       const shopId = ctx.session.shopId;
@@ -143,7 +143,7 @@ ${t('upgradeShop.benefitAnalytics', {}, lang)}`;
     } catch (error) {
       logger.error('[UpgradeShop] Step 1 error:', error);
 
-      const langErr = ctx.lang || ctx.session?.user?.language || 'ru';
+      const langErr = ctx.lang || ctx.session?.language || 'ru';
       const { seller: sellerMsgs } = getMessages(langErr);
       const errorMsg = error.response?.data?.error || error.message;
       await cleanReply(
@@ -158,7 +158,7 @@ ${t('upgradeShop.benefitAnalytics', {}, lang)}`;
 
   // Step 2: Handle confirmation and show crypto options
   async (ctx) => {
-    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const lang = ctx.lang || ctx.session?.language || 'ru';
     const { seller: sellerMessages, general: generalMessages } = getMessages(lang);
 
     if (!ctx.callbackQuery) {
@@ -204,7 +204,7 @@ ${t('upgradeShop.benefitAnalytics', {}, lang)}`;
 
   // Step 3: Handle crypto selection and generate upgrade invoice
   async (ctx) => {
-    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const lang = ctx.lang || ctx.session?.language || 'ru';
     const { seller: sellerMessages } = getMessages(lang);
 
     if (!ctx.callbackQuery) {
@@ -270,7 +270,7 @@ ${t('upgradeShop.benefitAnalytics', {}, lang)}`;
 
   // Step 4: Handle tx_hash and verify upgrade payment
   async (ctx) => {
-    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const lang = ctx.lang || ctx.session?.language || 'ru';
     const { seller: sellerMessages } = getMessages(lang);
 
     const { subscriptionId, currency, shopId } = ctx.wizard.state;
@@ -546,7 +546,7 @@ async function createUpgradeInvoiceAndShow(ctx, currency) {
     10000
   );
 
-  const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+  const lang = ctx.lang || ctx.session?.language || 'ru';
 
   if (!qrResponse || !qrResponse.success || !qrResponse.data?.qrCode) {
     throw new Error(t('seller.walletsQrError', {}, lang));

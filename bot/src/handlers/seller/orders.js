@@ -6,7 +6,7 @@ import logger from '../../utils/logger.js';
 /**
  * Get language with fallback
  */
-const getLangSafe = (ctx) => ctx.lang || ctx.session?.user?.language || 'ru';
+const getLangSafe = (ctx) => ctx.lang || ctx.session?.language || 'ru';
 
 /**
  * Get back to menu keyboard with localization

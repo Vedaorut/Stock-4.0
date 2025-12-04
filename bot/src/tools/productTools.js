@@ -289,7 +289,8 @@ Use for commands "rename", "set price", "set stock", "15% discount", "make out o
 Examples:
 - "set price 1299" (after discussing MacBook) → updateProduct({ productName: "MacBook...", updates: { price: 1299 } })
 - "set stock 0" → updates.stock_quantity = 0
-- "25% discount on iPhone for 3 days" → updates.discount_percentage = 25, updates.discount_expires_at = "3 days"
+- "25% discount on iPhone for 3 days" → updates.discount_percentage = 25, updates.discount_expires_at = "3d"
+- "скидка 20% на iPad на 24 часа" → updates.discount_percentage = 20, updates.discount_expires_at = "24h"
 - "cancel discount on AirPods" → discount_percentage = 0 (backend will restore price from original_price)
 
 Rules:
@@ -333,7 +334,7 @@ Rules:
               discount_expires_at: {
                 type: 'string',
                 description:
-                  'Discount expiry for the product. ISO datetime or duration phrase like "6 hours", "24h". Leave empty/null for permanent discount.',
+                  'Discount expiry. Use EXACT number from user. Examples: "6h"/"6 hours"/"6 часов", "24h"/"24 hours"/"24 часа", "3d"/"3 days"/"3 дня". Russian: "на 24 часа" → "24h", "на 2 дня" → "2d". Leave empty/null for permanent discount.',
               },
             },
             additionalProperties: false,
@@ -551,11 +552,15 @@ Examples:
 - User: "30% discount on iPhone" → applyDiscount({ productName: "iPhone", percentage: 30 })
 - User: "15% discount on AirPods for 6 hours" → applyDiscount({ productName: "AirPods", percentage: 15, duration: "6h" })
 - User: "20% discount on MacBook for 2 days" → applyDiscount({ productName: "MacBook", percentage: 20, duration: "2d" })
+- User: "скидка 25% на iPhone на 24 часа" → applyDiscount({ productName: "iPhone", percentage: 25, duration: "24h" })
+- User: "скидка 10% на iPad на 3 дня" → applyDiscount({ productName: "iPad", percentage: 10, duration: "3d" })
 
-Duration format:
-- "6h" or "6 hours" - expires in 6 hours
-- "2d" or "2 days" - expires in 2 days
-- "1w" or "1 week" - expires in 1 week
+Duration format (English and Russian):
+- "6h" / "6 hours" / "6 часов" - expires in 6 hours
+- "2d" / "2 days" / "2 дня" - expires in 2 days
+- "1w" / "1 week" / "1 неделя" - expires in 1 week
+- "24h" / "24 hours" / "24 часа" - expires in 24 hours
+- IMPORTANT: Use EXACT number from user request (user says "24 часа" → duration: "24h", NOT "20h")
 - null - permanent discount`,
       parameters: {
         type: 'object',
@@ -571,7 +576,7 @@ Duration format:
           duration: {
             type: 'string',
             description:
-              'Optional: discount duration (e.g. "6h", "2d", "1w"). If not specified - permanent discount.',
+              'Optional: discount duration. Use EXACT number from user request. Examples: "24h" for "24 часа/hours", "6h" for "6 часов/hours", "2d" for "2 дня/days", "1w" for "1 неделя/week". Russian: "на 24 часа" → "24h", "на 3 дня" → "3d". If not specified - permanent discount.',
           },
         },
         required: ['productName', 'percentage'],
@@ -613,7 +618,8 @@ Use when user explicitly says "15% discount on everything", "raise prices by 5%"
 
 Examples:
 - "20% discount on everything" → bulkUpdatePrices({ percentage: 20, operation: 'decrease', discount_type: 'permanent' })
-- "-15% on catalog for 6 hours" → percentage: 15, operation: 'decrease', discount_type: 'timer', duration: '6 hours'
+- "-15% on catalog for 6 hours" → percentage: 15, operation: 'decrease', discount_type: 'timer', duration: '6h'
+- "скидка 10% на всё на 24 часа" → percentage: 10, operation: 'decrease', discount_type: 'timer', duration: '24h'
 - "raise prices by 7%, except accessories" → operation: 'increase', excludedProducts: ['accessory']
 
 Rules:
@@ -646,7 +652,7 @@ Rules:
           duration: {
             type: 'string',
             description:
-              'Duration for timer discount in human-readable format. Examples: "6 hours", "3 days", "12h", "2 days", "24 hours". Only fill if user provided duration.',
+              'Duration for timer discount. Use EXACT number from user. Examples: "6h"/"6 hours"/"6 часов", "24h"/"24 hours"/"24 часа", "2d"/"2 days"/"2 дня". Russian: "на 24 часа" → "24h", "на 3 дня" → "3d". Only fill if user provided duration.',
           },
           excludedProducts: {
             type: 'array',

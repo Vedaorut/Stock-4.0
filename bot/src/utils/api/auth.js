@@ -79,4 +79,16 @@ export const authApi = {
     );
     return data.data || data;
   },
+
+  // Get current user language from DB (for syncing after webapp changes)
+  async getLanguage(token) {
+    try {
+      const { data } = await api.get('/auth/profile', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      return (data.data || data)?.user?.language || data?.user?.language || null;
+    } catch {
+      return null; // Silent fail - will use session language
+    }
+  },
 };

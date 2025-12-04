@@ -5,6 +5,7 @@ import { useTelegram } from '../../hooks/useTelegram';
 import { useApi } from '../../hooks/useApi';
 import { useBackButton } from '../../hooks/useBackButton';
 import { useTranslation } from '../../i18n/useTranslation';
+import { useStore } from '../../store/useStore';
 
 // Follow Card Component
 function FollowCard({ follow, onModeSwitch, onDelete, t }) {
@@ -278,6 +279,9 @@ export default function FollowsModal({ isOpen, onClose }) {
         }
 
         requestBody.markupPercentage = parsed;
+        // Preserve existing markup type and fixed value
+        requestBody.markupType = follow.markup_type || 'percentage';
+        requestBody.markupFixed = follow.markup_fixed || 0;
       }
 
       await fetchApi(`/follows/${follow.id}/mode`, {
@@ -357,6 +361,8 @@ export default function FollowsModal({ isOpen, onClose }) {
       setSearchQuery('');
       setSearchResults([]);
       await loadData();
+      // Update global state so TabBar shows Following tab immediately
+      useStore.getState().setHasFollows(true);
       await alert(t('follows.added'));
     } catch (error) {
       await alert(error.message || t('follows.addError'));

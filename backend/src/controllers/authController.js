@@ -213,6 +213,8 @@ export const authController = {
         throw new NotFoundError('User');
       }
 
+      logger.info(`[Profile] userId=${user.id} telegramId=${user.telegram_id} lang=${user.language}`);
+
       return res.status(200).json({
         user: {
           id: user.id,

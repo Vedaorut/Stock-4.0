@@ -10,7 +10,7 @@ import { t } from '../i18n/index.js';
 /**
  * Get language with fallback
  */
-const getLangSafe = (ctx) => ctx.lang || ctx.session?.user?.language || 'ru';
+const getLangSafe = (ctx) => ctx.lang || ctx.session?.language || 'ru';
 
 /**
  * Manage Workers Scene - Add/Remove workers

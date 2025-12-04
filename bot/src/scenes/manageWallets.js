@@ -44,7 +44,7 @@ async function showQRCode(ctx, crypto) {
   try {
     await ctx.answerCbQuery();
 
-    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const lang = ctx.lang || ctx.session?.language || 'ru';
     const { seller: sellerMessages } = getMessages(lang);
 
     // Get wallet address
@@ -104,7 +104,7 @@ async function showQRCode(ctx, crypto) {
     logger.error('Error showing QR code:', error);
 
     // Provide user-friendly error message based on error type
-    const langErr = ctx.lang || ctx.session?.user?.language || 'ru';
+    const langErr = ctx.lang || ctx.session?.language || 'ru';
     const { seller: sellerMsgs } = getMessages(langErr);
     const errorMessage = getQRErrorMessage(error, sellerMsgs.walletsQrError);
     await cleanReply(ctx, errorMessage);
@@ -127,7 +127,7 @@ const showWalletsSilent = async (ctx) => {
       return; // Silently fail
     }
 
-    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const lang = ctx.lang || ctx.session?.language || 'ru';
     const { seller: sellerMessages } = getMessages(lang);
 
     const shop = await walletApi.getWallets(ctx.session.shopId, ctx.session.token);
@@ -164,7 +164,7 @@ const showWallets = async (ctx) => {
   try {
     logger.info('wallet_manage_step:show', { userId: ctx.from.id });
 
-    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const lang = ctx.lang || ctx.session?.language || 'ru';
     const { seller: sellerMessages, general: generalMessages } = getMessages(lang);
 
     // Validate session
@@ -212,7 +212,7 @@ const showWallets = async (ctx) => {
     return ctx.wizard.next();
   } catch (error) {
     logger.error('Error showing wallets:', error);
-    const langErr = ctx.lang || ctx.session?.user?.language || 'ru';
+    const langErr = ctx.lang || ctx.session?.language || 'ru';
     const { seller: sellerMessages } = getMessages(langErr);
     await smartMessage.send(ctx, {
       text: sellerMessages.walletsLoadError,
@@ -228,7 +228,7 @@ const showWallets = async (ctx) => {
 
 const handleInput = async (ctx) => {
   try {
-    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const lang = ctx.lang || ctx.session?.language || 'ru';
     const { seller: sellerMessages } = getMessages(lang);
 
     // Handle callback query (button click)
@@ -545,7 +545,7 @@ ${formatted}`,
     });
   } catch (error) {
     logger.error('Error in handleInput:', error);
-    const langErr = ctx.lang || ctx.session?.user?.language || 'ru';
+    const langErr = ctx.lang || ctx.session?.language || 'ru';
     const { seller: sellerMsgs } = getMessages(langErr);
     await smartMessage.send(ctx, {
       text: sellerMsgs.walletsLoadError,
@@ -594,9 +594,9 @@ manageWalletsScene.action('cancel_scene', async (ctx) => {
   } catch (error) {
     logger.error('Error in cancel_scene handler:', error);
     try {
-      const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+      const lang = ctx.lang || ctx.session?.language || 'ru';
       const { general: generalMessages } = getMessages(lang);
-      const langErr = ctx.lang || ctx.session?.user?.language || 'ru';
+      const langErr = ctx.lang || ctx.session?.language || 'ru';
       await ctx.editMessageText(generalMessages.actionFailed, successButtons(langErr));
     } catch (replyError) {
       logger.error('Failed to send error message:', replyError);

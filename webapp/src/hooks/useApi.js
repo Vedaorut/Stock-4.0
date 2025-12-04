@@ -283,52 +283,50 @@ export function useFollowsApi() {
 
       // Update markup
       updateMarkup: async (followId, markupData) => {
-        try {
-          // Support both old (number) and new (object) format for backward compatibility
-          const payload = typeof markupData === 'number' 
-            ? { markupPercentage: markupData, markupType: 'percentage' }
-            : {
-                markupType: markupData.markupType || 'percentage',
-                markupPercentage: markupData.markupPercentage || 0,
-                markupFixed: markupData.markupFixed || 0,
-              };
-          const response = await api.put(`/follows/${followId}/markup`, payload);
-          return response.data;
-        } catch (error) {
+        // Support both old (number) and new (object) format for backward compatibility
+        const payload = typeof markupData === 'number'
+          ? { markupPercentage: markupData, markupType: 'percentage' }
+          : {
+              markupType: markupData.markupType || 'percentage',
+              markupPercentage: markupData.markupPercentage || 0,
+              markupFixed: markupData.markupFixed || 0,
+            };
+        const response = await api.put(`/follows/${followId}/markup`, payload);
+        if (response.error) {
           if (import.meta.env.DEV) {
-            console.error('Error updating markup:', error);
+            console.error('Error updating markup:', response.error);
           }
-          throw error;
+          throw new Error(response.error);
         }
+        return response;
       },
 
       // Switch mode
       switchMode: async (followId, mode, markupData = null) => {
-        try {
-          const body = { mode };
-          
-          // Support both old (number) and new (object) format for backward compatibility
-          if (markupData !== null) {
-            if (typeof markupData === 'number') {
-              // Old format: just markupPercentage
-              body.markupPercentage = markupData;
-              body.markupType = 'percentage';
-            } else {
-              // New format: { markupType, markupPercentage, markupFixed }
-              body.markupType = markupData.markupType || 'percentage';
-              body.markupPercentage = markupData.markupPercentage || 0;
-              body.markupFixed = markupData.markupFixed || 0;
-            }
+        const body = { mode };
+
+        // Support both old (number) and new (object) format for backward compatibility
+        if (markupData !== null) {
+          if (typeof markupData === 'number') {
+            // Old format: just markupPercentage
+            body.markupPercentage = markupData;
+            body.markupType = 'percentage';
+          } else {
+            // New format: { markupType, markupPercentage, markupFixed }
+            body.markupType = markupData.markupType || 'percentage';
+            body.markupPercentage = markupData.markupPercentage || 0;
+            body.markupFixed = markupData.markupFixed || 0;
           }
-          
-          const response = await api.put(`/follows/${followId}/mode`, body);
-          return response.data;
-        } catch (error) {
-          if (import.meta.env.DEV) {
-            console.error('Error switching mode:', error);
-          }
-          throw error;
         }
+
+        const response = await api.put(`/follows/${followId}/mode`, body);
+        if (response.error) {
+          if (import.meta.env.DEV) {
+            console.error('Error switching mode:', response.error);
+          }
+          throw new Error(response.error);
+        }
+        return response;
       },
 
       // Delete follow
@@ -346,33 +344,31 @@ export function useFollowsApi() {
 
       // Per-product markup: set individual product markup
       updateProductMarkup: async (followId, productId, markupData) => {
-        try {
-          const payload = {
-            markupType: markupData.markupType || 'percentage',
-            markupPercentage: markupData.markupPercentage || 0,
-            markupFixed: markupData.markupFixed || 0,
-          };
-          const response = await api.put(`/follows/${followId}/products/${productId}/markup`, payload);
-          return response.data;
-        } catch (error) {
+        const payload = {
+          markupType: markupData.markupType || 'percentage',
+          markupPercentage: markupData.markupPercentage || 0,
+          markupFixed: markupData.markupFixed || 0,
+        };
+        const response = await api.put(`/follows/${followId}/products/${productId}/markup`, payload);
+        if (response.error) {
           if (import.meta.env.DEV) {
-            console.error('Error updating product markup:', error);
+            console.error('Error updating product markup:', response.error);
           }
-          throw error;
+          throw new Error(response.error);
         }
+        return response;
       },
 
       // Per-product markup: reset product markup to global
       resetProductMarkup: async (followId, productId) => {
-        try {
-          const response = await api.delete(`/follows/${followId}/products/${productId}/markup`);
-          return response.data;
-        } catch (error) {
+        const response = await api.delete(`/follows/${followId}/products/${productId}/markup`);
+        if (response.error) {
           if (import.meta.env.DEV) {
-            console.error('Error resetting product markup:', error);
+            console.error('Error resetting product markup:', response.error);
           }
-          throw error;
+          throw new Error(response.error);
         }
+        return response;
       },
     };
   }

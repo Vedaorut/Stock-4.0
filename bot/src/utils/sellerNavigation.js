@@ -7,7 +7,7 @@ import { t } from '../i18n/index.js';
 
 const { seller: sellerMessages } = messages;
 
-const getLang = (ctx) => ctx.lang || ctx.session?.user?.language || 'ru';
+const getLang = (ctx) => ctx.lang || ctx.session?.language || 'ru';
 
 const formatDate = (dateValue) => {
   if (!dateValue) {

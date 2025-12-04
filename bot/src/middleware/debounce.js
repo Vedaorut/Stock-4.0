@@ -38,7 +38,7 @@ const debounceMiddleware = async (ctx, next) => {
 
     // Answer callback query with "please wait" message
     try {
-      const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+      const lang = ctx.lang || ctx.session?.language || 'ru';
       await ctx.answerCbQuery(t('general.pleaseWait', {}, lang));
     } catch (error) {
       logger.debug('Failed to answer debounced query', {

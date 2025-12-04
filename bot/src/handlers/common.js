@@ -16,7 +16,7 @@ import { handleStart } from './start.js';
 /**
  * Get language with fallback (C5 fix: ctx.lang undefined)
  */
-const getLangSafe = (ctx) => ctx.lang || ctx.session?.user?.language || 'ru';
+const getLangSafe = (ctx) => ctx.lang || ctx.session?.language || 'ru';
 
 
 /**
@@ -64,10 +64,7 @@ const handleLanguageSelection = async (ctx) => {
     logger.info(`User ${ctx.from.id} selected language: ${lang}`);
 
     // Save language to session
-    if (!ctx.session.user) {
-      ctx.session.user = {};
-    }
-    ctx.session.user.language = lang;
+    ctx.session.language = lang;
 
     // Save language to database via API
     try {
@@ -113,7 +110,7 @@ const handleMainMenu = async (ctx) => {
     }
 
     // Check if user has saved role - redirect to dashboard instead of resetting
-    const savedRole = ctx.session.user?.selectedRole;
+    const savedRole = ctx.session.role;
 
     if (savedRole === 'seller') {
       logger.info(`User ${ctx.from.id} has saved role: seller, redirecting to seller dashboard`);
@@ -275,7 +272,7 @@ const handleRoleToggle = async (ctx) => {
 
     // If NOT worker - auto-swap buyer↔seller without showing menu
     if (!isWorker) {
-      const currentRole = ctx.session.role || ctx.session.user?.selectedRole || 'buyer';
+      const currentRole = ctx.session.role || 'buyer';
       if (currentRole === 'buyer' || currentRole === null) {
         // Switch to seller
         return handleRoleSeller(ctx);
@@ -327,9 +324,6 @@ const handleRoleBuyer = async (ctx) => {
         await authApi.updateRole('buyer', ctx.session.token);
         ctx.session.role = 'buyer';
         ctx.session.workspaceShopId = null; // Clear workspace
-        if (ctx.session.user) {
-          ctx.session.user.selectedRole = 'buyer';
-        }
         logger.info(`Saved buyer role for user ${ctx.from.id}`);
       } else {
         logger.warn(`User ${ctx.from.id} has no token, cannot save role`);
@@ -373,9 +367,6 @@ const handleRoleSeller = async (ctx) => {
         await authApi.updateRole('seller', ctx.session.token);
         ctx.session.role = 'seller';
         ctx.session.workspaceShopId = null; // Clear workspace
-        if (ctx.session.user) {
-          ctx.session.user.selectedRole = 'seller';
-        }
         logger.info(`Saved seller role for user ${ctx.from.id}`);
       } else {
         logger.warn(`User ${ctx.from.id} has no token, cannot save role`);
@@ -423,9 +414,6 @@ const handleRoleWorker = async (ctx) => {
     try {
       await authApi.updateRole('worker', ctx.session.token);
       ctx.session.role = 'worker';
-      if (ctx.session.user) {
-        ctx.session.user.selectedRole = 'worker';
-      }
     } catch (error) {
       logger.error('Failed to persist worker role:', error);
       ctx.session.role = 'worker';
@@ -583,9 +571,6 @@ const handleBackToMain = async (ctx) => {
     try {
       if (ctx.session.token) {
         await authApi.updateRole('seller', ctx.session.token);
-        if (ctx.session.user) {
-          ctx.session.user.selectedRole = 'seller';
-        }
         logger.info(`Saved seller role for user ${ctx.from.id} (from subscription notification)`);
       }
     } catch (error) {
@@ -628,9 +613,6 @@ const handleStartCreateShop = async (ctx) => {
     try {
       if (ctx.session.token) {
         await authApi.updateRole('seller', ctx.session.token);
-        if (ctx.session.user) {
-          ctx.session.user.selectedRole = 'seller';
-        }
         logger.info(`Saved seller role for user ${ctx.from.id} (from create shop button)`);
       }
     } catch (error) {

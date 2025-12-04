@@ -19,13 +19,11 @@ const setWorkspaceSession = (ctx, shop) => {
   ctx.session.shopName = shop.name;
   ctx.session.shopTier = shop.tier;
   ctx.session.isShopOwner = false;
-  if (ctx.session.user) {
-    ctx.session.user.selectedRole = 'worker';
-  }
+
 };
 
 const ensureWorkspaceShop = async (ctx) => {
-  const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+  const lang = ctx.lang || ctx.session?.language || 'ru';
   if (!ctx.session.token) {
     await smartMessage.send(ctx, {
       text: generalMessages.authorizationRequired(lang),
@@ -82,7 +80,7 @@ export const handleWorkerDashboard = async (ctx) => {
       }
     }
 
-    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const lang = ctx.lang || ctx.session?.language || 'ru';
     if (!ctx.session.token) {
       await smartMessage.send(ctx, {
         text: generalMessages.authorizationRequired(lang),
@@ -111,7 +109,7 @@ export const handleWorkerDashboard = async (ctx) => {
     });
   } catch (error) {
     logger.error('handleWorkerDashboard error:', error);
-    const langErr = ctx.lang || ctx.session?.user?.language || 'ru';
+    const langErr = ctx.lang || ctx.session?.language || 'ru';
     await smartMessage.send(ctx, {
       text: generalMessages.actionFailed(langErr),
       keyboard: mainMenu(false, langErr),
@@ -144,7 +142,7 @@ export const handleWorkerProducts = async (ctx) => {
     });
   } catch (error) {
     logger.error('handleWorkerProducts error:', error);
-    const langErr = ctx.lang || ctx.session?.user?.language || 'ru';
+    const langErr = ctx.lang || ctx.session?.language || 'ru';
     await smartMessage.send(ctx, {
       text: generalMessages.actionFailed(langErr),
       keyboard: workerMenu(undefined, langErr),
@@ -175,7 +173,7 @@ export const handleWorkerStats = async (ctx) => {
     });
   } catch (error) {
     logger.error('handleWorkerStats error:', error);
-    const langErr = ctx.lang || ctx.session?.user?.language || 'ru';
+    const langErr = ctx.lang || ctx.session?.language || 'ru';
     await smartMessage.send(ctx, {
       text: generalMessages.actionFailed(langErr),
       keyboard: workerMenu(undefined, langErr),

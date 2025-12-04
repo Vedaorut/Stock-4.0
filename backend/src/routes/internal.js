@@ -288,6 +288,7 @@ router.post('/auth/bot-register', verifyInternalSecret, async (req, res) => {
         first_name: user.first_name,
         last_name: user.last_name,
         selected_role: user.selected_role,
+        language: user.language || 'ru',
         created_at: user.created_at,
       },
     });

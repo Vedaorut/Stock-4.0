@@ -94,9 +94,6 @@ export function TelegramProvider({ children }) {
       // Store backend user locally for context (includes selected_role)
       setBackendUser(user);
 
-      // eslint-disable-next-line no-console
-      console.log('[Auth] ✅ Token received, user:', user?.username);
-
       setError(null);
     } catch (err) {
       console.error('[Auth] ❌ Validation failed:', {

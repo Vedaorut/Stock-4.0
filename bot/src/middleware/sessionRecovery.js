@@ -31,7 +31,7 @@ const sessionRecoveryMiddleware = async (ctx, next) => {
         userId: ctx.from.id,
         hasToken: !!ctx.session.token,
         hasShopId: !!ctx.session.shopId,
-        role: ctx.session.user?.selectedRole,
+        role: ctx.session.role,
       });
 
       await recoverSessionData(ctx);
@@ -60,17 +60,12 @@ function checkIfRecoveryNeeded(ctx) {
     return false;
   }
 
-  // Has token but missing user data
-  if (ctx.session.token && !ctx.session.user) {
+  // Has token but missing userId
+  if (ctx.session.token && !ctx.session.userId) {
     return true;
   }
 
   // User is seller but missing shop data
-  if (ctx.session.user?.selectedRole === 'seller' && !ctx.session.shopId) {
-    return true;
-  }
-
-  // If role is 'seller' but shopId missing, also try recovery
   if (ctx.session.role === 'seller' && !ctx.session.shopId) {
     return true;
   }
@@ -99,11 +94,6 @@ async function recoverSessionData(ctx) {
         // If user has shop, set role to 'seller'
         if (!ctx.session.role) {
           ctx.session.role = 'seller';
-        }
-
-        // Also update user.selectedRole if user object exists
-        if (ctx.session.user) {
-          ctx.session.user.selectedRole = 'seller';
         }
 
         // P2-11 FIX: Set tokenCreatedAt if missing (prevents unnecessary token regeneration)
@@ -149,7 +139,7 @@ async function recoverSessionData(ctx) {
       });
 
       ctx.session.token = null;
-      ctx.session.user = null;
+      ctx.session.userId = null;
       ctx.session.shopId = null;
       ctx.session.shopName = null;
       ctx.session.role = null;

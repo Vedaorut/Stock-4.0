@@ -5,6 +5,7 @@ import { useTelegram } from '../../hooks/useTelegram';
 import { useBackButton } from '../../hooks/useBackButton';
 import { useTranslation } from '../../i18n/useTranslation';
 import { useApi } from '../../hooks/useApi';
+import { useStore } from '../../store/useStore';
 
 const LANGUAGES = [
   {
@@ -25,6 +26,8 @@ export default function LanguageModal({ isOpen, onClose }) {
   const { triggerHaptic } = useTelegram();
   const { t, lang, setLanguage } = useTranslation();
   const { fetchApi } = useApi();
+  const user = useStore((state) => state.user);
+  const setUser = useStore((state) => state.setUser);
 
   // Use Telegram BackButton API to close the modal
   const handleClose = useCallback(() => {
@@ -41,17 +44,22 @@ export default function LanguageModal({ isOpen, onClose }) {
       return;
     }
 
-    // Apply new language locally
-    await setLanguage(languageId);
-
-    // Save language choice on server
+    // 1. First save to server (syncs with bot)
     try {
       await fetchApi('/auth/language', {
         method: 'PATCH',
-        body: JSON.stringify({ language: languageId }),
+        body: { language: languageId },
       });
-    } catch {
-      // Ignore error - language is already set locally
+    } catch (err) {
+      // Show error but still apply locally for better UX
+      console.error('Failed to save language to server:', err);
+    }
+
+    // 2. Then apply locally (updates UI and localStorage)
+    await setLanguage(languageId);
+    // Keep Zustand user in sync so future hooks see updated value
+    if (user) {
+      setUser({ ...user, language: languageId });
     }
 
     onClose();

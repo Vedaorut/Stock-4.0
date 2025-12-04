@@ -31,7 +31,7 @@ const migrateChannelScene = new Scenes.WizardScene(
   'migrate_channel',
   async (ctx) => {
     try {
-      const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+      const lang = ctx.lang || ctx.session?.language || 'ru';
       const { seller: sellerMessages } = getMessages(lang);
 
       await smartMessage.send(ctx, {
@@ -50,7 +50,7 @@ const migrateChannelScene = new Scenes.WizardScene(
     return ctx.wizard.next();
   },
   async (ctx) => {
-    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const lang = ctx.lang || ctx.session?.language || 'ru';
     const { seller: sellerMessages } = getMessages(lang);
 
     if (!ctx.callbackQuery) {
@@ -89,7 +89,7 @@ const migrateChannelScene = new Scenes.WizardScene(
     return ctx.wizard.next();
   },
   async (ctx) => {
-    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const lang = ctx.lang || ctx.session?.language || 'ru';
     const { seller: sellerMessages } = getMessages(lang);
 
     if (ctx.callbackQuery?.data === 'seller:tools') {
@@ -172,7 +172,7 @@ const migrateChannelScene = new Scenes.WizardScene(
     return ctx.wizard.next();
   },
   async (ctx) => {
-    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const lang = ctx.lang || ctx.session?.language || 'ru';
     const { seller: sellerMessages, general: generalMessages } = getMessages(lang);
 
     if (!ctx.callbackQuery) {

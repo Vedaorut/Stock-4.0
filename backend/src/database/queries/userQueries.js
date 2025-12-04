@@ -66,7 +66,7 @@ export const userQueries = {
            last_name = COALESCE($4, last_name),
            updated_at = NOW()
        WHERE id = $1
-       RETURNING id, telegram_id, username, first_name, last_name, selected_role, created_at, updated_at`,
+       RETURNING id, telegram_id, username, first_name, last_name, selected_role, language, created_at, updated_at`,
       [id, username, firstName, lastName]
     );
     return result.rows[0];
@@ -79,7 +79,7 @@ export const userQueries = {
        SET selected_role = $2,
            updated_at = NOW()
        WHERE id = $1
-       RETURNING id, telegram_id, username, first_name, last_name, selected_role, created_at, updated_at`,
+       RETURNING id, telegram_id, username, first_name, last_name, selected_role, language, created_at, updated_at`,
       [userId, role]
     );
     return result.rows[0];

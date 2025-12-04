@@ -58,7 +58,7 @@ const parseDeepLink = (text) => {
  * Handle shop invite deep link - subscribe user to shop
  */
 const handleShopInvite = async (ctx, shopId) => {
-  const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+  const lang = ctx.lang || ctx.session?.language || 'ru';
 
   try {
     // Subscribe to shop via API
@@ -121,7 +121,7 @@ export const handleStart = async (ctx) => {
     delete ctx.session.pendingAI;
 
     // === PRIORITY 0: Check if language is set (first-time user) ===
-    if (!ctx.session.user?.language) {
+    if (!ctx.session.language) {
       logger.info(`User ${ctx.from.id} has no language set, showing language selection`);
       await smartMessage.send(ctx, {
         text: t('settings.selectLanguage', {}, 'en'),
@@ -154,11 +154,6 @@ export const handleStart = async (ctx) => {
           ctx.session.shopTier = primaryShop.tier || ctx.session.shopTier;
           ctx.session.role = 'seller';
 
-          // Persist seller role in session user
-          if (ctx.session.user) {
-            ctx.session.user.selectedRole = 'seller';
-          }
-
           // Save seller role to database
           try {
             await authApi.updateRole('seller', ctx.session.token);
@@ -181,7 +176,7 @@ export const handleStart = async (ctx) => {
     }
 
     // === PRIORITY 2: Check saved role (buyer fallback) ===
-    const savedRole = ctx.session.user?.selectedRole;
+    const savedRole = ctx.session.role;
 
     if (savedRole === 'buyer') {
       logger.info(`User ${ctx.from.id} has saved buyer role`);
@@ -224,7 +219,7 @@ export const handleStart = async (ctx) => {
     }
 
     // Send welcome message using smartMessage (edit if exists, else send new)
-    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const lang = ctx.lang || ctx.session?.language || 'ru';
     await smartMessage.send(ctx, {
       text: ctx.t('start.welcome'),
       keyboard: mainMenu(showWorkspace, lang),

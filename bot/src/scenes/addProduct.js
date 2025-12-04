@@ -20,7 +20,7 @@ const enterName = async (ctx) => {
   try {
     logger.info('product_add_step:name', { userId: ctx.from.id });
 
-    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const lang = ctx.lang || ctx.session?.language || 'ru';
     const { seller: sellerMessages } = getMessages(lang);
 
     await smartMessage.send(ctx, {
@@ -38,7 +38,7 @@ const enterName = async (ctx) => {
 // Step 2: Enter price
 const enterPrice = async (ctx) => {
   try {
-    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const lang = ctx.lang || ctx.session?.language || 'ru';
     const { seller: sellerMessages } = getMessages(lang);
 
     // Get product name from message
@@ -88,7 +88,7 @@ const enterPrice = async (ctx) => {
 // Step 3: Complete
 const complete = async (ctx) => {
   try {
-    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const lang = ctx.lang || ctx.session?.language || 'ru';
     const { seller: sellerMessages, general: generalMessages } = getMessages(lang);
 
     // Get price from message
@@ -187,7 +187,7 @@ const complete = async (ctx) => {
     return await ctx.scene.leave();
   } catch (error) {
     logger.error('Error creating product:', error);
-    const langErr = ctx.lang || ctx.session?.user?.language || 'ru';
+    const langErr = ctx.lang || ctx.session?.language || 'ru';
     const { seller: sellerMsgs } = getMessages(langErr);
     await smartMessage.send(ctx, {
       text: sellerMsgs.addProductError,
@@ -242,7 +242,7 @@ addProductScene.action('cancel_scene', async (ctx) => {
     logger.error('Error in cancel_scene handler:', error);
     // Local error handling
     try {
-      const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+      const lang = ctx.lang || ctx.session?.language || 'ru';
       const { general: generalMessages } = getMessages(lang);
       await ctx.reply(generalMessages.actionFailed);
     } catch (replyError) {

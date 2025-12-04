@@ -23,7 +23,7 @@ const showPrompt = async (ctx) => {
   try {
     logger.info('mark_orders_shipped:step:prompt', { userId: ctx.from.id });
 
-    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const lang = ctx.lang || ctx.session?.language || 'ru';
     const { general: generalMessages } = getMessages(lang);
 
     // Validate session
@@ -88,7 +88,7 @@ const showPrompt = async (ctx) => {
     return ctx.wizard.next();
   } catch (error) {
     logger.error('Error in markOrdersShipped showPrompt:', error);
-    const langErr = ctx.lang || ctx.session?.user?.language || 'ru';
+    const langErr = ctx.lang || ctx.session?.language || 'ru';
     const { general: generalMsgs } = getMessages(langErr);
     await ctx.editMessageText(generalMsgs.actionFailed);
     return await ctx.scene.leave();
@@ -101,7 +101,7 @@ const showPrompt = async (ctx) => {
 
 const handleInput = async (ctx) => {
   try {
-    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const lang = ctx.lang || ctx.session?.language || 'ru';
     const { seller: sellerMessages } = getMessages(lang);
 
     // Handle cancel button
@@ -174,7 +174,7 @@ const handleInput = async (ctx) => {
     return ctx.wizard.next();
   } catch (error) {
     logger.error('Error in markOrdersShipped handleInput:', error);
-    const langErr = ctx.lang || ctx.session?.user?.language || 'ru';
+    const langErr = ctx.lang || ctx.session?.language || 'ru';
     const { general: generalMsgs } = getMessages(langErr);
     await ctx.reply(generalMsgs.actionFailed);
     return await ctx.scene.leave();
@@ -187,7 +187,7 @@ const handleInput = async (ctx) => {
 
 const handleConfirmation = async (ctx) => {
   try {
-    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const lang = ctx.lang || ctx.session?.language || 'ru';
     const { seller: sellerMessages, general: generalMessages } = getMessages(lang);
 
     await ctx.answerCbQuery();
@@ -245,7 +245,7 @@ const handleConfirmation = async (ctx) => {
     }
   } catch (error) {
     logger.error('Error in markOrdersShipped handleConfirmation:', error);
-    const langErr = ctx.lang || ctx.session?.user?.language || 'ru';
+    const langErr = ctx.lang || ctx.session?.language || 'ru';
     const { general: generalMsgs } = getMessages(langErr);
     await ctx.editMessageText(generalMsgs.actionFailed);
     return await ctx.scene.leave();
@@ -334,7 +334,7 @@ markOrdersShippedScene.leave(async (ctx) => {
 // Handle cancel action within scene
 markOrdersShippedScene.action('cancel_scene', async (ctx) => {
   try {
-    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const lang = ctx.lang || ctx.session?.language || 'ru';
     const { seller: sellerMessages } = getMessages(lang);
 
     await ctx.answerCbQuery();
@@ -345,7 +345,7 @@ markOrdersShippedScene.action('cancel_scene', async (ctx) => {
   } catch (error) {
     logger.error('Error in cancel_scene handler:', error);
     try {
-      const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+      const lang = ctx.lang || ctx.session?.language || 'ru';
       const { general: generalMessages } = getMessages(lang);
       await ctx.editMessageText(generalMessages.actionFailed);
     } catch (replyError) {
@@ -357,7 +357,7 @@ markOrdersShippedScene.action('cancel_scene', async (ctx) => {
 // Also handle 'cancel' action (some buttons use this)
 markOrdersShippedScene.action('cancel', async (ctx) => {
   try {
-    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const lang = ctx.lang || ctx.session?.language || 'ru';
     const { seller: sellerMessages } = getMessages(lang);
 
     await ctx.answerCbQuery();

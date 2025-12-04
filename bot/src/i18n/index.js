@@ -75,14 +75,14 @@ export function t(key, params = {}, lang) {
 
 /**
  * Get user language from context
- * Priority: session.user.language > Telegram language_code > 'ru'
+ * Priority: session.language > Telegram language_code > 'ru'
  * @param {Object} ctx - Telegraf context
  * @returns {string} Language code ('ru' or 'en')
  */
 export function getLang(ctx) {
   // Check session first (user preference)
-  if (ctx.session?.user?.language) {
-    return ctx.session.user.language;
+  if (ctx.session?.language) {
+    return ctx.session.language;
   }
 
   // Check Telegram language code

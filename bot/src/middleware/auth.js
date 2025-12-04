@@ -2,6 +2,36 @@ import { authApi } from '../utils/api.js';
 import logger from '../utils/logger.js';
 import { t, getLang } from '../i18n/index.js';
 
+const LANGUAGE_SYNC_INTERVAL_MS = 0;
+
+const shouldSyncLanguage = (session) => {
+  if (!session.language) return true;
+  if (!session.languageSyncedAt) return true;
+  if (LANGUAGE_SYNC_INTERVAL_MS <= 0) return true;
+  return Date.now() - session.languageSyncedAt > LANGUAGE_SYNC_INTERVAL_MS;
+};
+
+const syncLanguageFromBackend = async (ctx) => {
+  if (!ctx.session?.token) {
+    logger.debug(`[LangSync] No token for user ${ctx.from?.id}, skipping sync`);
+    return;
+  }
+  try {
+    const dbLang = await authApi.getLanguage(ctx.session.token);
+    logger.info(`[LangSync] user=${ctx.from.id} session=${ctx.session.language} db=${dbLang}`);
+    if (dbLang && dbLang !== ctx.session.language) {
+      logger.info(
+        `Language synced from DB: ${ctx.session.language} → ${dbLang} for user ${ctx.from.id}`
+      );
+      ctx.session.language = dbLang;
+    }
+  } catch (error) {
+    logger.warn(`[LangSync] Failed for user ${ctx.from?.id}:`, error.message);
+  } finally {
+    ctx.session.languageSyncedAt = Date.now();
+  }
+};
+
 /**
  * Authentication middleware
  * Automatically registers/logs in user via Backend API
@@ -16,30 +46,47 @@ const authMiddleware = async (ctx, next) => {
     ctx.session = ctx.session || {};
 
     // Check if user already authenticated in session
-    // IMPORTANT: Both token AND user must be truthy (not null/undefined)
-    // Also check that token is not too old (refresh if older than 6 days)
-    if (ctx.session.token && ctx.session.user) {
+    // Token must be truthy and not too old (refresh if older than 6 days)
+    if (ctx.session.token) {
       // Old sessions may be missing tokenCreatedAt — backfill without forcing re-auth
       if (!ctx.session.tokenCreatedAt) {
         ctx.session.tokenCreatedAt = new Date().toISOString();
         logger.info(`Backfilled tokenCreatedAt for user ${ctx.from.id}`);
+        if (shouldSyncLanguage(ctx.session)) {
+          await syncLanguageFromBackend(ctx);
+        }
         return next();
       }
 
       const tokenAge = Date.now() - new Date(ctx.session.tokenCreatedAt).getTime();
       const sixDays = 6 * 24 * 60 * 60 * 1000;
       if (tokenAge < sixDays) {
-        return next(); // Token is valid and fresh
+        // Миграция старой структуры session (user → language/role)
+        if (ctx.session.user && !ctx.session.language) {
+          ctx.session.language = ctx.session.user.language || 'ru';
+          ctx.session.role = ctx.session.role || ctx.session.user.selected_role;
+          delete ctx.session.user;
+          logger.info(`Migrated old session format for user ${ctx.from.id}`);
+        }
+        // FIX: Sessions without language need re-auth to sync with backend
+        if (!ctx.session.language) {
+          logger.info(`Session missing language, forcing re-auth for user ${ctx.from.id}`);
+          // Fall through to re-authenticate below
+        } else {
+          if (shouldSyncLanguage(ctx.session)) {
+            await syncLanguageFromBackend(ctx);
+          }
+          return next(); // Token is valid and fresh
+        }
       }
       logger.info(
         `Token age ${Math.floor(tokenAge / (24 * 60 * 60 * 1000))} days, refreshing for user ${ctx.from.id}`
       );
     }
 
-    // Force re-auth if token is null but user exists (corrupted session state)
-    // Or if tokenCreatedAt is missing (old session format)
-    if (ctx.session?.user && (!ctx.session?.token || !ctx.session?.tokenCreatedAt)) {
-      logger.info(`Forcing re-auth for user ${ctx.from.id} (token was null or no creation time)`);
+    // Force re-auth if token is missing
+    if (!ctx.session?.token) {
+      logger.info(`Authenticating user ${ctx.from.id} (no token in session)`);
     }
 
     // Extract user data from Telegram
@@ -64,11 +111,13 @@ const authMiddleware = async (ctx, next) => {
     const existingRole = ctx.session.role;
 
     ctx.session.token = authData.token;
-    ctx.session.user = authData.user;
     ctx.session.tokenCreatedAt = new Date().toISOString(); // Track token creation time
-    ctx.session.role = existingRole || null;
+    ctx.session.userId = authData.user?.id;
+    ctx.session.language = authData.user?.language || 'ru';
+    ctx.session.role = existingRole || authData.user?.selected_role || null;
     ctx.session.shopId = existingShopId || null; // Preserve if exists
     ctx.session.shopName = existingShopName || null;
+    ctx.session.languageSyncedAt = Date.now();
 
     logger.info(`User authenticated: ${ctx.from.id} (@${ctx.from.username})`);
 

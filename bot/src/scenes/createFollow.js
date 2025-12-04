@@ -20,7 +20,7 @@ const enterShopName = async (ctx) => {
   try {
     logger.info('follow_create_step:shop_name', { userId: ctx.from.id });
 
-    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const lang = ctx.lang || ctx.session?.language || 'ru';
     const { general: generalMessages, follows: followMessages } = getMessages(lang);
 
     // Check token first
@@ -66,7 +66,7 @@ const enterShopName = async (ctx) => {
 // Step 2: Show search results
 const showSearchResults = async (ctx) => {
   try {
-    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const lang = ctx.lang || ctx.session?.language || 'ru';
     const { general: generalMessages, follows: followMessages } = getMessages(lang);
 
     // Get shop name from message
@@ -161,7 +161,7 @@ const showSearchResults = async (ctx) => {
 // Step 3: Validate shop ID and ask mode
 const selectMode = async (ctx) => {
   try {
-    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const lang = ctx.lang || ctx.session?.language || 'ru';
     const { general: generalMessages, follows: followMessages } = getMessages(lang);
 
     // Get shop ID from callback query
@@ -266,7 +266,7 @@ const selectMode = async (ctx) => {
 // Step 4: Handle mode selection
 const handleModeSelection = async (ctx) => {
   try {
-    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const lang = ctx.lang || ctx.session?.language || 'ru';
     const { follows: followMessages } = getMessages(lang);
 
     if (!ctx.callbackQuery) {
@@ -346,7 +346,7 @@ const handleModeSelection = async (ctx) => {
 // Step 5: Handle markup input (only for resell mode)
 const handleMarkup = async (ctx) => {
   try {
-    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const lang = ctx.lang || ctx.session?.language || 'ru';
     const { general: generalMessages, follows: followMessages } = getMessages(lang);
 
     if (!ctx.message || !ctx.message.text) {
@@ -465,7 +465,7 @@ const handleMarkup = async (ctx) => {
     }
   } catch (error) {
     logger.error('Error in handleMarkup step:', error);
-    const langErr = ctx.lang || ctx.session?.user?.language || 'ru';
+    const langErr = ctx.lang || ctx.session?.language || 'ru';
     const { follows: followMsgs } = getMessages(langErr);
     await smartMessage.send(ctx, {
       text: followMsgs.createError,
@@ -530,7 +530,7 @@ createFollowScene.leave(async (ctx) => {
 // Handle cancel command
 createFollowScene.command('cancel', async (ctx) => {
   try {
-    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const lang = ctx.lang || ctx.session?.language || 'ru';
     const { follows: followMessages } = getMessages(lang);
 
     logger.info('follow_create_cancelled', { userId: ctx.from.id });
@@ -544,7 +544,7 @@ createFollowScene.command('cancel', async (ctx) => {
     logger.error('Error in cancel command handler:', error);
     // Local error handling
     try {
-      const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+      const lang = ctx.lang || ctx.session?.language || 'ru';
       const { follows: followMessages } = getMessages(lang);
       await smartMessage.send(ctx, {
         text: followMessages.cancelOperationError,
@@ -569,7 +569,7 @@ createFollowScene.action('cancel_scene', async (ctx) => {
     logger.error('Error in cancel_scene handler:', error);
     // Local error handling
     try {
-      const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+      const lang = ctx.lang || ctx.session?.language || 'ru';
       const { general: generalMessages } = getMessages(lang);
       await ctx.reply(generalMessages.actionFailed);
     } catch (replyError) {
@@ -609,7 +609,7 @@ createFollowScene.action('seller:menu', async (ctx) => {
   } catch (error) {
     logger.error('Error in seller:menu handler:', error);
     try {
-      const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+      const lang = ctx.lang || ctx.session?.language || 'ru';
       const { general: generalMessages } = getMessages(lang);
       await ctx.reply(generalMessages.actionFailed);
     } catch (replyError) {

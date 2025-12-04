@@ -35,7 +35,7 @@ export function setupSettingsHandlers(bot) {
   bot.action('settings', async (ctx) => {
     try {
       await ctx.answerCbQuery();
-      const lang = ctx.session.user?.language || 'ru';
+      const lang = ctx.session.language || 'ru';
       const shopContext = await getShopContext(ctx);
 
       let text = t('settings.title', {}, lang);
@@ -60,7 +60,7 @@ export function setupSettingsHandlers(bot) {
   bot.action('settings:language', async (ctx) => {
     try {
       await ctx.answerCbQuery();
-      const lang = ctx.session.user?.language || 'ru';
+      const lang = ctx.session.language || 'ru';
 
       await smartMessage.send(ctx, {
         text: t('settings.selectLanguage', {}, lang),
@@ -78,8 +78,8 @@ export function setupSettingsHandlers(bot) {
       await ctx.answerCbQuery();
 
       // Update session
-      if (!ctx.session.user) ctx.session.user = {};
-      ctx.session.user.language = newLang;
+      ctx.session.language = newLang;
+      ctx.session.languageSyncedAt = Date.now();
 
       // Save to database
       if (ctx.session.token) {
@@ -105,7 +105,7 @@ export function setupSettingsHandlers(bot) {
   bot.action('settings:main', async (ctx) => {
     try {
       await ctx.answerCbQuery();
-      const lang = ctx.session.user?.language || 'ru';
+      const lang = ctx.session.language || 'ru';
       const shopContext = await getShopContext(ctx);
 
       await ctx.editMessageText(t('settings.title', {}, lang), settingsMenu(shopContext, lang));
@@ -120,7 +120,7 @@ export function setupSettingsHandlers(bot) {
       await ctx.answerCbQuery();
 
       if (!ctx.session.shopId) {
-        const lang = ctx.session.user?.language || 'ru';
+        const lang = ctx.session.language || 'ru';
         await smartMessage.send(ctx, {
           text: t('errors.shopRequired', {}, lang),
         });

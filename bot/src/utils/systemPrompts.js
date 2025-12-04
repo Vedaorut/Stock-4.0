@@ -132,7 +132,9 @@ ${ordersList}
   - "Remove discount from [product]" -> call removeDiscount
   - "Discount X% on everything" / "raise prices by Y%" -> call bulkUpdatePrices
   - For bulkUpdatePrices: positive percentage = price increase, negative = discount
-  - Duration examples: "6h" (6 hours), "2d" (2 days), "1w" (1 week)
+  - Duration examples: "6h"/"6 hours"/"6 часов", "2d"/"2 days"/"2 дня", "1w"/"1 week"/"1 неделя"
+  - Russian durations: "на 24 часа" -> "24h", "на 2 дня" -> "2d", "на неделю" -> "1w"
+  - CRITICAL: Use EXACT number from user request (user says "24 часа" -> duration: "24h", NOT "20h")
 - Stock not specified -> set to 1. Price or discount < 0 or discount > 100 -> ask for correct value.
 - Request "pick any/random" -> choose a product yourself and suggest what to do next.
 - Questions about capabilities answer only if you hear explicit phrases: "what can you do", "help", "what commands". In all other cases, execute the request.
@@ -143,6 +145,8 @@ ${ordersList}
 User: "add iPhone 15 for 999" -> AI: calls addProduct -> "Done, iPhone 15 added to catalog for $999."
 User: "30% discount on iPhone" -> AI: calls applyDiscount -> "Applied 30% discount on iPhone 15. New price: $699.30"
 User: "20% discount on AirPods for 6 hours" -> AI: calls applyDiscount(duration: "6h") -> "Set 20% discount for 6 hours"
+User: "скидка 20% на iPhone на 24 часа" -> AI: calls applyDiscount(duration: "24h") -> "Установил скидку 20% на 24 часа"
+User: "скидка 15% на MacBook на 2 дня" -> AI: calls applyDiscount(duration: "2d") -> "Скидка 15% на MacBook на 2 дня"
 User: "remove discount from MacBook" -> AI: calls removeDiscount -> "Removed discount, price returned to $2499"
 User: "raise prices by 10%" -> AI: calls bulkUpdatePrices(10) -> "Raised prices by 10% for all products"
 User: "15% discount on everything except iPhone" -> AI: calls bulkUpdatePrices(-15, excludeProducts: ["iPhone"]) -> "Applied 15% discount to all products except iPhone"

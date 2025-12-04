@@ -13,7 +13,7 @@ import { getMessages } from '../../texts/messages.js';
 import { validateShopBeforeScene } from '../../utils/sceneValidation.js';
 import { t } from '../../i18n/index.js';
 
-const getLangSafe = (ctx) => ctx.lang || ctx.session?.user?.language || 'ru';
+const getLangSafe = (ctx) => ctx.lang || ctx.session?.language || 'ru';
 const getLocalizedMessages = (ctx) => getMessages(getLangSafe(ctx));
 
 const formatMoney = (value) => {

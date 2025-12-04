@@ -146,7 +146,7 @@ const shopOnboardingScene = new Scenes.WizardScene(
         return;
       }
 
-      const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+      const lang = ctx.lang || ctx.session?.language || 'ru';
 
       // Save to wizard state
       ctx.wizard.state.shopId = shopId;
@@ -215,7 +215,7 @@ shopOnboardingScene.action('onboarding:next', async (ctx) => {
   try {
     await ctx.answerCbQuery();
 
-    const lang = ctx.wizard.state.lang || ctx.lang || ctx.session?.user?.language || 'ru';
+    const lang = ctx.wizard.state.lang || ctx.lang || ctx.session?.language || 'ru';
     const currentStep = ctx.wizard.state.currentStep || 0;
     const nextStep = currentStep + 1;
 
@@ -239,7 +239,7 @@ shopOnboardingScene.action('onboarding:next', async (ctx) => {
   } catch (error) {
     logger.error('Error in onboarding:next:', error);
     try {
-      const lang = ctx.wizard?.state?.lang || ctx.lang || ctx.session?.user?.language || 'ru';
+      const lang = ctx.wizard?.state?.lang || ctx.lang || ctx.session?.language || 'ru';
       await ctx.answerCbQuery(t('general.errorRetry', {}, lang));
     } catch {
       /* ignored */
@@ -254,7 +254,7 @@ shopOnboardingScene.action('onboarding:skip', async (ctx) => {
 
     await markOnboardingCompleted(ctx);
 
-    const lang = ctx.wizard.state.lang || ctx.lang || ctx.session?.user?.language || 'ru';
+    const lang = ctx.wizard.state.lang || ctx.lang || ctx.session?.language || 'ru';
 
     logger.info('onboarding_skipped', {
       userId: ctx.from?.id,
@@ -273,7 +273,7 @@ shopOnboardingScene.action('onboarding:skip', async (ctx) => {
   } catch (error) {
     logger.error('Error in onboarding:skip:', error);
     try {
-      const lang = ctx.wizard?.state?.lang || ctx.lang || ctx.session?.user?.language || 'ru';
+      const lang = ctx.wizard?.state?.lang || ctx.lang || ctx.session?.language || 'ru';
       await ctx.answerCbQuery(t('general.errorRetry', {}, lang));
     } catch {
       /* ignored */
@@ -287,7 +287,7 @@ shopOnboardingScene.action('onboarding:open_shop', async (ctx) => {
     await ctx.answerCbQuery();
     await markOnboardingCompleted(ctx);
 
-    const lang = ctx.wizard.state.lang || ctx.lang || ctx.session?.user?.language || 'ru';
+    const lang = ctx.wizard.state.lang || ctx.lang || ctx.session?.language || 'ru';
 
     logger.info('onboarding_open_shop', {
       userId: ctx.from?.id,
@@ -303,7 +303,7 @@ shopOnboardingScene.action('onboarding:open_shop', async (ctx) => {
   } catch (error) {
     logger.error('Error in onboarding:open_shop:', error);
     try {
-      const lang = ctx.wizard?.state?.lang || ctx.lang || ctx.session?.user?.language || 'ru';
+      const lang = ctx.wizard?.state?.lang || ctx.lang || ctx.session?.language || 'ru';
       await ctx.answerCbQuery(t('general.errorRetry', {}, lang));
     } catch {
       /* ignored */
@@ -317,7 +317,7 @@ shopOnboardingScene.action('onboarding:finish', async (ctx) => {
     await ctx.answerCbQuery();
     await markOnboardingCompleted(ctx);
 
-    const lang = ctx.wizard.state.lang || ctx.lang || ctx.session?.user?.language || 'ru';
+    const lang = ctx.wizard.state.lang || ctx.lang || ctx.session?.language || 'ru';
     const shopName =
       ctx.wizard.state.shopName || ctx.session?.shopName || ctx.t('general.shopFallbackName');
 
@@ -343,7 +343,7 @@ shopOnboardingScene.action('onboarding:finish', async (ctx) => {
   } catch (error) {
     logger.error('Error in onboarding:finish:', error);
     try {
-      const lang = ctx.wizard?.state?.lang || ctx.lang || ctx.session?.user?.language || 'ru';
+      const lang = ctx.wizard?.state?.lang || ctx.lang || ctx.session?.language || 'ru';
       await ctx.answerCbQuery(t('general.errorRetry', {}, lang));
     } catch {
       /* ignored */
@@ -387,7 +387,7 @@ shopOnboardingScene.action('cancel_scene', async (ctx) => {
     await ctx.scene.leave();
 
     // Show seller menu
-    const lang = ctx.wizard?.state?.lang || ctx.lang || ctx.session?.user?.language || 'ru';
+    const lang = ctx.wizard?.state?.lang || ctx.lang || ctx.session?.language || 'ru';
     const shopName = ctx.wizard?.state?.shopName || ctx.session?.shopName || t('general.shopFallbackName', {}, lang);
     const menu = sellerMenu(0, { hasFollows: false }, lang);
     const message = t('seller.shopPanel', { shop: shopName }, lang);
@@ -416,7 +416,7 @@ shopOnboardingScene.action('cancel', async (ctx) => {
     await ctx.scene.leave();
 
     // Show seller menu
-    const lang = ctx.wizard?.state?.lang || ctx.lang || ctx.session?.user?.language || 'ru';
+    const lang = ctx.wizard?.state?.lang || ctx.lang || ctx.session?.language || 'ru';
     const shopName = ctx.wizard?.state?.shopName || ctx.session?.shopName || t('general.shopFallbackName', {}, lang);
     const menu = sellerMenu(0, { hasFollows: false }, lang);
     const message = t('seller.shopPanel', { shop: shopName }, lang);

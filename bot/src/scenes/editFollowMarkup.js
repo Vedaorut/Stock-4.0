@@ -26,7 +26,7 @@ import { getMessages } from '../texts/messages.js';
 // Step 1: Show markup type selection
 const showMarkupTypeSelection = async (ctx) => {
   try {
-    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const lang = ctx.lang || ctx.session?.language || 'ru';
     const { follows: followMessages } = getMessages(lang);
 
     // P1-BOT-003 FIX: Validate and set lock (moved from enter() hook)
@@ -101,7 +101,7 @@ const showMarkupTypeSelection = async (ctx) => {
 const waitForMarkupType = async (ctx) => {
   // This step is handled by action handlers, just wait
   if (ctx.message?.text) {
-    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const lang = ctx.lang || ctx.session?.language || 'ru';
     const { follows: followMessages } = getMessages(lang);
     await cleanReply(ctx, followMessages.markupTypeRequired, cancelButton(lang));
   }
@@ -111,7 +111,7 @@ const waitForMarkupType = async (ctx) => {
 // Step 3: Handle markup value input
 const handleMarkupInput = async (ctx) => {
   try {
-    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const lang = ctx.lang || ctx.session?.language || 'ru';
     const { general: generalMessages, follows: followMessages } = getMessages(lang);
 
     const markupType = ctx.scene.state.markupType;
@@ -250,7 +250,7 @@ const handleMarkupInput = async (ctx) => {
     }
   } catch (error) {
     logger.error('Error in handleMarkupInput step:', error);
-    const langErr = ctx.lang || ctx.session?.user?.language || 'ru';
+    const langErr = ctx.lang || ctx.session?.language || 'ru';
     const { follows: followMsgs } = getMessages(langErr);
     await cleanReply(ctx, followMsgs.switchError, followsMenu(Boolean(ctx.session?.hasFollows)));
     return ctx.scene.leave();
@@ -296,7 +296,7 @@ editFollowMarkupScene.action(/^markup_type:(percentage|fixed)$/, async (ctx) => 
     const markupType = ctx.match[1];
     ctx.scene.state.markupType = markupType;
 
-    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const lang = ctx.lang || ctx.session?.language || 'ru';
     const { follows: followMessages } = getMessages(lang);
 
     logger.info('edit_markup_type_selected', {
@@ -319,7 +319,7 @@ editFollowMarkupScene.action(/^markup_type:(percentage|fixed)$/, async (ctx) => 
     return ctx.wizard.next();
   } catch (error) {
     logger.error('Error in markup_type handler:', error);
-    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const lang = ctx.lang || ctx.session?.language || 'ru';
     const { follows: followMessages } = getMessages(lang);
     await cleanReply(ctx, followMessages.switchError, followsMenu(Boolean(ctx.session?.hasFollows)));
     return ctx.scene.leave();
@@ -329,7 +329,7 @@ editFollowMarkupScene.action(/^markup_type:(percentage|fixed)$/, async (ctx) => 
 // Handle cancel action within scene
 editFollowMarkupScene.action('cancel_scene', async (ctx) => {
   try {
-    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const lang = ctx.lang || ctx.session?.language || 'ru';
     const { follows: followMessages } = getMessages(lang);
 
     await ctx.answerCbQuery();
@@ -339,7 +339,7 @@ editFollowMarkupScene.action('cancel_scene', async (ctx) => {
   } catch (error) {
     logger.error('Error in cancel_scene handler:', error);
     try {
-      const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+      const lang = ctx.lang || ctx.session?.language || 'ru';
       const { follows: followMessages } = getMessages(lang);
       await cleanReply(ctx, followMessages.cancelOperationError, followsMenu(Boolean(ctx.session?.hasFollows)));
     } catch (replyError) {
@@ -351,7 +351,7 @@ editFollowMarkupScene.action('cancel_scene', async (ctx) => {
 // Also handle 'cancel' action (some buttons use this)
 editFollowMarkupScene.action('cancel', async (ctx) => {
   try {
-    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const lang = ctx.lang || ctx.session?.language || 'ru';
     const { follows: followMessages } = getMessages(lang);
 
     await ctx.answerCbQuery();

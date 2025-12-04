@@ -37,7 +37,7 @@ const paySubscriptionScene = new Scenes.WizardScene(
   // Step 1: Show pricing and tier selection
   async (ctx) => {
     try {
-      const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+      const lang = ctx.lang || ctx.session?.language || 'ru';
       const { general: generalMessages, subscription: subMessages } = getMessages(lang);
 
       // Check if tier was passed on scene entry (from chooseTier scene)
@@ -132,7 +132,7 @@ const paySubscriptionScene = new Scenes.WizardScene(
     } catch (error) {
       logger.error('[PaySubscription] Step 1 error:', error);
 
-      const langErr = ctx.lang || ctx.session?.user?.language || 'ru';
+      const langErr = ctx.lang || ctx.session?.language || 'ru';
       const errorMsg = error.response?.data?.error || error.message;
       await cleanReply(
         ctx,
@@ -146,7 +146,7 @@ const paySubscriptionScene = new Scenes.WizardScene(
 
   // Step 2: Handle tier selection and show crypto options
   async (ctx) => {
-    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const lang = ctx.lang || ctx.session?.language || 'ru';
     const { subscription: subMessages } = getMessages(lang);
 
     if (!ctx.callbackQuery) {
@@ -227,7 +227,7 @@ const paySubscriptionScene = new Scenes.WizardScene(
 
   // Step 3: Handle payment method selection and create CrystalPay invoice
   async (ctx) => {
-    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const lang = ctx.lang || ctx.session?.language || 'ru';
     const { general: generalMessages, subscription: subMessages } = getMessages(lang);
 
     if (!ctx.callbackQuery) {
@@ -354,7 +354,7 @@ const paySubscriptionScene = new Scenes.WizardScene(
 
   // Step 4: Handle payment status check via CrystalPay
   async (ctx) => {
-    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const lang = ctx.lang || ctx.session?.language || 'ru';
     const { general: generalMessages, subscription: subMessages } = getMessages(lang);
 
     if (!ctx.callbackQuery) {

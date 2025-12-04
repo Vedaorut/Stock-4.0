@@ -17,7 +17,7 @@ import { t } from '../i18n/index.js';
 // Step 1: Enter shop name (with payment verification for paid subscriptions)
 const enterShopName = async (ctx) => {
   try {
-    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const lang = ctx.lang || ctx.session?.language || 'ru';
 
     // Get state from scene entry (passed from paySubscription or chooseTier)
     const sceneState = ctx.scene.state;
@@ -60,7 +60,7 @@ const enterShopName = async (ctx) => {
 // Step 2: Handle shop name and create shop immediately
 const handleShopNameAndCreate = async (ctx) => {
   try {
-    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const lang = ctx.lang || ctx.session?.language || 'ru';
     const { seller: sellerMessages } = getMessages(lang);
 
     // Get shop name from message
@@ -102,7 +102,7 @@ const handleShopNameAndCreate = async (ctx) => {
     await createShop(ctx, shopName, lang);
   } catch (error) {
     logger.error('Error creating shop:', error);
-    const langErr = ctx.lang || ctx.session?.user?.language || 'ru';
+    const langErr = ctx.lang || ctx.session?.language || 'ru';
     const { seller: sellerMsgs } = getMessages(langErr);
 
     await smartMessage.send(ctx, {
@@ -115,7 +115,7 @@ const handleShopNameAndCreate = async (ctx) => {
 };
 
 // Helper function to create shop
-const createShop = async (ctx, shopName, lang = ctx.lang || ctx.session?.user?.language || 'ru') => {
+const createShop = async (ctx, shopName, lang = ctx.lang || ctx.session?.language || 'ru') => {
   const { seller: sellerMessages, general: generalMessages } = getMessages(lang);
   let loadingMsg = null;
   try {
@@ -192,9 +192,6 @@ const createShop = async (ctx, shopName, lang = ctx.lang || ctx.session?.user?.l
 
     // Auto-switch to seller role after shop creation
     ctx.session.role = 'seller';
-    if (ctx.session.user) {
-      ctx.session.user.selectedRole = 'seller';
-    }
 
     // Save seller role to database
     try {
@@ -337,7 +334,7 @@ createShopScene.action('cancel_scene', async (ctx) => {
     await ctx.answerCbQuery(); // Silent
     logger.info('shop_create_cancelled', { userId: ctx.from.id });
 
-    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const lang = ctx.lang || ctx.session?.language || 'ru';
     const { start: startMessages } = getMessages(lang);
 
     await ctx.scene.leave();
@@ -348,7 +345,7 @@ createShopScene.action('cancel_scene', async (ctx) => {
     logger.error('Error in cancel_scene handler:', error);
     // Local error handling - don't throw to avoid infinite spinner
     try {
-      const langErr = ctx.lang || ctx.session?.user?.language || 'ru';
+      const langErr = ctx.lang || ctx.session?.language || 'ru';
       const { general: generalMessages } = getMessages(langErr);
       await smartMessage.send(ctx, {
         text: generalMessages.actionFailed,
@@ -366,7 +363,7 @@ createShopScene.action('cancel', async (ctx) => {
     await ctx.answerCbQuery();
     logger.info('shop_create_cancelled', { userId: ctx.from.id });
 
-    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const lang = ctx.lang || ctx.session?.language || 'ru';
     const { start: startMessages } = getMessages(lang);
 
     await ctx.scene.leave();

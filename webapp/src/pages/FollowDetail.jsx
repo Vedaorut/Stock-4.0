@@ -164,13 +164,20 @@ export default function FollowDetail() {
       triggerHaptic('medium');
 
       try {
-        await updateMarkup(followDetailId, markupData);
-        setFollow((prev) => ({
-          ...prev,
-          markup_type: markupData.markupType,
-          markup_percentage: markupData.markupPercentage,
-          markup_fixed: markupData.markupFixed,
-        }));
+        const response = await updateMarkup(followDetailId, markupData);
+
+        // Use server response for state update - unpack nested data
+        const followData = response?.data?.data || response?.data;
+        if (followData) {
+          setFollow(followData);
+        } else {
+          setFollow((prev) => ({
+            ...prev,
+            markup_type: markupData.markupType,
+            markup_percentage: markupData.markupPercentage,
+            markup_fixed: markupData.markupFixed,
+          }));
+        }
         triggerHaptic('success');
         // Reload products to update prices with new markup
         loadProducts();
@@ -191,8 +198,25 @@ export default function FollowDetail() {
     triggerHaptic('medium');
 
     try {
-      await switchMode(followDetailId, newMode);
-      setFollow((prev) => ({ ...prev, mode: newMode }));
+      // When switching to resell, pass existing markup or default 10%
+      const markupData = newMode === 'resell' ? {
+        markupType: follow.markup_type || 'percentage',
+        markupPercentage: follow.markup_percentage || 10,
+        markupFixed: follow.markup_fixed || 0,
+      } : null;
+
+      const response = await switchMode(followDetailId, newMode, markupData);
+
+      // Use server response for state update - unpack nested data
+      const followData = response?.data?.data || response?.data;
+      if (followData) {
+        setFollow(followData);
+        if (newMode === 'resell') {
+          loadProducts();
+        }
+      } else {
+        setFollow((prev) => ({ ...prev, mode: newMode }));
+      }
       triggerHaptic('success');
     } catch (err) {
       if (import.meta.env.DEV) {
@@ -200,7 +224,7 @@ export default function FollowDetail() {
       }
       triggerHaptic('error');
     }
-  }, [followDetailId, follow, switchMode, triggerHaptic]);
+  }, [followDetailId, follow, switchMode, triggerHaptic, loadProducts]);
 
   // Handle delete
   const handleDelete = useCallback(async () => {

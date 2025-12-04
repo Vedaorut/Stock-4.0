@@ -25,7 +25,7 @@ const chooseTierScene = new Scenes.WizardScene(
     try {
       logger.info('choose_tier_step:entry', { userId: ctx.from.id });
 
-      const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+      const lang = ctx.lang || ctx.session?.language || 'ru';
 
       // Fetch current prices from backend API
       const pricing = await subscriptionApi.getPricing();
@@ -59,7 +59,7 @@ const chooseTierScene = new Scenes.WizardScene(
 
   // Step 2: Handle tier/promo selection
   async (ctx) => {
-    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const lang = ctx.lang || ctx.session?.language || 'ru';
     const { subscription: subMessages } = getMessages(lang);
 
     // Handle callback queries
@@ -211,7 +211,7 @@ const chooseTierScene = new Scenes.WizardScene(
 
   // Step 3: Handle promo code input
   async (ctx) => {
-    const lang = ctx.lang || ctx.session?.user?.language || 'ru';
+    const lang = ctx.lang || ctx.session?.language || 'ru';
     const { subscription: subMessages } = getMessages(lang);
 
     // Handle back button

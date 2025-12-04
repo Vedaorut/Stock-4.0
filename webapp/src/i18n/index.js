@@ -6,6 +6,8 @@ const translations = {
 
 let currentLang = 'ru';
 
+const LANG_STORAGE_KEY = 'statusstock_language';
+
 // Lazy load translations
 async function loadTranslations(lang) {
   if (!translations[lang]) {
@@ -15,7 +17,29 @@ async function loadTranslations(lang) {
   return translations[lang];
 }
 
-// Get language from Telegram SDK (NO localStorage)
+// Get language from localStorage (user preference)
+function getStoredLanguage() {
+  try {
+    const stored = localStorage.getItem(LANG_STORAGE_KEY);
+    if (stored && ['ru', 'en'].includes(stored)) {
+      return stored;
+    }
+  } catch {
+    // localStorage not available
+  }
+  return null;
+}
+
+// Save language to localStorage
+function saveLanguage(lang) {
+  try {
+    localStorage.setItem(LANG_STORAGE_KEY, lang);
+  } catch {
+    // localStorage not available
+  }
+}
+
+// Get language from Telegram SDK
 function getTelegramLanguage() {
   const tg = window.Telegram?.WebApp;
   const userLang = tg?.initDataUnsafe?.user?.language_code || 'ru';
@@ -27,7 +51,9 @@ export async function setLanguage(lang) {
   // Validate language - only ru or en
   const validLang = ['ru', 'en'].includes(lang) ? lang : 'ru';
   currentLang = validLang;
-  // NO localStorage.setItem
+
+  // Save to localStorage for persistence
+  saveLanguage(currentLang);
 
   // Load translations for new language
   await loadTranslations(currentLang);
@@ -39,18 +65,25 @@ export async function setLanguage(lang) {
 
 // Get current language
 export function getLanguage() {
-  // Always get from Telegram (NO localStorage)
-  return getTelegramLanguage();
+  return currentLang;
 }
 
 // Initialize i18n (called in App.jsx)
-// Accepts optional language from backend (priority over Telegram SDK)
+// Priority: backend (synced with bot) > localStorage > Telegram SDK
 export async function initI18n(backendLang = null) {
-  // Priority: backend language > Telegram SDK
+  // 1. Backend language is primary (synced across bot and webapp)
   if (backendLang && ['ru', 'en'].includes(backendLang)) {
     currentLang = backendLang;
+    saveLanguage(currentLang); // Sync localStorage with backend
   } else {
-    currentLang = getTelegramLanguage();
+    // 2. Fallback to localStorage if backend not available
+    const storedLang = getStoredLanguage();
+    if (storedLang) {
+      currentLang = storedLang;
+    } else {
+      // 3. Fallback to Telegram SDK for first-time users
+      currentLang = getTelegramLanguage();
+    }
   }
   await loadTranslations(currentLang);
 }

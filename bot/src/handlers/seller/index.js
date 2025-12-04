@@ -27,7 +27,7 @@ const { seller: sellerMessages } = messages;
 /**
  * Get language with fallback (C5 fix: ctx.lang undefined)
  */
-const getLangSafe = (ctx) => ctx.lang || ctx.session?.user?.language || 'ru';
+const getLangSafe = (ctx) => ctx.lang || ctx.session?.language || 'ru';
 
 /**
  * Get seller menu with active orders count
@@ -245,18 +245,11 @@ export const handleSellerRole = async (ctx, options = {}) => {
       try {
         if (ctx.session.token) {
           await authApi.updateRole('seller', ctx.session.token);
-          if (ctx.session.user) {
-            ctx.session.user.selectedRole = 'seller'; // Update session cache
-          }
+
           logger.info(`Saved seller role for user ${ctx.from.id}`);
         }
       } catch (error) {
         logger.error('Failed to save role:', error);
-      }
-    } else {
-      // Just update session cache
-      if (ctx.session.user) {
-        ctx.session.user.selectedRole = 'seller';
       }
     }
 
@@ -561,7 +554,7 @@ export const setupSellerHandlers = (bot) => {
       if (typeof isOwner !== 'boolean') {
         try {
           const shopResponse = await shopApi.getShop(ctx.session.shopId, ctx.session.token);
-          isOwner = shopResponse?.owner_id === ctx.session.user?.id;
+          isOwner = shopResponse?.owner_id === ctx.session.userId;
           if (shopResponse?.tier) {
             ctx.session.shopTier = shopResponse.tier;
           }
@@ -674,7 +667,7 @@ export const setupSellerHandlers = (bot) => {
 
       // Check if user is shop owner
       const shopResponse = await shopApi.getShop(ctx.session.shopId, ctx.session.token);
-      const isOwner = shopResponse.owner_id === ctx.session.user?.id;
+      const isOwner = shopResponse.owner_id === ctx.session.userId;
       if (shopResponse?.tier) {
         ctx.session.shopTier = shopResponse.tier;
       }
@@ -726,7 +719,7 @@ const handleWorkers = async (ctx) => {
           ctx.session.shopTier = shopDetails.tier;
         }
 
-        if (shopDetails?.owner_id && shopDetails.owner_id !== ctx.session.user?.id) {
+        if (shopDetails?.owner_id && shopDetails.owner_id !== ctx.session.userId) {
           const menu = await getSellerMenuKeyboard(ctx);
           await ctx.reply(ctx.t('seller.workersOwnerOnly'), menu);
           return;
