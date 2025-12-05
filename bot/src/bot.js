@@ -221,20 +221,17 @@ export async function startBot() {
       logger.warn('Failed to set bot commands:', cmdError.message);
     }
 
-    // Set Menu Button with WebApp
+    // Set Menu Button to default (opens /start command menu)
+    // This shows "Menu" button that triggers bot commands, not WebApp
     try {
-      const webappUrl = getWebAppUrl();
       await bot.telegram.setChatMenuButton({
         menu_button: {
-          type: 'web_app',
-          text: t('general.menu'),
-          web_app: { url: webappUrl },
+          type: 'commands',
         },
       });
-      logger.info(`Menu Button configured: ${webappUrl}`);
+      logger.info('Menu Button configured: commands (default)');
     } catch (menuError) {
-      logger.warn('Failed to set Menu Button automatically:', menuError.message);
-      logger.warn('You can set it manually in BotFather: /setmenubutton');
+      logger.warn('Failed to set Menu Button:', menuError.message);
     }
 
     // Launch bot (this starts polling and won't return in polling mode)
