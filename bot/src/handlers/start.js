@@ -56,6 +56,7 @@ const parseDeepLink = (text) => {
 
 /**
  * Handle shop invite deep link - subscribe user to shop
+ * After successful subscription, redirect to buyer menu
  */
 const handleShopInvite = async (ctx, shopId) => {
   const lang = ctx.lang || ctx.session?.language || 'ru';
@@ -79,10 +80,23 @@ const handleShopInvite = async (ctx, shopId) => {
 
     await ctx.reply(t('inviteLink.subscribed', { shopName }, lang));
     logger.info(`User ${ctx.from.id} subscribed to shop ${shopId} via invite link`);
+
+    // Set buyer role and redirect to buyer menu
+    ctx.session.role = 'buyer';
+    try {
+      await authApi.updateRole('buyer', ctx.session.token);
+    } catch (roleError) {
+      logger.error('Failed to save buyer role after invite:', roleError);
+    }
+
+    // Redirect to buyer menu so they see their subscriptions
+    const fakeCtx = createFakeCallbackContext(ctx);
+    await handleBuyerRole(fakeCtx, { skipRoleUpdate: true });
+    return true; // Signal that we handled the flow
   } catch (error) {
     // Handle subscription errors with user feedback
     if (error.response?.status === 409) {
-      // Already subscribed - show friendly message
+      // Already subscribed - show friendly message and redirect to buyer
       logger.debug(`User ${ctx.from.id} already subscribed to shop ${shopId}`);
       try {
         const shop = await shopApi.getShop(shopId, ctx.session.token);
@@ -91,6 +105,17 @@ const handleShopInvite = async (ctx, shopId) => {
       } catch {
         await ctx.reply(t('inviteLink.alreadySubscribed', { shopName: `#${shopId}` }, lang));
       }
+
+      // Still redirect to buyer menu
+      ctx.session.role = 'buyer';
+      try {
+        await authApi.updateRole('buyer', ctx.session.token);
+      } catch (roleError) {
+        logger.error('Failed to save buyer role:', roleError);
+      }
+      const fakeCtx = createFakeCallbackContext(ctx);
+      await handleBuyerRole(fakeCtx, { skipRoleUpdate: true });
+      return true;
     } else if (error.response?.status === 404) {
       logger.warn(`Shop ${shopId} not found for invite link`);
       await ctx.reply(t('inviteLink.shopNotFound', {}, lang));
@@ -98,6 +123,7 @@ const handleShopInvite = async (ctx, shopId) => {
       logger.warn('Shop subscribe via invite link failed:', error.message);
       await ctx.reply(t('inviteLink.error', {}, lang));
     }
+    return false;
   }
 };
 
@@ -146,7 +172,11 @@ export const handleStart = async (ctx) => {
       delete ctx.session.pendingDeepLink;
 
       if (pendingDeepLink.type === 'shop_invite') {
-        await handleShopInvite(ctx, pendingDeepLink.shopId);
+        const handled = await handleShopInvite(ctx, pendingDeepLink.shopId);
+        if (handled) {
+          // handleShopInvite redirected to buyer menu, stop here
+          return;
+        }
       }
     }
 
@@ -196,14 +226,12 @@ export const handleStart = async (ctx) => {
       await handleBuyerRole(fakeCtx, { skipRoleUpdate: true });
       return;
     } else if (savedRole === 'seller') {
-      // Seller without shop - should not happen, but handle gracefully
-      logger.warn(`User ${ctx.from.id} has seller role but no shop`);
-      ctx.session.role = 'seller';
-
-      // PERF: Role already saved in DB from previous session, skip update
-      const fakeCtx = createFakeCallbackContext(ctx);
-      await handleSellerRole(fakeCtx, { skipRoleUpdate: true });
-      return;
+      // Seller role in session but no shop found above
+      // This can happen if user selected seller, then canceled shop creation
+      // Reset role and fall through to role selection
+      logger.warn(`User ${ctx.from.id} has seller role in session but no shop, resetting`);
+      ctx.session.role = null;
+      // Fall through to PRIORITY 3 (role selection)
     }
 
     // === PRIORITY 3: New user - show role selection ===

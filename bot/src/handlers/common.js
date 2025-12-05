@@ -353,7 +353,8 @@ const handleRoleBuyer = async (ctx) => {
 
 /**
  * Handle role:seller action - switch to seller role
- * PERF: Role update done here, passed to handleSellerRole with skipRoleUpdate
+ * NOTE: Role is saved to DB only when shop is created (in createShop scene)
+ * This prevents seller role being saved for users without a shop
  */
 const handleRoleSeller = async (ctx) => {
   try {
@@ -361,23 +362,29 @@ const handleRoleSeller = async (ctx) => {
 
     logger.info(`User ${ctx.from.id} switching to seller role`);
 
-    // Save role to database ONCE here
-    try {
-      if (ctx.session.token) {
-        await authApi.updateRole('seller', ctx.session.token);
-        ctx.session.role = 'seller';
-        ctx.session.workspaceShopId = null; // Clear workspace
-        logger.info(`Saved seller role for user ${ctx.from.id}`);
-      } else {
-        logger.warn(`User ${ctx.from.id} has no token, cannot save role`);
-        ctx.session.role = 'seller';
+    // Only set role in SESSION, not in DB
+    // DB role is updated only when shop is actually created (createShop scene)
+    // This prevents the bug where user selects "seller", cancels shop creation,
+    // but webapp still shows seller UI because role was saved to DB
+    ctx.session.role = 'seller';
+    ctx.session.workspaceShopId = null; // Clear workspace
+
+    // Check if user already has a shop - then save role to DB
+    if (ctx.session.token) {
+      try {
+        const shops = await shopApi.getMyShop(ctx.session.token);
+        if (shops && Array.isArray(shops) && shops.length > 0) {
+          // User HAS a shop - safe to save seller role to DB
+          await authApi.updateRole('seller', ctx.session.token);
+          logger.info(`Saved seller role for user ${ctx.from.id} (has shop)`);
+        } else {
+          logger.info(`User ${ctx.from.id} has no shop, role NOT saved to DB yet`);
+        }
+      } catch (error) {
+        logger.debug('Failed to check shops for role save:', error.message);
       }
-    } catch (error) {
-      logger.error('Failed to save seller role:', error);
-      ctx.session.role = 'seller';
     }
 
-    // PERF: Pass skipRoleUpdate to avoid duplicate PATCH /auth/role call
     await handleSellerRole(ctx, { skipRoleUpdate: true });
   } catch (error) {
     logger.error('Error in role:seller handler:', error);

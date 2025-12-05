@@ -240,18 +240,10 @@ export const handleSellerRole = async (ctx, options = {}) => {
     ctx.session.role = 'seller';
     logger.info(`User ${ctx.from.id} selected seller role`);
 
-    // PERF: Skip role update if already done by caller (e.g., handleRoleSeller)
-    if (!options.skipRoleUpdate) {
-      try {
-        if (ctx.session.token) {
-          await authApi.updateRole('seller', ctx.session.token);
-
-          logger.info(`Saved seller role for user ${ctx.from.id}`);
-        }
-      } catch (error) {
-        logger.error('Failed to save role:', error);
-      }
-    }
+    // NOTE: Role is saved to DB only if user has a shop
+    // This prevents the bug where user selects "seller", cancels shop creation,
+    // but webapp still shows seller UI because role was saved to DB
+    // skipRoleUpdate is passed when caller already handled role save logic
 
     if (!ctx.session.token) {
       logger.warn(`User ${ctx.from.id} has no token, cannot check shop`);
