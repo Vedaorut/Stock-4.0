@@ -15,8 +15,11 @@ const POLL_INTERVAL = 30 * 1000; // 30 seconds (in milliseconds)
 // 72 hours to accommodate slow BTC/LTC confirmations during network congestion
 const MAX_AGE_HOURS = 72;
 const BATCH_SIZE = 50;
+const STUCK_PAYMENT_TIMEOUT_MINUTES = 5; // Recovery timeout for stuck 'processing' payments
+const RECOVERY_INTERVAL = 5 * 60 * 1000; // Run recovery every 5 minutes
 
 let workerInterval = null;
+let recoveryInterval = null;
 
 /**
  * Start the payment verification worker
@@ -33,10 +36,16 @@ export function startPaymentVerificationWorker() {
   logger.info(`  - Poll interval: ${POLL_INTERVAL / 1000} seconds`);
   logger.info(`  - Max payment age: ${MAX_AGE_HOURS} hours`);
   logger.info(`  - Batch size: ${BATCH_SIZE} payments`);
+  logger.info(`  - Stuck payment recovery: every ${RECOVERY_INTERVAL / 60000} minutes`);
 
   // Run immediately on start
   processPendingPayments().catch((err) => {
     logger.error('[PaymentWorker] Initial run failed:', err);
+  });
+
+  // Run recovery for stuck payments immediately and periodically
+  recoverStuckPayments().catch((err) => {
+    logger.error('[PaymentWorker] Initial recovery failed:', err);
   });
 
   // Schedule recurring checks
@@ -47,6 +56,15 @@ export function startPaymentVerificationWorker() {
       logger.error('[PaymentWorker] Unhandled error:', error);
     }
   }, POLL_INTERVAL);
+
+  // Schedule stuck payment recovery (every 5 minutes)
+  recoveryInterval = setInterval(async () => {
+    try {
+      await recoverStuckPayments();
+    } catch (error) {
+      logger.error('[PaymentWorker] Recovery error:', error);
+    }
+  }, RECOVERY_INTERVAL);
 }
 
 /**
@@ -56,7 +74,35 @@ export function stopPaymentVerificationWorker() {
   if (workerInterval) {
     clearInterval(workerInterval);
     workerInterval = null;
-    logger.info('[PaymentWorker] Stopped');
+  }
+  if (recoveryInterval) {
+    clearInterval(recoveryInterval);
+    recoveryInterval = null;
+  }
+  logger.info('[PaymentWorker] Stopped');
+}
+
+/**
+ * Recover stuck payments that are in 'processing' status for too long
+ * This prevents payments from being stuck forever if worker crashes mid-processing
+ */
+async function recoverStuckPayments() {
+  try {
+    const result = await query(
+      `UPDATE payments
+       SET status = 'pending', updated_at = NOW()
+       WHERE status = 'processing'
+         AND updated_at < NOW() - INTERVAL '${STUCK_PAYMENT_TIMEOUT_MINUTES} minutes'
+       RETURNING id, order_id, currency`
+    );
+
+    if (result.rows.length > 0) {
+      logger.warn(`[PaymentWorker] Recovered ${result.rows.length} stuck payments`, {
+        paymentIds: result.rows.map(r => r.id),
+      });
+    }
+  } catch (error) {
+    logger.error('[PaymentWorker] Failed to recover stuck payments:', error);
   }
 }
 

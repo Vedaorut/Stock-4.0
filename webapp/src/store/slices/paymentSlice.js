@@ -457,22 +457,31 @@ export const createPaymentSlice = (set, get) => ({
         return; // Don't throw, just return
       }
 
-      // Detailed toast messages for different errors
+      // Detailed error messages for different error types
       const errorMsg = error.response?.data?.error || error.message;
       const statusCode = error.response?.status;
+      let userFriendlyError = 'Payment verification error';
 
       if (statusCode === 404) {
+        userFriendlyError = 'Order not found. Please try again.';
       } else if (errorMsg?.includes('confirmation')) {
+        userFriendlyError = 'Transaction not yet confirmed. Please wait and try again.';
       } else if (errorMsg?.includes('amount')) {
+        userFriendlyError = 'Payment amount mismatch. Check the exact amount sent.';
       } else if (errorMsg?.includes('address') || errorMsg?.includes('wallet')) {
+        userFriendlyError = 'Invalid wallet address. Check recipient address.';
       } else if (errorMsg?.includes('expired')) {
+        userFriendlyError = 'Payment window expired. Please create a new order.';
       } else if (errorMsg?.includes('timeout') || errorMsg?.includes('network')) {
+        userFriendlyError = 'Network error. Check your connection and try again.';
       } else if (errorMsg?.includes('invalid') || errorMsg?.includes('hash')) {
-      } else {
+        userFriendlyError = 'Invalid transaction hash. Check and re-enter.';
+      } else if (errorMsg) {
+        userFriendlyError = errorMsg;
       }
 
       set({
-        verifyError: error.response?.data?.error || 'Payment verification error',
+        verifyError: userFriendlyError,
       });
     } finally {
       // CRITICAL: Always reset loading state
