@@ -211,6 +211,7 @@
     "products": "товаров",
     "subscribe": "Подписаться",
     "subscribed": "Подписан",
+    "inactive": "Неактивен",
     "notSelected": "Магазин не выбран",
     "noShop": "У вас ещё нет магазина",
     "createShop": "Создайте магазин для доступа",
@@ -418,6 +419,7 @@
 
   "follows": {
     "title": "Follows",
+    "myFollows": "Мои follows",
     "empty": "Нет подписок",
     "searchShop": "Поиск магазина",
     "searchPlaceholder": "Название или @username",

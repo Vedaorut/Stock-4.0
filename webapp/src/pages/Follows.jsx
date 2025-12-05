@@ -9,6 +9,7 @@ import { useTranslation } from '../i18n/useTranslation';
 import FollowCard from '../components/Follows/FollowCard';
 // eslint-disable-next-line no-unused-vars -- Used in JSX below
 import ProductsPreview from '../components/Follows/ProductsPreview';
+import SubscriptionCard from '../components/Follows/SubscriptionCard';
 
 export default function Follows() {
   const { get } = useApi();
@@ -21,6 +22,7 @@ export default function Follows() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [follows, setFollows] = useState([]);
+  const [subscriptions, setSubscriptions] = useState([]);
 
   // AbortController for retry requests
   const retryControllerRef = useRef(null);
@@ -36,6 +38,19 @@ export default function Follows() {
 
   const loadFollows = useCallback(
     async (signal) => {
+      // Load user subscriptions (shops subscribed via invite link)
+      // This works for ALL users, even without a shop
+      const { data: subsResponse, error: subsError } = await get('/users/subscriptions', { signal });
+
+      if (signal?.aborted) return { status: 'aborted' };
+
+      if (!subsError && subsResponse?.data) {
+        setSubscriptions(Array.isArray(subsResponse.data) ? subsResponse.data : []);
+      } else {
+        setSubscriptions([]);
+      }
+
+      // Load follows (only for sellers with a shop)
       let shop = myShop;
 
       if (!shop) {
@@ -47,7 +62,10 @@ export default function Follows() {
           if (import.meta.env.DEV) {
             console.error('[Follows] Error loading shops:', shopsError);
           }
-          return { status: 'error', error: 'Failed to load data' };
+          // Still return success if we loaded subscriptions
+          setFollows([]);
+          useStore.getState().setHasFollows(false);
+          return { status: 'success' };
         }
 
         const shops = Array.isArray(shopsResponse?.data) ? shopsResponse.data : [];
@@ -121,6 +139,21 @@ export default function Follows() {
     },
     [triggerHaptic]
   );
+
+  // Handle click on subscription - navigate to shop catalog
+  const handleSubscriptionClick = useCallback((subscription) => {
+    triggerHaptic('light');
+    const { setCurrentShop, setActiveTab } = useStore.getState();
+
+    setCurrentShop({
+      id: subscription.shop_id,
+      name: subscription.shop_name,
+      logo: subscription.shop_logo || null,
+      isOwned: false,
+    });
+
+    setActiveTab('catalog');
+  }, [triggerHaptic]);
 
   // Handle retry with AbortController
   const handleRetry = useCallback(() => {
@@ -215,7 +248,7 @@ export default function Follows() {
               {t('common.retry')}
             </motion.button>
           </div>
-        ) : follows.length === 0 ? (
+        ) : subscriptions.length === 0 && follows.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <div className="relative w-24 h-24 mb-6">
                 <div className="absolute inset-0 bg-[#FF6B00]/10 blur-xl rounded-full"></div>
@@ -241,26 +274,60 @@ export default function Follows() {
             </p>
           </div>
         ) : (
-          <div className="space-y-3">
-            {follows.map((follow, index) => (
-              <motion.div
-                key={follow.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.05, type: "spring", stiffness: 300, damping: 25 }}
-              >
-                <FollowCard
-                  follow={follow}
-                  onClick={() => handleFollowClick(follow.id)}
-                />
-                <ProductsPreview
-                  followId={follow.id}
-                  mode={follow.mode}
-                  maxProducts={5}
-                />
-              </motion.div>
-            ))}
-          </div>
+          <>
+            {/* User Subscriptions Section */}
+            {subscriptions.length > 0 && (
+              <div className="mb-6">
+                <h2 className="text-sm font-semibold text-white/50 uppercase tracking-wider mb-3 px-1">
+                  {t('subscriptions.title')}
+                </h2>
+                <div className="space-y-3">
+                  {subscriptions.map((sub, index) => (
+                    <motion.div
+                      key={sub.shop_id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.05, type: "spring", stiffness: 300, damping: 25 }}
+                    >
+                      <SubscriptionCard
+                        subscription={sub}
+                        onClick={() => handleSubscriptionClick(sub)}
+                      />
+                    </motion.div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Follows Section (for sellers) */}
+            {follows.length > 0 && (
+              <div className="space-y-3">
+                {subscriptions.length > 0 && (
+                  <h2 className="text-sm font-semibold text-white/50 uppercase tracking-wider mb-3 px-1">
+                    {t('follows.myFollows')}
+                  </h2>
+                )}
+                {follows.map((follow, index) => (
+                  <motion.div
+                    key={follow.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: (subscriptions.length + index) * 0.05, type: "spring", stiffness: 300, damping: 25 }}
+                  >
+                    <FollowCard
+                      follow={follow}
+                      onClick={() => handleFollowClick(follow.id)}
+                    />
+                    <ProductsPreview
+                      followId={follow.id}
+                      mode={follow.mode}
+                      maxProducts={5}
+                    />
+                  </motion.div>
+                ))}
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

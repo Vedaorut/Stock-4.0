@@ -211,6 +211,7 @@
     "products": "products",
     "subscribe": "Subscribe",
     "subscribed": "Subscribed",
+    "inactive": "Inactive",
     "notSelected": "Shop not selected",
     "noShop": "You don't have a shop yet",
     "createShop": "Create a shop to access",
@@ -418,6 +419,7 @@
 
   "follows": {
     "title": "Follows",
+    "myFollows": "My Follows",
     "empty": "No subscriptions",
     "searchShop": "Search shop",
     "searchPlaceholder": "Name or @username",
