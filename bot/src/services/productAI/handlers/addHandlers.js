@@ -15,7 +15,7 @@ import { safeApiCall } from '../../../utils/safeApiCall.js';
  * Add product handler
  */
 export async function handleAddProduct(args, shopId, token) {
-  const { name, stock, is_preorder } = args;
+  const { name, stock, is_preorder, discount_percentage } = args;
   let { price } = args;
 
   // Validate
@@ -107,6 +107,54 @@ export async function handleAddProduct(args, shopId, token) {
 
   const product = apiResult.data;
 
+  // Apply discount if requested during creation
+  let discountApplied = false;
+  let finalPrice = product.price;
+  let originalPrice = null;
+
+  if (discount_percentage && discount_percentage >= 1 && discount_percentage <= 99 && product.id) {
+    try {
+      const discountedPrice = product.price * (1 - discount_percentage / 100);
+      const discountUpdateData = {
+        discountPercentage: discount_percentage,
+        originalPrice: product.price,
+        price: discountedPrice,
+        discountExpiresAt: null, // Permanent discount when creating product
+      };
+
+      const discountResult = await safeApiCall(
+        productApi.updateProduct,
+        product.id,
+        discountUpdateData,
+        token
+      );
+
+      if (discountResult.success) {
+        discountApplied = true;
+        originalPrice = product.price;
+        finalPrice = discountedPrice;
+        logger.info('Discount applied to newly created product', {
+          productId: product.id,
+          productName: transliteratedName,
+          discount_percentage,
+          originalPrice,
+          finalPrice,
+        });
+      } else {
+        logger.warn('Failed to apply discount to new product', {
+          productId: product.id,
+          productName: transliteratedName,
+          error: discountResult.error,
+        });
+      }
+    } catch (discountError) {
+      logger.warn('Exception applying discount to new product:', {
+        productId: product.id,
+        error: discountError.message,
+      });
+    }
+  }
+
   return {
     success: true,
     data: {
@@ -115,7 +163,9 @@ export async function handleAddProduct(args, shopId, token) {
         id: product.id,
         name: transliteratedName,
         originalName: translitInfo.changed ? name : null,
-        price: product.price,
+        price: finalPrice,
+        original_price: discountApplied ? originalPrice : null,
+        discount_percentage: discountApplied ? discount_percentage : null,
         stock_quantity: product.stock_quantity,
         transliterated: translitInfo.changed,
       },
@@ -164,7 +214,7 @@ export async function handleBulkAddProducts(args, shopId, token) {
 
   // Process each product
   for (const product of products) {
-    const { name, price, stock, is_preorder } = product;
+    const { name, price, stock, is_preorder, discount_percentage } = product;
     const normalizedStock = stock === undefined || stock === null ? 1 : stock;
 
     // Validate individual product
@@ -245,10 +295,65 @@ export async function handleBulkAddProducts(args, shopId, token) {
 
     const createdProduct = apiResult.data;
 
+    // Apply discount if requested during creation
+    let finalPrice = createdProduct.price;
+    let originalPrice = null;
+    let discountApplied = false;
+
+    if (
+      discount_percentage &&
+      discount_percentage >= 1 &&
+      discount_percentage <= 99 &&
+      createdProduct.id
+    ) {
+      try {
+        const discountedPrice = createdProduct.price * (1 - discount_percentage / 100);
+        const discountUpdateData = {
+          discountPercentage: discount_percentage,
+          originalPrice: createdProduct.price,
+          price: discountedPrice,
+          discountExpiresAt: null,
+        };
+
+        const discountResult = await safeApiCall(
+          productApi.updateProduct,
+          createdProduct.id,
+          discountUpdateData,
+          token
+        );
+
+        if (discountResult.success) {
+          discountApplied = true;
+          originalPrice = createdProduct.price;
+          finalPrice = discountedPrice;
+          logger.info('Discount applied to bulk-created product', {
+            productId: createdProduct.id,
+            productName: transliteratedName,
+            discount_percentage,
+            originalPrice,
+            finalPrice,
+          });
+        } else {
+          logger.warn('Failed to apply discount to bulk-created product', {
+            productId: createdProduct.id,
+            productName: transliteratedName,
+            error: discountResult.error,
+          });
+        }
+      } catch (discountError) {
+        logger.warn('Exception applying discount to bulk-created product:', {
+          productId: createdProduct.id,
+          error: discountError.message,
+        });
+      }
+    }
+
     results.successful.push({
       name: transliteratedName,
       originalName: translitInfo.changed ? name : null,
-      price: createdProduct.price,
+      price: finalPrice,
+      original_price: discountApplied ? originalPrice : null,
+      discount_percentage: discountApplied ? discount_percentage : null,
       stock_quantity: createdProduct.stock_quantity,
       id: createdProduct.id,
       transliterated: translitInfo.changed,

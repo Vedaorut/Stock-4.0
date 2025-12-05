@@ -409,7 +409,7 @@ ${t('subscription.pendingSetup.createShop', {}, lang)}`;
    * @returns {string|null} Explorer URL or null
    */
   _getExplorerUrl(currency, txHash) {
-    if (!txHash) return null;
+    if (!txHash) {return null;}
 
     const explorers = {
       BTC: `https://blockchair.com/bitcoin/transaction/${txHash}`,

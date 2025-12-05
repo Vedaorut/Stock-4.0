@@ -5,6 +5,8 @@ import { useApi } from '../hooks/useApi';
 import { useStore } from '../store/useStore';
 import { useTelegram } from '../hooks/useTelegram';
 import { useTranslation } from '../i18n/useTranslation';
+import { useToast } from '../hooks/useToast';
+import ConfirmDialog from '../components/Follows/ConfirmDialog';
 
 function SearchResultItem({ product, onClick }) {
   const price = typeof product.price === 'number' ? product.price : parseFloat(product.price) || 0;
@@ -48,7 +50,9 @@ export default function Subscriptions() {
   const [buyerSubscriptions, setBuyerSubscriptions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const { get } = useApi();
+  const [confirmUnsubscribe, setConfirmUnsubscribe] = useState(null);
+  const { get, delete: del } = useApi();
+  const toast = useToast();
 
   // AbortController for retry requests
   const retryControllerRef = useRef(null);
@@ -280,6 +284,35 @@ export default function Subscriptions() {
     setActiveTab('catalog');
   };
 
+  // Unsubscribe from shop (buyer mode)
+  const handleUnsubscribeClick = useCallback((e, sub) => {
+    e.stopPropagation();
+    triggerHaptic('light');
+    setConfirmUnsubscribe(sub);
+  }, [triggerHaptic]);
+
+  const handleUnsubscribe = useCallback(async () => {
+    if (!confirmUnsubscribe) return;
+
+    try {
+      const { error: delError } = await del(`/shops/${confirmUnsubscribe.shop_id}/subscribe`);
+
+      if (delError) {
+        toast.error(t('subscriptions.unsubscribeError'));
+        return;
+      }
+
+      // Remove from local state
+      setBuyerSubscriptions((prev) =>
+        prev.filter((sub) => sub.shop_id !== confirmUnsubscribe.shop_id)
+      );
+      toast.success(t('subscriptions.unsubscribeSuccess'));
+      triggerHaptic('success');
+    } catch {
+      toast.error(t('subscriptions.unsubscribeError'));
+    }
+  }, [confirmUnsubscribe, del, t, toast, triggerHaptic]);
+
   // Handle retry with AbortController
   const handleRetry = useCallback(() => {
     // Cancel any in-flight retry request
@@ -326,6 +359,18 @@ export default function Subscriptions() {
       document.removeEventListener('touchstart', handleClickOutside);
     };
   }, [isSearchActive]);
+
+  // Auto-refresh subscriptions when webapp gains focus (for invite link flow)
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible' && token && !loading) {
+        const controller = new AbortController();
+        loadData(controller.signal);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, [token, loading, loadData]);
 
   // Determine if we have data based on mode
   const hasData = viewMode === 'buyer'
@@ -478,14 +523,25 @@ export default function Subscriptions() {
               <motion.div
                 key={sub.id}
                 onClick={() => handleBuyerSubscriptionClick(sub)}
-                className="glass-card rounded-2xl p-6 cursor-pointer min-h-[90px]"
+                className="glass-card rounded-2xl p-6 cursor-pointer min-h-[90px] relative"
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 whileHover={{ scale: 1.01, y: -2 }}
                 whileTap={{ scale: 0.99 }}
                 transition={{ duration: 0.2, delay: index * 0.05 }}
               >
-                <div className="flex items-center justify-between">
+                {/* Unsubscribe button */}
+                <button
+                  onClick={(e) => handleUnsubscribeClick(e, sub)}
+                  className="absolute top-3 right-3 p-1.5 rounded-lg bg-white/5 hover:bg-red-500/20 text-gray-500 hover:text-red-400 transition-colors"
+                  aria-label={t('subscriptions.unsubscribe')}
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+
+                <div className="flex items-center justify-between pr-8">
                   <div className="flex-1 space-y-2">
                     <h3
                       className="text-xl font-bold text-white"
@@ -601,6 +657,18 @@ export default function Subscriptions() {
           </div>
         )}
       </div>
+
+      {/* Unsubscribe confirmation dialog */}
+      <ConfirmDialog
+        isOpen={!!confirmUnsubscribe}
+        onClose={() => setConfirmUnsubscribe(null)}
+        onConfirm={handleUnsubscribe}
+        title={t('subscriptions.unsubscribeTitle')}
+        message={t('subscriptions.unsubscribeMessage', { shop: confirmUnsubscribe?.shop_name })}
+        confirmText={t('subscriptions.unsubscribe')}
+        cancelText={t('common.cancel')}
+        danger
+      />
     </div>
   );
 }

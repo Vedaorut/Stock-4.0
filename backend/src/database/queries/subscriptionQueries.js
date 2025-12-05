@@ -87,11 +87,12 @@ export const subscriptionQueries = {
   },
 
   // Find shop subscription (billing) by ID with owner info
+  // Uses LEFT JOIN to support subscriptions without shop (pending new shop creation)
   findShopSubscriptionById: async (id) => {
     const result = await query(
       `SELECT ss.*, s.owner_id
        FROM shop_subscriptions ss
-       JOIN shops s ON ss.shop_id = s.id
+       LEFT JOIN shops s ON ss.shop_id = s.id
        WHERE ss.id = $1`,
       [id]
     );

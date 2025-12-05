@@ -10,12 +10,14 @@ import { useStore } from '../store/useStore';
 import { useTelegram } from '../hooks/useTelegram';
 import { useBackButton } from '../hooks/useBackButton';
 import { useTranslation } from '../i18n/useTranslation';
+import { useToast } from '../hooks/useToast';
 
 export default function FollowDetail() {
   const followDetailId = useStore((state) => state.followDetailId);
   const { getDetail, updateMarkup, switchMode, deleteFollow, getProducts, updateProductMarkup, resetProductMarkup } = useFollowsApi();
   const { triggerHaptic } = useTelegram();
   const { t } = useTranslation();
+  const { showToast } = useToast();
 
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -186,9 +188,10 @@ export default function FollowDetail() {
           console.error('[FollowDetail] Error updating markup:', err);
         }
         triggerHaptic('error');
+        showToast(t('follows.markupError') || 'Failed to update markup', 'error');
       }
     },
-    [followDetailId, follow, updateMarkup, triggerHaptic, loadProducts]
+    [followDetailId, follow, updateMarkup, triggerHaptic, loadProducts, showToast, t]
   );
 
   // Handle mode switch
@@ -223,8 +226,9 @@ export default function FollowDetail() {
         console.error('[FollowDetail] Error switching mode:', err);
       }
       triggerHaptic('error');
+      showToast(t('follows.modeError') || 'Failed to switch mode', 'error');
     }
-  }, [followDetailId, follow, switchMode, triggerHaptic, loadProducts]);
+  }, [followDetailId, follow, switchMode, triggerHaptic, loadProducts, showToast, t]);
 
   // Handle delete
   const handleDelete = useCallback(async () => {
@@ -239,8 +243,9 @@ export default function FollowDetail() {
         console.error('[FollowDetail] Error deleting follow:', err);
       }
       triggerHaptic('error');
+      showToast(t('follows.deleteError') || 'Failed to delete follow', 'error');
     }
-  }, [followDetailId, deleteFollow, triggerHaptic]);
+  }, [followDetailId, deleteFollow, triggerHaptic, showToast, t]);
 
   // Handle product click for individual markup
   const handleProductClick = useCallback((product) => {
@@ -266,9 +271,10 @@ export default function FollowDetail() {
           console.error('[FollowDetail] Error updating product markup:', err);
         }
         triggerHaptic('error');
+        showToast(t('follows.productMarkupError') || 'Failed to update product markup', 'error');
       }
     },
-    [followDetailId, selectedProduct, updateProductMarkup, triggerHaptic, loadProducts]
+    [followDetailId, selectedProduct, updateProductMarkup, triggerHaptic, loadProducts, showToast, t]
   );
 
   // Handle reset product markup
@@ -287,8 +293,9 @@ export default function FollowDetail() {
         console.error('[FollowDetail] Error resetting product markup:', err);
       }
       triggerHaptic('error');
+      showToast(t('follows.productMarkupError') || 'Failed to reset product markup', 'error');
     }
-  }, [followDetailId, selectedProduct, resetProductMarkup, triggerHaptic, loadProducts]);
+  }, [followDetailId, selectedProduct, resetProductMarkup, triggerHaptic, loadProducts, showToast, t]);
 
   // Get display values
   const shopName = follow?.source_shop_name || follow?.shop_name || 'Loading...';

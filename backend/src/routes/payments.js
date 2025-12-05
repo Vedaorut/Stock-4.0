@@ -85,12 +85,16 @@ router.post('/subscriptions/:id/invoice/crystalpay', verifyToken, async (req, re
       return res.status(404).json({ error: 'Subscription not found' });
     }
 
-    // SECURITY: Check ownership - user must own the shop associated with this subscription
-    if (subscription.owner_id !== userId) {
+    // SECURITY: Check ownership - user must own the shop OR be the user_id on subscription (for pending subs)
+    const isShopOwner = subscription.owner_id === userId;
+    const isSubscriptionUser = subscription.user_id === userId;
+
+    if (!isShopOwner && !isSubscriptionUser) {
       logger.warn('[API] Subscription ownership check failed', {
         subscriptionId,
         requestUserId: userId,
         ownerId: subscription.owner_id,
+        subscriptionUserId: subscription.user_id,
       });
       return res.status(403).json({ error: 'Access denied: not subscription owner' });
     }

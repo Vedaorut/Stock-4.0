@@ -17,13 +17,15 @@ Use it for commands like "add iPhone 15 for 999", "new case arrived $20". If you
 Examples:
 - "add iPhone 15 999" → addProduct({ name: "iPhone 15", price: 999, stock: 1 })
 - "create MacBook Air 1299, 3 pieces" → addProduct({ name: "MacBook Air", price: 1299, stock: 3 })
+- "add Samsung 799 with 20% discount" → addProduct({ name: "Samsung", price: 799, discount_percentage: 20 })
 
 Rules:
 - Price is required - if missing, ask "What price should I set?"
 - CRITICAL: Price MUST be > 0, NEVER use 0 or negative values
 - Minimum price: 0.01 USD
 - Default stock = 1, if user didn't specify (no questions needed).
-- Name must be meaningful (at least 3 characters).`,
+- Name must be meaningful (at least 3 characters).
+- If user mentions discount when creating product, include discount_percentage (1-99).`,
       parameters: {
         type: 'object',
         properties: {
@@ -42,6 +44,13 @@ Rules:
             type: 'number',
             description:
               'Stock quantity. If missing, treat as 1 automatically. Examples: 1, 5, 100. Must be >= 0.',
+          },
+          discount_percentage: {
+            type: 'number',
+            description:
+              'Optional discount percentage (1-99). Apply if user mentions discount when creating product. Examples: "add iPhone $999 with 20% off" → discount_percentage: 20, "create Samsung 799 with 15% discount" → discount_percentage: 15. If not mentioned, omit this parameter.',
+            minimum: 1,
+            maximum: 99,
           },
         },
         required: ['name', 'price'],
@@ -105,6 +114,13 @@ CRITICAL - EXECUTION:
                   type: 'number',
                   description:
                     'Stock quantity. Defaults to 1 if not specified. Extract from: "5pcs", "10 pcs", "2 pieces". Must be >= 0.',
+                },
+                discount_percentage: {
+                  type: 'number',
+                  description:
+                    'Optional discount percentage (1-99). Apply if user mentions discount for specific product. Example: "Samsung 799 with 20% discount" → discount_percentage: 20.',
+                  minimum: 1,
+                  maximum: 99,
                 },
               },
               required: ['name', 'price'],

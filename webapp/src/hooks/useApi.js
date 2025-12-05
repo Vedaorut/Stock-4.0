@@ -77,6 +77,17 @@ export function useApi() {
 
           // Handle 401 Unauthorized - attempt token refresh and retry ONCE
           if (err.response?.status === 401 && !isRetry && isTokenRefreshInitialized()) {
+            const errorCode = err.response?.data?.code;
+
+            // USER_NOT_FOUND means DB was reset - clear token and force re-auth
+            if (errorCode === 'USER_NOT_FOUND') {
+              if (import.meta.env.DEV) {
+                // eslint-disable-next-line no-console
+                console.log('[useApi] 🔄 User not found in DB, clearing token and re-authenticating');
+              }
+              useStore.getState().setToken(null);
+            }
+
             if (import.meta.env.DEV) {
               // eslint-disable-next-line no-console
               console.log('[useApi] 🔄 Got 401, attempting token refresh for:', endpoint);

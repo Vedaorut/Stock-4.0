@@ -123,7 +123,7 @@ const searchShopScene = new Scenes.WizardScene('searchShop', enterShopName, show
 searchShopScene.leave(async (ctx) => {
   // P1-2 FIX: Clear wizard state to prevent memory leak
   if (ctx.wizard) {
-    delete ctx.wizard.state;
+    ctx.wizard.state = {};
   }
   ctx.scene.state = {};
 

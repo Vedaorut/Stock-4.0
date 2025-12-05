@@ -100,7 +100,7 @@ const paySubscriptionScene = new Scenes.WizardScene(
       }
 
       const statusResponse = await subscriptionApi.getStatus(shopId, token);
-      const shopName = ctx.session.shopName || ctx.t('general.shopFallbackName');
+      const shopName = ctx.session.shopName || t('general.shopFallbackName', {}, lang);
 
       const message = [
         subMessages.chooseTierIntro(lang),
@@ -136,7 +136,7 @@ const paySubscriptionScene = new Scenes.WizardScene(
       const errorMsg = error.response?.data?.error || error.message;
       await cleanReply(
         ctx,
-        ctx.t('general.errorWithReason', { reason: errorMsg }),
+        t('general.errorWithReason', { reason: errorMsg }, langErr),
         Markup.inlineKeyboard([[Markup.button.callback(t('buttons.backToMenu', {}, langErr), 'seller:menu')]])
       );
 
@@ -150,7 +150,7 @@ const paySubscriptionScene = new Scenes.WizardScene(
     const { subscription: subMessages } = getMessages(lang);
 
     if (!ctx.callbackQuery) {
-      await ctx.reply(ctx.t('subscription.selectTierPrompt'));
+      await ctx.reply(t('subscription.selectTierPrompt', {}, lang));
       return;
     }
 
@@ -183,7 +183,7 @@ const paySubscriptionScene = new Scenes.WizardScene(
     // This happens for Trial shops that have no shop_subscriptions record
     if (!ctx.wizard.state.subscriptionId) {
       try {
-        await ctx.editMessageText(ctx.t('subscription.creating'), { parse_mode: 'HTML' });
+        await ctx.editMessageText(t('subscription.creating', {}, lang), { parse_mode: 'HTML' });
 
         const token = ctx.session.token;
         if (!token) {
@@ -202,7 +202,7 @@ const paySubscriptionScene = new Scenes.WizardScene(
         });
       } catch (error) {
         logger.error('[PaySubscription] Failed to create pending subscription:', error);
-        await ctx.editMessageText(ctx.t('subscription.pendingCreationError', { error: error.message }), {
+        await ctx.editMessageText(t('subscription.pendingCreationError', { error: error.message }, lang), {
           parse_mode: 'HTML',
           ...Markup.inlineKeyboard([[Markup.button.callback(t('buttons.back', {}, lang), 'subscription:back')]]),
         });
@@ -231,7 +231,7 @@ const paySubscriptionScene = new Scenes.WizardScene(
     const { general: generalMessages, subscription: subMessages } = getMessages(lang);
 
     if (!ctx.callbackQuery) {
-      await ctx.reply(ctx.t('subscription.selectPaymentPrompt'));
+      await ctx.reply(t('subscription.selectPaymentPrompt', {}, lang));
       return;
     }
 
@@ -259,7 +259,7 @@ const paySubscriptionScene = new Scenes.WizardScene(
 
     const methodKey = data.replace('subscription:method:', '');
     if (!['BTC', 'LTC'].includes(methodKey)) {
-      await ctx.answerCbQuery(ctx.t('errors.invalidPaymentMethod'));
+      await ctx.answerCbQuery(t('errors.invalidPaymentMethod', {}, lang));
       return;
     }
 
@@ -267,7 +267,7 @@ const paySubscriptionScene = new Scenes.WizardScene(
 
     try {
       // Show loading message
-      await ctx.editMessageText(ctx.t('subscription.creatingInvoice'), { parse_mode: 'HTML' });
+      await ctx.editMessageText(t('subscription.creatingInvoice', {}, lang), { parse_mode: 'HTML' });
 
       const { tier, subscriptionId, createShopAfter } = ctx.wizard.state;
       const token = ctx.session.token;
@@ -358,7 +358,7 @@ const paySubscriptionScene = new Scenes.WizardScene(
     const { general: generalMessages, subscription: subMessages } = getMessages(lang);
 
     if (!ctx.callbackQuery) {
-      await ctx.reply(ctx.t('subscription.checkStatusPrompt'));
+      await ctx.reply(t('subscription.checkStatusPrompt', {}, lang));
       return;
     }
 
@@ -376,7 +376,7 @@ const paySubscriptionScene = new Scenes.WizardScene(
     if (data === 'subscription:check_payment') {
       // Answer callback immediately, ignore timeout errors
       try {
-        await ctx.answerCbQuery(ctx.t('subscription.checkingStatus'));
+        await ctx.answerCbQuery(t('subscription.checkingStatus', {}, lang));
       } catch (cbError) {
         // Ignore "query is too old" or timeout errors
         if (!cbError.message?.includes('query is too old')) {
@@ -435,14 +435,14 @@ const paySubscriptionScene = new Scenes.WizardScene(
               subscriptionId,
               paidSubscription: true, // Flag to skip payment check
             };
-            // Clear wizard state before leaving
+            // Clear wizard state before scene transition
             ctx.wizard.state = {};
-            await ctx.scene.leave();
+            // NOTE: Do NOT call ctx.scene.leave() before enter() - Telegraf does it automatically
             return ctx.scene.enter('createShop', transitionData);
           }
 
           // Renewal / Existing Shop Flow
-          await ctx.editMessageText(ctx.t('subscription.renewedSuccessfully'), {
+          await ctx.editMessageText(t('subscription.renewedSuccessfully', {}, lang), {
             parse_mode: 'HTML',
             ...Markup.inlineKeyboard([[Markup.button.callback(t('buttons.mainMenu', {}, lang), 'seller:menu')]]),
           });
@@ -520,14 +520,11 @@ const paySubscriptionScene = new Scenes.WizardScene(
 paySubscriptionScene.leave(async (ctx) => {
   // P1-2 FIX: Clear wizard state to prevent memory leak
   if (ctx.wizard) {
-    delete ctx.wizard.state;
+    ctx.wizard.state = {};
   }
-  ctx.scene.state = {};
-
-  // Clear __scenes from Redis session to prevent stuck state
-  if (ctx.session && ctx.session.__scenes) {
-    delete ctx.session.__scenes;
-  }
+  // NOTE: Do NOT clear ctx.scene.state or ctx.session.__scenes here!
+  // This breaks scene transitions (e.g., paySubscription -> createShop)
+  // Telegraf manages __scenes internally during enter/leave
 
   logger.info('[PaySubscription] Scene left');
 });

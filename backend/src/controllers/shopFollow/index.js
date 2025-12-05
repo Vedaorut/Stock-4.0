@@ -28,7 +28,7 @@ export { deleteFollow } from './handlers/deleteHandlers.js';
 
 // Helper exports (for tests/utilities)
 export {
-  FREE_TIER_LIMIT,
+  PRO_TIER_FOLLOW_LIMIT,
   toNumber,
   formatFollowResponse,
   formatMonitorProduct,

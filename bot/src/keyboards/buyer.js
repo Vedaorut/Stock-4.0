@@ -2,28 +2,36 @@ import { Markup } from 'telegraf';
 import { getWebAppUrl } from '../utils/webappUrl.js';
 import { t } from '../i18n/index.js';
 
-// Buyer menu (minimalist labels)
-export const buyerMenu = (lang = 'ru') =>
-  Markup.inlineKeyboard([
-    [Markup.button.webApp(t('buttons.openCatalog', {}, lang), getWebAppUrl())],
-    [Markup.button.callback(t('buttons.findShop', {}, lang), 'buyer:search')],
-    [Markup.button.callback(t('buttons.mySubscriptions', {}, lang), 'buyer:subscriptions')],
-    [Markup.button.callback(t('buttons.myOrders', {}, lang), 'buyer:orders')],
-    [Markup.button.callback(t('buttons.settings', {}, lang), 'settings')],
-    [Markup.button.callback(t('buttons.switchRole', {}, lang), 'role:toggle')],
-  ]);
+/**
+ * Buyer menu keyboard
+ * @param {Object} options - { hasShop: boolean }
+ * @param {string} lang - Language code
+ */
+export const buyerMenu = (options = {}, lang = 'ru') => {
+  // Handle legacy calls where first arg is lang string
+  if (typeof options === 'string') {
+    lang = options;
+    options = { hasShop: true };
+  }
 
-// Buyer menu without shop (shows CTA to create shop)
-export const buyerMenuNoShop = (lang = 'ru') =>
-  Markup.inlineKeyboard([
+  const buttons = [
     [Markup.button.webApp(t('buttons.openCatalog', {}, lang), getWebAppUrl())],
-    [Markup.button.callback(t('buttons.createShop', {}, lang), 'seller:create_shop')],
     [Markup.button.callback(t('buttons.findShop', {}, lang), 'buyer:search')],
     [Markup.button.callback(t('buttons.mySubscriptions', {}, lang), 'buyer:subscriptions')],
     [Markup.button.callback(t('buttons.myOrders', {}, lang), 'buyer:orders')],
     [Markup.button.callback(t('buttons.settings', {}, lang), 'settings')],
-    [Markup.button.callback(t('buttons.switchRole', {}, lang), 'role:toggle')],
-  ]);
+  ];
+
+  // Only show "Switch Role" if user has a shop
+  if (options.hasShop) {
+    buttons.push([Markup.button.callback(t('buttons.switchRole', {}, lang), 'role:toggle')]);
+  }
+
+  return Markup.inlineKeyboard(buttons);
+};
+
+// Backward compatibility alias (deprecated)
+export const buyerMenuNoShop = (lang = 'ru') => buyerMenu({ hasShop: false }, lang);
 
 // Shop actions (subscribe/unsubscribe/open)
 export const shopActionsKeyboard = (

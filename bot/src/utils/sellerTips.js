@@ -40,8 +40,8 @@ function getContextualTipKeys(shopHealth) {
     if (!shopHealth.wallets.USDT) tips.push('addUsdt');
   }
 
-  // Check workers (only for PRO/MAX tiers)
-  if (['pro', 'max'].includes(shopHealth.tier) && !shopHealth.hasWorkers) {
+  // Check workers (only for MAX tier)
+  if (shopHealth.tier === 'max' && !shopHealth.hasWorkers) {
     tips.push('addWorker');
   }
 

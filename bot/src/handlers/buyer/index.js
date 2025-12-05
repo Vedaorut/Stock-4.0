@@ -1,4 +1,4 @@
-import { buyerMenu, buyerMenuNoShop, shopActionsKeyboard } from '../../keyboards/buyer.js';
+import { buyerMenu, shopActionsKeyboard } from '../../keyboards/buyer.js';
 import { subscriptionApi, shopApi, authApi, orderApi, productApi } from '../../utils/api.js';
 import { splitProductsByAvailability } from '../../utils/minimalist.js';
 import logger from '../../utils/logger.js';
@@ -117,11 +117,12 @@ export const handleBuyerRole = async (ctx, options = {}) => {
       }
     }
 
-    // Check if buyer has shop (for CTA to create shop)
+    // Check if buyer has shop (to show/hide role switch button)
     // STABILITY FIX #2: Use explicit .catch() for graceful fallback on 401/403
+    let hasShop = false;
     if (ctx.session.token) {
       const shops = await shopApi.getMyShop(ctx.session.token).catch((error) => {
-        // Graceful fallback: on 401/403 or any error, return null to show normal menu
+        // Graceful fallback: on 401/403 or any error, return null
         if (error.response?.status === 401 || error.response?.status === 403) {
           logger.debug('Token expired or forbidden when checking shop for buyer, showing normal menu');
         } else {
@@ -130,21 +131,14 @@ export const handleBuyerRole = async (ctx, options = {}) => {
         return null;
       });
 
-      if (shops !== null && (!shops || shops.length === 0)) {
-        // No shop - show CTA to create shop
-        await smartMessage.send(ctx, {
-          text: buyerMessages.panel(lang),
-          keyboard: buyerMenuNoShop(lang),
-        });
-        logger.info(`Buyer ${ctx.from.id} has no shop, showing CTA`);
-        return;
-      }
+      hasShop = shops !== null && Array.isArray(shops) && shops.length > 0;
     }
 
     await smartMessage.send(ctx, {
       text: buyerMessages.panel(lang),
-      keyboard: buyerMenu(lang),
+      keyboard: buyerMenu({ hasShop }, lang),
     });
+    logger.info(`Buyer ${ctx.from.id} menu shown, hasShop=${hasShop}`);
   } catch (error) {
     logger.error('Error in buyer role handler:', error);
     // Local error handling - don't throw to avoid infinite spinner

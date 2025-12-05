@@ -47,6 +47,7 @@ const chooseTierScene = new Scenes.WizardScene(
           [Markup.button.callback(t('chooseTier.proButton', { price: proPrice }, lang), 'tier_select:pro')],
           [Markup.button.callback(t('chooseTier.maxButton', { price: maxPrice }, lang), 'tier_select:max')],
           [Markup.button.callback(t('chooseTier.promoButton', {}, lang), 'tier_promo')],
+          [Markup.button.callback(t('buttons.back', {}, lang), 'cancel_scene')],
         ])
       );
 
@@ -79,7 +80,8 @@ const chooseTierScene = new Scenes.WizardScene(
         // Free Trial selection - gives MAX tier for 7 days
         if (action === 'tier_trial') {
           logger.info('tier_trial_selected', { userId: ctx.from.id });
-          await ctx.scene.leave();
+          // NOTE: Do NOT call ctx.scene.leave() before enter() - Telegraf does it automatically
+          // Calling leave() first can cause race conditions with scene state
           await ctx.scene.enter('createShop', { trial: true, tier: 'max' });
           return;
         }
@@ -143,8 +145,8 @@ const chooseTierScene = new Scenes.WizardScene(
               tier: pendingData.tier,
             });
 
-            // Leave chooseTier and enter pay_subscription with subscriptionId
-            await ctx.scene.leave();
+            // Enter pay_subscription with subscriptionId
+            // NOTE: Do NOT call ctx.scene.leave() before enter() - Telegraf does it automatically
             await ctx.scene.enter('pay_subscription', {
               tier,
               subscriptionId: pendingData.subscriptionId,
@@ -250,10 +252,8 @@ const chooseTierScene = new Scenes.WizardScene(
     // Store promo code in wizard state
     ctx.wizard.state.promoCode = promoCode;
 
-    // Transition to createShop scene with promo code
-    await ctx.scene.leave();
-
     // Enter createShop scene with promo code - promo determines tier
+    // NOTE: Do NOT call ctx.scene.leave() before enter() - Telegraf does it automatically
     await ctx.scene.enter('createShop', { promoCode });
   }
 );
@@ -272,14 +272,11 @@ chooseTierScene.leave(async (ctx) => {
 
   // P1-2 FIX: Clear wizard state to prevent memory leak
   if (ctx.wizard) {
-    delete ctx.wizard.state;
+    ctx.wizard.state = {};
   }
-  ctx.scene.state = {};
-
-  // Clear __scenes from Redis session to prevent stuck state
-  if (ctx.session && ctx.session.__scenes) {
-    delete ctx.session.__scenes;
-  }
+  // NOTE: Do NOT clear ctx.scene.state or ctx.session.__scenes here!
+  // This breaks scene transitions (e.g., chooseTier -> createShop -> shopOnboarding)
+  // Telegraf manages __scenes internally during enter/leave
 
   logger.info(`User ${ctx.from?.id} left chooseTier scene`);
 });
@@ -292,7 +289,9 @@ chooseTierScene.action('cancel_scene', async (ctx) => {
 
     await ctx.scene.leave();
 
-    // Don't send additional message - just leave and let handler take over
+    // Return to buyer menu after cancelling
+    const { handleBuyerRole } = await import('../handlers/buyer/index.js');
+    await handleBuyerRole(ctx, { skipRoleUpdate: true });
   } catch (error) {
     logger.error('Error in cancel_scene handler:', error);
   }
@@ -304,6 +303,10 @@ chooseTierScene.action('cancel', async (ctx) => {
     await ctx.answerCbQuery();
     logger.info('choose_tier_cancelled', { userId: ctx.from.id });
     await ctx.scene.leave();
+
+    // Return to buyer menu after cancelling
+    const { handleBuyerRole } = await import('../handlers/buyer/index.js');
+    await handleBuyerRole(ctx, { skipRoleUpdate: true });
   } catch (error) {
     logger.error('Error in cancel handler:', error);
     try {

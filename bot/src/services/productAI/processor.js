@@ -379,9 +379,9 @@ export async function processProductCommand(userCommand, context) {
       });
 
       // Delete streaming message since function result will be in a new message
+      // No delay - delete immediately to reduce flash effect
       if (streamingMessage && ctx) {
         try {
-          await new Promise((resolve) => setTimeout(resolve, 100));
           await ctx.telegram.deleteMessage(streamingMessage.chat.id, streamingMessage.message_id);
         } catch (err) {
           if (err.response?.error_code !== 400) {

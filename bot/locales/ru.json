@@ -20,8 +20,8 @@
     "authenticationFailed": "Не удалось авторизоваться. Попробуйте снова через /start."
   },
   "buttons": {
-    "buyerRole": "Покупаю",
-    "sellerRole": "Продаю",
+    "buyerRole": "Я покупатель",
+    "sellerRole": "Я продавец",
     "workspace": "Сотрудник",
     "back": "Назад",
     "refresh": "Обновить",

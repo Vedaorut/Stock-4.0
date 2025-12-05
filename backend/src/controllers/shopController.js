@@ -667,16 +667,16 @@ export const shopController = {
         }
       }
 
-      // WALLET-VALIDATION: Validate USDT address (ERC20 = Ethereum format)
+      // WALLET-VALIDATION: Validate USDT address (TRC-20 = Tron format)
       if (wallet_usdt !== undefined && wallet_usdt && wallet_usdt.trim()) {
-        const isValid = validateAddress(wallet_usdt.trim(), 'ETH');
+        const isValid = validateAddress(wallet_usdt.trim(), 'USDT');
         if (!isValid) {
           logger.warn(`[Wallet Validation] Invalid USDT address attempt`, {
             userId: req.user.id,
             shopId: id,
             address: wallet_usdt.substring(0, 8) + '...',
           });
-          throw new ValidationError(`Invalid USDT (ERC20) address format: ${wallet_usdt}`);
+          throw new ValidationError(`Invalid USDT (TRC-20) address format: ${wallet_usdt}. Expected Tron address starting with T.`);
         }
       }
 

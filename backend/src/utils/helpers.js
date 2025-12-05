@@ -35,7 +35,8 @@ export const validateWalletAddress = (address, currency) => {
   const patterns = {
     BTC: /^[13][a-km-zA-HJ-NP-Z1-9]{25,34}$|^bc1[a-z0-9]{39,59}$/,
     ETH: /^0x[a-fA-F0-9]{40}$/,
-    USDT: /^0x[a-fA-F0-9]{40}$/,
+    // USDT TRC-20 (Tron): starts with T, 34 characters total, base58 chars
+    USDT: /^T[1-9A-HJ-NP-Za-km-z]{33}$/,
     LTC: /^[LM][a-km-zA-HJ-NP-Z1-9]{25,34}$|^ltc1[a-z0-9]{39,59}$/,
   };
 

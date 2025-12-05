@@ -14,16 +14,16 @@ import { useApi } from '../hooks/useApi';
 // Skeleton loader component
 function ProductCardSkeleton() {
   return (
-  <div className="glass-card rounded-2xl p-4 space-y-3 animate-pulse border border-white/10">
-    <div className="w-full aspect-square rounded-xl bg-white/5" />
-    <div className="h-5 bg-white/10 rounded-lg w-3/4" />
-    <div className="h-3 bg-white/5 rounded w-full" />
-    <div className="h-3 bg-white/5 rounded w-2/3" />
-    <div className="flex items-center justify-between mt-4">
-      <div className="h-6 bg-white/10 rounded-lg w-20" />
-      <div className="h-9 bg-white/5 rounded-lg w-24" />
+    <div className="glass-card rounded-2xl p-4 space-y-3 animate-pulse border border-white/10">
+      <div className="w-full aspect-square rounded-xl bg-white/5" />
+      <div className="h-5 bg-white/10 rounded-lg w-3/4" />
+      <div className="h-3 bg-white/5 rounded w-full" />
+      <div className="h-3 bg-white/5 rounded w-2/3" />
+      <div className="flex items-center justify-between mt-4">
+        <div className="h-6 bg-white/10 rounded-lg w-20" />
+        <div className="h-9 bg-white/5 rounded-lg w-24" />
+      </div>
     </div>
-  </div>
   );
 }
 
@@ -87,7 +87,7 @@ export default function Catalog() {
   const searchInputRef = useRef(null);
   const searchContainerRef = useRef(null);
   const debounceTimerRef = useRef(null);
-  
+
   // Optimized Store Selection
   const {
     products,
@@ -98,6 +98,7 @@ export default function Catalog() {
     token,
     myShops,
     setMyShops,
+    setActiveTab,
   } = useStore(
     useShallow((state) => ({
       products: state.products,
@@ -108,6 +109,7 @@ export default function Catalog() {
       token: state.token,
       myShops: state.myShops,
       setMyShops: state.setMyShops,
+      setActiveTab: state.setActiveTab,
     }))
   );
 
@@ -124,7 +126,7 @@ export default function Catalog() {
       try {
         const { data, error: apiError } = await get('/shops/my', { signal });
         if (signal?.aborted) return { status: 'aborted' };
-        
+
         if (apiError) {
           if (import.meta.env.DEV) {
             console.error('[Catalog] 🔴 loadMyShop ERROR:', apiError);
@@ -134,10 +136,10 @@ export default function Catalog() {
 
         const shops = data?.data || [];
         const shop = shops[0] || null;
-        
+
         // Save ALL shops to store for multi-shop ownership detection
         setMyShops(shops);
-        
+
         if (shop) setMyShop(shop);
         return { status: 'success', shop };
       } catch (err) {
@@ -335,43 +337,44 @@ export default function Catalog() {
     const signal = controller.signal;
 
     const fetchData = async () => {
-      // 1. Load My Shop (if not already known or needed context)
-      const shopResult = await loadMyShop(signal);
-      if (signal.aborted) return;
-      if (shopResult.status === 'error' && !currentShop) {
-         // Only block if we have absolutely no shop to show
-         setError(shopResult.error);
-         setLoading(false);
-         return;
-      }
+      try {
+        // 1. Load My Shop (if not already known or needed context)
+        const shopResult = await loadMyShop(signal);
+        if (signal.aborted) return;
+        if (shopResult.status === 'error' && !currentShop) {
+          // Only block if we have absolutely no shop to show
+          setError(shopResult.error);
+          return;
+        }
 
-      // 2. Determine target shop ID
-      let shop = currentShop || shopResult.shop;
+        // 2. Determine target shop ID
+        let shop = currentShop || shopResult.shop;
 
-      // 3. If viewing external shop (not own), load full shop data for availableCryptos
-      // This is needed for payment flow to know which crypto wallets are available
-      // Get myShops from store directly to avoid dependency cycle
-      const currentMyShops = useStore.getState().myShops;
-      if (currentShop && currentShop.id && !currentShop.availableCryptos) {
-        const isOwnShop = currentMyShops.some(s => s.id === currentShop.id);
-        if (!isOwnShop) {
-          // Load full shop data for external shops (needed for payment wallets)
-          const fullShopResult = await loadShopById(currentShop.id, signal);
-          if (signal.aborted) return;
-          if (fullShopResult.status === 'success' && fullShopResult.shop) {
-            shop = fullShopResult.shop;
+        // 3. If viewing external shop (not own), load full shop data for availableCryptos
+        // This is needed for payment flow to know which crypto wallets are available
+        // Get myShops from store directly to avoid dependency cycle
+        const currentMyShops = useStore.getState().myShops;
+        if (currentShop && currentShop.id && !currentShop.availableCryptos) {
+          const isOwnShop = currentMyShops.some(s => s.id === currentShop.id);
+          if (!isOwnShop) {
+            // Load full shop data for external shops (needed for payment wallets)
+            const fullShopResult = await loadShopById(currentShop.id, signal);
+            if (signal.aborted) return;
+            if (fullShopResult.status === 'success' && fullShopResult.shop) {
+              shop = fullShopResult.shop;
+            }
           }
         }
-      }
 
-      if (shop) {
-        const prodResult = await loadProducts(shop.id, signal);
-        if (!signal.aborted && prodResult.status === 'error') {
-           setError(prodResult.error);
+        if (shop) {
+          const prodResult = await loadProducts(shop.id, signal);
+          if (!signal.aborted && prodResult.status === 'error') {
+            setError(prodResult.error);
+          }
         }
+      } finally {
+        if (!signal.aborted) setLoading(false);
       }
-
-      if (!signal.aborted) setLoading(false);
     };
 
     fetchData();
@@ -390,13 +393,13 @@ export default function Catalog() {
   const handleBackToMyShop = useCallback(() => {
     triggerHaptic('light');
     setCurrentShop(null);
-    // Products will reload via useEffect when currentShop becomes null (and logic picks up myShop)
-  }, [triggerHaptic, setCurrentShop]);
+    setActiveTab('subscriptions');
+  }, [triggerHaptic, setCurrentShop, setActiveTab]);
 
   // Derived State (displayShop moved up for searchProducts dependency)
   const displayShopLogo = displayShop?.logo || displayShop?.image || null;
   const isViewingOwnShop = !currentShop && myShop;
-  
+
   // Check if currentShop belongs to user (using myShops array for multi-shop ownership)
   const isCurrentShopOwned = currentShop && myShops.some(s => s.id === currentShop.id);
   const isViewingSubscription = currentShop && !isCurrentShopOwned;
@@ -414,7 +417,7 @@ export default function Catalog() {
   const { stockProducts, preorderProducts } = useMemo(() => {
     const stock = [];
     const preorder = [];
-    
+
     if (!products) return { stockProducts: [], preorderProducts: [] };
 
     for (const product of products) {
@@ -483,31 +486,7 @@ export default function Catalog() {
     <div className="pb-24" style={{ paddingTop: 'calc(env(safe-area-inset-top) + 56px)' }}>
       {/* Shop Header */}
       <div className="bg-dark-card/80 backdrop-blur-lg p-4 sticky top-0 z-10">
-        {isViewingSubscription && (
-          <motion.button
-            onClick={handleBackToMyShop}
-            className="flex items-center gap-2 text-orange-primary mb-2"
-            whileTap={{ scale: 0.95 }}
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-            <span className="font-medium">{t('catalog.backToMyShop')}</span>
-          </motion.button>
-        )}
 
-        {currentShop && !isViewingSubscription && (
-          <motion.button
-            onClick={handleBack}
-            className="flex items-center gap-2 text-orange-primary mb-2"
-            whileTap={{ scale: 0.95 }}
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-            <span className="font-medium">{t('common.back')}</span>
-          </motion.button>
-        )}
 
         <div className="flex items-center gap-4">
           {displayShopLogo && (
@@ -622,9 +601,8 @@ export default function Catalog() {
                 key={sectionId}
                 type="button"
                 onClick={() => handleSectionChange(sectionId)}
-                className={`relative flex-1 py-2.5 rounded-xl transition-colors ${
-                  isActive ? 'text-white' : 'text-white/60'
-                }`}
+                className={`relative flex-1 py-2.5 rounded-xl transition-colors ${isActive ? 'text-white' : 'text-white/60'
+                  }`}
               >
                 {isActive && (
                   <motion.div

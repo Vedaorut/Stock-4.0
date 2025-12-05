@@ -14,9 +14,10 @@
 
 import { Scenes, Markup } from 'telegraf';
 import logger from '../utils/logger.js';
-import { authApi } from '../utils/api.js';
+import { authApi, walletApi } from '../utils/api.js';
 import { t } from '../i18n/index.js';
 import { sellerMenu } from '../keyboards/seller.js';
+import { detectCryptoType, validateCryptoAddress } from '../utils/validation.js';
 
 const TOTAL_STEPS = 5;
 
@@ -81,8 +82,8 @@ const getWelcomeAnimationFrames = (inviteLink, lang = 'ru') => [
   t('shopOnboarding.shopCreated', {}, lang),
   t('shopOnboarding.shopCreated', {}, lang) + '\n\n' + t('shopOnboarding.preparing', {}, lang),
   t('shopOnboarding.linkTitle', {}, lang) + '\n\n' +
-    `<code>${inviteLink}</code>\n\n` +
-    t('shopOnboarding.linkText', {}, lang),
+  `<code>${inviteLink}</code>\n\n` +
+  t('shopOnboarding.linkText', {}, lang),
 ];
 
 // Build navigation keyboard based on current step
@@ -132,83 +133,108 @@ const markOnboardingCompleted = async (ctx) => {
 const shopOnboardingScene = new Scenes.WizardScene(
   'shopOnboarding',
 
-  // Entry step - show welcome with animation
-  async (ctx) => {
-    try {
-      const { shopId, shopName, inviteLink } = ctx.scene.state || {};
-
-      if (!shopId || !shopName || !inviteLink) {
-        logger.error('Missing required state for shopOnboarding', {
-          userId: ctx.from?.id,
-          state: ctx.scene.state,
-        });
-        await ctx.scene.leave();
-        return;
-      }
-
-      const lang = ctx.lang || ctx.session?.language || 'ru';
-
-      // Save to wizard state
-      ctx.wizard.state.shopId = shopId;
-      ctx.wizard.state.shopName = shopName;
-      ctx.wizard.state.inviteLink = inviteLink;
-      ctx.wizard.state.currentStep = 0;
-      ctx.wizard.state.lang = lang;
-
-      logger.info('shop_onboarding_started', {
-        userId: ctx.from?.id,
-        shopId,
-        shopName,
-      });
-
-      // Animated welcome sequence
-      const frames = getWelcomeAnimationFrames(inviteLink, lang);
-      const content = getStepContent(0, ctx.wizard.state, lang);
-
-      // Send first frame
-      const msg = await ctx.reply(frames[0], { parse_mode: 'HTML' });
-      ctx.wizard.state.messageId = msg.message_id;
-
-      // Animate through frames
-      await sleep(400);
-      await ctx.telegram.editMessageText(
-        ctx.chat.id,
-        msg.message_id,
-        null,
-        frames[1],
-        { parse_mode: 'HTML' }
-      );
-
-      await sleep(600);
-      await ctx.telegram.editMessageText(
-        ctx.chat.id,
-        msg.message_id,
-        null,
-        content.text,
-        {
-          parse_mode: 'HTML',
-          ...content.keyboard,
-        }
-      );
-
-      return ctx.wizard.next();
-    } catch (error) {
-      logger.error('Error in shopOnboarding entry:', error);
-      // Cleanup messageId to prevent memory leak
-      if (ctx.wizard?.state?.messageId) {
-        delete ctx.wizard.state.messageId;
-      }
-      await ctx.scene.leave();
-    }
+  // Step 0 - placeholder (entry logic moved to .enter() hook below)
+  // WizardScene's first step doesn't execute immediately on scene.enter()
+  // It waits for the NEXT user update. So we use .enter() hook instead.
+  async (_ctx) => {
+    // This step is skipped via selectStep(1) in .enter() hook
+    return;
   },
 
-  // Handler step - process navigation
+  // Step 1 - Handler for navigation (processes callback queries)
   async (_ctx) => {
-    // This step handles callback queries
     // The actual logic is in action handlers below
     return;
   }
 );
+
+// FIX: Use .enter() hook to send first message immediately
+// This runs synchronously when scene.enter() is called, not waiting for next update
+shopOnboardingScene.enter(async (ctx) => {
+  try {
+    // Read state from session (reliable) OR fallback to scene.state (legacy)
+    const sessionState = ctx.session?.__onboardingState || {};
+    const sceneState = ctx.scene.state || {};
+
+    const shopId = sessionState.shopId || sceneState.shopId;
+    const shopName = sessionState.shopName || sceneState.shopName;
+    const inviteLink = sessionState.inviteLink || sceneState.inviteLink;
+
+    // Debug logging to verify state transfer
+    logger.info('shopOnboarding .enter() hook - state check', {
+      userId: ctx.from?.id,
+      fromSession: !!sessionState.shopId,
+      fromSceneState: !!sceneState.shopId,
+      shopId,
+      shopName,
+      hasInviteLink: !!inviteLink,
+    });
+
+    // Clear session state after reading (cleanup)
+    if (ctx.session?.__onboardingState) {
+      delete ctx.session.__onboardingState;
+    }
+
+    if (!shopId || !shopName || !inviteLink) {
+      logger.error('Missing required state for shopOnboarding', {
+        userId: ctx.from?.id,
+        sessionState: Object.keys(sessionState),
+        sceneState: Object.keys(sceneState),
+        shopId,
+        shopName,
+        inviteLink,
+      });
+      await ctx.scene.leave();
+      return;
+    }
+
+    const lang = ctx.lang || ctx.session?.language || 'ru';
+
+    // Save to wizard state (don't reassign ctx.wizard.state, set keys individually)
+    ctx.wizard.state.shopId = shopId;
+    ctx.wizard.state.shopName = shopName;
+    ctx.wizard.state.inviteLink = inviteLink;
+    ctx.wizard.state.currentStep = 0;
+    ctx.wizard.state.lang = lang;
+
+    logger.info('shop_onboarding_started', {
+      userId: ctx.from?.id,
+      shopId,
+      shopName,
+      inviteLink: inviteLink.substring(0, 50),
+    });
+
+    // Get step content
+    const content = getStepContent(0, ctx.wizard.state, lang);
+
+    // Send first message immediately
+    const msg = await ctx.reply(content.text, {
+      parse_mode: 'HTML',
+      ...content.keyboard,
+    });
+    ctx.wizard.state.messageId = msg.message_id;
+
+    logger.info('shop_onboarding_message_sent', {
+      userId: ctx.from?.id,
+      messageId: msg.message_id,
+      shopId,
+    });
+
+    // Skip step 0 and go to step 1 for next user interaction
+    ctx.wizard.selectStep(1);
+  } catch (error) {
+    logger.error('Error in shopOnboarding .enter() hook:', {
+      userId: ctx.from?.id,
+      error: error.message,
+      stack: error.stack,
+    });
+    // Cleanup messageId to prevent memory leak
+    if (ctx.wizard?.state?.messageId) {
+      delete ctx.wizard.state.messageId;
+    }
+    await ctx.scene.leave();
+  }
+});
 
 // Navigation: Next
 shopOnboardingScene.action('onboarding:next', async (ctx) => {
@@ -336,9 +362,25 @@ shopOnboardingScene.action('onboarding:finish', async (ctx) => {
       /* ignore if can't delete */
     }
 
-    // Show seller menu
+    // Show seller menu with tips
     const menu = sellerMenu(0, { hasFollows: false }, lang);
-    const message = t('seller.shopPanel', { shop: shopName }, lang);
+    // Use shopPanelWithStats to show random tip for new shop
+    const { messages } = await import('../texts/messages.js');
+    const { getTipForShop } = await import('../utils/sellerTips.js');
+    const { checkShopHealth } = await import('../utils/shopHealthCheck.js');
+
+    // Get shop health for tip generation
+    let statusBar = '';
+    try {
+      const shopHealth = await checkShopHealth(shopId, ctx.session?.token);
+      if (shopHealth) {
+        statusBar = getTipForShop(ctx, shopHealth);
+      }
+    } catch {
+      // Silent fail - just show without tip
+    }
+
+    const message = messages.seller.shopPanelWithStats(shopName, 0, 0, statusBar, lang);
     await ctx.reply(message, { parse_mode: 'HTML', ...menu });
   } catch (error) {
     logger.error('Error in onboarding:finish:', error);
@@ -362,18 +404,150 @@ shopOnboardingScene.action('main_menu', async (ctx) => {
   }
 });
 
+// Handle text input for wallet addresses on step 2
+shopOnboardingScene.on('text', async (ctx) => {
+  try {
+    // Only process on wallets step (step 2)
+    if (ctx.wizard.state.currentStep !== 2) {
+      return;
+    }
+
+    const lang = ctx.wizard.state.lang || ctx.lang || ctx.session?.language || 'ru';
+    const shopId = ctx.wizard.state.shopId || ctx.session?.shopId;
+    const token = ctx.session?.token;
+    const userMessageId = ctx.message?.message_id;
+
+    // Delete user input message
+    const deleteUserInput = async () => {
+      if (userMessageId) {
+        await ctx.deleteMessage(userMessageId).catch((err) => {
+          const status = err.response?.error_code || err.code;
+          if (status !== 400 && status !== 429) {
+            logger.warn('Unexpected deleteMessage error (onboarding wallet)', {
+              messageId: userMessageId,
+              error: err.message,
+              status,
+            });
+          }
+        });
+      }
+    };
+
+    if (!shopId || !token) {
+      logger.warn('Missing shopId or token in wallet handler', {
+        userId: ctx.from?.id,
+        shopId,
+        hasToken: !!token,
+      });
+      await deleteUserInput();
+      return;
+    }
+
+    const inputText = ctx.message.text.trim();
+    const lines = inputText.split('\n').map((l) => l.trim()).filter((l) => l.length > 0);
+
+    if (lines.length === 0) {
+      await deleteUserInput();
+      return;
+    }
+
+    const validWallets = [];
+    const invalidAddresses = [];
+    const walletData = {};
+
+    // Process each line as a potential wallet address
+    for (const address of lines) {
+      const detectedType = detectCryptoType(address);
+
+      if (!detectedType) {
+        invalidAddresses.push(address.substring(0, 15) + (address.length > 15 ? '...' : ''));
+        continue;
+      }
+
+      const isValid = validateCryptoAddress(address, detectedType);
+
+      if (!isValid) {
+        invalidAddresses.push(`${detectedType}: ${address.substring(0, 15)}...`);
+        continue;
+      }
+
+      // Add to wallet data
+      const walletField = `wallet_${detectedType.toLowerCase()}`;
+      walletData[walletField] = address;
+      validWallets.push(detectedType);
+    }
+
+    await deleteUserInput();
+
+    // Save valid wallets if any
+    if (Object.keys(walletData).length > 0) {
+      try {
+        await walletApi.updateWallets(shopId, walletData, token);
+
+        logger.info('onboarding_wallets_saved', {
+          shopId,
+          userId: ctx.from?.id,
+          wallets: validWallets,
+        });
+      } catch (apiError) {
+        logger.error('Failed to save wallets in onboarding:', {
+          shopId,
+          userId: ctx.from?.id,
+          error: apiError.message,
+          apiResponse: apiError.response?.data,
+        });
+
+        // Send user-friendly error as temporary message
+        const errorMsg = apiError.response?.data?.error || apiError.message;
+        const feedbackMsg = await ctx.reply(
+          `❌ ${t('shopOnboarding.walletSaveError', {}, lang)}\n<i>${errorMsg}</i>`,
+          { parse_mode: 'HTML' }
+        );
+        // Auto-delete after 7 seconds
+        setTimeout(() => {
+          ctx.deleteMessage(feedbackMsg.message_id).catch(() => {});
+        }, 7000);
+        return;
+      }
+    }
+
+    // Build feedback message - human-friendly style
+    const feedbackParts = [];
+
+    if (validWallets.length > 0) {
+      feedbackParts.push(`✅ ${t('shopOnboarding.walletsAdded', { wallets: validWallets.join(', ') }, lang)}`);
+    }
+
+    if (invalidAddresses.length > 0) {
+      feedbackParts.push(`⚠️ ${t('shopOnboarding.invalidWallets', { addresses: invalidAddresses.join(', ') }, lang)}`);
+    }
+
+    // Send temporary feedback message (auto-delete after 5 sec)
+    if (feedbackParts.length > 0) {
+      const feedbackText = feedbackParts.join('\n');
+      const feedbackMsg = await ctx.reply(feedbackText, { parse_mode: 'HTML' });
+
+      // Auto-delete feedback after 5 seconds to keep chat clean
+      setTimeout(() => {
+        ctx.deleteMessage(feedbackMsg.message_id).catch(() => {});
+      }, 5000);
+    }
+  } catch (error) {
+    logger.error('Error in shopOnboarding wallet text handler:', error);
+  }
+});
+
 // Leave handler - cleanup
 shopOnboardingScene.leave((ctx) => {
-  // Clear wizard state to prevent memory leak
-  if (ctx.wizard) {
-    delete ctx.wizard.state;
+  // FIX: Don't reassign ctx.wizard.state - it's readonly
+  // Clear individual keys instead to prevent memory leak
+  if (ctx.wizard?.state) {
+    Object.keys(ctx.wizard.state).forEach(key => {
+      delete ctx.wizard.state[key];
+    });
   }
-  ctx.scene.state = {};
-
-  // Clear __scenes from Redis session to prevent stuck state
-  if (ctx.session && ctx.session.__scenes) {
-    delete ctx.session.__scenes;
-  }
+  // NOTE: Do NOT clear ctx.scene.state or ctx.session.__scenes here!
+  // Telegraf manages __scenes internally during enter/leave
 
   logger.info(`User ${ctx.from?.id} left shopOnboarding scene`);
 });
@@ -386,11 +560,28 @@ shopOnboardingScene.action('cancel_scene', async (ctx) => {
     await markOnboardingCompleted(ctx);
     await ctx.scene.leave();
 
-    // Show seller menu
+    // Show seller menu with tips
     const lang = ctx.wizard?.state?.lang || ctx.lang || ctx.session?.language || 'ru';
     const shopName = ctx.wizard?.state?.shopName || ctx.session?.shopName || t('general.shopFallbackName', {}, lang);
+    const shopId = ctx.wizard?.state?.shopId || ctx.session?.shopId;
     const menu = sellerMenu(0, { hasFollows: false }, lang);
-    const message = t('seller.shopPanel', { shop: shopName }, lang);
+
+    // Get tip for seller menu
+    const { messages } = await import('../texts/messages.js');
+    const { getTipForShop } = await import('../utils/sellerTips.js');
+    const { checkShopHealth } = await import('../utils/shopHealthCheck.js');
+
+    let statusBar = '';
+    try {
+      if (shopId && ctx.session?.token) {
+        const shopHealth = await checkShopHealth(shopId, ctx.session.token);
+        if (shopHealth) {
+          statusBar = getTipForShop(ctx, shopHealth);
+        }
+      }
+    } catch { /* silent */ }
+
+    const message = messages.seller.shopPanelWithStats(shopName, 0, 0, statusBar, lang);
 
     try {
       await ctx.deleteMessage();
@@ -415,11 +606,28 @@ shopOnboardingScene.action('cancel', async (ctx) => {
     await markOnboardingCompleted(ctx);
     await ctx.scene.leave();
 
-    // Show seller menu
+    // Show seller menu with tips
     const lang = ctx.wizard?.state?.lang || ctx.lang || ctx.session?.language || 'ru';
     const shopName = ctx.wizard?.state?.shopName || ctx.session?.shopName || t('general.shopFallbackName', {}, lang);
+    const shopId = ctx.wizard?.state?.shopId || ctx.session?.shopId;
     const menu = sellerMenu(0, { hasFollows: false }, lang);
-    const message = t('seller.shopPanel', { shop: shopName }, lang);
+
+    // Get tip for seller menu
+    const { messages } = await import('../texts/messages.js');
+    const { getTipForShop } = await import('../utils/sellerTips.js');
+    const { checkShopHealth } = await import('../utils/shopHealthCheck.js');
+
+    let statusBar = '';
+    try {
+      if (shopId && ctx.session?.token) {
+        const shopHealth = await checkShopHealth(shopId, ctx.session.token);
+        if (shopHealth) {
+          statusBar = getTipForShop(ctx, shopHealth);
+        }
+      }
+    } catch { /* silent */ }
+
+    const message = messages.seller.shopPanelWithStats(shopName, 0, 0, statusBar, lang);
 
     try {
       await ctx.deleteMessage();

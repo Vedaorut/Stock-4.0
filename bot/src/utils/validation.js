@@ -56,23 +56,33 @@ export function detectCryptoType(address) {
 
   const trimmed = address.trim();
 
-  // BTC: starts with 1, 3, or bc1
-  if (/^(1|3|bc1)[a-zA-Z0-9]{25,62}$/.test(trimmed)) {
+  // BTC: P2PKH (1...) = 25-34 chars, P2SH (3...) = 34 chars, Bech32 (bc1...) = 42-62 chars
+  // More strict: only base58 chars for legacy, only lowercase alphanumeric for bech32
+  if (/^1[1-9A-HJ-NP-Za-km-z]{25,33}$/.test(trimmed)) {
+    return 'BTC';
+  }
+  if (/^3[1-9A-HJ-NP-Za-km-z]{33}$/.test(trimmed)) {
+    return 'BTC';
+  }
+  if (/^bc1[a-z0-9]{39,59}$/.test(trimmed)) {
     return 'BTC';
   }
 
-  // ETH: starts with 0x and 40 hex characters
+  // ETH: starts with 0x and exactly 40 hex characters (total 42 chars)
   if (/^0x[a-fA-F0-9]{40}$/.test(trimmed)) {
     return 'ETH';
   }
 
-  // USDT (Tron TRC-20): starts with TR and 32 base58 characters
-  if (/^TR[1-9A-HJ-NP-Za-km-z]{32}$/.test(trimmed)) {
+  // USDT (Tron TRC-20): starts with T and exactly 33 base58 characters (total 34 chars)
+  if (/^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(trimmed)) {
     return 'USDT';
   }
 
-  // LTC: starts with L or M (legacy), or ltc1 (bech32)
-  if (/^(L|M)[a-km-zA-HJ-NP-Z1-9]{26,33}$/.test(trimmed) || /^ltc1[a-z0-9]{39,59}$/.test(trimmed)) {
+  // LTC: L/M legacy (34 chars) or ltc1 bech32 (43-63 chars)
+  if (/^[LM][1-9A-HJ-NP-Za-km-z]{33}$/.test(trimmed)) {
+    return 'LTC';
+  }
+  if (/^ltc1[a-z0-9]{39,59}$/.test(trimmed)) {
     return 'LTC';
   }
 

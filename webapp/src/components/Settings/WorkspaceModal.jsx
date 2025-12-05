@@ -4,6 +4,7 @@ import PageHeader from '../common/PageHeader';
 import { useTelegram } from '../../hooks/useTelegram';
 import { useApi } from '../../hooks/useApi';
 import { useBackButton } from '../../hooks/useBackButton';
+import { canUseWorkers } from '../../config/tierLimits';
 
 // Worker Card Component
 function WorkerCard({ worker, onRemove, isOwner }) {
@@ -82,7 +83,7 @@ export default function WorkspaceModal({ isOpen, onClose }) {
 
   const [myShop, setMyShop] = useState(null);
   const [workers, setWorkers] = useState([]);
-  const [isPro, setIsPro] = useState(false);
+  const [canManageWorkers, setCanManageWorkers] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showForm, setShowForm] = useState(false);
@@ -141,18 +142,18 @@ export default function WorkspaceModal({ isOpen, onClose }) {
 
       if (!shop) {
         // No shop - valid state, not an error
-        setIsPro(false);
+        setCanManageWorkers(false);
         setWorkers([]);
         setShowForm(false);
         return { status: 'success' };
       }
 
-      // Check PRO tier
-      const proTier = shop.tier === 'pro';
-      setIsPro(proTier);
+      // Check if tier allows workers (only MAX tier)
+      const hasWorkerAccess = canUseWorkers(shop.tier);
+      setCanManageWorkers(hasWorkerAccess);
 
-      if (proTier) {
-        // Load workers for PRO shops
+      if (hasWorkerAccess) {
+        // Load workers for MAX tier shops
         const workersRes = await fetchApi(`/shops/${shop.id}/workers`, {
           signal,
           timeout: 10000, // 10 second timeout to prevent infinite loading
@@ -172,7 +173,7 @@ export default function WorkspaceModal({ isOpen, onClose }) {
       if (signal?.aborted) return { status: 'aborted' };
 
       setError(err.message || 'Failed to load data');
-      setIsPro(false);
+      setCanManageWorkers(false);
       setWorkers([]);
       setMyShop(null);
       return { status: 'error', error: err.message };
@@ -219,8 +220,8 @@ export default function WorkspaceModal({ isOpen, onClose }) {
         return;
       }
 
-      if (!isPro) {
-        await alert('Workers are only available on the PRO plan');
+      if (!canManageWorkers) {
+        await alert('Workers are only available on the MAX plan');
         return;
       }
 
@@ -432,7 +433,7 @@ export default function WorkspaceModal({ isOpen, onClose }) {
           >
             <div className="px-4 py-6 space-y-4">
               {/* Info / Upgrade card */}
-              {isPro ? (
+              {canManageWorkers ? (
                 <div className="glass-card rounded-2xl p-4">
                   <div className="flex items-start gap-3">
                     <svg
@@ -474,9 +475,9 @@ export default function WorkspaceModal({ isOpen, onClose }) {
                       />
                     </svg>
                     <div>
-                      <p className="text-sm text-white font-medium mb-1">Available only on PRO</p>
+                      <p className="text-sm text-white font-medium mb-1">Available only on MAX</p>
                       <p className="text-xs text-gray-400">
-                        Upgrade to PRO to unlock collaboration: workers will be able to
+                        Upgrade to MAX to unlock collaboration: workers will be able to
                         manage products and sales. Go to the Subscription section to
                         upgrade your plan.
                       </p>
@@ -486,7 +487,7 @@ export default function WorkspaceModal({ isOpen, onClose }) {
               )}
 
               {/* Add worker button */}
-              {isPro && !showForm && !loading && (
+              {canManageWorkers && !showForm && !loading && (
                 <motion.button
                   onClick={() => {
                     triggerHaptic('light');
@@ -504,7 +505,7 @@ export default function WorkspaceModal({ isOpen, onClose }) {
               )}
 
               {/* Add worker form */}
-              {isPro && (
+              {canManageWorkers && (
                 <AnimatePresence>
                   {showForm && (
                     <motion.div
@@ -554,7 +555,7 @@ export default function WorkspaceModal({ isOpen, onClose }) {
                   <div className="inline-block w-8 h-8 border-4 border-orange-primary border-t-transparent rounded-full animate-spin"></div>
                 </div>
               ) : (
-                isPro &&
+                canManageWorkers &&
                 (workers.length > 0 ? (
                   <div className="space-y-3">
                     <h3 className="text-sm font-semibold text-gray-400 px-2">

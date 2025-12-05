@@ -6,32 +6,34 @@ import * as smartMessage from '../utils/smartMessage.js';
 
 /**
  * Get shop info for settings context
- * Note: Subscription options are only shown for sellers, not buyers
+ * @returns {Object} { hasShop, isTrial, tier, trialEndsAt, role }
  */
 async function getShopContext(ctx) {
-  // Buyers should NOT see subscription options - that's seller-only functionality
-  const role = ctx.session?.role;
-  if (role === 'buyer') {
-    return { hasShop: false };
-  }
+  const role = ctx.session?.role || null;
 
-  if (!ctx.session.token) return { hasShop: false };
+  if (!ctx.session.token) return { hasShop: false, role };
 
   try {
     const shops = await shopApi.getMyShop(ctx.session.token);
     if (shops && shops.length > 0) {
       const shop = shops[0];
+      // For buyers, we still need to know if they have a shop (for "Create Shop" button)
+      // but we don't show subscription options
+      if (role === 'buyer') {
+        return { hasShop: true, role };
+      }
       return {
         hasShop: true,
         isTrial: shop.is_trial || false,
         tier: shop.tier || 'pro',
         trialEndsAt: shop.trial_ends_at,
+        role,
       };
     }
   } catch (error) {
     logger.debug('No shop found for settings:', error.message);
   }
-  return { hasShop: false };
+  return { hasShop: false, role };
 }
 
 /**

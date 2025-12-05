@@ -12,7 +12,14 @@ import { subscriptionCreationLimiter, strictPaymentLimiter } from '../middleware
 const router = express.Router();
 
 /**
- * All subscription routes require authentication
+ * GET /api/subscriptions/pricing
+ * Get subscription pricing information (free vs pro)
+ * @access Public - No authentication required
+ */
+router.get('/pricing', subscriptionController.getPricing);
+
+/**
+ * All OTHER subscription routes require authentication
  */
 router.use(verifyToken);
 
@@ -89,12 +96,6 @@ router.get('/status/:shopId', requireShopOwner, subscriptionController.getStatus
  * @security Requires shop ownership
  */
 router.get('/history/:shopId', requireShopOwner, subscriptionController.getHistory);
-
-/**
- * GET /api/subscriptions/pricing
- * Get subscription pricing information (free vs pro)
- */
-router.get('/pricing', subscriptionController.getPricing);
 
 /**
  * POST /api/subscriptions/:id/payment/generate

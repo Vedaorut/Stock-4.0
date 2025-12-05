@@ -3,13 +3,20 @@ import { t } from '../i18n/index.js';
 
 /**
  * Settings menu keyboard
- * @param {Object} options - { hasShop, isTrial, tier }
+ * @param {Object} options - { hasShop, isTrial, tier, role }
  * @param {string} lang - Language code
  */
 export const settingsMenu = (options = {}, lang = 'ru') => {
   const buttons = [
     [Markup.button.callback(t('settings.language', {}, lang), 'settings:language')],
   ];
+
+  // Show "Create Shop" for buyers who don't have a shop yet
+  if (!options.hasShop && options.role === 'buyer') {
+    buttons.push([
+      Markup.button.callback(t('buttons.createShop', {}, lang), 'seller:create_shop'),
+    ]);
+  }
 
   // Show subscription renewal for shop owners not on trial
   if (options.hasShop && !options.isTrial) {

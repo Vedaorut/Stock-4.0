@@ -100,10 +100,11 @@ export const followCatalogMenu = (followId, lang = 'ru') =>
   ]);
 
 // Seller menu (no shop - need registration) - minimalist
+// Use 'buyer:main' instead of 'main_menu' to avoid loop (main_menu → seller role → no shop → main_menu)
 export const sellerMenuNoShop = (lang = 'ru') =>
   Markup.inlineKeyboard([
     [Markup.button.callback(t('buttons.createShop', {}, lang), 'seller:create_shop')],
-    [Markup.button.callback(t('buttons.mainMenu', {}, lang), 'main_menu')],
+    [Markup.button.callback(t('buttons.mainMenu', {}, lang), 'buyer:main')],
   ]);
 
 // Subscription status menu

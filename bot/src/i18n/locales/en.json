@@ -7,8 +7,8 @@
     "myOrders": "My Orders",
     "switchRole": "Switch Role",
     "createShop": "Create Shop",
-    "buyerRole": "I'm Buying",
-    "sellerRole": "I'm Selling",
+    "buyerRole": "I'm a Buyer",
+    "sellerRole": "I'm a Seller",
     "workspace": "Workspace",
     "subscribe": "Subscribe",
     "subscribed": "Subscribed",
@@ -111,7 +111,7 @@
     "searchContext": "Shop Search\n\nEnter the shop ID or name.\n\nExamples:\n12345 (Shop ID)\nShopName (name)\n\nAfter searching, you can open the catalog and add items to cart.",
     "ordersContext": "My Orders\n\nHere are all your orders:\nAwaiting shipment\nShipped (with tracking)\nDelivered\n\nClick on an order for details.",
     "cartContext": "Cart\n\nHere are the items you added from shop catalogs.\n\nTo checkout, click \"Place Order\" - the system will generate a crypto payment address.",
-    "panel": "Buyer Dashboard\n\nEverything works via the app (Menu button):\n• Search products across all subscribed shops\n• Convenient cart and checkout\n• Order history and delivery tracking\n\nTap Open App to start shopping!",
+    "panel": "Welcome!\n\nOpen the app to search products, place orders and track your purchases.",
     "noSubscriptions": "No subscriptions. Click \"Find Shop\" to add your first.",
     "listSubscriptionsTitle": "My Subscriptions ({count}).",
     "ordersTitle": "Orders ({count}).",
@@ -138,7 +138,7 @@
   },
   "seller": {
     "panel": "Seller Panel. Available sections below.",
-    "shopPanel": "Shop \"{shop}\". Available sections below.",
+    "shopPanel": "Welcome to {shop}!",
     "noShop": "Create a shop to access the seller panel.",
     "noWorkers": "Workers of shop {shop}. No one connected yet.",
     "workersListTitle": "Workers of shop {shop}.",
@@ -498,8 +498,8 @@
   },
   "warnings": {
     "noWallets": "No wallets configured - buyers won't be able to pay for products.",
-    "noWalletsCritical": "Set up wallets or customers won't be able to pay!",
-    "noProducts": "No products in shop yet - add products to start selling."
+    "noWalletsCritical": "⚠️ Set up wallets or customers won't be able to pay!",
+    "noProducts": "📦 No products in shop yet - add products to start selling."
   },
   "inviteLink": {
     "title": "Invite Link",
@@ -516,7 +516,7 @@
     "step1Title": "Invite Link",
     "step1Text": "Send this link to buyers:",
     "step2Title": "Add Products",
-    "step2Text": "Open shop or write in chat:\n\"Add 5 T-shirts for $15 each and 3 Caps for $10 each\"",
+    "step2Text": "Open shop or write in chat:\n• \"Add 5 T-shirts for $15\"\n• \"Delete product Cap\"\n• \"Change price T-shirt to $20\"\n• \"Set 10 Sneakers in stock\"",
     "step3Text": "Shop is ready.",
     "buttonNext": "Next",
     "buttonSkip": "Skip",
@@ -528,7 +528,7 @@
     "linkTitle": "Your store link",
     "linkText": "Customer clicks → your store opens → auto-subscribe.\nShare in your channel and with clients.",
     "productsTitle": "Adding products",
-    "productsText": "Two ways:\n\nAI assistant — type in chat:\n\"Add 5 T-shirts for $15 each and 3 Caps for $10 each\"\n\nApp — open store and add manually.",
+    "productsText": "Two ways:\n\nAI assistant — type in chat:\n• \"Add 5 T-shirts for $15\"\n• \"Delete product Cap\"\n• \"Change price T-shirt to $20\"\n• \"Set 10 Sneakers in stock\"\n\nApp — open store and add manually.",
     "walletsTitle": "Set up payouts",
     "walletsText": "Send wallet addresses — each on a new line.\nBTC, ETH, LTC, USDT — we'll detect automatically.\n\n💡 You can add or change wallets anytime via tools or the app.",
     "followingTitle": "Tool: Following",
@@ -541,7 +541,7 @@
     "step1Title": "Your Link",
     "step1Text": "Send to buyers:",
     "step2Title": "Add Products",
-    "step2Text": "Open shop or write in chat:\n\"Add 5 T-shirts for $15 each and 3 Caps for $10 each\"",
+    "step2Text": "Open shop or write in chat:\n• \"Add 5 T-shirts for $15\"\n• \"Delete product Cap\"\n• \"Change price T-shirt to $20\"\n• \"Set 10 Sneakers in stock\"",
     "step3Title": "Setup Payments",
     "step3Text": "Add wallets to receive payments.",
     "step4Title": "Follow Shops",
@@ -554,7 +554,10 @@
     "buttonAddWallet": "Add Wallet",
     "shopCreated": "Shop created.",
     "preparing": "Preparing...",
-    "shopReady": "Shop is ready."
+    "shopReady": "Shop is ready.",
+    "walletsAdded": "Wallets saved: {wallets}",
+    "invalidWallets": "Not recognized: {addresses}",
+    "walletSaveError": "Failed to save wallets"
   },
   "chooseTier": {
     "title": "Choose your plan",

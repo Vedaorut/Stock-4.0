@@ -4,7 +4,6 @@ import Header from '../components/Layout/Header';
 import { useTelegram } from '../hooks/useTelegram';
 import { useTranslation } from '../i18n/useTranslation';
 import { useStore } from '../store/useStore';
-import { useApi } from '../hooks/useApi';
 import InteractiveListItem from '../components/common/InteractiveListItem';
 
 // Lazy load modals - only load when user opens them
@@ -218,21 +217,6 @@ const getSettingsSections = (t, lang, viewMode) => {
           ),
           value: languageNames[lang] || 'Russian',
         },
-        {
-          id: 'switch-mode',
-          label: viewMode === 'seller' ? t('settings.items.switchToBuyer') : t('settings.items.switchToSeller'),
-          description: viewMode === 'seller' ? t('settings.items.switchToBuyerDesc') : t('settings.items.switchToSellerDesc'),
-          icon: (
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
-              />
-            </svg>
-          ),
-        },
       ],
     },
   ];
@@ -251,11 +235,9 @@ const getSettingsSections = (t, lang, viewMode) => {
 };
 
 export default function Settings() {
-  const { user, triggerHaptic, alert, showConfirm } = useTelegram();
+  const { user, triggerHaptic } = useTelegram();
   const { t, lang } = useTranslation();
   const viewMode = useStore((state) => state.viewMode);
-  const setViewMode = useStore((state) => state.setViewMode);
-  const { patch } = useApi();
   const [showWallets, setShowWallets] = useState(false);
   const [showLanguage, setShowLanguage] = useState(false);
   const [showProducts, setShowProducts] = useState(false);
@@ -309,37 +291,8 @@ export default function Settings() {
       case 'shop-orders':
         setShowShopOrders(true);
         break;
-      case 'switch-mode':
-        handleSwitchMode();
-        break;
       default:
         break;
-    }
-  };
-
-  const handleSwitchMode = async () => {
-    const newMode = viewMode === 'seller' ? 'buyer' : 'seller';
-    const message = newMode === 'seller'
-      ? t('settings.switchMode.sellerMessage')
-      : t('settings.switchMode.buyerMessage');
-
-    const confirmed = await showConfirm(message);
-
-    if (confirmed) {
-      try {
-        // Optimistic update
-        setViewMode(newMode);
-
-        // API update (PATCH not PUT)
-        await patch('/auth/role', { role: newMode });
-
-        triggerHaptic('success');
-      } catch (error) {
-        // Revert on error
-        setViewMode(viewMode);
-        console.error('Failed to switch mode:', error);
-        alert(t('settings.switchMode.error'));
-      }
     }
   };
 

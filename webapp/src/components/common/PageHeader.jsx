@@ -25,38 +25,8 @@ export default function PageHeader({ title, onBack, action, variant = 'back' }) 
       }}
     >
       <div className="flex items-center justify-between px-4" style={{ height: '56px' }}>
-        {/* Back/Close Button (only if onBack is provided) */}
-        {onBack ? (
-          <motion.button
-            onClick={handleBack}
-            className="flex items-center justify-center text-orange-primary"
-            style={{
-              width: '40px',
-              height: '40px',
-            }}
-            whileTap={{ scale: 0.9 }}
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              {variant === 'close' ? (
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              ) : (
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M15 19l-7-7 7-7"
-                />
-              )}
-            </svg>
-          </motion.button>
-        ) : (
-          <div style={{ width: '40px', height: '40px' }} />
-        )}
+        {/* Spacer for symmetry (Back button is now native-only) */}
+        <div style={{ width: '40px', height: '40px' }} />
 
         {/* Title */}
         <h1

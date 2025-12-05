@@ -5,7 +5,7 @@ import { asyncHandler } from '../../../middleware/errorHandler.js';
 import { NotFoundError, UnauthorizedError, ValidationError, ConflictError, PaymentRequiredError } from '../../../utils/errors.js';
 import { queueProductSync } from '../../../jobs/syncQueue.js';
 import logger from '../../../utils/logger.js';
-import { FREE_TIER_LIMIT, formatFollowResponse } from '../helpers.js';
+import { PRO_TIER_FOLLOW_LIMIT, formatFollowResponse } from '../helpers.js';
 
 /**
  * Create new follow relationship
@@ -106,9 +106,9 @@ export const createFollow = asyncHandler(async (req, res) => {
           [followerId]
         );
 
-        if (activeRows.rowCount >= FREE_TIER_LIMIT) {
+        if (activeRows.rowCount >= PRO_TIER_FOLLOW_LIMIT) {
           await client.query('ROLLBACK');
-          const limitError = new PaymentRequiredError('FREE tier limit reached');
+          const limitError = new PaymentRequiredError('PRO tier limit reached');
           limitError.meta = { count: activeRows.rowCount };
           throw limitError;
         }
@@ -148,14 +148,14 @@ export const createFollow = asyncHandler(async (req, res) => {
       }
 
       if (txError instanceof PaymentRequiredError) {
-        const count = txError.meta?.count ?? FREE_TIER_LIMIT;
+        const count = txError.meta?.count ?? PRO_TIER_FOLLOW_LIMIT;
         return res.status(402).json({
           success: false,
           error: txError.message,
           data: {
-            limit: FREE_TIER_LIMIT,
+            limit: PRO_TIER_FOLLOW_LIMIT,
             count,
-            remaining: Math.max(0, FREE_TIER_LIMIT - count),
+            remaining: Math.max(0, PRO_TIER_FOLLOW_LIMIT - count),
             reached: true,
             canFollow: false,
           },

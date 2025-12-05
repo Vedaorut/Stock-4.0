@@ -124,7 +124,7 @@ export default function CartSheet() {
         <LazyMotion features={loadDomMax}>
           {/* Backdrop */}
           <motion.div
-            className="fixed inset-0 z-50"
+            className="fixed inset-0 z-[1000]"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -135,7 +135,7 @@ export default function CartSheet() {
 
           {/* Sheet */}
           <motion.div
-            className="fixed inset-x-0 bottom-0 z-50 flex flex-col"
+            className="fixed inset-x-0 bottom-0 z-[1000] flex flex-col"
             style={{ maxHeight: getSheetMaxHeight(platform, 24) }}
             initial={{ y: '100%' }}
             animate={{ y: 0, opacity: 1 }}

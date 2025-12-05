@@ -133,7 +133,7 @@ const createShop = async (ctx, shopName, lang = ctx.lang || ctx.session?.languag
       });
       // Show user-friendly message and redirect to chooseTier
       await cleanReply(ctx, t('createShop.selectTierFirst', {}, lang));
-      await ctx.scene.leave();
+      // NOTE: Do NOT call ctx.scene.leave() before enter() - Telegraf does it automatically
       await ctx.scene.enter('chooseTier');
       return;
     }
@@ -225,15 +225,24 @@ const createShop = async (ctx, shopName, lang = ctx.lang || ctx.session?.languag
     }
     const inviteLink = `https://t.me/${botUsername}?start=shop_${shop.id}`;
 
-    // Leave createShop and enter onboarding scene
-    await ctx.scene.leave();
-
     // Enter shopOnboarding with shop data
-    return await ctx.scene.enter('shopOnboarding', {
+    // FIX: Store state in session because ctx.scene.state is unreliable between WizardScenes
+    // Telegraf's scene.enter() state parameter doesn't reliably work for WizardScene transitions
+    logger.info('createShop transitioning to shopOnboarding', {
+      userId: ctx.from.id,
+      shopId: shop.id,
+      shopName: shop.name,
+      inviteLink: inviteLink.substring(0, 50),
+    });
+
+    // Store in session for reliable transfer
+    ctx.session.__onboardingState = {
       shopId: shop.id,
       shopName: shop.name,
       inviteLink: inviteLink,
-    });
+    };
+
+    return await ctx.scene.enter('shopOnboarding');
   } catch (error) {
     logger.error('Error creating shop:', error);
 
@@ -303,11 +312,19 @@ const createShopScene = new Scenes.WizardScene(
 
 // Handle scene leave
 createShopScene.leave(async (ctx) => {
+  logger.info('createShop leave handler started', {
+    userId: ctx.from?.id,
+    userMsgIds: ctx.wizard?.state?.userMessageIds,
+    hasWizard: !!ctx.wizard,
+    sceneState: ctx.scene?.state ? Object.keys(ctx.scene.state) : [],
+  });
+
   // Delete user messages (shop name input)
   const userMsgIds = ctx.wizard?.state?.userMessageIds || [];
   for (const msgId of userMsgIds) {
     try {
       await ctx.deleteMessage(msgId);
+      logger.debug(`Deleted user message ${msgId} in createShop leave`);
     } catch (error) {
       // Message may already be deleted or too old
       logger.debug(`Could not delete user message ${msgId}:`, error.message);
@@ -316,14 +333,11 @@ createShopScene.leave(async (ctx) => {
 
   // P1-2 FIX: Clear wizard state to prevent memory leak
   if (ctx.wizard) {
-    delete ctx.wizard.state;
+    ctx.wizard.state = {};
   }
-  ctx.scene.state = {};
-
-  // Clear __scenes from Redis session to prevent stuck state
-  if (ctx.session && ctx.session.__scenes) {
-    delete ctx.session.__scenes;
-  }
+  // NOTE: Do NOT clear ctx.scene.state or ctx.session.__scenes here!
+  // This breaks scene transitions (e.g., createShop -> shopOnboarding)
+  // Telegraf manages __scenes internally during enter/leave
 
   logger.info(`User ${ctx.from?.id} left createShop scene`);
 });

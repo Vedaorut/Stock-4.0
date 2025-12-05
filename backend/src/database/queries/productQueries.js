@@ -261,9 +261,19 @@ export const productQueries = {
 
       // SELECT FOR UPDATE to lock rows before update (only when using transaction)
       if (client) {
+        // Build separate WHERE clause for SELECT with correct parameter indices
+        let selectWhereClause = 'shop_id = $1 AND is_active = true';
+        const selectParams = [shopId];
+
+        if (excludedProductIds.length > 0) {
+          const placeholders = excludedProductIds.map((_, i) => `$${2 + i}`).join(', ');
+          selectWhereClause += ` AND id NOT IN (${placeholders})`;
+          selectParams.push(...excludedProductIds);
+        }
+
         await queryFn(
-          `SELECT id FROM products WHERE ${whereClause} FOR UPDATE`,
-          params.slice(2) // Skip percentage and expiresAt params
+          `SELECT id FROM products WHERE ${selectWhereClause} FOR UPDATE`,
+          selectParams
         );
       }
 

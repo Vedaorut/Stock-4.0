@@ -20,8 +20,8 @@
     "authenticationFailed": "Authentication failed. Try /start again."
   },
   "buttons": {
-    "buyerRole": "Buyer",
-    "sellerRole": "Seller",
+    "buyerRole": "I'm a Buyer",
+    "sellerRole": "I'm a Seller",
     "workspace": "Worker",
     "back": "Back",
     "refresh": "Refresh",

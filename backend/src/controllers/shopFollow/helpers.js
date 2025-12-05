@@ -15,8 +15,8 @@ export const getFollowLimit = (tier) => {
   return limits ? limits.follows : TIER_LIMITS.pro.follows;
 };
 
-// Legacy constant for backward compatibility
-export const FREE_TIER_LIMIT = TIER_LIMITS.pro.follows;
+// PRO tier follow limit constant
+export const PRO_TIER_FOLLOW_LIMIT = TIER_LIMITS.pro.follows;
 
 /**
  * Normalize numeric values from PostgreSQL
