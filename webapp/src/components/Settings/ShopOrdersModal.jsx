@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import PageHeader from '../common/PageHeader';
 import { useApi } from '../../hooks/useApi';
@@ -230,24 +230,27 @@ function OrderRow({ order, isExpanded, onToggle, onStatusUpdate, isUpdating, t }
 
 // Main modal component
 export default function ShopOrdersModal({ isOpen, onClose }) {
-  const { get, put } = useApi();
+  const api = useApi();
   const { triggerHaptic, alert } = useTelegram();
   const { t } = useTranslation();
   const [orders, setOrders] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
   const [updatingOrderId, setUpdatingOrderId] = useState(null);
+  const [retryTrigger, setRetryTrigger] = useState(0);
+
+  // Stable ref for API to avoid useEffect re-runs
+  const apiRef = useRef(api);
+  useEffect(() => { apiRef.current = api; }, [api]);
 
   // Get shop context from store
   const isWorkerMode = useStore((state) => state.isWorkerMode);
-  const workspaceShopId = useStore((state) => state.workspaceShopId);
   const workspaceShop = useStore((state) => state.workspaceShop);
   const myShop = useStore((state) => state.myShop);
 
   // Determine which shop to use
   const effectiveShop = isWorkerMode ? workspaceShop : myShop;
-  const effectiveShopId = isWorkerMode ? workspaceShopId : myShop?.id;
 
   const handleClose = useCallback(() => {
     onClose();
@@ -255,61 +258,93 @@ export default function ShopOrdersModal({ isOpen, onClose }) {
 
   useBackButton(isOpen ? handleClose : null);
 
-  const loadOrders = useCallback(async (signal, options = {}) => {
-    const { showLoading = false } = options;
-
-    try {
-      if (!effectiveShopId) {
-        setError(t('shop.notSelected'));
-        return { status: 'error' };
-      }
-
-      const { data, error: apiError } = await get(`/shops/${effectiveShopId}/orders`, { signal });
-      if (signal?.aborted) return { status: 'aborted' };
-
-      if (apiError) {
-        setError(apiError);
-        console.error('[ShopOrdersModal] Failed to load orders:', apiError);
-        return { status: 'error' };
-      }
-
-      const ordersList = Array.isArray(data?.data) ? data.data : [];
-      setOrders(ordersList);
-      setError(null);
-      return { status: 'success' };
-    } catch (err) {
-      if (signal?.aborted) return { status: 'aborted' };
-      console.error('[ShopOrdersModal] Unexpected error:', err);
-      setError(t('common.unexpectedError'));
-      return { status: 'error' };
-    } finally {
-      if (showLoading && !signal?.aborted) {
-        setLoading(false);
-      }
-    }
-  }, [get, effectiveShopId, t]);
-
+  // Load data - stable effect with minimal deps
   useEffect(() => {
     if (!isOpen) return;
-    setLoading(true);
-    setError(null);
-    setExpandedId(null);
 
+    let cancelled = false;
     const controller = new AbortController();
 
-    // Initial load with loading indicator
-    loadOrders(controller.signal, { showLoading: true });
+    const loadData = async (showSkeleton = true) => {
+      if (showSkeleton) {
+        setLoading(true);
+        setError(null);
+        setExpandedId(null);
+      }
 
-    // Auto-refresh every 30s (silent, no loading indicator)
-    const interval = setInterval(() => {
-      loadOrders(controller.signal, { showLoading: false });
+      try {
+        const storeState = useStore.getState();
+        const currentIsWorkerMode = storeState.isWorkerMode;
+        let shopId = currentIsWorkerMode ? storeState.workspaceShopId : storeState.myShop?.id;
+
+        // Fetch shop if needed
+        if (!shopId && !currentIsWorkerMode) {
+          const { data, error: apiError } = await apiRef.current.get('/shops/my', { signal: controller.signal });
+          if (cancelled) return;
+
+          if (apiError) {
+            setError(apiError);
+            setLoading(false);
+            return;
+          }
+
+          const shops = Array.isArray(data?.data) ? data.data : [];
+          if (shops.length > 0) {
+            useStore.getState().setMyShops(shops);
+            shopId = shops[0].id;
+          } else {
+            setError('No shop found');
+            setLoading(false);
+            return;
+          }
+        }
+
+        if (!shopId) {
+          setError('No shop selected');
+          setLoading(false);
+          return;
+        }
+
+        // Fetch orders
+        const { data: ordersData, error: ordersError } = await apiRef.current.get(`/shops/${shopId}/orders`, { signal: controller.signal });
+        if (cancelled) return;
+
+        if (ordersError) {
+          setError(ordersError);
+        } else {
+          setOrders(Array.isArray(ordersData?.data) ? ordersData.data : []);
+          setError(null);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError('Unexpected error');
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadData(true);
+
+    // Silent refresh every 30s
+    const intervalId = setInterval(() => {
+      if (!cancelled) loadData(false);
     }, 30000);
 
     return () => {
+      cancelled = true;
       controller.abort();
-      clearInterval(interval);
+      clearInterval(intervalId);
     };
-  }, [isOpen, loadOrders]);
+  }, [isOpen, retryTrigger]); // Only these 2 deps!
+
+  // Retry handler
+  const handleRetry = useCallback(() => {
+    triggerHaptic('light');
+    setRetryTrigger((prev) => prev + 1);
+  }, [triggerHaptic]);
 
   const handleStatusUpdate = async (orderId, newStatus) => {
     setUpdatingOrderId(orderId);
@@ -445,12 +480,7 @@ export default function ShopOrdersModal({ isOpen, onClose }) {
                   </div>
                   <p className="text-gray-400 text-sm mb-3">{error}</p>
                   <motion.button
-                    onClick={() => {
-                      triggerHaptic('light');
-                      setLoading(true);
-                      setError(null);
-                      loadOrders(null, { showLoading: true });
-                    }}
+                    onClick={handleRetry}
                     className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-white/10 hover:bg-white/15 transition-colors"
                     whileTap={{ scale: 0.95 }}
                   >

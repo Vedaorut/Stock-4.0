@@ -438,3 +438,13 @@ html.platform-android .gradient-mesh {
   border-radius: 9999px;
   background: #1a1a1a;
 }
+
+/* Product highlight glow animation for search */
+@keyframes highlight-glow {
+  0%, 100% {
+    box-shadow: 0 0 60px rgba(255, 255, 255, 0.8), 0 0 100px rgba(255, 255, 255, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 80px rgba(255, 255, 255, 1), 0 0 120px rgba(255, 255, 255, 0.6), 0 0 150px rgba(255, 255, 255, 0.3);
+  }
+}

@@ -224,7 +224,7 @@ const ProductCard = memo(function ProductCard({ product, onPreorder: _onPreorder
       ref={cardRef}
       className={`relative min-h-[200px] rounded-3xl overflow-hidden group ${
         hasDiscount ? 'ring-2 ring-red-500/50 shadow-[0_0_20px_rgba(255,71,87,0.25)]' : ''
-      } ${isHighlighted ? 'ring-2 ring-orange-500 animate-pulse shadow-[0_0_30px_rgba(255,107,0,0.4)]' : ''}`}
+      } ${isHighlighted ? 'ring-4 ring-white z-10 shadow-[0_0_60px_rgba(255,255,255,0.8),0_0_100px_rgba(255,255,255,0.4)] animate-[highlight-glow_1s_ease-in-out_infinite]' : ''}`}
       style={backgroundStyle}
     >
       {!android && (
