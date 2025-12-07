@@ -8,6 +8,7 @@ import { usePlatform } from './hooks/usePlatform';
 import { initI18n, getLanguage } from './i18n';
 import TabBarPortal from './components/TabBarPortal';
 import CartSheet from './components/Cart/CartSheet';
+import CartButton from './components/Cart/CartButton';
 import PaymentFlowManager from './components/Payment/PaymentFlowManager';
 import { ToastContainer } from './components/common/Toast';
 import OfflineBanner from './components/common/OfflineBanner';
@@ -41,6 +42,7 @@ function App() {
   const token = useStore((state) => state.token);
   const hasFollows = useStore((state) => state.hasFollows);
   const isI18nReady = useStore((state) => state.isI18nReady);
+  const setCartOpen = useStore((state) => state.setCartOpen);
   const { user, isReady, isValidating, error } = useTelegram();
   const { isConnected } = useWebSocket();
   const platform = usePlatform();
@@ -274,6 +276,10 @@ function App() {
 
         <div className="relative z-20">
           <TabBarPortal />
+          {/* CartButton shown globally but only visible on catalog tab */}
+          {activeTab === 'catalog' && !followDetailId && (
+            <CartButton onClick={() => setCartOpen(true)} />
+          )}
           <CartSheet />
           <PaymentFlowManager />
           <ToastContainer toasts={toasts} removeToast={removeToast} />

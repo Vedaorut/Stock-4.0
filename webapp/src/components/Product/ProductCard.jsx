@@ -288,11 +288,12 @@ const ProductCard = memo(function ProductCard({ product, onPreorder: _onPreorder
       </div>
 
       <div className="absolute top-3 right-3 z-10 flex flex-col gap-2 items-end">
-        {isTimerDiscount ? (
+        {isTimerDiscount && (
           <div className="px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md border border-red-500/30 shadow-lg flex items-center justify-center">
             <CountdownTimer expiresAt={product.discount_expires_at} />
           </div>
-        ) : isPreorder ? (
+        )}
+        {isPreorder ? (
           <PreorderIcon />
         ) : (
           stock > 0 && <StockBadge stock={stock} lowStock={lowStock} pcsLabel={t('shopOrders.labels.pcs')} />

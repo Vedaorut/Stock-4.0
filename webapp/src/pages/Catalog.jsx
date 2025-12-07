@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo, useCallback, useRef, memo } from 'react';
 import { m as motion, AnimatePresence } from 'framer-motion'; // Used in JSX
 import { useShallow } from 'zustand/react/shallow';
 import ProductGrid from '../components/Product/ProductGrid';
-import CartButton from '../components/Cart/CartButton';
 import Header from '../components/Layout/Header';
 import { useStore } from '../store/useStore';
 import { useTelegram } from '../hooks/useTelegram';
@@ -94,7 +93,6 @@ export default function Catalog() {
     currentShop,
     setCurrentShop,
     setProducts,
-    setCartOpen,
     token,
     myShops,
     setMyShops,
@@ -105,7 +103,6 @@ export default function Catalog() {
       currentShop: state.currentShop,
       setCurrentShop: state.setCurrentShop,
       setProducts: state.setProducts,
-      setCartOpen: state.setCartOpen,
       token: state.token,
       myShops: state.myShops,
       setMyShops: state.setMyShops,
@@ -759,8 +756,6 @@ export default function Catalog() {
           />
         )}
       </div>
-
-      <CartButton onClick={() => setCartOpen(true)} />
     </div>
   );
 }
