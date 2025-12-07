@@ -36,19 +36,31 @@ function createFakeCallbackContext(ctx) {
  */
 /**
  * Parse deep link payload from /start command
- * Supports: shop_123 (invite link to shop)
+ * Supports:
+ * - Legacy: shop_123 (invite link to shop by ID)
+ * - New: CoolGadgets_x7k (invite link to shop by invite code)
  */
 const parseDeepLink = (text) => {
   if (!text) return null;
 
   const args = text.split(' ');
-  const payload = args[1]; // "shop_123" or undefined
+  const payload = args[1]; // "shop_123" or "CoolGadgets_x7k" or undefined
 
-  if (payload && payload.startsWith('shop_')) {
-    const shopId = parseInt(payload.replace('shop_', ''), 10);
+  if (!payload) return null;
+
+  // Legacy format: shop_123 (starts with "shop_" followed by digits only)
+  const legacyMatch = payload.match(/^shop_(\d+)$/);
+  if (legacyMatch) {
+    const shopId = parseInt(legacyMatch[1], 10);
     if (!isNaN(shopId) && shopId > 0) {
-      return { type: 'shop_invite', shopId };
+      return { type: 'shop_invite', shopId, inviteCode: null };
     }
+  }
+
+  // New format: any valid invite code (alphanumeric with underscore/hyphen, 3-50 chars)
+  const inviteCodePattern = /^[a-zA-Z0-9_-]{3,50}$/;
+  if (inviteCodePattern.test(payload)) {
+    return { type: 'shop_invite', shopId: null, inviteCode: payload };
   }
 
   return null;
@@ -56,30 +68,61 @@ const parseDeepLink = (text) => {
 
 /**
  * Handle shop invite deep link - subscribe user to shop
+ * Supports both legacy (shopId) and new (inviteCode) formats
  * After successful subscription, redirect to buyer menu
  */
-const handleShopInvite = async (ctx, shopId) => {
+const handleShopInvite = async (ctx, deepLink) => {
   const lang = ctx.lang || ctx.session?.language || 'ru';
+  const { shopId: legacyShopId, inviteCode } = deepLink;
 
   try {
+    // Resolve shop: either by ID (legacy) or by invite code (new)
+    let shop = null;
+    let shopId = legacyShopId;
+
+    if (inviteCode) {
+      // New format: lookup by invite code first
+      try {
+        shop = await shopApi.getShopByInviteCode(inviteCode, ctx.session.token);
+        if (shop?.id) {
+          shopId = shop.id;
+        }
+      } catch (lookupError) {
+        if (lookupError.response?.status === 404) {
+          logger.warn(`Shop not found for invite code: ${inviteCode}`);
+          await ctx.reply(t('inviteLink.shopNotFound', {}, lang));
+          return false;
+        }
+        throw lookupError;
+      }
+    }
+
+    if (!shopId) {
+      logger.warn(`Could not resolve shop from deep link`, { inviteCode, legacyShopId });
+      await ctx.reply(t('inviteLink.shopNotFound', {}, lang));
+      return false;
+    }
+
     // Subscribe to shop via API
     await api.post(`/shops/${shopId}/subscribe`, {}, {
       headers: { Authorization: `Bearer ${ctx.session.token}` },
     });
 
-    // Try to get shop name for better UX
-    let shopName = `#${shopId}`;
-    try {
-      const shop = await shopApi.getShop(shopId, ctx.session.token);
-      if (shop?.name) {
-        shopName = shop.name;
+    // Try to get shop name for better UX (if not already fetched)
+    let shopName = shop?.name || `#${shopId}`;
+    if (!shop) {
+      try {
+        shop = await shopApi.getShop(shopId, ctx.session.token);
+        if (shop?.name) {
+          shopName = shop.name;
+        }
+      } catch {
+        // Use ID if shop name fetch fails
       }
-    } catch {
-      // Use ID if shop name fetch fails
     }
 
     await ctx.reply(t('inviteLink.subscribed', { shopName }, lang));
-    logger.info(`User ${ctx.from.id} subscribed to shop ${shopId} via invite link`);
+    logger.info(`User ${ctx.from.id} subscribed to shop ${shopId} via invite link`, { inviteCode });
 
     // Set buyer role and redirect to buyer menu
     ctx.session.role = 'buyer';
@@ -96,17 +139,21 @@ const handleShopInvite = async (ctx, shopId) => {
   } catch (error) {
     // Handle subscription errors with user feedback
     const errorMessage = error.response?.data?.error || error.message || '';
+    const displayId = inviteCode || `#${legacyShopId}`;
 
     if (error.response?.status === 409) {
       // Already subscribed - show friendly message and redirect to buyer
-      logger.debug(`User ${ctx.from.id} already subscribed to shop ${shopId}`);
+      logger.debug(`User ${ctx.from.id} already subscribed to shop`, { inviteCode, legacyShopId });
+      let shopName = displayId;
       try {
-        const shop = await shopApi.getShop(shopId, ctx.session.token);
-        const shopName = shop?.name || `#${shopId}`;
-        await ctx.reply(t('inviteLink.alreadySubscribed', { shopName }, lang));
+        const shop = legacyShopId
+          ? await shopApi.getShop(legacyShopId, ctx.session.token)
+          : await shopApi.getShopByInviteCode(inviteCode, ctx.session.token);
+        shopName = shop?.name || displayId;
       } catch {
-        await ctx.reply(t('inviteLink.alreadySubscribed', { shopName: `#${shopId}` }, lang));
+        // Use display ID if shop name fetch fails
       }
+      await ctx.reply(t('inviteLink.alreadySubscribed', { shopName }, lang));
 
       // Still redirect to buyer menu
       ctx.session.role = 'buyer';
@@ -120,12 +167,25 @@ const handleShopInvite = async (ctx, shopId) => {
       return true;
     } else if (error.response?.status === 400 && errorMessage.includes('own shop')) {
       // Cannot subscribe to own shop - redirect to seller menu
-      logger.info(`User ${ctx.from.id} tried to subscribe to their own shop ${shopId}`);
+      logger.info(`User ${ctx.from.id} tried to subscribe to their own shop`, { inviteCode, legacyShopId });
       await ctx.reply(t('inviteLink.ownShop', {}, lang));
+
+      // Need to get shopId if we only have inviteCode
+      let resolvedShopId = legacyShopId;
+      if (!resolvedShopId && inviteCode) {
+        try {
+          const shop = await shopApi.getShopByInviteCode(inviteCode, ctx.session.token);
+          resolvedShopId = shop?.id;
+        } catch {
+          // Fallback
+        }
+      }
 
       // Redirect to seller menu since it's their shop
       ctx.session.role = 'seller';
-      ctx.session.shopId = shopId;
+      if (resolvedShopId) {
+        ctx.session.shopId = resolvedShopId;
+      }
       try {
         await authApi.updateRole('seller', ctx.session.token);
       } catch (roleError) {
@@ -135,7 +195,7 @@ const handleShopInvite = async (ctx, shopId) => {
       await handleSellerRole(fakeCtx, { skipRoleUpdate: true });
       return true;
     } else if (error.response?.status === 404) {
-      logger.warn(`Shop ${shopId} not found for invite link`);
+      logger.warn(`Shop not found for invite link`, { inviteCode, legacyShopId });
       await ctx.reply(t('inviteLink.shopNotFound', {}, lang));
     } else {
       logger.warn('Shop subscribe via invite link failed:', error.message);
@@ -193,7 +253,8 @@ export const handleStart = async (ctx) => {
         if (!ctx.session.language) {
           ctx.session.pendingLanguageSelection = true;
         }
-        const handled = await handleShopInvite(ctx, pendingDeepLink.shopId);
+        // Pass entire deepLink object (supports both shopId and inviteCode)
+        const handled = await handleShopInvite(ctx, pendingDeepLink);
         if (handled) {
           // handleShopInvite redirected to buyer menu, stop here
           return;

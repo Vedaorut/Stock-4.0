@@ -454,17 +454,28 @@ const handleInviteLink = async (ctx) => {
     const botUsername = process.env.BOT_USERNAME || 'saveropus_bot';
     const lang = getLangSafe(ctx);
 
+    // Try to get invite_code from shop for prettier link
+    let invitePayload = `shop_${shopId}`; // fallback to legacy format
+    try {
+      const shop = await shopApi.getShop(shopId, ctx.session.token);
+      if (shop?.invite_code) {
+        invitePayload = shop.invite_code;
+      }
+    } catch (error) {
+      logger.debug('Could not fetch shop invite_code, using legacy format:', error.message);
+    }
+
     // Build invite link message with copyable link
     const title = t('inviteLink.title', {}, lang);
     const description = t('inviteLink.description', {}, lang);
     const copyHint = t('inviteLink.copyHint', {}, lang);
-    const link = `https://t.me/${botUsername}?start=shop_${shopId}`;
+    const link = `https://t.me/${botUsername}?start=${invitePayload}`;
 
     const message = `${title}\n\n${description}\n\n${copyHint}\n<code>${link}</code>`;
 
     await ctx.replyWithHTML(message, sellerToolsMenu(ctx.session.isShopOwner ?? false, lang));
 
-    logger.info(`User ${ctx.from.id} viewed invite link for shop ${shopId}`);
+    logger.info(`User ${ctx.from.id} viewed invite link for shop ${shopId}`, { invitePayload });
   } catch (error) {
     logger.error('Error in invite link handler:', error);
     try {

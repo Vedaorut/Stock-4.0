@@ -33,7 +33,7 @@ export const shopQueries = {
     const result = await query(
       `INSERT INTO shops (owner_id, name, description, logo, tier)
        VALUES ($1, $2, $3, $4, $5)
-       RETURNING id, owner_id, name, description, logo, tier, is_active, is_trial, trial_ends_at, subscription_status, next_payment_due, grace_period_until, registration_paid, wallet_btc, wallet_eth, wallet_usdt, wallet_ltc, created_at, updated_at`,
+       RETURNING id, owner_id, name, description, logo, tier, is_active, is_trial, trial_ends_at, subscription_status, next_payment_due, grace_period_until, registration_paid, wallet_btc, wallet_eth, wallet_usdt, wallet_ltc, invite_code, created_at, updated_at`,
       [ownerId, name, description, logo, tier]
     );
     return result.rows[0];
@@ -55,7 +55,7 @@ export const shopQueries = {
   // Active shops only by default, unless includeInactive=true
   findByOwnerId: async (ownerId, { includeInactive = false } = {}) => {
     const baseQuery = [
-      'SELECT id, owner_id, name, description, logo, tier, is_active, is_trial, trial_ends_at, subscription_status, next_payment_due, grace_period_until, registration_paid, wallet_btc, wallet_eth, wallet_usdt, wallet_ltc, created_at, updated_at',
+      'SELECT id, owner_id, name, description, logo, tier, is_active, is_trial, trial_ends_at, subscription_status, next_payment_due, grace_period_until, registration_paid, wallet_btc, wallet_eth, wallet_usdt, wallet_ltc, invite_code, created_at, updated_at',
       'FROM shops',
       'WHERE owner_id = $1',
     ];
@@ -120,7 +120,7 @@ export const shopQueries = {
            channel_url = COALESCE($6, channel_url),
            updated_at = NOW()
        WHERE id = $1
-       RETURNING id, owner_id, name, description, logo, channel_url, tier, is_active, is_trial, trial_ends_at, subscription_status, next_payment_due, grace_period_until, registration_paid, wallet_btc, wallet_eth, wallet_usdt, wallet_ltc, created_at, updated_at`,
+       RETURNING id, owner_id, name, description, logo, channel_url, tier, is_active, is_trial, trial_ends_at, subscription_status, next_payment_due, grace_period_until, registration_paid, wallet_btc, wallet_eth, wallet_usdt, wallet_ltc, invite_code, created_at, updated_at`,
       [id, name, description, logo, isActive, channelUrl]
     );
     return result.rows[0];
@@ -148,6 +148,36 @@ export const shopQueries = {
     return result.rows;
   },
 
+  // Find shop by invite code
+  findByInviteCode: async (inviteCode) => {
+    const result = await query(
+      `SELECT s.*, u.username as seller_username, u.first_name as seller_first_name
+       FROM shops s
+       JOIN users u ON s.owner_id = u.id
+       WHERE s.invite_code = $1`,
+      [inviteCode]
+    );
+    return result.rows[0];
+  },
+
+  // Get all existing invite codes (for collision checking)
+  getAllInviteCodes: async () => {
+    const result = await query('SELECT invite_code FROM shops WHERE invite_code IS NOT NULL');
+    return result.rows.map((row) => row.invite_code);
+  },
+
+  // Update shop invite code
+  updateInviteCode: async (id, inviteCode) => {
+    const result = await query(
+      `UPDATE shops
+       SET invite_code = $2, updated_at = NOW()
+       WHERE id = $1
+       RETURNING id, invite_code`,
+      [id, inviteCode]
+    );
+    return result.rows[0];
+  },
+
   // Update shop wallets
   updateWallets: async (id, walletData) => {
     const allowedFields = ['wallet_btc', 'wallet_eth', 'wallet_usdt', 'wallet_ltc'];
@@ -166,7 +196,7 @@ export const shopQueries = {
     if (setClauses.length === 0) {
       // Nothing to update, return current record for consistency
       const existing = await query(
-        `SELECT id, owner_id, name, description, logo, channel_url, tier, is_active, is_trial, trial_ends_at, subscription_status, next_payment_due, grace_period_until, registration_paid, wallet_btc, wallet_eth, wallet_usdt, wallet_ltc, created_at, updated_at
+        `SELECT id, owner_id, name, description, logo, channel_url, tier, is_active, is_trial, trial_ends_at, subscription_status, next_payment_due, grace_period_until, registration_paid, wallet_btc, wallet_eth, wallet_usdt, wallet_ltc, invite_code, created_at, updated_at
          FROM shops
          WHERE id = $1`,
         [id]
@@ -180,7 +210,7 @@ export const shopQueries = {
       `UPDATE shops
        SET ${setClauses.join(', ')}
        WHERE id = $1
-       RETURNING id, owner_id, name, description, logo, channel_url, tier, is_active, is_trial, trial_ends_at, subscription_status, next_payment_due, grace_period_until, registration_paid, wallet_btc, wallet_eth, wallet_usdt, wallet_ltc, created_at, updated_at`,
+       RETURNING id, owner_id, name, description, logo, channel_url, tier, is_active, is_trial, trial_ends_at, subscription_status, next_payment_due, grace_period_until, registration_paid, wallet_btc, wallet_eth, wallet_usdt, wallet_ltc, invite_code, created_at, updated_at`,
       params
     );
     return result.rows[0];

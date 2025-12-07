@@ -151,6 +151,13 @@ router.get(
  */
 router.get('/search', apiLimiter, optionalAuth, shopController.search);
 
+/**
+ * @route   GET /api/shops/invite/:inviteCode
+ * @desc    Get shop by invite code (for deep links)
+ * @access  Public (auth optional, rate limited)
+ */
+router.get('/invite/:inviteCode', apiLimiter, optionalAuth, shopController.getByInviteCode);
+
 // ============================================
 // Shop Subscriber Routes (Invite Links)
 // ============================================

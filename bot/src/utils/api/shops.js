@@ -45,6 +45,16 @@ export const shopApi = {
     return data.data || data;
   },
 
+  // Get shop by invite code
+  async getShopByInviteCode(inviteCode, token = null) {
+    const reqConfig = {};
+    if (token) {
+      reqConfig.headers = { Authorization: `Bearer ${token}` };
+    }
+    const { data } = await api.get(`/shops/invite/${encodeURIComponent(inviteCode)}`, reqConfig);
+    return data.data || data;
+  },
+
   // Update shop (rename, etc)
   async updateShop(shopId, shopData, token) {
     const { data } = await api.patch(`/shops/${shopId}`, shopData, {

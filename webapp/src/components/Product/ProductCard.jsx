@@ -56,16 +56,34 @@ const PremiumIcon = () => (
 );
 
 const PreorderIcon = () => (
-  <div className="w-9 h-9 rounded-full border border-orange-400/50 bg-orange-500/15 flex items-center justify-center shadow-[0_4px_12px_rgba(255,107,0,0.25)]">
+  <div
+    className="relative w-9 h-9 rounded-xl flex items-center justify-center overflow-hidden"
+    style={{
+      background: 'linear-gradient(135deg, rgba(255, 107, 0, 0.2) 0%, rgba(255, 140, 66, 0.15) 100%)',
+      boxShadow: `
+        0 0 0 1px rgba(255, 107, 0, 0.3),
+        0 4px 16px rgba(255, 107, 0, 0.2),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1)
+      `,
+      backdropFilter: 'blur(8px)',
+    }}
+  >
+    {/* Subtle inner glow */}
+    <div
+      className="absolute inset-0 opacity-50"
+      style={{
+        background: 'radial-gradient(circle at 30% 30%, rgba(255, 140, 66, 0.3) 0%, transparent 60%)',
+      }}
+    />
     <svg
-      className="w-5 h-5 text-orange-300"
+      className="relative w-[18px] h-[18px] text-orange-400"
       fill="none"
       stroke="currentColor"
       viewBox="0 0 24 24"
-      strokeWidth={2.2}
+      strokeWidth={2}
     >
-      <circle cx="12" cy="12" r="9" />
-      <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l2.5 2.5" />
+      <circle cx="12" cy="12" r="9" strokeOpacity="0.8" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 7v5l3 3" />
     </svg>
   </div>
 );
@@ -81,15 +99,40 @@ const SyncedBadge = ({ sourceName, t }) => (
 
 const StockBadge = ({ stock, lowStock, pcsLabel }) => (
   <div
-    className={`flex items-center gap-1 px-2 py-1 rounded-full border ${lowStock ? 'border-orange-400/70 bg-orange-500/12' : 'border-white/12 bg-black/35'
-      } shadow-[0_8px_24px_rgba(12,12,12,0.35)] backdrop-blur`}
+    className="relative flex items-center gap-1.5 px-2.5 py-1 rounded-lg overflow-hidden"
+    style={{
+      background: lowStock
+        ? 'linear-gradient(135deg, rgba(255, 107, 0, 0.18) 0%, rgba(255, 140, 66, 0.12) 100%)'
+        : 'linear-gradient(135deg, rgba(34, 197, 94, 0.12) 0%, rgba(16, 185, 129, 0.08) 100%)',
+      boxShadow: lowStock
+        ? `0 0 0 1px rgba(255, 107, 0, 0.35), 0 4px 12px rgba(255, 107, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.08)`
+        : `0 0 0 1px rgba(34, 197, 94, 0.25), 0 4px 12px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.06)`,
+      backdropFilter: 'blur(8px)',
+    }}
   >
-    <span
-      className={`w-1 h-1 rounded-full ${lowStock ? 'bg-orange-400 animate-pulse' : 'bg-emerald-400'}`}
+    {/* Subtle highlight */}
+    <div
+      className="absolute inset-0 opacity-40"
+      style={{
+        background: lowStock
+          ? 'radial-gradient(ellipse at 20% 20%, rgba(255, 140, 66, 0.25) 0%, transparent 50%)'
+          : 'radial-gradient(ellipse at 20% 20%, rgba(34, 197, 94, 0.2) 0%, transparent 50%)',
+      }}
     />
+    {/* Status dot */}
     <span
-      className="text-[10px] font-semibold text-white"
-      style={{ letterSpacing: '0.08em' }}
+      className={`relative w-1.5 h-1.5 rounded-full ${lowStock ? 'bg-orange-400' : 'bg-emerald-400'}`}
+      style={{
+        boxShadow: lowStock
+          ? '0 0 6px rgba(255, 107, 0, 0.6)'
+          : '0 0 6px rgba(34, 197, 94, 0.5)',
+        animation: lowStock ? 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite' : 'none',
+      }}
+    />
+    {/* Stock text */}
+    <span
+      className={`relative text-[10px] font-semibold ${lowStock ? 'text-orange-200' : 'text-emerald-200'}`}
+      style={{ letterSpacing: '0.06em' }}
     >
       {stock > 999 ? '999+' : stock} {pcsLabel}
     </span>
@@ -386,17 +429,6 @@ const ProductCard = memo(function ProductCard({ product, onPreorder: _onPreorder
             className="relative w-[2.75rem] h-[2.75rem] min-w-[2.75rem] min-h-[2.75rem] flex-shrink-0 rounded-xl text-white overflow-hidden disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center"
             style={buttonStyle}
           >
-            {!isDisabled && !android && (
-              <motion.div
-                className="absolute inset-0"
-                initial={{ x: '-100%', opacity: 0 }}
-                whileHover={{ x: '100%', opacity: 0.3 }}
-                transition={{ duration: 0.6 }}
-                style={{
-                  background: 'linear-gradient(90deg, transparent, white, transparent)',
-                }}
-              />
-            )}
             <CartIcon />
           </motion.button>
         </div>

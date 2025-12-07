@@ -219,12 +219,14 @@ const createShop = async (ctx, shopName, lang = ctx.lang || ctx.session?.languag
       logger.debug(`Could not delete loading message:`, error.message);
     }
 
-    // Generate invite link
+    // Generate invite link using invite_code (new) or shop ID (fallback)
     const botUsername = process.env.BOT_USERNAME;
     if (!botUsername) {
       throw new Error('BOT_USERNAME environment variable is not set');
     }
-    const inviteLink = `https://t.me/${botUsername}?start=shop_${shop.id}`;
+    // Prefer invite_code for prettier links, fallback to legacy shop_ID format
+    const invitePayload = shop.invite_code || `shop_${shop.id}`;
+    const inviteLink = `https://t.me/${botUsername}?start=${invitePayload}`;
 
     // Enter shopOnboarding with shop data
     // FIX: Store state in session because ctx.scene.state is unreliable between WizardScenes

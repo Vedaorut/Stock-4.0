@@ -7,6 +7,7 @@ import { validateAddress } from '../utils/addressValidation.js';
 import * as promoCodeQueries from '../../database/queries/promoCodeQueries.js';
 import { broadcast } from '../utils/websocket.js';
 import { TRIAL_PERIOD_DAYS } from '../config/subscriptionPricing.js';
+import { generateInviteCode } from '../utils/inviteCodeGenerator.js';
 
 /**
  * Shop Controller
@@ -99,13 +100,17 @@ export const shopController = {
             throw new ValidationError('Subscription already linked to a shop');
           }
 
+          // Generate unique invite code
+          const existingCodes = await shopQueries.getAllInviteCodes();
+          const inviteCode = generateInviteCode(name.trim(), existingCodes);
+
           // Create shop
           const shopResult = await client.query(
             `INSERT INTO shops
-             (owner_id, name, description, logo, tier, subscription_status, is_active, registration_paid)
-             VALUES ($1, $2, $3, $4, $5, 'active', true, true)
+             (owner_id, name, description, logo, tier, subscription_status, is_active, registration_paid, invite_code)
+             VALUES ($1, $2, $3, $4, $5, 'active', true, true, $6)
              RETURNING *`,
-            [req.user.id, name.trim(), description, logo, subscription.tier]
+            [req.user.id, name.trim(), description, logo, subscription.tier, inviteCode]
           );
 
           const shop = shopResult.rows[0];
@@ -124,6 +129,7 @@ export const shopController = {
             shopId: shop.id,
             subscriptionId,
             userId: req.user.id,
+            inviteCode: shop.invite_code,
           });
 
           return res.status(201).json({
@@ -162,6 +168,10 @@ export const shopController = {
             throw new ValidationError('Free trial already used. Please subscribe to continue.');
           }
 
+          // Generate unique invite code
+          const existingCodes = await shopQueries.getAllInviteCodes();
+          const inviteCode = generateInviteCode(name.trim(), existingCodes);
+
           // Create shop with trial fields in single transaction
           const shopResult = await client.query(
             `INSERT INTO shops (
@@ -174,11 +184,12 @@ export const shopController = {
                trial_ends_at,
                subscription_status,
                is_active,
-               next_payment_due
+               next_payment_due,
+               invite_code
              )
-             VALUES ($1, $2, $3, $4, $5, true, $6, 'active', true, $7)
+             VALUES ($1, $2, $3, $4, $5, true, $6, 'active', true, $7, $8)
              RETURNING *`,
-            [req.user.id, name.trim(), description, logo, trialTier, trialEndsAt, trialEndsAt]
+            [req.user.id, name.trim(), description, logo, trialTier, trialEndsAt, trialEndsAt, inviteCode]
           );
 
           await client.query('COMMIT');
@@ -189,6 +200,7 @@ export const shopController = {
             userId: req.user.id,
             trialEndsAt: shop.trial_ends_at,
             tier: shop.tier,
+            inviteCode: shop.invite_code,
           });
 
           return res.status(201).json({
@@ -234,6 +246,12 @@ export const shopController = {
         logo,
         tier: effectiveTier, // Use tier from promo code or request
       });
+
+      // Generate and set invite code
+      const existingCodes = await shopQueries.getAllInviteCodes();
+      const inviteCode = generateInviteCode(name.trim(), existingCodes);
+      await shopQueries.updateInviteCode(shop.id, inviteCode);
+      shop.invite_code = inviteCode;
 
       // Activate promo subscription if promo code was used
       if (promoValidation && promoValidation.valid) {
@@ -351,6 +369,66 @@ export const shopController = {
       }
 
       logger.error('Get shop error', { error: error.message, stack: error.stack });
+      throw error;
+    }
+  }),
+
+
+  /**
+   * Get shop by invite code (for deep links)
+   * Returns shop data with same security filtering as getById
+   */
+  getByInviteCode: asyncHandler(async (req, res) => {
+    try {
+      const { inviteCode } = req.params;
+
+      if (!inviteCode || inviteCode.length < 3) {
+        throw new ValidationError('Invalid invite code');
+      }
+
+      const shop = await shopQueries.findByInviteCode(inviteCode);
+
+      if (!shop) {
+        throw new NotFoundError('Shop');
+      }
+
+      // SECURITY: Filter sensitive data if not owner
+      const isOwner = req.user && req.user.id === shop.owner_id;
+
+      // Build list of available crypto currencies
+      const availableCryptos = [];
+      if (shop.wallet_btc) {availableCryptos.push('BTC');}
+      if (shop.wallet_eth) {availableCryptos.push('ETH');}
+      if (shop.wallet_usdt) {availableCryptos.push('USDT_TRC20');}
+      if (shop.wallet_ltc) {availableCryptos.push('LTC');}
+      shop.availableCryptos = availableCryptos;
+
+      if (!isOwner) {
+        // Remove sensitive fields for non-owners
+        delete shop.wallet_btc;
+        delete shop.wallet_eth;
+        delete shop.wallet_usdt;
+        delete shop.wallet_ltc;
+        delete shop.subscription_status;
+        delete shop.next_payment_due;
+        delete shop.grace_period_until;
+      }
+
+      return res.status(200).json({
+        success: true,
+        data: shop,
+      });
+    } catch (error) {
+      if (error.code) {
+        const handledError = dbErrorHandler(error);
+        return res.status(handledError.statusCode).json({
+          success: false,
+          error: handledError.message,
+          ...(handledError.details ? { details: handledError.details } : {}),
+        });
+      }
+
+      logger.error('Get shop by invite code error', { error: error.message, stack: error.stack });
       throw error;
     }
   }),

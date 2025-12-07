@@ -59,6 +59,7 @@ CREATE TABLE shops (
   wallet_usdt VARCHAR(255),
   wallet_ltc VARCHAR(255),
   channel_url VARCHAR(255),
+  invite_code VARCHAR(50),
   tier VARCHAR(20) NOT NULL DEFAULT 'pro' CHECK (tier IN ('pro', 'max')),
   is_active BOOLEAN NOT NULL DEFAULT true,
   is_trial BOOLEAN DEFAULT false,
@@ -73,6 +74,7 @@ CREATE TABLE shops (
 COMMENT ON TABLE shops IS 'Stores shops - any user with a shop becomes a seller';
 COMMENT ON COLUMN shops.owner_id IS 'Reference to shop owner (user becomes seller by creating shop)';
 COMMENT ON COLUMN shops.registration_paid IS 'Whether initial subscription payment was confirmed';
+COMMENT ON COLUMN shops.invite_code IS 'Personalized invite code for deep links (e.g., CoolGadgets_x7k instead of shop_123)';
 COMMENT ON COLUMN shops.channel_url IS 'Telegram channel URL for shop notifications (format: @channel_name or https://t.me/channel_name)';
 COMMENT ON COLUMN shops.is_active IS 'Shop activation status (deactivated after grace period expires)';
 COMMENT ON COLUMN shops.tier IS 'Subscription tier: basic ($25/month, 4 products max) or pro ($35/month, unlimited)';
@@ -571,6 +573,8 @@ CREATE INDEX IF NOT EXISTS idx_users_selected_role ON users(selected_role);
 CREATE INDEX IF NOT EXISTS idx_shops_owner ON shops(owner_id);
 CREATE INDEX IF NOT EXISTS idx_shops_tier ON shops(tier);
 CREATE INDEX IF NOT EXISTS idx_shops_channel_url ON shops(channel_url);
+-- Invite code uniqueness for personalized deep links
+CREATE UNIQUE INDEX IF NOT EXISTS idx_shops_invite_code ON shops(invite_code) WHERE invite_code IS NOT NULL;
 -- Shop name uniqueness: case-insensitive unique constraint via functional index
 CREATE UNIQUE INDEX IF NOT EXISTS idx_shops_name_unique_lower ON shops(LOWER(name));
 CREATE INDEX IF NOT EXISTS idx_products_shop ON products(shop_id);
