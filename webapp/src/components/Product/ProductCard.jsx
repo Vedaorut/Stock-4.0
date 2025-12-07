@@ -19,14 +19,22 @@ const getSurfaceStyles = (platform) => ({
 
 // Extract Price Logic
 const calculatePriceDetails = (product) => {
-  const hasDiscount =
-    product.original_price &&
-    parseFloat(product.original_price) > 0 &&
-    (product.discount_percentage || 0) > 0;
+  // Use discount_active from backend if available (already checks expiration)
+  // Fallback to manual check for compatibility
+  const now = Date.now();
+  const isExpired = product.discount_expires_at && new Date(product.discount_expires_at).getTime() < now;
+
+  const hasDiscount = product.discount_active !== undefined
+    ? product.discount_active
+    : (product.original_price &&
+       parseFloat(product.original_price) > 0 &&
+       (product.discount_percentage || 0) > 0 &&
+       !isExpired);
 
   const originalPrice = hasDiscount ? product.original_price : product.price;
   const discountPercentage = hasDiscount ? product.discount_percentage || 0 : 0;
-  const isTimerDiscount = hasDiscount && product.discount_expires_at;
+  // Timer discount only when discount is active AND has expiration time
+  const isTimerDiscount = hasDiscount && product.discount_expires_at && !isExpired;
 
   const rawPrice = product.price ?? '';
   const priceString = typeof rawPrice === 'number' ? String(rawPrice) : `${rawPrice}`;
