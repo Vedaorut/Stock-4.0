@@ -12,15 +12,34 @@ export function cleanDeepSeekTokens(text) {
   if (!text || typeof text !== 'string') return text;
 
   return text
-    .replace(/<｜tool calls begin｜>/g, '')
-    .replace(/<｜tool calls end｜>/g, '')
-    .replace(/<｜tool sep｜>/g, '')
-    .replace(/<｜tool result begin｜>/g, '')
-    .replace(/<｜tool result end｜>/g, '')
-    .replace(/<｜end of sentence｜>/g, '')
-    // Strip Markdown code blocks if AI wraps the entire response or parts of it
-    .replace(/```(json|markdown|text)?\s*/gi, '')
+    // DeepSeek special tokens (both space and ▁ variants)
+    .replace(/<｜tool[ ▁]calls[ ▁]begin｜>/g, '')
+    .replace(/<｜tool[ ▁]calls[ ▁]end｜>/g, '')
+    .replace(/<｜tool[ ▁]sep｜>/g, '')
+    .replace(/<｜tool[ ▁]result[ ▁]begin｜>/g, '')
+    .replace(/<｜tool[ ▁]result[ ▁]end｜>/g, '')
+    .replace(/<｜end[ ▁]of[ ▁]sentence｜>/g, '')
+    // DSML tags (DeepSeek Markup Language) - CRITICAL FIX
+    .replace(/<｜DSML｜[^>]*>/g, '')
+    .replace(/<｜DSML｜>/g, '')
+    .replace(/<\/｜DSML｜[^>]*>/g, '')
+    // Any DSML-style function calls
+    .replace(/<｜DSML｜function_calls>[\s\S]*?<\/｜DSML｜function_calls>/g, '')
+    .replace(/<｜DSML｜invoke[^>]*>[\s\S]*?<\/｜DSML｜invoke>/g, '')
+    .replace(/<｜DSML｜parameter[^>]*>[\s\S]*?<\/｜DSML｜parameter>/g, '')
+    // XML-style function calls (generic)
+    .replace(/<function_calls>[\s\S]*?<\/function_calls>/gi, '')
+    .replace(/<invoke[^>]*>[\s\S]*?<\/invoke>/gi, '')
+    .replace(/<parameter[^>]*>[\s\S]*?<\/parameter>/gi, '')
+    // Enhanced JSON stripping
+    .replace(/```(json|javascript|js|markdown|text)?\s*/gi, '')
     .replace(/```/g, '')
+    // Strip function calls with JSON arguments: functionName({...})
+    .replace(/\w+\s*\(\s*\{[\s\S]*?\}\s*\)/g, '')
+    // Strip standalone JSON objects (entire line)
+    .replace(/^\s*\{[^}]*"(?:success|error|data|message|product_id)"[^}]*\}\s*$/gm, '')
+    // Strip JSON arrays
+    .replace(/^\s*\[[\s\S]*\]\s*$/gm, '')
     .trim();
 }
 
@@ -33,7 +52,8 @@ export function cleanDeepSeekTokens(text) {
 export function detectJSONInMessage(text) {
   if (!text || typeof text !== 'string') return false;
 
-  const jsonPatterns = [
+  const technicalPatterns = [
+    // JSON patterns
     /\{[\s\S]*"success"[\s\S]*:/i, // {"success": true}
     /\{[\s\S]*"error"[\s\S]*:/i, // {"error": ...}
     /\{[\s\S]*"data"[\s\S]*:/i, // {"data": ...}
@@ -41,9 +61,15 @@ export function detectJSONInMessage(text) {
     /\{[\s\S]*"message"[\s\S]*:/i, // {"message": "..."}
     /^\s*\{[\s\S]*\}\s*$/, // Entire response is JSON object
     /^\s*\[[\s\S]*\]\s*$/, // Entire response is JSON array
+    // DSML patterns (DeepSeek Markup Language)
+    /<｜DSML｜/i, // Any DSML tag
+    /<｜tool/i, // Tool-related tokens
+    /<function_calls>/i, // XML function calls
+    /<invoke\s+name=/i, // invoke tags
+    /<parameter\s+name=/i, // parameter tags
   ];
 
-  return jsonPatterns.some((pattern) => pattern.test(text));
+  return technicalPatterns.some((pattern) => pattern.test(text));
 }
 
 /**

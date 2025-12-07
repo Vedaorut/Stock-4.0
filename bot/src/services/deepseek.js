@@ -198,7 +198,8 @@ class DeepSeekClient {
     userMessage,
     tools = [],
     conversationHistory = [],
-    onChunk = null
+    onChunk = null,
+    options = {}
   ) {
     if (!this.isAvailable()) {
       throw new Error('DeepSeek API not configured');
@@ -222,6 +223,9 @@ class DeepSeekClient {
     const toolCalls = [];
     let finishReason = null;
 
+    // Extract signal from options for abort support
+    const { signal } = options;
+
     try {
       const stream = await this.client.chat.completions.create({
         model: 'deepseek-chat',
@@ -231,7 +235,7 @@ class DeepSeekClient {
         temperature: tools.length > 0 ? 0.2 : 0.7, // Low temp for function calling, normal for chat
         max_tokens: 500,
         stream: true, // Enable streaming
-      });
+      }, { signal }); // Pass signal to abort if needed
 
       // Process stream chunks
       for await (const chunk of stream) {

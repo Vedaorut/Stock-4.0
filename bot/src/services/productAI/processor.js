@@ -278,6 +278,14 @@ export async function processProductCommand(userCommand, context) {
       command: sanitizedCommand.slice(0, 50),
     });
 
+    // Global timeout with AbortController - prevents infinite hanging
+    const GLOBAL_TIMEOUT = 60000; // 60 seconds max for entire operation
+    const abortController = new AbortController();
+    const timeoutId = setTimeout(() => {
+      logger.warn('AI operation global timeout reached', { shopId, userId: ctx?.from?.id });
+      abortController.abort();
+    }, GLOBAL_TIMEOUT);
+
     // Typing indicator - keep showing "typing..." during AI processing
     let typingInterval = null;
     if (ctx) {
@@ -291,8 +299,20 @@ export async function processProductCommand(userCommand, context) {
     let streamingMessage = null;
     let lastUpdateTime = 0;
     let wordCount = 0;
-    const UPDATE_THROTTLE_MS = 500; // Update max once per 500ms
+    let lastContentHash = '';
+    const UPDATE_THROTTLE_MS = 800; // Update max once per 800ms (increased to reduce flickering)
     const WORDS_PER_UPDATE = 15; // Or every 15 words
+
+    // Simple hash function for content comparison
+    const simpleHash = (str) => {
+      let hash = 0;
+      for (let i = 0; i < str.length; i++) {
+        const char = str.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash;
+      }
+      return hash;
+    };
 
     // onChunk callback for streaming updates to Telegram
     const onChunk = async (chunk, fullText) => {
@@ -304,15 +324,31 @@ export async function processProductCommand(userCommand, context) {
       const timeSinceLastUpdate = now - lastUpdateTime;
 
       if (wordCount >= WORDS_PER_UPDATE || timeSinceLastUpdate >= UPDATE_THROTTLE_MS) {
+        // Skip update if content hasn't changed (prevents "not modified" errors)
+        const contentHash = simpleHash(fullText);
+        if (contentHash === lastContentHash) return;
+        lastContentHash = contentHash;
+
+        // Skip streaming update if text looks like JSON/DSML
+        if (detectJSONInMessage(fullText)) {
+          return; // Don't send JSON/DSML to user during streaming
+        }
+
+        // Clean DSML tokens before sending to user
+        const cleanedText = cleanDeepSeekTokens(fullText);
+        if (!cleanedText || cleanedText.length < 3) {
+          return; // Skip empty or too short cleaned text
+        }
+
         try {
           if (!streamingMessage) {
-            streamingMessage = await cleanReply(ctx, fullText);
+            streamingMessage = await cleanReply(ctx, cleanedText);
           } else {
             await ctx.telegram.editMessageText(
               streamingMessage.chat.id,
               streamingMessage.message_id,
               undefined,
-              fullText
+              cleanedText
             );
           }
           lastUpdateTime = now;
@@ -333,13 +369,16 @@ export async function processProductCommand(userCommand, context) {
         sanitizedCommand,
         productTools,
         conversationHistory,
-        onChunk
+        onChunk,
+        { signal: abortController.signal }
       );
     } finally {
       // Stop typing indicator
       if (typingInterval) {
         clearInterval(typingInterval);
       }
+      // Clear global timeout
+      clearTimeout(timeoutId);
     }
 
     const processingTime = Date.now() - startTime;
@@ -378,14 +417,20 @@ export async function processProductCommand(userCommand, context) {
         clarified: !!clarifiedProductId,
       });
 
-      // Delete streaming message since function result will be in a new message
-      // No delay - delete immediately to reduce flash effect
+      // Edit streaming message instead of deleting (prevents flickering)
       if (streamingMessage && ctx) {
         try {
-          await ctx.telegram.deleteMessage(streamingMessage.chat.id, streamingMessage.message_id);
+          await ctx.telegram.editMessageText(
+            streamingMessage.chat.id,
+            streamingMessage.message_id,
+            undefined,
+            '...' // Processing indicator
+          );
+          // Save reference for later reuse
+          context.streamingMessageToUpdate = streamingMessage;
         } catch (err) {
           if (err.response?.error_code !== 400) {
-            logger.warn('Failed to delete streaming message:', err.message);
+            logger.warn('Failed to edit streaming message:', err.message);
           }
         }
       }
@@ -504,23 +549,30 @@ export async function processProductCommand(userCommand, context) {
     // No tool call - AI responded with text
     const aiMessage = choice.message.content;
 
+    // Final sanitization - ensure no JSON in response
+    let sanitizedMessage = cleanDeepSeekTokens(aiMessage);
+    if (detectJSONInMessage(sanitizedMessage)) {
+      logger.warn('Detected JSON in final AI message, using fallback');
+      sanitizedMessage = 'Команда обработана. Проверьте результат в меню товаров.';
+    }
+
     // ALWAYS do final update to ensure complete message is sent
-    if (streamingMessage && ctx && aiMessage) {
+    if (streamingMessage && ctx && sanitizedMessage) {
       try {
         await ctx.telegram.editMessageText(
           streamingMessage.chat.id,
           streamingMessage.message_id,
           undefined,
-          aiMessage
+          sanitizedMessage
         );
       } catch (err) {
         if (err.response?.description !== 'Bad Request: message is not modified') {
           logger.warn('Failed to send final AI message:', err.message);
         }
       }
-    } else if (!streamingMessage && ctx && aiMessage) {
+    } else if (!streamingMessage && ctx && sanitizedMessage) {
       try {
-        await cleanReply(ctx, aiMessage);
+        await cleanReply(ctx, sanitizedMessage);
       } catch (err) {
         logger.warn('Failed to send AI message:', err.message);
       }
@@ -529,10 +581,10 @@ export async function processProductCommand(userCommand, context) {
     const totalTime = Date.now() - startTime;
 
     // Save text conversation (no tool calls)
-    if (ctx && aiMessage) {
+    if (ctx && sanitizedMessage) {
       saveToConversationHistory(ctx, [
         { role: 'user', content: sanitizedCommand },
-        { role: 'assistant', content: aiMessage },
+        { role: 'assistant', content: sanitizedMessage },
       ]);
     }
 
@@ -540,12 +592,12 @@ export async function processProductCommand(userCommand, context) {
       shopId,
       userId: ctx?.from?.id,
       totalTimeMs: totalTime,
-      responseLength: aiMessage?.length || 0,
+      responseLength: sanitizedMessage?.length || 0,
     });
 
     return {
       success: true,
-      message: aiMessage || 'Command processed',
+      message: sanitizedMessage || 'Command processed',
       data: null,
       streamingMessageId: streamingMessage?.message_id,
     };
