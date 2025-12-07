@@ -12,12 +12,15 @@ export function cleanDeepSeekTokens(text) {
   if (!text || typeof text !== 'string') return text;
 
   return text
-    .replace(/<｜tool▁calls▁begin｜>/g, '')
-    .replace(/<｜tool▁calls▁end｜>/g, '')
-    .replace(/<｜tool▁sep｜>/g, '')
-    .replace(/<｜tool▁result▁begin｜>/g, '')
-    .replace(/<｜tool▁result▁end｜>/g, '')
-    .replace(/<｜end▁of▁sentence｜>/g, '')
+    .replace(/<｜tool calls begin｜>/g, '')
+    .replace(/<｜tool calls end｜>/g, '')
+    .replace(/<｜tool sep｜>/g, '')
+    .replace(/<｜tool result begin｜>/g, '')
+    .replace(/<｜tool result end｜>/g, '')
+    .replace(/<｜end of sentence｜>/g, '')
+    // Strip Markdown code blocks if AI wraps the entire response or parts of it
+    .replace(/```(json|markdown|text)?\s*/gi, '')
+    .replace(/```/g, '')
     .trim();
 }
 

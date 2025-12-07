@@ -65,13 +65,11 @@ export const verifyTelegramInitData = (req, res, next) => {
       .update(dataCheckString)
       .digest('hex');
 
-    // DEBUG: Log validation details
-    logger.info('Telegram validation debug', {
-      botTokenPrefix: config.telegram.botToken?.substring(0, 10) + '...',
+    // P0 SEC FIX: Removed sensitive debug logging (bot token, hashes)
+    // Only log non-sensitive metadata in debug mode
+    logger.debug('Telegram validation attempt', {
       dataCheckStringLength: dataCheckString.length,
-      dataCheckStringPreview: dataCheckString.substring(0, 100),
-      calculatedHash: calculatedHash.substring(0, 16) + '...',
-      providedHash: hash.substring(0, 16) + '...',
+      hashMatch: calculatedHash === hash,
     });
 
     // Compare hashes using constant-time comparison to prevent timing attacks

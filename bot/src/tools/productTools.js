@@ -25,7 +25,8 @@ Rules:
 - Minimum price: 0.01 USD
 - Default stock = 1, if user didn't specify (no questions needed).
 - Name must be meaningful (at least 3 characters).
-- If user mentions discount when creating product, include discount_percentage (1-99).`,
+- If user mentions discount when creating product, include discount_percentage (1-99).
+- PREORDER: If user says "preorder", "pre-order", or "out of stock", set stock: 0.`,
       parameters: {
         type: 'object',
         properties: {
@@ -313,7 +314,8 @@ Rules:
 - If product is not specified and cannot be clearly understood from context - ask which one.
 - If product is the only one or was just discussed - use it without questions.
 - discount_percentage 0-100. For timer you can pass ISO date or phrase like "6 hours".
-- If user gives multiple changes at once, combine them into one call.`,
+- If user gives multiple changes at once, combine them into one call.
+- PREORDER: To mark as pre-order, set stock_quantity: 0.`,
       parameters: {
         type: 'object',
         properties: {

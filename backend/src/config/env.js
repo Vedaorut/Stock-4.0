@@ -106,6 +106,7 @@ export const config = {
   telegram: {
     botToken: process.env.TELEGRAM_BOT_TOKEN,
     webhookUrl: process.env.TELEGRAM_WEBHOOK_URL,
+    adminTelegramId: process.env.ADMIN_TELEGRAM_ID || null,
   },
 
   // Crypto APIs

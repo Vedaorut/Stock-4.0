@@ -31,6 +31,8 @@ import upgradeShopScene from './scenes/upgradeShop.js';
 import manageWorkersScene from './scenes/manageWorkers.js';
 import markOrdersShippedScene from './scenes/markOrdersShipped.js';
 import shopOnboardingScene from './scenes/shopOnboarding.js';
+import feedbackScene from './scenes/feedback.js';
+import renameShopScene from './scenes/renameShop.js';
 
 // Handlers
 import { handleStart } from './handlers/start.js';
@@ -92,10 +94,35 @@ const stage = new Scenes.Stage([
   manageWorkersScene,
   markOrdersShippedScene,
   shopOnboardingScene,
+  feedbackScene,
+  renameShopScene,
 ]);
 
 // Configure session middleware with Redis store
 bot.use(createRedisSession(redis));
+
+// CRITICAL: /start must ALWAYS reset scene state - even when stuck in a scene
+// This middleware runs BEFORE stage.middleware() so it can clear __scenes first
+bot.use((ctx, next) => {
+  if (ctx.message?.text === '/start' || ctx.message?.text?.startsWith('/start ')) {
+    // Preserve only essential data: language, role, token, user info
+    if (ctx.session) {
+      const { language, role, token, userId, shopId, shopName, tokenCreatedAt } = ctx.session;
+      // Hard reset session but keep essentials
+      ctx.session = {
+        language,
+        role,
+        token,
+        userId,
+        shopId,
+        shopName,
+        tokenCreatedAt,
+      };
+      logger.info(`Session hard reset on /start for user ${ctx.from?.id}`);
+    }
+  }
+  return next();
+});
 
 bot.use(stage.middleware());
 
@@ -199,7 +226,7 @@ bot.catch((err, ctx) => {
   // DON'T clear session - preserve shopId, token, role, etc.
   // Only wizard state (ctx.wizard.state) should be cleared, which happens in scene.leave()
 
-  cleanReply(ctx, t('general.restartRequired', {}, ctx.lang || 'ru')).catch(() => {});
+  cleanReply(ctx, t('general.restartRequired', {}, ctx.lang || 'ru')).catch(() => { });
 });
 
 // Export bot instance and redis for backend integration
@@ -223,19 +250,36 @@ export async function startBot() {
 
     // Set Menu Button to default (opens /start command menu)
     // This shows "Menu" button that triggers bot commands, not WebApp
+    // Set Menu Button to default (opens /start command menu)
+    // This shows "Menu" button that triggers bot commands, not WebApp
     try {
+      // Explicitly forcefully set the menu button to commands
       await bot.telegram.setChatMenuButton({
         menu_button: {
           type: 'commands',
         },
       });
-      logger.info('Menu Button configured: commands (default)');
+      logger.info('✅ Menu Button configured: commands (default)');
     } catch (menuError) {
-      logger.warn('Failed to set Menu Button:', menuError.message);
+      logger.error('❌ Failed to set Menu Button:', menuError.message);
     }
 
+    // Debug command to force fix menu button
+    bot.command('fixmenu', async (ctx) => {
+      try {
+        await ctx.setChatMenuButton({ type: 'commands' });
+        await ctx.reply('✅ Menu button force-reset to "commands". Please restart the app or clear cache if it persists.');
+        logger.info(`Manually fixed menu button for ${ctx.from.id}`);
+      } catch (err) {
+        logger.error('Failed to fix menu:', err);
+        await ctx.reply(`❌ Error: ${err.message}`);
+      }
+    });
+
     // Launch bot (this starts polling and won't return in polling mode)
-    bot.launch();
+    await bot.launch({
+      dropPendingUpdates: true,
+    });
 
     logger.info(`Bot started successfully in ${config.nodeEnv} mode`);
     logger.info(`Backend URL: ${config.backendUrl}`);

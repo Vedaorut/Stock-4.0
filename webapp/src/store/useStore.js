@@ -84,6 +84,7 @@ export const useStore = create(
         // Token is obtained from Telegram initData on each session
         pendingOrders: state.pendingOrders,
         cart: state.cart, // Fix: Persist cart across page refresh
+        viewMode: state.viewMode, // Persist view mode (buyer/seller)
       }),
     }
   )

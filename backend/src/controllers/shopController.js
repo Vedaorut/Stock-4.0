@@ -242,7 +242,8 @@ export const shopController = {
             shop.id,
             req.user.id,
             normalizedPromo,
-            promoValidation.tier
+            promoValidation.tier,
+            promoValidation.isPermanent || false
           );
 
           // Increment promo code usage count

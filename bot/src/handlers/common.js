@@ -45,8 +45,7 @@ export const setupCommonHandlers = (bot) => {
   bot.action('role:toggle', handleRoleToggle);
 
   // Role selection actions
-  bot.action('role:buyer', handleRoleBuyer);
-  bot.action('role:seller', handleRoleSeller);
+  // role:buyer and role:seller are handled in their respective modules and SHOULD NOT be duplicated here
   bot.action('role:worker', handleRoleWorker);
 
   // Workspace shop selection
@@ -65,6 +64,12 @@ const handleLanguageSelection = async (ctx) => {
 
     // Save language to session
     ctx.session.language = lang;
+    ctx.session.isLanguageConfirmed = true; // Mark as explicitly chosen by user
+    ctx.session.pendingLanguageSelection = false; // Clear pending flag
+
+    // CRITICAL: Update ctx.lang and ctx.t to use new language immediately
+    ctx.lang = lang;
+    ctx.t = (key, params = {}) => t(key, params, lang);
 
     // Save language to database via API
     try {
@@ -77,8 +82,8 @@ const handleLanguageSelection = async (ctx) => {
       // Continue anyway - language is set in session
     }
 
-    // Show confirmation and continue to main flow
-    const confirmMessage = ctx.t('settings.languageChanged');
+    // Show confirmation and continue to main flow (use t() with explicit lang)
+    const confirmMessage = t('settings.languageChanged', {}, lang);
     await ctx.editMessageText(`✅ ${confirmMessage}`);
 
     // Small delay for UX

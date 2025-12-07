@@ -3,9 +3,13 @@ import axios from 'axios';
 import { useStore } from '../store/useStore';
 import { refreshAuthToken, isTokenRefreshInitialized } from '../utils/tokenRefresh';
 import { getApiBaseUrl } from '../utils/apiBase';
+import { mockApi } from '../mock/api'; // Import mock adapter
 
 // Base API URL (can be moved to .env)
 const API_BASE_URL = getApiBaseUrl();
+
+// Demo mode flag
+const IS_DEMO_MODE = import.meta.env.VITE_DEMO_MODE === 'true';
 
 /**
  * Hook for API calls with stable reference
@@ -24,109 +28,119 @@ export function useApi() {
     // Create request function with token getter closure
     const createRequest =
       (tokenGetter) =>
-      async (method, endpoint, data = null, config = {}) => {
-        // Track retry attempt to prevent infinite loops
-        const isRetry = config._isRetryAfter401 || false;
+        async (method, endpoint, data = null, config = {}) => {
+          // Track retry attempt to prevent infinite loops
+          const isRetry = config._isRetryAfter401 || false;
 
-        // Helper function to make the actual request
-        const makeRequest = async (currentToken) => {
-          const initData = window.Telegram?.WebApp?.initData || '';
+          // DEMO MODE INTERCEPTION
+          if (IS_DEMO_MODE) {
+            console.log(`[DemoMode] Intercepting ${method} ${endpoint}`);
+            const apiMethod = mockApi[method.toLowerCase()];
+            if (apiMethod) {
+              return await apiMethod(endpoint, data);
+            }
+            return { error: 'Method not implemented in mock' };
+          }
 
-          const axiosConfig = {
-            method,
-            url: `${API_BASE_URL}${endpoint}`,
-            headers: {
-              'Content-Type': 'application/json',
-              'X-Telegram-Init-Data': initData,
-              ...(currentToken && { Authorization: `Bearer ${currentToken}` }),
-              ...config.headers,
-            },
-            timeout: config.timeout || 15000,
-            signal: config.signal,
-            ...config,
+          // Helper function to make the actual request
+          const makeRequest = async (currentToken) => {
+            const initData = window.Telegram?.WebApp?.initData || '';
+
+            const axiosConfig = {
+              method,
+              url: `${API_BASE_URL}${endpoint}`,
+              headers: {
+                'Content-Type': 'application/json',
+                'X-Telegram-Init-Data': initData,
+                ...(currentToken && { Authorization: `Bearer ${currentToken}` }),
+                ...config.headers,
+              },
+              timeout: config.timeout || 15000,
+              signal: config.signal,
+              ...config,
+            };
+
+            // Remove internal flag from config
+            delete axiosConfig._isRetryAfter401;
+
+            if (method !== 'GET' && method !== 'DELETE' && data !== null) {
+              axiosConfig.data = data;
+            }
+
+            return await axios(axiosConfig);
           };
 
-          // Remove internal flag from config
-          delete axiosConfig._isRetryAfter401;
-
-          if (method !== 'GET' && method !== 'DELETE' && data !== null) {
-            axiosConfig.data = data;
-          }
-
-          return await axios(axiosConfig);
-        };
-
-        try {
-          const currentToken = tokenGetter();
-          const response = await makeRequest(currentToken);
-          return { data: response.data, error: null };
-        } catch (err) {
-          if (import.meta.env.DEV) {
-            console.error(`API ${method} ${endpoint} error:`, err);
-          }
-
-          // Handle axios native timeout
-          if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
-            return { data: null, error: 'Request timeout - please check your connection' };
-          }
-
-          // Handle external AbortSignal (from useEffect cleanup)
-          if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') {
-            return { data: null, error: 'Request cancelled' };
-          }
-
-          // Handle 401 Unauthorized - attempt token refresh and retry ONCE
-          if (err.response?.status === 401 && !isRetry && isTokenRefreshInitialized()) {
-            const errorCode = err.response?.data?.code;
-
-            // USER_NOT_FOUND means DB was reset - clear token and force re-auth
-            if (errorCode === 'USER_NOT_FOUND') {
-              if (import.meta.env.DEV) {
-                // eslint-disable-next-line no-console
-                console.log('[useApi] 🔄 User not found in DB, clearing token and re-authenticating');
-              }
-              useStore.getState().setToken(null);
-            }
-
+          try {
+            const currentToken = tokenGetter();
+            const response = await makeRequest(currentToken);
+            return { data: response.data, error: null };
+          } catch (err) {
             if (import.meta.env.DEV) {
-              // eslint-disable-next-line no-console
-              console.log('[useApi] 🔄 Got 401, attempting token refresh for:', endpoint);
+              console.error(`API ${method} ${endpoint} error:`, err);
             }
 
-            try {
-              await refreshAuthToken();
+            // Handle axios native timeout
+            if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
+              return { data: null, error: 'Request timeout - please check your connection' };
+            }
 
-              // Get fresh token after refresh
-              const newToken = tokenGetter();
+            // Handle external AbortSignal (from useEffect cleanup)
+            if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') {
+              return { data: null, error: 'Request cancelled' };
+            }
+
+            // Handle 401 Unauthorized - attempt token refresh and retry ONCE
+            if (err.response?.status === 401 && !isRetry && isTokenRefreshInitialized()) {
+              const errorCode = err.response?.data?.code;
+
+              // USER_NOT_FOUND means DB was reset - clear token and force re-auth
+              if (errorCode === 'USER_NOT_FOUND') {
+                if (import.meta.env.DEV) {
+                  // eslint-disable-next-line no-console
+                  console.log('[useApi] 🔄 User not found in DB, clearing token and re-authenticating');
+                }
+                useStore.getState().setToken(null);
+              }
 
               if (import.meta.env.DEV) {
                 // eslint-disable-next-line no-console
-                console.log('[useApi] ✅ Token refreshed, retrying request');
+                console.log('[useApi] 🔄 Got 401, attempting token refresh for:', endpoint);
               }
 
-              // Retry the request with new token (mark as retry to prevent infinite loop)
-              const retryResponse = await makeRequest(newToken);
-              return { data: retryResponse.data, error: null };
-            } catch (refreshError) {
-              if (import.meta.env.DEV) {
-                console.error('[useApi] ❌ Token refresh failed:', {
-                  error: refreshError.message,
-                  endpoint,
-                  hint: 'initData may have expired. Restart the app from Telegram.',
-                });
+              try {
+                await refreshAuthToken();
+
+                // Get fresh token after refresh
+                const newToken = tokenGetter();
+
+                if (import.meta.env.DEV) {
+                  // eslint-disable-next-line no-console
+                  console.log('[useApi] ✅ Token refreshed, retrying request');
+                }
+
+                // Retry the request with new token (mark as retry to prevent infinite loop)
+                const retryResponse = await makeRequest(newToken);
+                return { data: retryResponse.data, error: null };
+              } catch (refreshError) {
+                if (import.meta.env.DEV) {
+                  console.error('[useApi] ❌ Token refresh failed:', {
+                    error: refreshError.message,
+                    endpoint,
+                    hint: 'initData may have expired. Restart the app from Telegram.',
+                  });
+                }
+                // Token refresh failed - return user-friendly error
+                return { data: null, error: 'Session expired. Please restart the app from Telegram.' };
               }
-              // Token refresh failed - return user-friendly error
-              return { data: null, error: 'Session expired. Please restart the app from Telegram.' };
             }
-          }
 
-          // Regular errors
-          const apiError = err.response?.data;
-          const errorMessage =
-            apiError?.error || apiError?.message || err.message || 'An error occurred';
-          return { data: null, error: errorMessage };
-        }
-      };
+            // Regular errors
+            const apiError = err.response?.data;
+            const errorMessage =
+              apiError?.error || apiError?.message || err.message || 'An error occurred';
+            return { data: null, error: errorMessage };
+          }
+        };
 
     // Create request function with token getter
     const request = createRequest(getToken);
@@ -304,10 +318,10 @@ export function useFollowsApi() {
         const payload = typeof markupData === 'number'
           ? { markupPercentage: markupData, markupType: 'percentage' }
           : {
-              markupType: markupData.markupType || 'percentage',
-              markupPercentage: markupData.markupPercentage || 0,
-              markupFixed: markupData.markupFixed || 0,
-            };
+            markupType: markupData.markupType || 'percentage',
+            markupPercentage: markupData.markupPercentage || 0,
+            markupFixed: markupData.markupFixed || 0,
+          };
         const response = await api.put(`/follows/${followId}/markup`, payload);
         if (response.error) {
           if (import.meta.env.DEV) {

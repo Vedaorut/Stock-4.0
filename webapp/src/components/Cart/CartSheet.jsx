@@ -188,7 +188,8 @@ export default function CartSheet() {
                   <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="flex flex-col items-center justify-center h-full py-10"
+                    className="flex flex-col items-center justify-center h-full"
+                    style={{ minHeight: '300px', paddingBottom: 'var(--tabbar-total, 80px)' }}
                   >
                     <motion.div
                       animate={emptyAnimate}

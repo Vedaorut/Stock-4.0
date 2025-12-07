@@ -52,6 +52,7 @@
     "backToTools": "To Tools",
     "changeChannel": "Channel Blocked?",
     "inviteLink": "Invite Link",
+    "renameShop": "Rename Shop",
     "goToTools": "To Tools",
     "migrationConfirm": "Yes, my channel is blocked",
     "sendNotifications": "Send Notifications",
@@ -78,7 +79,8 @@
     "switchToResell": "Switch to Resell",
     "language": "Language",
     "renewSubscription": "Renew subscription",
-    "exitTrial": "Exit Trial"
+    "exitTrial": "Exit Trial",
+    "feedback": "Feedback"
   },
   "start": {
     "welcome": "Status Stock. Choose a role to continue."
@@ -173,9 +175,9 @@
     "toolsIntro": "Tools\n\nAdditional features for shop management:",
     "toolsError": "Failed to load tools. Please try again.",
     "createShopNamePrompt": "Enter shop name",
-    "createShopNameHint": "Use Latin letters (a-z), numbers and underscore.",
+    "createShopNameHint": "Latin letters (a-z), numbers, spaces and _",
     "createShopNameInvalidLength": "Name must be 3 to 100 characters.",
-    "createShopNameInvalidChars": "Name can only contain Latin letters (a-z), numbers and underscore.",
+    "createShopNameInvalidChars": "Only Latin letters, numbers, spaces and _",
     "createShopNameTaken": "Name is already taken. Try another one.",
     "createShopPromoPrompt": "If you have a promo code, send it. If not - type \"-\".",
     "createShopSaving": "Creating shop...",
@@ -303,6 +305,13 @@
     "hour1": "{count} hour",
     "hour24": "{count} hours",
     "hour5": "{count} hours"
+  },
+  "feedback": {
+    "prompt": "Feedback\n\nDescribe your issue, suggestion, or question.\n\nMinimum 10 characters.",
+    "tooShort": "Message is too short. Minimum 10 characters.",
+    "success": "Thank you for your feedback! We'll contact you if needed.",
+    "error": "Failed to send message. Please try later.",
+    "cancelled": "Sending cancelled."
   },
   "activeOrders": {
     "empty": "No active orders.\n\nPaid orders will appear here automatically.",
@@ -469,6 +478,7 @@
     "title": "Settings",
     "language": "Language",
     "selectLanguage": "Choose your language:",
+    "selectLanguageWelcome": "👋 Welcome!\n\nChoose your language:",
     "languageOptionRu": "🇷🇺 Russian",
     "languageOptionEn": "🇬🇧 English",
     "renewSubscription": "Renew subscription ({tier})",
@@ -491,6 +501,7 @@
     "ai": "AI adds products for you - describe a product in text.",
     "stats": "See what sells - analyze statistics.",
     "workers": "Add helpers - give employees access.",
+    "discount": "Run a sale - type \"20% discount on MacBook for 4 hours\"",
     "addEth": "Add ETH wallet - expand payment options.",
     "addBtc": "Add BTC wallet - Bitcoin is popular with buyers.",
     "addUsdt": "Add USDT wallet - stablecoin with no volatility.",
@@ -510,6 +521,7 @@
     "subscribeFailed": "Failed to subscribe to shop.",
     "alreadySubscribed": "You are already subscribed to \"{shopName}\"",
     "shopNotFound": "Shop not found or was deleted",
+    "ownShop": "This is your shop! Opening seller panel.",
     "error": "Failed to subscribe. Please try again later."
   },
   "onboarding": {
@@ -528,20 +540,23 @@
     "linkTitle": "Your store link",
     "linkText": "Customer clicks → your store opens → auto-subscribe.\nShare in your channel and with clients.",
     "productsTitle": "Adding products",
-    "productsText": "Two ways:\n\nAI assistant — type in chat:\n• \"Add 5 T-shirts for $15\"\n• \"Delete product Cap\"\n• \"Change price T-shirt to $20\"\n• \"Set 10 Sneakers in stock\"\n\nApp — open store and add manually.",
+    "productsText": "Two ways:\n\nAI assistant — type in chat:\n• \"Add 5 T-shirts for $15\"\n• \"Delete product Cap\"\n• \"Change price T-shirt to $20\"\n• \"Set 20% discount on MacBook for 4 hours\"\n\nApp — open store and add manually.",
     "walletsTitle": "Set up payouts",
     "walletsText": "Send wallet addresses — each on a new line.\nBTC, ETH, LTC, USDT — we'll detect automatically.\n\n💡 You can add or change wallets anytime via tools or the app.",
     "followingTitle": "Tool: Following",
     "followingText": "Monitor — subscribe to a store and see all their products.\n\nResale — products auto-sync to your store with your markup.",
     "doneTitle": "Store is ready",
     "doneText": "Your 7 days MAX trial:\n• All unlimited\n• 365 days stats\n• Channel migration",
+    "doneTextTrial": "Your 7 days MAX trial:\n• All unlimited\n• 365 days stats\n• Channel migration",
+    "doneTextPromo": "Promo code activated!\n\nYour plan is active.\nStart adding products now.",
+    "doneTextPaid": "Subscription paid!\n\nYour plan is active.\nStart adding products now.",
     "nextButton": "Next",
     "skipAllButton": "Skip all",
     "openStoreButton": "Open store",
     "step1Title": "Your Link",
     "step1Text": "Send to buyers:",
     "step2Title": "Add Products",
-    "step2Text": "Open shop or write in chat:\n• \"Add 5 T-shirts for $15\"\n• \"Delete product Cap\"\n• \"Change price T-shirt to $20\"\n• \"Set 10 Sneakers in stock\"",
+    "step2Text": "Open shop or write in chat:\n• \"Add 5 T-shirts for $15\"\n• \"Delete product Cap\"\n• \"Change price T-shirt to $20\"\n• \"Set 20% discount on MacBook for 4 hours\"",
     "step3Title": "Setup Payments",
     "step3Text": "Add wallets to receive payments.",
     "step4Title": "Follow Shops",
@@ -623,6 +638,14 @@
     "shopExists": "❌ You already have a shop.",
     "nameTaken": "❌ This name is already taken. Choose another.",
     "genericError": "Failed to create shop"
+  },
+  "renameShop": {
+    "enterNewName": "Enter new shop name:",
+    "currentName": "Current name: {name}",
+    "success": "Shop renamed: {oldName} → {newName}",
+    "error": "Failed to rename shop. Try again later.",
+    "nameTaken": "This name is already taken. Choose another.",
+    "invalidName": "Invalid name. Use letters, numbers, spaces and _"
   },
   "scenes": {
     "sendTextMessage": "Please send as text.",
@@ -878,6 +901,7 @@
     "product": "Product",
     "stock": "stock {count}",
     "added": "Added: {name} for {price}{stock}",
+    "merged": "Updated: {name} for {price}{stock}",
     "bulkAddFailed": "Failed to add products.",
     "bulkAdded": "Products added: {count}",
     "productUpdated": "Product updated.",

@@ -88,6 +88,7 @@ export async function handleAddProduct(args, shopId, token) {
       shopId,
       stockQuantity: normalizedStock,
       isPreorder: is_preorder || false,
+      merge: true, // MERGE: Update existing product with same name instead of creating duplicate
     },
     token
   );
@@ -106,6 +107,7 @@ export async function handleAddProduct(args, shopId, token) {
   }
 
   const product = apiResult.data;
+  const wasMerged = apiResult.merged || false; // Backend returns merged: true if existing product was updated
 
   // Apply discount if requested during creation
   let discountApplied = false;
@@ -158,7 +160,8 @@ export async function handleAddProduct(args, shopId, token) {
   return {
     success: true,
     data: {
-      action: 'product_created',
+      action: wasMerged ? 'product_updated' : 'product_created',
+      merged: wasMerged,
       product: {
         id: product.id,
         name: transliteratedName,
@@ -278,6 +281,7 @@ export async function handleBulkAddProducts(args, shopId, token) {
         shopId,
         stockQuantity: normalizedStock,
         isPreorder: is_preorder || false,
+        merge: true, // MERGE: Update existing product with same name instead of creating duplicate
       },
       token
     );

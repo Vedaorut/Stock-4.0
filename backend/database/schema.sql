@@ -9,6 +9,13 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 DROP TABLE IF EXISTS synced_products CASCADE;
 DROP TABLE IF EXISTS shop_follows CASCADE;
 DROP TABLE IF EXISTS payments CASCADE;
+DROP TABLE IF EXISTS shop_subscriptions CASCADE; -- Added
+DROP TABLE IF EXISTS channel_migrations CASCADE; -- Added
+DROP TABLE IF EXISTS shop_workers CASCADE; -- Added
+DROP TABLE IF EXISTS invoices CASCADE; -- Added
+DROP TABLE IF EXISTS processed_webhooks CASCADE; -- Added
+DROP TABLE IF EXISTS promo_activations CASCADE; -- Added
+DROP TABLE IF EXISTS promo_codes CASCADE; -- Added
 DROP TABLE IF EXISTS subscriptions CASCADE;
 DROP TABLE IF EXISTS order_items CASCADE;
 DROP TABLE IF EXISTS orders CASCADE;
@@ -40,7 +47,8 @@ COMMENT ON COLUMN users.telegram_id IS 'Unique Telegram user ID';
 -- ============================================
 CREATE TABLE shops (
   id SERIAL PRIMARY KEY,
-  owner_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  -- P0 SEC FIX: Changed CASCADE to RESTRICT to prevent accidental data loss
+  owner_id INT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
   registration_paid BOOLEAN DEFAULT false,
   name VARCHAR(255) NOT NULL,
   description TEXT,
@@ -50,8 +58,10 @@ CREATE TABLE shops (
   wallet_usdt VARCHAR(255),
   wallet_ltc VARCHAR(255),
   channel_url VARCHAR(255),
-  tier VARCHAR(20) NOT NULL DEFAULT 'basic' CHECK (tier IN ('basic', 'pro', 'max')),
+  tier VARCHAR(20) NOT NULL DEFAULT 'pro' CHECK (tier IN ('pro', 'max')),
   is_active BOOLEAN NOT NULL DEFAULT true,
+  is_trial BOOLEAN DEFAULT false,
+  trial_ends_at TIMESTAMP,
   subscription_status VARCHAR(20) NOT NULL DEFAULT 'active' CHECK (subscription_status IN ('active', 'pending', 'grace_period', 'inactive')),
   next_payment_due TIMESTAMP,
   grace_period_until TIMESTAMP,
@@ -109,12 +119,19 @@ CREATE TABLE shop_follows (
   follower_shop_id INT NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
   source_shop_id INT NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
   mode VARCHAR(20) NOT NULL CHECK (mode IN ('monitor', 'resell')),
-  markup_percentage DECIMAL(5, 2) NOT NULL DEFAULT 0 CHECK (markup_percentage >= 0.1 AND markup_percentage <= 200),
+  markup_type VARCHAR(20) DEFAULT 'percentage' CHECK (markup_type IN ('percentage', 'fixed')),
+  markup_percentage DECIMAL(5, 2) NOT NULL DEFAULT 0,
+  markup_fixed DECIMAL(10, 2) DEFAULT 0,
   status VARCHAR(20) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'paused', 'cancelled')),
   created_at TIMESTAMP NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
   UNIQUE(follower_shop_id, source_shop_id),
-  CHECK (follower_shop_id != source_shop_id)
+  CHECK (follower_shop_id != source_shop_id),
+  -- Monitor mode allows 0 markup, resell requires valid markup
+  CHECK (
+    (mode = 'monitor' AND markup_percentage >= 0) OR
+    (mode = 'resell' AND markup_percentage >= 0.1 AND markup_percentage <= 500)
+  )
 );
 
 COMMENT ON TABLE shop_follows IS 'Tracks follower→source shop relationships for dropshipping/reseller functionality';
@@ -219,6 +236,41 @@ CREATE TABLE subscriptions (
 COMMENT ON TABLE subscriptions IS 'Stores user subscriptions to shops for notifications';
 
 -- ============================================
+-- Shop Subscriptions table (Recurring Payments)
+-- ============================================
+CREATE TABLE shop_subscriptions (
+  id SERIAL PRIMARY KEY,
+  user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  shop_id INT REFERENCES shops(id) ON DELETE CASCADE,
+  tier VARCHAR(20) NOT NULL CHECK (tier IN ('basic', 'pro', 'max')),
+  amount DECIMAL(10, 2) NOT NULL,
+  tx_hash VARCHAR(255) UNIQUE NOT NULL,
+  currency VARCHAR(10) NOT NULL CHECK (currency IN ('BTC', 'ETH', 'USDT', 'LTC')),
+  period_start TIMESTAMP NOT NULL,
+  period_end TIMESTAMP NOT NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('active', 'pending', 'expired', 'cancelled', 'paid')),
+  is_trial BOOLEAN DEFAULT false,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  verified_at TIMESTAMP
+);
+
+COMMENT ON TABLE shop_subscriptions IS 'Stores monthly subscription payments for shops (basic $25/mo, pro $35/mo)';
+COMMENT ON COLUMN shop_subscriptions.user_id IS 'User who created subscription (before shop is created)';
+COMMENT ON COLUMN shop_subscriptions.shop_id IS 'Shop associated with subscription (NULL until payment confirmed)';
+COMMENT ON COLUMN shop_subscriptions.tier IS 'Subscription tier: basic ($25, 4 products max) or pro ($35, unlimited)';
+COMMENT ON COLUMN shop_subscriptions.amount IS 'Payment amount in USD';
+COMMENT ON COLUMN shop_subscriptions.tx_hash IS 'Blockchain transaction hash for verification';
+COMMENT ON COLUMN shop_subscriptions.period_start IS 'Start date of subscription period';
+COMMENT ON COLUMN shop_subscriptions.period_end IS 'End date of subscription period (30 days from start)';
+COMMENT ON COLUMN shop_subscriptions.status IS 'pending: awaiting confirmation, active: valid, expired: period ended, cancelled: refunded';
+
+CREATE INDEX idx_shop_subscriptions_user_id ON shop_subscriptions(user_id);
+CREATE INDEX idx_shop_subscriptions_shop ON shop_subscriptions(shop_id);
+CREATE INDEX idx_shop_subscriptions_status ON shop_subscriptions(status);
+CREATE INDEX idx_shop_subscriptions_period_end ON shop_subscriptions(period_end);
+CREATE INDEX IF NOT EXISTS idx_shop_subscriptions_tx_hash ON shop_subscriptions(tx_hash);
+
+-- ============================================
 -- Payments table (for crypto payment verification)
 -- ============================================
 CREATE TABLE payments (
@@ -228,7 +280,7 @@ CREATE TABLE payments (
     tx_hash VARCHAR(255),
     amount DECIMAL(18, 8) NOT NULL,
     currency VARCHAR(10) NOT NULL CHECK (currency IN ('BTC', 'ETH', 'USDT', 'LTC', 'USDT_TRC20')),
-    status VARCHAR(50) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'confirmed', 'failed')),
+    status VARCHAR(50) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'confirmed', 'failed')),
     confirmations INTEGER NOT NULL DEFAULT 0,
     verified_at TIMESTAMP,
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
@@ -261,6 +313,7 @@ ON payments(status, created_at) WHERE status = 'pending' AND subscription_id IS 
 
 CREATE UNIQUE INDEX idx_payments_tx_hash_unique 
 ON payments(tx_hash) WHERE tx_hash IS NOT NULL;
+
 
 -- ============================================
 -- Promo Codes table (migration 022)
@@ -345,31 +398,7 @@ COMMENT ON COLUMN channel_migrations.failed_count IS 'Number of failed message d
 -- ============================================
 -- Shop Subscriptions table (Recurring Payments)
 -- ============================================
-CREATE TABLE shop_subscriptions (
-  id SERIAL PRIMARY KEY,
-  user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  shop_id INT REFERENCES shops(id) ON DELETE CASCADE,
-  tier VARCHAR(20) NOT NULL CHECK (tier IN ('basic', 'pro', 'max')),
-  amount DECIMAL(10, 2) NOT NULL,
-  tx_hash VARCHAR(255) UNIQUE NOT NULL,
-  currency VARCHAR(10) NOT NULL CHECK (currency IN ('BTC', 'ETH', 'USDT', 'LTC')),
-  period_start TIMESTAMP NOT NULL,
-  period_end TIMESTAMP NOT NULL,
-  status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('active', 'pending', 'expired', 'cancelled', 'paid')),
-  is_trial BOOLEAN DEFAULT false,
-  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-  verified_at TIMESTAMP
-);
 
-COMMENT ON TABLE shop_subscriptions IS 'Stores monthly subscription payments for shops (basic $25/mo, pro $35/mo)';
-COMMENT ON COLUMN shop_subscriptions.user_id IS 'User who created subscription (before shop is created)';
-COMMENT ON COLUMN shop_subscriptions.shop_id IS 'Shop associated with subscription (NULL until payment confirmed)';
-COMMENT ON COLUMN shop_subscriptions.tier IS 'Subscription tier: basic ($25, 4 products max) or pro ($35, unlimited)';
-COMMENT ON COLUMN shop_subscriptions.amount IS 'Payment amount in USD';
-COMMENT ON COLUMN shop_subscriptions.tx_hash IS 'Blockchain transaction hash for verification';
-COMMENT ON COLUMN shop_subscriptions.period_start IS 'Start date of subscription period';
-COMMENT ON COLUMN shop_subscriptions.period_end IS 'End date of subscription period (30 days from start)';
-COMMENT ON COLUMN shop_subscriptions.status IS 'pending: awaiting confirmation, active: valid, expired: period ended, cancelled: refunded';
 
 -- ============================================
 -- Shop Workers table (Workspace - PRO feature)
@@ -395,18 +424,23 @@ CREATE TABLE invoices (
   id SERIAL PRIMARY KEY,
   order_id INT REFERENCES orders(id) ON DELETE CASCADE,
   subscription_id INT REFERENCES shop_subscriptions(id) ON DELETE CASCADE,
-  chain VARCHAR(20) NOT NULL CHECK (chain IN ('BTC', 'ETH', 'USDT_ERC20', 'USDT_TRC20', 'LTC')),
-  address VARCHAR(255) UNIQUE NOT NULL,
-  address_index INT NOT NULL,
+  chain VARCHAR(20) NOT NULL CHECK (chain IN ('BTC', 'ETH', 'USDT_ERC20', 'USDT_TRC20', 'LTC', 'CRYSTALPAY')),
+  address VARCHAR(255),
+  address_index INT,
   expected_amount DECIMAL(18, 8) NOT NULL CHECK (expected_amount > 0),
   crypto_amount DECIMAL(20, 8),
   usd_rate DECIMAL(20, 2),
   currency VARCHAR(10) NOT NULL,
   tatum_subscription_id VARCHAR(255),
+  crystalpay_id VARCHAR(255),
+  crystalpay_url TEXT,
+  paid_at TIMESTAMP,
+  tx_hash VARCHAR(255),
   status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'paid', 'expired', 'cancelled')),
   expires_at TIMESTAMP NOT NULL,
   created_at TIMESTAMP NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  purpose VARCHAR(50),
   CONSTRAINT check_invoice_reference CHECK (
     (order_id IS NOT NULL AND subscription_id IS NULL) OR
     (order_id IS NULL AND subscription_id IS NOT NULL)
@@ -416,7 +450,7 @@ CREATE TABLE invoices (
 COMMENT ON TABLE invoices IS 'Payment invoices with unique addresses generated via HD wallet (BIP44 derivation)';
 COMMENT ON COLUMN invoices.order_id IS 'Reference to order (mutually exclusive with subscription_id)';
 COMMENT ON COLUMN invoices.subscription_id IS 'Reference to subscription payment (mutually exclusive with order_id)';
-COMMENT ON COLUMN invoices.chain IS 'Blockchain: BTC, ETH, USDT_ERC20, USDT_TRC20, LTC';
+COMMENT ON COLUMN invoices.chain IS 'Blockchain: BTC, ETH, USDT_ERC20, USDT_TRC20, LTC, or CRYSTALPAY (external gateway)';
 COMMENT ON COLUMN invoices.address IS 'Unique payment address generated from HD wallet';
 COMMENT ON COLUMN invoices.address_index IS 'Derivation index for HD wallet (m/44''/0''/0''/0/{index})';
 COMMENT ON COLUMN invoices.expected_amount IS 'Expected payment amount (USD for subscriptions, crypto for orders)';
@@ -542,12 +576,7 @@ CREATE INDEX IF NOT EXISTS idx_orders_crypto_payment ON orders(id, crypto_curren
 CREATE INDEX IF NOT EXISTS idx_channel_migrations_shop ON channel_migrations(shop_id);
 CREATE INDEX IF NOT EXISTS idx_channel_migrations_status ON channel_migrations(status);
 CREATE INDEX IF NOT EXISTS idx_channel_migrations_created ON channel_migrations(created_at);
-CREATE INDEX IF NOT EXISTS idx_shop_subscriptions_user_id ON shop_subscriptions(user_id);
-CREATE INDEX IF NOT EXISTS idx_shop_subscriptions_shop ON shop_subscriptions(shop_id);
-CREATE INDEX IF NOT EXISTS idx_shop_subscriptions_status ON shop_subscriptions(status);
-CREATE INDEX IF NOT EXISTS idx_shop_subscriptions_period_end ON shop_subscriptions(period_end);
--- Subscription payment deduplication: tx_hash lookup
-CREATE INDEX IF NOT EXISTS idx_shop_subscriptions_tx_hash ON shop_subscriptions(tx_hash);
+
 CREATE INDEX IF NOT EXISTS idx_shops_subscription_status ON shops(subscription_status);
 CREATE INDEX IF NOT EXISTS idx_shops_next_payment_due ON shops(next_payment_due);
 

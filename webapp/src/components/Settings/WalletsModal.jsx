@@ -91,7 +91,7 @@ function WalletCard({ wallet, onRemove, onEdit, isEditing, onStartEdit, onCancel
             <span className={`text-sm font-bold ${typeColors[wallet.type] || 'text-gray-400'}`}>
               {wallet.type}
             </span>
-            <span className="text-blue-400 text-xs">✏️ Editing</span>
+            <span className="text-blue-400 text-xs">✏️ {t('wallet.editing')}</span>
           </div>
 
           <input
@@ -103,11 +103,9 @@ function WalletCard({ wallet, onRemove, onEdit, isEditing, onStartEdit, onCancel
             autoFocus
           />
 
-          {editValue && (
-            <span className={`text-xs ${isValid ? 'text-green-500' : 'text-red-500'}`}>
-              {isValid ? '✓ Valid address' : '⚠️ Invalid address format'}
-            </span>
-          )}
+          <span className={`text-xs ${isValid ? 'text-green-500' : 'text-red-500'}`}>
+            {isValid ? '✓ ' + t('wallet.valid') : '⚠️ ' + t('wallet.invalidAddress')}
+          </span>
 
           <div className="flex gap-2">
             <motion.button
@@ -121,7 +119,7 @@ function WalletCard({ wallet, onRemove, onEdit, isEditing, onStartEdit, onCancel
               }}
               whileTap={isValid ? { scale: 0.98 } : {}}
             >
-              {saving ? 'Saving...' : 'Save'}
+              {saving ? t('products.saving') : t('common.save')}
             </motion.button>
 
             <motion.button
@@ -133,7 +131,7 @@ function WalletCard({ wallet, onRemove, onEdit, isEditing, onStartEdit, onCancel
               }}
               whileTap={{ scale: 0.98 }}
             >
-              Cancel
+              {t('common.cancel')}
             </motion.button>
           </div>
         </div>
@@ -355,15 +353,6 @@ export default function WalletsModal({ isOpen, onClose }) {
 
   useBackButton(isOpen ? handleBackButton : null);
 
-  // Disable vertical swipes when modal is open (Telegram Mini App)
-  useEffect(() => {
-    if (isOpen && window.Telegram?.WebApp) {
-      window.Telegram.WebApp.disableVerticalSwipes();
-      return () => {
-        window.Telegram.WebApp.enableVerticalSwipes();
-      };
-    }
-  }, [isOpen]);
 
   const walletList = useMemo(() => {
     return orderedWalletTypes
@@ -429,7 +418,7 @@ export default function WalletsModal({ isOpen, onClose }) {
 
       const mapping = walletFieldMap[walletType];
       if (!mapping) {
-        await alert('Invalid wallet type');
+        await alert(t('wallet.invalidAddress'));
         throw new Error('Invalid wallet type');
       }
 
@@ -578,15 +567,15 @@ export default function WalletsModal({ isOpen, onClose }) {
                   </div>
                   <div className="flex-1">
                     <h3 className="text-white font-semibold mb-1">
-                      Payment Wallets
+                      {t('wallet.title')}
                     </h3>
                     <p className="text-gray-400 text-sm mb-2">
-                      Enter addresses for receiving cryptocurrency from buyers.
+                      {t('wallet.enterAddresses')}
                     </p>
                     <p className="text-gray-500 text-xs">{t('wallet.supported')}</p>
                     {shop && (
                       <p className="text-gray-500 text-xs mt-2">
-                        Shop: <span className="text-white">{shop.name}</span>
+                        {t('wallet.shopLabel')} <span className="text-white">{shop.name}</span>
                       </p>
                     )}
                   </div>
@@ -661,7 +650,7 @@ export default function WalletsModal({ isOpen, onClose }) {
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                     >
-                      All available wallets added
+                      {t('wallet.allAdded')}
                     </motion.div>
                   )}
 
@@ -677,7 +666,7 @@ export default function WalletsModal({ isOpen, onClose }) {
                         {availableWalletTypes.includes('BTC') && (
                           <div>
                             <label className="text-sm text-gray-400 mb-2 block">
-                              Bitcoin (BTC)
+                              {t('wallet.currencies.BTC')}
                             </label>
                             <input
                               type="text"
@@ -690,7 +679,7 @@ export default function WalletsModal({ isOpen, onClose }) {
                               <span
                                 className={`text-sm ${isValidBTC ? 'text-green-500' : 'text-red-500'}`}
                               >
-                                {isValidBTC ? '✓ Valid BTC' : '⚠️ Invalid BTC'}
+                                {isValidBTC ? '✓ ' + t('wallet.valid') : '⚠️ ' + t('wallet.invalidAddress')}
                               </span>
                             )}
                           </div>
@@ -699,7 +688,7 @@ export default function WalletsModal({ isOpen, onClose }) {
                         {availableWalletTypes.includes('ETH') && (
                           <div>
                             <label className="text-sm text-gray-400 mb-2 block">
-                              Ethereum (ETH)
+                              {t('wallet.currencies.ETH')}
                             </label>
                             <input
                               type="text"
@@ -712,7 +701,7 @@ export default function WalletsModal({ isOpen, onClose }) {
                               <span
                                 className={`text-sm ${isValidETH ? 'text-green-500' : 'text-red-500'}`}
                               >
-                                {isValidETH ? '✓ Valid ETH' : '⚠️ Invalid ETH'}
+                                {isValidETH ? '✓ ' + t('wallet.valid') : '⚠️ ' + t('wallet.invalidAddress')}
                               </span>
                             )}
                           </div>
@@ -721,7 +710,7 @@ export default function WalletsModal({ isOpen, onClose }) {
                         {availableWalletTypes.includes('USDT') && (
                           <div>
                             <label className="text-sm text-gray-400 mb-2 block">
-                              USDT (TRC-20)
+                              {t('wallet.currencies.USDT')}
                             </label>
                             <input
                               type="text"
@@ -734,7 +723,7 @@ export default function WalletsModal({ isOpen, onClose }) {
                               <span
                                 className={`text-sm ${isValidUSDT ? 'text-green-500' : 'text-red-500'}`}
                               >
-                                {isValidUSDT ? '✓ Valid USDT' : '⚠️ Invalid USDT'}
+                                {isValidUSDT ? '✓ ' + t('wallet.valid') : '⚠️ ' + t('wallet.invalidAddress')}
                               </span>
                             )}
                           </div>
@@ -743,7 +732,7 @@ export default function WalletsModal({ isOpen, onClose }) {
                         {availableWalletTypes.includes('LTC') && (
                           <div>
                             <label className="text-sm text-gray-400 mb-2 block">
-                              Litecoin (LTC)
+                              {t('wallet.currencies.LTC')}
                             </label>
                             <input
                               type="text"
@@ -756,7 +745,7 @@ export default function WalletsModal({ isOpen, onClose }) {
                               <span
                                 className={`text-sm ${isValidLTC ? 'text-green-500' : 'text-red-500'}`}
                               >
-                                {isValidLTC ? '✓ Valid LTC' : '⚠️ Invalid LTC'}
+                                {isValidLTC ? '✓ ' + t('wallet.valid') : '⚠️ ' + t('wallet.invalidAddress')}
                               </span>
                             )}
                           </div>

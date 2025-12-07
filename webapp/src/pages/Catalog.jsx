@@ -460,13 +460,35 @@ export default function Catalog() {
 
   if (!displayShop) {
     return (
-      <div className="pb-24" style={{ paddingTop: 'calc(env(safe-area-inset-top) + 56px)' }}>
+      <div
+        className="h-screen overflow-y-auto bg-[#181818]"
+        style={{
+          paddingTop: 'calc(env(safe-area-inset-top) + 56px)',
+          paddingBottom: 'calc(var(--tabbar-total) + 20px)',
+        }}
+      >
         <Header title={t('catalog.title')} />
         <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
           {loading ? (
             <>
               <div className="w-12 h-12 border-4 border-orange-primary border-t-transparent rounded-full animate-spin mb-4" />
               <p className="text-gray-400">{t('common.loading')}</p>
+            </>
+          ) : !token ? (
+            <>
+              <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center mb-4">
+                <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-bold text-white mb-2">{t('common.authRequired')}</h3>
+              <p className="text-gray-400 mb-6">{t('common.restartBot')}</p>
+              <button
+                onClick={() => window.location.reload()}
+                className="bg-white/10 hover:bg-white/20 text-white px-6 py-2 rounded-xl transition-colors"
+              >
+                {t('common.retry')}
+              </button>
             </>
           ) : (
             <>
@@ -483,184 +505,208 @@ export default function Catalog() {
   }
 
   return (
-    <div className="pb-24" style={{ paddingTop: 'calc(env(safe-area-inset-top) + 56px)' }}>
-      {/* Shop Header */}
-      <div className="bg-dark-card/80 backdrop-blur-lg p-4 sticky top-0 z-10">
+    <div
+      className="h-screen overflow-y-auto bg-[#181818]"
+      style={{
+        paddingTop: 'calc(env(safe-area-inset-top) + 56px)',
+        paddingBottom: 'calc(var(--tabbar-total) + 20px)',
+      }}
+    >
+      <Header title={t('catalog.title')} />
 
-
-        <div className="flex items-center gap-4">
-          {displayShopLogo && (
-            <div className="w-12 h-12 rounded-xl bg-dark-elevated overflow-hidden flex-shrink-0">
-              <img src={displayShopLogo} alt={displayShop.name} className="w-full h-full object-cover" />
-            </div>
-          )}
-          <div className="flex-1">
-            <h1 className="text-white text-2xl font-bold">
-              {displayShop.name}
+      {/* Shop Info & Search - Redesigned */}
+      <div className="relative z-10">
+        <div className="px-4 py-4 space-y-4">
+          {/* Shop Info Card */}
+          <div className="flex items-center gap-4 p-4 rounded-2xl bg-white/5 border border-white/5 backdrop-blur-sm">
+            {displayShopLogo ? (
+              <div className="w-14 h-14 rounded-full bg-dark-elevated overflow-hidden flex-shrink-0 shadow-lg ring-2 ring-white/10">
+                <img src={displayShopLogo} alt={displayShop.name} className="w-full h-full object-cover" />
+              </div>
+            ) : (
+              <div className="w-14 h-14 rounded-full bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center text-white text-xl font-bold shadow-lg ring-2 ring-white/10">
+                {displayShop.name.charAt(0)}
+              </div>
+            )}
+            <div className="flex-1 min-w-0">
+              <h2 className="text-white text-xl font-bold truncate leading-tight">
+                {displayShop.name}
+              </h2>
               {isViewingOwnShop && (
-                <span className="ml-2 text-sm text-orange-primary">{t('catalog.myShop')}</span>
+                <span className="inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-orange-500/20 text-orange-400">
+                  {t('catalog.myShop')}
+                </span>
               )}
-            </h1>
-            <p className="text-gray-400 text-sm">
-              {activeSection === 'preorder'
-                ? `${preorderProducts.length} ${t('catalog.inPreorder')}`
-                : `${stockProducts.length} ${t('catalog.inStock')}`}
-            </p>
+            </div>
+            <div className="text-right">
+              <div className="text-2xl font-bold text-white leading-none">
+                {activeSection === 'preorder' ? preorderProducts.length : stockProducts.length}
+              </div>
+              <div className="text-[10px] items-center text-gray-400 font-medium uppercase tracking-wider mt-1">
+                {activeSection === 'preorder' ? t('catalog.inPreorder') : t('catalog.inStock')}
+              </div>
+            </div>
           </div>
-        </div>
 
-        {/* Search Bar */}
-        <div className="mt-4 relative" ref={searchContainerRef}>
-          <div className="relative">
-            {/* Search Icon */}
-            <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
-              <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
+          {/* Enhanced Search & Filters Area */}
+          <div className="space-y-3 sticky top-0 z-20">
+            {/* Search Bar */}
+            <div className="relative" ref={searchContainerRef}>
+              <div className="relative group">
+                {/* Search Icon */}
+                <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none transition-colors duration-200 group-focus-within:text-orange-primary">
+                  <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </div>
+
+                {/* Input */}
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  value={searchQuery}
+                  onChange={handleSearchChange}
+                  placeholder={t('catalog.searchPlaceholder')}
+                  className="w-full bg-[#242424] border border-white/5 rounded-2xl py-3.5 pl-12 pr-12 text-white placeholder-gray-500 focus:outline-none focus:bg-[#2a2a2a] focus:border-orange-primary/50 focus:ring-1 focus:ring-orange-primary/50 transition-all shadow-sm"
+                />
+
+                {/* Clear button */}
+                {searchQuery && (
+                  <motion.button
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.8 }}
+                    onClick={clearSearch}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 hover:bg-white/10 rounded-full transition-colors text-gray-400 hover:text-white"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </motion.button>
+                )}
+              </div>
+
+              {/* Search Results Dropdown */}
+              <AnimatePresence>
+                {isSearchActive && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 10, scale: 0.98 }}
+                    className="absolute top-full left-0 right-0 mt-3 bg-[#242424] rounded-2xl border border-white/10 shadow-[0_20px_40px_rgba(0,0,0,0.4)] z-50 max-h-[60vh] overflow-y-auto overflow-hidden ring-1 ring-white/5"
+                  >
+                    {isSearching ? (
+                      <div className="flex items-center justify-center py-10">
+                        <div className="w-8 h-8 border-3 border-orange-primary border-t-transparent rounded-full animate-spin opacity-80" />
+                      </div>
+                    ) : searchResults.length > 0 ? (
+                      <div className="p-2 space-y-1">
+                        {searchResults.map((product) => (
+                          <SearchResultItem
+                            key={`${product.shop_id}-${product.id}`}
+                            product={product}
+                            onClick={() => handleSearchResultClick(product)}
+                            t={t}
+                          />
+                        ))}
+                      </div>
+                    ) : searchQuery.trim().length >= 2 ? (
+                      <div className="flex flex-col items-center justify-center py-10 text-center px-6">
+                        <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mb-4">
+                          <svg className="w-8 h-8 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                        </div>
+                        <p className="text-white font-semibold">{t('catalog.searchEmpty')}</p>
+                        <p className="text-gray-500 text-sm mt-1">{t('catalog.searchEmptyDesc')}</p>
+                      </div>
+                    ) : (
+                      <div className="py-6 px-4 text-center text-gray-500 text-sm font-medium">
+                        {t('catalog.searchMinChars')}
+                      </div>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
 
-            {/* Input */}
-            <input
-              ref={searchInputRef}
-              type="text"
-              value={searchQuery}
-              onChange={handleSearchChange}
-              placeholder={t('catalog.searchPlaceholder')}
-              className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 pl-10 pr-10 text-white placeholder-gray-500 focus:outline-none focus:border-orange-primary/50 focus:ring-1 focus:ring-orange-primary/30 transition-all"
-            />
+            {/* Tabs */}
+            <div className="relative flex bg-[#242424] rounded-2xl p-1.5 border border-white/5 shadow-inner">
+              {['stock', 'preorder'].map((sectionId) => {
+                const isActive = activeSection === sectionId;
+                const label = sectionId === 'stock' ? t('catalog.tabs.stock') : t('catalog.tabs.preorder');
 
-            {/* Clear button */}
-            {searchQuery && (
-              <motion.button
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.8 }}
-                onClick={clearSearch}
-                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-white/10 rounded-full transition-colors"
-              >
-                <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </motion.button>
-            )}
-          </div>
-
-          {/* Search Results Dropdown */}
-          <AnimatePresence>
-            {isSearchActive && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="absolute top-full left-0 right-0 mt-2 bg-dark-card/95 backdrop-blur-lg rounded-xl border border-white/10 shadow-xl z-50 max-h-80 overflow-y-auto"
-              >
-                {isSearching ? (
-                  <div className="flex items-center justify-center py-8">
-                    <div className="w-6 h-6 border-2 border-orange-primary border-t-transparent rounded-full animate-spin" />
-                  </div>
-                ) : searchResults.length > 0 ? (
-                  <div className="p-2 space-y-1">
-                    {searchResults.map((product) => (
-                      <SearchResultItem
-                        key={`${product.shop_id}-${product.id}`}
-                        product={product}
-                        onClick={() => handleSearchResultClick(product)}
-                        t={t}
+                return (
+                  <button
+                    key={sectionId}
+                    type="button"
+                    onClick={() => handleSectionChange(sectionId)}
+                    className={`relative flex-1 py-3 rounded-xl transition-all duration-300 ${isActive ? 'text-white' : 'text-gray-500 hover:text-gray-300'
+                      }`}
+                  >
+                    {isActive && (
+                      <motion.div
+                        layoutId="catalog-section-highlight"
+                        className="absolute inset-0 bg-white/10 shadow-[0_4px_12px_rgba(0,0,0,0.2)] rounded-xl border border-white/10"
+                        transition={{ type: 'spring', stiffness: 350, damping: 25 }}
                       />
-                    ))}
-                  </div>
-                ) : searchQuery.trim().length >= 2 ? (
-                  <div className="flex flex-col items-center justify-center py-8 text-center px-4">
-                    <svg className="w-12 h-12 text-gray-600 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <p className="text-gray-400 font-medium">{t('catalog.searchEmpty')}</p>
-                    <p className="text-gray-500 text-sm mt-1">{t('catalog.searchEmptyDesc')}</p>
-                  </div>
-                ) : (
-                  <div className="py-4 px-4 text-center text-gray-500 text-sm">
-                    {t('catalog.searchMinChars')}
-                  </div>
-                )}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-      </div>
-
-      {/* Tabs */}
-      <div className="px-4 pt-4">
-        <div className="relative flex bg-white/5 backdrop-blur rounded-2xl p-1">
-          {['stock', 'preorder'].map((sectionId) => {
-            const isActive = activeSection === sectionId;
-            const label = sectionId === 'stock' ? t('catalog.tabs.stock') : t('catalog.tabs.preorder');
-            const count = sectionId === 'stock' ? stockProducts.length : preorderProducts.length;
-
-            return (
-              <button
-                key={sectionId}
-                type="button"
-                onClick={() => handleSectionChange(sectionId)}
-                className={`relative flex-1 py-2.5 rounded-xl transition-colors ${isActive ? 'text-white' : 'text-white/60'
-                  }`}
-              >
-                {isActive && (
-                  <motion.div
-                    layoutId="catalog-section-highlight"
-                    className="absolute inset-0 bg-white/16 shadow-[0_10px_30px_rgba(10,10,10,0.35)] rounded-xl"
-                    transition={{ type: 'spring', stiffness: 320, damping: 28 }}
-                  />
-                )}
-                <span className="relative z-10 text-sm font-semibold" style={{ letterSpacing: '-0.01em' }}>
-                  {label}
-                </span>
-                <span className={`relative z-10 ml-2 text-xs font-semibold ${isActive ? 'text-orange-primary' : 'text-white/35'}`}>
-                  {count}
-                </span>
-              </button>
-            );
-          })}
+                    )}
+                    <div className="relative z-10 flex items-center justify-center gap-2">
+                      <span className="text-sm font-bold tracking-wide">
+                        {label}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </div>
       </div>
 
       {/* Content */}
-      {loading && (
-        <div className="px-4 py-6">
-          <div className="grid grid-cols-2 gap-4">
-            {[...Array(6)].map((_, i) => <ProductCardSkeleton key={i} />)}
+      <div className="mt-2">
+        {loading && (
+          <div className="px-4">
+            <div className="grid grid-cols-2 gap-4">
+              {[...Array(6)].map((_, i) => <ProductCardSkeleton key={i} />)}
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {!loading && error && (
-        <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
-          <svg className="w-16 h-16 text-red-500 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          <h3 className="text-lg font-semibold text-gray-400 mb-2">{error}</h3>
-          <motion.button
-            onClick={handleRetry}
-            className="bg-orange-primary hover:bg-orange-light text-white font-semibold px-6 py-3 rounded-xl transition-colors mt-4"
-            whileTap={{ scale: 0.95 }}
-          >
-            {t('common.retry')}
-          </motion.button>
-        </div>
-      )}
+        {!loading && error && (
+          <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
+            <div className="w-20 h-20 rounded-full bg-red-500/10 flex items-center justify-center mb-4">
+              <svg className="w-10 h-10 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-bold text-white mb-2">Oops!</h3>
+            <p className="text-gray-400 mb-6 max-w-[200px]">{error}</p>
+            <motion.button
+              onClick={handleRetry}
+              className="bg-orange-primary hover:bg-orange-600 text-white font-bold px-8 py-3.5 rounded-2xl shadow-lg shadow-orange-500/20 transition-all"
+              whileTap={{ scale: 0.95 }}
+            >
+              {t('common.retry')}
+            </motion.button>
+          </div>
+        )}
 
-      {!loading && !error && (
-        <ProductGrid
-          products={displayedProducts}
-          loading={loading}
-          emptyTitle={activeSection === 'preorder' ? t('catalog.preorderEmpty') : t('catalog.empty')}
-          emptyDescription={
-            activeSection === 'preorder'
-              ? t('catalog.preorderEmptyDesc')
-              : t('catalog.emptyDesc')
-          }
-          emptyIcon={activeSection === 'preorder' ? '🕒' : '📦'}
-        />
-      )}
+        {!loading && !error && (
+          <ProductGrid
+            products={displayedProducts}
+            loading={loading}
+            emptyTitle={activeSection === 'preorder' ? t('catalog.preorderEmpty') : t('catalog.empty')}
+            emptyDescription={
+              activeSection === 'preorder'
+                ? t('catalog.preorderEmptyDesc')
+                : t('catalog.emptyDesc')
+            }
+            emptyIcon={activeSection === 'preorder' ? 'clock' : 'box'}
+          />
+        )}
+      </div>
 
       <CartButton onClick={() => setCartOpen(true)} />
     </div>

@@ -10,6 +10,9 @@ export default function Header({ title }) {
       <div className="flex items-center justify-between px-4" style={{ height: '56px' }}>
 
 
+        {/* Spacer for symmetry */}
+        <div style={{ width: '40px', height: '40px' }} />
+
         {/* Title */}
         <h1 className="flex-1 text-xl font-bold text-white text-center">{title}</h1>
 

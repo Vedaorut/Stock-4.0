@@ -75,6 +75,9 @@ export const shopQueries = {
     const params = [`%${name}%`, limit];
     const paramIndex = params.length + 1;
 
+    // FIX: Use shop_subscribers table instead of subscriptions
+    // subscriptions = seller payment subscriptions (PRO/MAX)
+    // shop_subscribers = buyer follows shops
     const queryText = `
       SELECT
         s.*,
@@ -84,8 +87,8 @@ export const shopQueries = {
         ${
           userId
             ? `EXISTS(
-          SELECT 1 FROM subscriptions sub
-          WHERE sub.shop_id = s.id AND sub.user_id = $${paramIndex}
+          SELECT 1 FROM shop_subscribers ss
+          WHERE ss.shop_id = s.id AND ss.user_id = $${paramIndex}
         )`
             : 'false'
         } as is_subscribed

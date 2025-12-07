@@ -20,7 +20,7 @@ function WorkspaceShopCard({ shop, onSelect, isActive, t }) {
   const formatAccessDate = (dateString) => {
     if (!dateString) return null;
     const date = new Date(dateString);
-    return date.toLocaleDateString('ru-RU', {
+    return date.toLocaleDateString(t('common.locale'), {
       day: 'numeric',
       month: 'short',
       year: 'numeric',
@@ -79,16 +79,15 @@ function WorkspaceShopCard({ shop, onSelect, isActive, t }) {
         {/* Action Button */}
         <motion.button
           onClick={handleSelect}
-          className={`px-4 py-2 rounded-xl font-semibold text-sm ${
-            isActive
-              ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-              : 'text-white'
-          }`}
+          className={`px-4 py-2 rounded-xl font-semibold text-sm ${isActive
+            ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+            : 'text-white'
+            }`}
           style={
             !isActive
               ? {
-                  background: 'linear-gradient(135deg, #FF6B00 0%, #FF8533 100%)',
-                }
+                background: 'linear-gradient(135deg, #FF6B00 0%, #FF8533 100%)',
+              }
               : undefined
           }
           whileTap={{ scale: 0.95 }}
@@ -120,15 +119,6 @@ export default function WorkerModeModal({ isOpen, onClose }) {
 
   useBackButton(isOpen ? handleClose : null);
 
-  // Disable vertical swipes when modal is open (Telegram Mini App)
-  useEffect(() => {
-    if (isOpen && window.Telegram?.WebApp) {
-      window.Telegram.WebApp.disableVerticalSwipes();
-      return () => {
-        window.Telegram.WebApp.enableVerticalSwipes();
-      };
-    }
-  }, [isOpen]);
 
   const loadData = useCallback(
     async (signal) => {
@@ -310,7 +300,7 @@ export default function WorkerModeModal({ isOpen, onClose }) {
           exit={{ x: '100%' }}
           transition={{ type: 'spring', damping: 30, stiffness: 300 }}
         >
-          <PageHeader title="Worker Mode" onBack={handleClose} variant="close" />
+          <PageHeader title={t('settings.items.workerMode')} onBack={handleClose} variant="close" />
           <div
             className="flex-1 overflow-y-auto"
             style={{

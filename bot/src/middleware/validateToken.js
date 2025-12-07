@@ -60,7 +60,8 @@ const regenerateToken = async (ctx) => {
     ctx.session.tokenCreatedAt = new Date().toISOString();
     // Session fields (migrated from ctx.session.user)
     ctx.session.userId = authData.user?.id;
-    ctx.session.language = authData.user?.language || 'ru';
+    // FIX: Don't set default - let start.js show language selection for new users
+    ctx.session.language = authData.user?.language || null;
     ctx.session.role = authData.user?.selected_role || null;
 
     logger.info('Token regenerated successfully', { userId: telegramId });

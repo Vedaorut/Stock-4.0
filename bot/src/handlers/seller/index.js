@@ -47,25 +47,25 @@ const getSellerMenu = async (ctx) => {
         // Active orders count requires token (user-specific data)
         token
           ? orderApi.getActiveOrdersCount(shopId, token).catch((error) => {
-              logger.error('Failed to get active orders count:', error);
-              // STABILITY FIX #1: Track token expiration
-              if (error.response?.status === 401) {
-                return { count: 0, tokenExpired: true };
-              }
-              return { count: 0, tokenExpired: false };
-            })
+            logger.error('Failed to get active orders count:', error);
+            // STABILITY FIX #1: Track token expiration
+            if (error.response?.status === 401) {
+              return { count: 0, tokenExpired: true };
+            }
+            return { count: 0, tokenExpired: false };
+          })
           : Promise.resolve({ count: 0, tokenExpired: false }),
         // Follows list - use HTTP API with token
         token
           ? followApi.getMyFollows(shopId, token).catch((error) => {
-              // STABILITY FIX #1: Track token expiration for re-auth message
-              if (error.response?.status === 401) {
-                logger.debug('Token expired or user not authenticated for follows menu');
-                return { follows: [], tokenExpired: true };
-              }
-              logger.error('Failed to get follows for menu:', error);
-              return { follows: [], tokenExpired: false };
-            })
+            // STABILITY FIX #1: Track token expiration for re-auth message
+            if (error.response?.status === 401) {
+              logger.debug('Token expired or user not authenticated for follows menu');
+              return { follows: [], tokenExpired: true };
+            }
+            logger.error('Failed to get follows for menu:', error);
+            return { follows: [], tokenExpired: false };
+          })
           : Promise.resolve({ follows: [], tokenExpired: false }),
       ]);
 
@@ -92,7 +92,7 @@ const getSellerMenu = async (ctx) => {
   }
 
   ctx.session.hasFollows = hasFollows;
-  
+
   // STABILITY FIX #1: Return both menu and tokenExpired flag
   return { menu: sellerMenu(activeCount, { hasFollows }, getLangSafe(ctx)), tokenExpired };
 };
@@ -491,21 +491,7 @@ export const setupSellerHandlers = (bot) => {
 
   // Active orders management
   bot.action('seller:active_orders', handleActiveOrders);
-  // P2-9 FIX: Validate shop before entering markOrdersShipped scene
-  bot.action('seller:mark_shipped', async (ctx) => {
-    try {
-      await ctx.answerCbQuery();
 
-      // P2-9 FIX: Validate shop exists in database
-      const isValid = await validateShopBeforeScene(ctx, 'markOrdersShipped');
-      if (!isValid) return;
-
-      await ctx.scene.enter('markOrdersShipped');
-    } catch (error) {
-      logger.error('Error entering markOrdersShipped scene:', error);
-      await ctx.reply(ctx.t('general.actionFailed'), await getSellerMenuKeyboard(ctx));
-    }
-  });
   bot.action(/^order:ship:(\d+)$/, handleMarkShipped);
   bot.action(/^order:deliver:(\d+)$/, handleMarkDelivered);
   bot.action(/^order:cancel:(\d+)$/, handleCancelOrder);
@@ -568,6 +554,46 @@ export const setupSellerHandlers = (bot) => {
       await ctx.scene.enter('migrate_channel');
     } catch (error) {
       logger.error('Error entering migrate_channel scene:', error);
+      await ctx.reply(
+        ctx.t('general.actionFailed'),
+        sellerToolsMenu(ctx.session.isShopOwner ?? false, getLangSafe(ctx))
+      );
+    }
+  });
+
+  // Rename shop (owner only)
+  bot.action('seller:rename_shop', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+
+      // Validate shop exists
+      const isValid = await validateShopBeforeScene(ctx, 'renameShop');
+      if (!isValid) return;
+
+      // Check ownership
+      let isOwner = ctx.session.isShopOwner;
+      if (typeof isOwner !== 'boolean') {
+        try {
+          const shopResponse = await shopApi.getShop(ctx.session.shopId, ctx.session.token);
+          isOwner = shopResponse?.owner_id === ctx.session.userId;
+          ctx.session.isShopOwner = isOwner;
+        } catch (error) {
+          logger.error('Failed to verify ownership for rename_shop:', error);
+          isOwner = false;
+        }
+      }
+
+      if (!isOwner) {
+        await ctx.reply(
+          t('errors.shopAccessDenied', {}, getLangSafe(ctx)),
+          sellerToolsMenu(false, getLangSafe(ctx))
+        );
+        return;
+      }
+
+      await ctx.scene.enter('renameShop');
+    } catch (error) {
+      logger.error('Error entering renameShop scene:', error);
       await ctx.reply(
         ctx.t('general.actionFailed'),
         sellerToolsMenu(ctx.session.isShopOwner ?? false, getLangSafe(ctx))
@@ -677,6 +703,19 @@ export const setupSellerHandlers = (bot) => {
 
   // Invite link - show copyable link for sharing
   bot.action('seller:invite_link', handleInviteLink);
+
+  // Feedback - enter feedback scene
+  bot.action('feedback:start', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      logger.info('feedback:start', { userId: ctx.from.id });
+      await ctx.scene.enter('feedback');
+    } catch (error) {
+      logger.error('Error entering feedback scene:', error);
+      const lang = getLangSafe(ctx);
+      await ctx.reply(t('general.errorOccurred', {}, lang));
+    }
+  });
 
   // Back to seller menu
   bot.action('seller:main', handleSellerRole);

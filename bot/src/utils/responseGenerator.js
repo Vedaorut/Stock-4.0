@@ -130,9 +130,9 @@ export function generateDeterministicResponse(result, lang = 'ru') {
   // SUCCESS OPERATIONS - generate informative response
 
   switch (data.action) {
-    // Create single product
+    // Create single product (or update if merged)
     case 'product_created': {
-      const { product } = data;
+      const { product, merged } = data;
       if (!product) return t('responseGenerator.productAdded', {}, lang);
 
       const name = product.name || t('responseGenerator.product', {}, lang);
@@ -141,6 +141,11 @@ export function generateDeterministicResponse(result, lang = 'ru') {
         product.stock_quantity !== undefined
           ? ` (${t('responseGenerator.stock', { count: product.stock_quantity }, lang)})`
           : '';
+
+      // If product was merged (updated existing), use different message
+      if (merged) {
+        return t('responseGenerator.merged', { name, price, stock }, lang);
+      }
 
       return t('responseGenerator.added', { name, price, stock }, lang);
     }

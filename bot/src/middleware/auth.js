@@ -63,21 +63,18 @@ const authMiddleware = async (ctx, next) => {
       if (tokenAge < sixDays) {
         // Миграция старой структуры session (user → language/role)
         if (ctx.session.user && !ctx.session.language) {
-          ctx.session.language = ctx.session.user.language || 'ru';
+          // FIX: Don't set default 'ru' - let start.js show language selection
+          ctx.session.language = ctx.session.user.language || null;
           ctx.session.role = ctx.session.role || ctx.session.user.selected_role;
           delete ctx.session.user;
           logger.info(`Migrated old session format for user ${ctx.from.id}`);
         }
-        // FIX: Sessions without language need re-auth to sync with backend
-        if (!ctx.session.language) {
-          logger.info(`Session missing language, forcing re-auth for user ${ctx.from.id}`);
-          // Fall through to re-authenticate below
-        } else {
-          if (shouldSyncLanguage(ctx.session)) {
-            await syncLanguageFromBackend(ctx);
-          }
-          return next(); // Token is valid and fresh
+        // FIX: Don't force re-auth if language is null - start.js will handle language selection
+        // This prevents infinite re-auth loop when DB has no language set
+        if (shouldSyncLanguage(ctx.session)) {
+          await syncLanguageFromBackend(ctx);
         }
+        return next(); // Token is valid and fresh
       }
       logger.info(
         `Token age ${Math.floor(tokenAge / (24 * 60 * 60 * 1000))} days, refreshing for user ${ctx.from.id}`
@@ -113,7 +110,10 @@ const authMiddleware = async (ctx, next) => {
     ctx.session.token = authData.token;
     ctx.session.tokenCreatedAt = new Date().toISOString(); // Track token creation time
     ctx.session.userId = authData.user?.id;
-    ctx.session.language = authData.user?.language || 'ru';
+    // FIX: Don't set default 'ru' - let start.js show language selection for new users
+    ctx.session.language = authData.user?.language || null;
+    // FIX: Flag to track if language was explicitly set by user (not auto-detected by i18n)
+    ctx.session.isLanguageConfirmed = !!authData.user?.language;
     ctx.session.role = existingRole || authData.user?.selected_role || null;
     ctx.session.shopId = existingShopId || null; // Preserve if exists
     ctx.session.shopName = existingShopName || null;

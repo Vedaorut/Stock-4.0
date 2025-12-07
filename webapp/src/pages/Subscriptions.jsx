@@ -84,7 +84,7 @@ export default function Subscriptions() {
       try {
         // BUYER MODE: fetch user's subscriptions to shops
         if (viewMode === 'buyer') {
-          const { data: subsData, error: subsError } = await get('/subscriptions', { signal });
+          const { data: subsData, error: subsError } = await get('/users/subscriptions', { signal });
 
           if (signal?.aborted) return { status: 'aborted' };
 

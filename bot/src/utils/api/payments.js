@@ -30,21 +30,21 @@ export const subscriptionApi = {
 
   // Check if user is subscribed to shop
   async checkSubscription(shopId, token) {
-    const { data } = await api.get(`/subscriptions/check/${shopId}`, {
+    // FIX: Use /shops/:shopId/subscribed which reads from shop_subscribers table
+    const { data } = await api.get(`/shops/${shopId}/subscribed`, {
       headers: { Authorization: `Bearer ${token}` },
     });
-    // Unwrap response: return data.data (object with isSubscribed and subscription) instead of wrapper
+    // Unwrap response: return data.data (object with subscribed flag) instead of wrapper
     return data.data || data;
   },
 
-  // Subscribe to shop
+  // Subscribe to shop (buyer follows a shop)
   async subscribe(shopId, token, telegramId = null) {
+    // FIX: Use /shops/:shopId/subscribe which writes to shop_subscribers table
+    // (not /subscriptions which writes to subscriptions table - seller payment subscriptions)
     const { data } = await api.post(
-      '/subscriptions',
-      {
-        shopId: Number(shopId),
-        telegramId: telegramId ? String(telegramId) : undefined,
-      },
+      `/shops/${shopId}/subscribe`,
+      {},
       {
         headers: { Authorization: `Bearer ${token}` },
       }
@@ -53,18 +53,21 @@ export const subscriptionApi = {
     return data.data || data;
   },
 
-  // Get user subscriptions
+  // Get user subscriptions (shops the user is subscribed to)
   async getMySubscriptions(token) {
-    const { data } = await api.get('/subscriptions', {
+    // FIX: Use /users/subscriptions which reads from shop_subscribers table
+    // (not /subscriptions which reads from subscriptions table - seller payment subscriptions)
+    const { data } = await api.get('/users/subscriptions', {
       headers: { Authorization: `Bearer ${token}` },
     });
     // Unwrap response: return data.data (array of subscriptions) instead of wrapper
     return data.data || data;
   },
 
-  // Unsubscribe from shop
+  // Unsubscribe from shop (buyer unfollows a shop)
   async unsubscribe(shopId, token) {
-    const { data } = await api.delete(`/subscriptions/${shopId}`, {
+    // FIX: Use /shops/:shopId/subscribe which deletes from shop_subscribers table
+    const { data } = await api.delete(`/shops/${shopId}/subscribe`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     // Unwrap response: return data.data instead of wrapper

@@ -13,7 +13,7 @@ import { t } from '../i18n/index.js';
 function createFakeCallbackContext(ctx) {
   return {
     ...ctx,
-    answerCbQuery: async () => {},
+    answerCbQuery: async () => { },
     editMessageText: async (text, extra) => {
       return await ctx.reply(text, extra);
     },
@@ -95,6 +95,8 @@ const handleShopInvite = async (ctx, shopId) => {
     return true; // Signal that we handled the flow
   } catch (error) {
     // Handle subscription errors with user feedback
+    const errorMessage = error.response?.data?.error || error.message || '';
+
     if (error.response?.status === 409) {
       // Already subscribed - show friendly message and redirect to buyer
       logger.debug(`User ${ctx.from.id} already subscribed to shop ${shopId}`);
@@ -116,6 +118,22 @@ const handleShopInvite = async (ctx, shopId) => {
       const fakeCtx = createFakeCallbackContext(ctx);
       await handleBuyerRole(fakeCtx, { skipRoleUpdate: true });
       return true;
+    } else if (error.response?.status === 400 && errorMessage.includes('own shop')) {
+      // Cannot subscribe to own shop - redirect to seller menu
+      logger.info(`User ${ctx.from.id} tried to subscribe to their own shop ${shopId}`);
+      await ctx.reply(t('inviteLink.ownShop', {}, lang));
+
+      // Redirect to seller menu since it's their shop
+      ctx.session.role = 'seller';
+      ctx.session.shopId = shopId;
+      try {
+        await authApi.updateRole('seller', ctx.session.token);
+      } catch (roleError) {
+        logger.error('Failed to save seller role:', roleError);
+      }
+      const fakeCtx = createFakeCallbackContext(ctx);
+      await handleSellerRole(fakeCtx, { skipRoleUpdate: true });
+      return true;
     } else if (error.response?.status === 404) {
       logger.warn(`Shop ${shopId} not found for invite link`);
       await ctx.reply(t('inviteLink.shopNotFound', {}, lang));
@@ -130,6 +148,15 @@ const handleShopInvite = async (ctx, shopId) => {
 export const handleStart = async (ctx) => {
   try {
     logger.info(`/start command from user ${ctx.from.id}`);
+
+    // FIX: Force set Menu Button to 'commands' for this user
+    // This fixes the bug where the button gets stuck on WebApp for some users
+    try {
+      await ctx.setChatMenuButton({ type: 'commands' });
+      logger.debug(`Force-fixed Menu Button for user ${ctx.from.id}`);
+    } catch (menuErr) {
+      logger.warn(`Failed to force-fix Menu Button for user ${ctx.from.id}:`, menuErr.message);
+    }
 
     // Parse deep link payload (e.g., shop_123)
     const deepLink = parseDeepLink(ctx.message?.text);
@@ -155,29 +182,42 @@ export const handleStart = async (ctx) => {
     delete ctx.session.aiConversation;
     delete ctx.session.pendingAI;
 
-    // === PRIORITY 0: Check if language is set (first-time user) ===
-    if (!ctx.session.language) {
-      logger.info(`User ${ctx.from.id} has no language set, showing language selection`);
-      await smartMessage.send(ctx, {
-        text: t('settings.selectLanguage', {}, 'en'),
-        keyboard: languageMenu('en'),
-      });
-      return;
-    }
-
-    // === Handle pending deep link (shop invite) ===
-    // Process after language is set and user has token
+    // === Handle pending deep link (shop invite) FIRST ===
+    // For invite links: subscribe first, show LK, then ask language later
     if (ctx.session.pendingDeepLink && ctx.session.token) {
       const pendingDeepLink = ctx.session.pendingDeepLink;
       delete ctx.session.pendingDeepLink;
 
       if (pendingDeepLink.type === 'shop_invite') {
+        // Mark that user needs language selection after seeing LK
+        if (!ctx.session.language) {
+          ctx.session.pendingLanguageSelection = true;
+        }
         const handled = await handleShopInvite(ctx, pendingDeepLink.shopId);
         if (handled) {
           // handleShopInvite redirected to buyer menu, stop here
           return;
         }
       }
+    }
+
+    // === PRIORITY 0: Check if language is set (first-time user without invite) ===
+    // Skip if user came via invite (they'll see language selection after LK)
+    // FIX: Check if language is already in session (from DB sync or previous selection)
+    // If language exists in session, consider it confirmed (don't ask again)
+    const hasLanguageInSession = !!ctx.session.language;
+    const isLanguageConfirmed = ctx.session.isLanguageConfirmed || hasLanguageInSession;
+
+    if (!isLanguageConfirmed && !ctx.session.pendingLanguageSelection) {
+      // Auto-detect language from Telegram for initial display
+      const detectedLang = ctx.from?.language_code?.startsWith('ru') ? 'ru' : 'en';
+      logger.info(`User ${ctx.from.id} has no confirmed language, showing language selection (detected: ${detectedLang})`);
+      ctx.session.pendingLanguageSelection = true; // Prevent re-showing on refresh
+      await smartMessage.send(ctx, {
+        text: t('settings.selectLanguageWelcome', {}, detectedLang),
+        keyboard: languageMenu(detectedLang),
+      });
+      return;
     }
 
     // === PRIORITY 1: Check if user has shop (seller priority) ===

@@ -122,9 +122,28 @@ export default function FollowDetail() {
 
   // Back button handler
   const handleBack = useCallback(() => {
+    // Check if any modal is open and close it first
+    if (isMarkupModalOpen) {
+      setIsMarkupModalOpen(false);
+      return;
+    }
+    if (isSwitchModeDialogOpen) {
+      setIsSwitchModeDialogOpen(false);
+      return;
+    }
+    if (isDeleteDialogOpen) {
+      setIsDeleteDialogOpen(false);
+      return;
+    }
+    if (isProductMarkupModalOpen) {
+      setIsProductMarkupModalOpen(false);
+      setSelectedProduct(null);
+      return;
+    }
+
     triggerHaptic('light');
     useStore.getState().setFollowDetailId(null);
-  }, [triggerHaptic]);
+  }, [triggerHaptic, isMarkupModalOpen, isSwitchModeDialogOpen, isDeleteDialogOpen, isProductMarkupModalOpen]);
 
   // Telegram BackButton integration
   useBackButton(handleBack);
@@ -341,7 +360,7 @@ export default function FollowDetail() {
               transition={{ delay: 0.05 }}
             >
               <div className="absolute inset-0 bg-gradient-to-br from-white/[0.06] to-transparent" />
-              
+
               <div className="relative flex items-center gap-4">
                 {/* Shop Avatar */}
                 <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#FF6B00] to-[#FF8F00] shadow-lg shadow-[#FF6B00]/20 flex items-center justify-center text-white font-bold text-xl flex-shrink-0">
@@ -353,11 +372,10 @@ export default function FollowDetail() {
                   <h2 className="text-white font-bold text-lg truncate">{shopName}</h2>
                   <div className="flex items-center gap-2 mt-1 flex-wrap">
                     <span
-                      className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
-                        mode === 'resell'
+                      className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${mode === 'resell'
                           ? 'bg-[#FF6B00]/10 text-[#FF6B00] border-[#FF6B00]/20'
                           : 'bg-blue-500/10 text-blue-400 border-blue-500/20'
-                      }`}
+                        }`}
                     >
                       {mode === 'resell' ? t('followDetail.resale') : t('followDetail.monitor')}
                     </span>

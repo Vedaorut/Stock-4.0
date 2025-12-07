@@ -25,12 +25,12 @@ const FollowDetailPage = lazy(() => import('./pages/FollowDetail'));
 // Loading fallback component
 function PageLoader() {
   return (
-  <div className="min-h-screen flex items-center justify-center bg-[#0A0A0A]">
-    <div className="text-center">
-      <div className="w-12 h-12 border-4 border-[#FF6B00] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-      <p className="text-white/60 text-sm">Loading...</p>
+    <div className="min-h-screen flex items-center justify-center bg-[#0A0A0A]">
+      <div className="text-center">
+        <div className="w-12 h-12 border-4 border-[#FF6B00] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+        <p className="text-white/60 text-sm">Loading...</p>
+      </div>
     </div>
-  </div>
   );
 }
 
@@ -86,6 +86,16 @@ function App() {
       const tg = window.Telegram.WebApp;
       tg.ready();
       tg.expand();
+
+      // Prevent app from closing on vertical swipe (Bot API 7.7+)
+      if (tg.isVersionAtLeast('7.7') && tg.disableVerticalSwipes) {
+        tg.disableVerticalSwipes();
+      }
+
+      // Also disable confirmation closing if enabled
+      if (tg.isClosingConfirmationEnabled) {
+        tg.enableClosingConfirmation();
+      }
 
       tg.setHeaderColor('#0A0A0A');
       tg.setBackgroundColor('#0A0A0A');
@@ -244,9 +254,8 @@ function App() {
         {import.meta.env.DEV && (
           <div className="fixed top-2 right-2 z-50">
             <div
-              className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
-                isConnected ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
-              }`}
+              className={`px-2 py-1 rounded text-xs font-medium transition-colors ${isConnected ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
+                }`}
             >
               {isConnected ? '🟢 WS Connected' : '🔴 WS Disconnected'}
             </div>

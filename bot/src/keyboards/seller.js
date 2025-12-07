@@ -43,8 +43,13 @@ export const sellerToolsMenu = (isOwner = false, lang = 'ru') => {
   buttons.push([Markup.button.callback(t('buttons.inviteLink', {}, lang), 'seller:invite_link')]);
 
   if (isOwner) {
+    buttons.push([Markup.button.callback(t('buttons.renameShop', {}, lang), 'seller:rename_shop')]);
     buttons.push([Markup.button.callback(t('buttons.changeChannel', {}, lang), 'seller:migrate_channel')]);
   }
+
+  // Feedback button - always available
+  buttons.push([Markup.button.callback(t('buttons.feedback', {}, lang), 'feedback:start')]);
+
   buttons.push([Markup.button.callback(t('buttons.backToMenu', {}, lang), 'seller:menu')]);
 
   return Markup.inlineKeyboard(buttons);

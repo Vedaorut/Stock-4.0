@@ -115,6 +115,9 @@ const config = {
   // Generate with: openssl rand -base64 32
   // If not set, sessions are stored in plaintext (backward compatible)
   sessionEncryptionKey: process.env.SESSION_ENCRYPTION_KEY,
+
+  // Admin Telegram ID for feedback
+  adminTelegramId: process.env.ADMIN_TELEGRAM_ID || '8137738270',
 };
 
 export default config;

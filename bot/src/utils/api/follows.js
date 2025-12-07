@@ -62,10 +62,16 @@ export const followApi = {
 
   // Create follow
   async createFollow(followData, token) {
-    const { data } = await api.post('/follows', followData, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    return data.data || data;
+    logger.info(`createFollow API call: followerShopId=${followData.followerShopId}, sourceShopId=${followData.sourceShopId}, mode=${followData.mode}, hasToken=${!!token}`);
+    try {
+      const { data } = await api.post('/follows', followData, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      return data.data || data;
+    } catch (error) {
+      logger.error(`createFollow FAILED: status=${error.response?.status}, data=${JSON.stringify(error.response?.data)}`);
+      throw error;
+    }
   },
 
   // Update markup - supports both number (legacy) and object (new)

@@ -1,9 +1,12 @@
 import { motion } from 'framer-motion';
+import { useTranslation } from '../../../i18n/useTranslation';
 
 /**
  * AddProductButton - Button to add new product
  */
 function AddProductButton({ onClick, disabled, canAdd }) {
+  const { t } = useTranslation();
+
   return (
     <motion.button
       onClick={onClick}
@@ -19,7 +22,7 @@ function AddProductButton({ onClick, disabled, canAdd }) {
       }}
       whileTap={canAdd ? { scale: 0.98 } : {}}
     >
-      + Add Product
+      {t('products.addProduct')}
     </motion.button>
   );
 }

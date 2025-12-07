@@ -104,15 +104,6 @@ export default function ProductsModal({ isOpen, onClose }) {
 
   useBackButton(isOpen ? (showAIChat ? handleCloseAIChat : handleClose) : null);
 
-  // Disable vertical swipes when modal is open (Telegram Mini App)
-  useEffect(() => {
-    if (isOpen && window.Telegram?.WebApp) {
-      window.Telegram.WebApp.disableVerticalSwipes();
-      return () => {
-        window.Telegram.WebApp.enableVerticalSwipes();
-      };
-    }
-  }, [isOpen]);
 
   // Initialize AI chat history
   useEffect(() => {
@@ -468,7 +459,7 @@ export default function ProductsModal({ isOpen, onClose }) {
           exit={{ x: '100%' }}
           transition={{ type: 'spring', damping: 30, stiffness: 300 }}
         >
-          <PageHeader title="My Products" onBack={handleClose} variant="close" />
+          <PageHeader title={t('settings.items.products')} onBack={handleClose} variant="close" />
           <div
             className="flex-1 overflow-y-auto"
             style={{
@@ -513,7 +504,7 @@ export default function ProductsModal({ isOpen, onClose }) {
                   t={t}
                 />
               ) : (
-                !showForm && <ProductEmptyState onOpenAIChat={handleOpenAIChat} />
+                !showForm && <ProductEmptyState />
               )}
             </div>
           </div>

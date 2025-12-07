@@ -60,6 +60,9 @@ import { requestIdMiddleware } from './middleware/requestId.js';
 // Import logger
 import logger from './utils/logger.js';
 
+// Import schema validator
+import { ensureSchemaValid } from './utils/schemaValidator.js';
+
 // Import routes
 import authRoutes from './routes/auth.js';
 import shopRoutes from './routes/shops.js';
@@ -74,6 +77,7 @@ import internalRoutes from './routes/internal.js';
 import aiRoutes from './routes/ai.js';
 import debugRoutes from './routes/debug.js';
 import userRoutes from './routes/users.js';
+import feedbackRoutes from './routes/feedback.js';
 
 // Routes registration (will be added after middleware setup)
 
@@ -412,6 +416,7 @@ app.use('/api/follows', followRoutes);
 app.use('/api/shop-follows', followRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/feedback', feedbackRoutes);
 app.use('/webhooks', webhookRoutes); // Crypto payment webhooks
 app.use('/api/internal', internalRoutes); // Internal API for bot-backend communication
 
@@ -475,6 +480,9 @@ const startServer = async () => {
 
     // ✅ REGRESSION PREVENTION: Validate database sequences before starting
     await validateDatabaseSequences();
+
+    // ✅ SCHEMA VALIDATION: Check all required columns exist before starting
+    await ensureSchemaValid();
 
     // Start HTTP server
     const server = app.listen(config.port, () => {

@@ -17,7 +17,7 @@ class DeepSeekClient {
     this.client = new OpenAI({
       baseURL: 'https://api.deepseek.com',
       apiKey: config.deepseekApiKey,
-      timeout: 10000, // 10s timeout
+      timeout: 30000, // 30s timeout (standard for fast models to handle load spikes)
     });
 
     logger.info('DeepSeek client initialized');

@@ -25,23 +25,21 @@
     "attention": "Attention",
     "copy": "Copy",
     "products": "products",
-    "more": "more"
+    "more": "more",
+    "locale": "en-US"
   },
-
   "product": {
     "syncedFrom": "from {shop}",
     "synced": "Synced",
     "syncedEditDisabled": "Synced product. Edit in source shop.",
     "syncedDeleteDisabled": "Synced product cannot be deleted. Remove it from source shop or disable sync."
   },
-
   "tabs": {
     "subscriptions": "Subscriptions",
     "follows": "Follows",
     "catalog": "Catalog",
     "settings": "Settings"
   },
-
   "settings": {
     "title": "Settings",
     "account": "Account",
@@ -98,7 +96,6 @@
     "nowWorkingIn": "You are now working in \"{name}\"",
     "shopSelectionError": "Failed to select shop"
   },
-
   "wallet": {
     "title": "My Wallets",
     "empty": "You don't have any saved wallets yet",
@@ -118,9 +115,19 @@
     "shopRequired": "Create a shop in the bot first",
     "invalidAll": "Enter at least one valid address",
     "invalidAddresses": "Invalid wallet addresses",
-    "supported": "Supported: BTC, ETH, USDT, LTC"
+    "supported": "Supported: BTC, ETH, USDT, LTC",
+    "enterAddresses": "Enter addresses for receiving cryptocurrency from buyers.",
+    "shopLabel": "Shop:",
+    "editing": "Editing",
+    "valid": "Valid address",
+    "allAdded": "All available wallets added",
+    "currencies": {
+      "BTC": "Bitcoin (BTC)",
+      "ETH": "Ethereum (ETH)",
+      "USDT": "USDT (TRC-20)",
+      "LTC": "Litecoin (LTC)"
+    }
   },
-
   "orders": {
     "title": "My Orders",
     "empty": "You don't have any orders yet",
@@ -137,7 +144,6 @@
       "cancelled": "Cancelled"
     }
   },
-
   "language": {
     "title": "Language",
     "russian": "Russian",
@@ -145,7 +151,6 @@
     "comingSoon": "Coming soon",
     "info": "Currently only Russian language is available. English version will be available soon."
   },
-
   "catalog": {
     "title": "Catalog",
     "selectShop": "Select a shop",
@@ -174,7 +179,6 @@
     "preorderEmpty": "No preorder products",
     "preorderEmptyDesc": "We will notify you when new preorder items become available"
   },
-
   "cart": {
     "title": "Cart",
     "empty": "Cart is empty",
@@ -188,7 +192,6 @@
     "browseCatalog": "Browse Catalog",
     "clearForOtherShop": "Clear cart to shop from another store"
   },
-
   "subscriptions": {
     "title": "My Subscriptions",
     "empty": "You are not subscribed to any shops",
@@ -206,7 +209,6 @@
     "searchEmptyDesc": "Try changing your search query",
     "searchMinChars": "Enter at least 2 characters"
   },
-
   "shop": {
     "products": "products",
     "subscribe": "Subscribe",
@@ -217,7 +219,6 @@
     "createShop": "Create a shop to access",
     "createShopForWorkers": "Create a shop to manage workers"
   },
-
   "payment": {
     "selectCrypto": "Select cryptocurrency",
     "selectMethod": "Select order payment method",
@@ -260,7 +261,6 @@
     "noWallets": "No payment methods",
     "noWalletsDesc": "This shop hasn't configured payment wallets yet"
   },
-
   "subscription": {
     "title": "Subscription",
     "activePlan": "Active plan",
@@ -270,9 +270,20 @@
     "select": "Select",
     "perMonth": "/mo",
     "goToBot": "To upgrade to PRO, go to the bot",
-    "changePlanBot": "To change your plan, go to the bot"
+    "changePlanBot": "To change your plan, go to the bot",
+    "switchToMax": "Switch to MAX",
+    "switchToPro": "Switch to PRO",
+    "goToBotMax": "To upgrade to MAX, go to the bot",
+    "goToBotChange": "To change your plan, go to the bot",
+    "features": {
+      "unlimited": "Unlimited Products",
+      "analytics": "Advanced Analytics",
+      "support": "Priority Support",
+      "allPro": "Everything in PRO",
+      "manager": "Dedicated Manager",
+      "integrations": "Custom Integrations"
+    }
   },
-
   "analytics": {
     "title": "Analytics",
     "totalSales": "Total sales",
@@ -291,7 +302,6 @@
     "loadError": "Failed to load analytics",
     "fetchError": "Error loading data"
   },
-
   "shopOrders": {
     "title": "Shop Orders",
     "ordersFor": "Orders: {shop}",
@@ -318,11 +328,11 @@
       "buyer": "Buyer",
       "product": "Product",
       "quantity": "Qty",
-      "pcs": "pcs"
+      "pcs": "pcs",
+      "anonymousHint": "No username, but buyer will get your contact"
     },
     "updateError": "Failed to update status"
   },
-
   "workspace": {
     "title": "Workspace",
     "workersTitle": "Workers",
@@ -346,7 +356,6 @@
     "addError": "Failed to add worker",
     "removeError": "Failed to remove worker"
   },
-
   "workerMode": {
     "active": "Active",
     "work": "Work",
@@ -360,7 +369,6 @@
     "askOwner": "Ask the shop owner to add you to Workspace",
     "accessSince": "Access since {date}"
   },
-
   "products": {
     "title": "My Products",
     "noShop": "You don't have a shop yet",
@@ -392,7 +400,6 @@
     "aiError": "Failed to process request. Try again later.",
     "aiCommandError": "Could not process command. Try again or rephrase."
   },
-
   "migration": {
     "title": "Migration",
     "doneTitle": "Done",
@@ -416,7 +423,6 @@
     "daysFew": "days",
     "daysMany": "days"
   },
-
   "follows": {
     "title": "Follows",
     "myFollows": "My Follows",
@@ -461,7 +467,6 @@
     "deleteSubscription": "Delete subscription",
     "irreversible": "This action is irreversible"
   },
-
   "myOrders": {
     "title": "My Orders",
     "noOrders": "No orders",
@@ -480,13 +485,11 @@
       "cancelled": "Cancelled"
     }
   },
-
   "confirm": {
     "title": "Confirmation",
     "deleteTitle": "Delete",
     "warningTitle": "Warning"
   },
-
   "errors": {
     "loadFailed": "Failed to load data",
     "loadSubscriptionsFailed": "Failed to load subscriptions",
@@ -501,12 +504,10 @@
     "persistentError": "If the problem persists, contact support",
     "sessionExpired": "Session expired. Restart the app from Telegram."
   },
-
   "offline": {
     "title": "No internet connection",
     "description": "Check your connection and try again"
   },
-
   "followDetail": {
     "title": "Subscription Details",
     "products": "Products",
@@ -524,21 +525,36 @@
     "deleteTitle": "Delete Subscription",
     "deleteWarning": "Are you sure? All synced products will be removed. This cannot be undone."
   },
-
   "dialogs": {
     "switchMode": "Switch",
     "delete": "Delete"
   },
-
   "hints": {
     "useFollowCommand": "Use /follow command in bot to add shops",
     "copied": "Copied!",
     "clickToCopy": "Click to copy",
     "stackTrace": "Stack trace"
   },
-
   "actions": {
     "adding": "Adding...",
     "retry": "Retry"
+  },
+  "feedback": {
+    "title": "Feedback",
+    "description": "Help us improve the app by sharing your thoughts",
+    "categoryLabel": "Category",
+    "messageLabel": "Message",
+    "placeholder": "Describe your issue or suggestion...",
+    "submit": "Send Feedback",
+    "success": "Thank you! Your feedback has been sent.",
+    "error": "Failed to send feedback. Please try again.",
+    "minCharsError": "Message must be at least {min} characters",
+    "minCharsHint": "At least {min} characters required ({current} now)",
+    "categories": {
+      "bug": "Bug",
+      "feature": "Feature",
+      "question": "Question",
+      "other": "Other"
+    }
   }
 }

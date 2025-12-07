@@ -16,11 +16,12 @@ import logger from '../../src/utils/logger.js';
  */
 export async function findByCode(code) {
   const query = `
-    SELECT 
+    SELECT
       id,
       code,
       discount_percentage,
       tier,
+      type,
       max_uses,
       used_count,
       expires_at,
@@ -97,6 +98,7 @@ export async function validatePromoCode(code) {
       valid: true,
       promoCode,
       tier: promoCode.tier, // Return the tier from promo code
+      isPermanent: promoCode.type === 'permanent_subscription',
     };
   } catch (error) {
     logger.error('[PromoCodeQueries] Error validating promo code:', {
@@ -109,9 +111,10 @@ export async function validatePromoCode(code) {
 
 /**
  * Increment usage count for promo code
+ * P0 FIX: Added max_uses check in WHERE clause to prevent race condition
  *
  * @param {number} promoCodeId - Promo code ID
- * @returns {Promise<Object>} Updated promo code
+ * @returns {Promise<Object|null>} Updated promo code or null if limit exceeded
  */
 export async function incrementUsageCount(promoCodeId) {
   const query = `
@@ -119,11 +122,19 @@ export async function incrementUsageCount(promoCodeId) {
     SET used_count = used_count + 1,
         updated_at = NOW()
     WHERE id = $1
+      AND (max_uses IS NULL OR used_count < max_uses)
     RETURNING *
   `;
 
   try {
     const result = await pool.query(query, [promoCodeId]);
+    // If no rows returned, max_uses limit was exceeded (race condition prevented)
+    if (result.rows.length === 0) {
+      logger.warn('[PromoCodeQueries] Promo code usage limit exceeded (race prevented):', {
+        promoCodeId,
+      });
+      return null;
+    }
     return result.rows[0];
   } catch (error) {
     logger.error('[PromoCodeQueries] Error incrementing usage count:', {

@@ -264,7 +264,7 @@ async function checkExpiredTrials() {
   }
 }
 
-async function activatePromoSubscription(shopId, userId, promoCode, targetTier = 'pro') {
+async function activatePromoSubscription(shopId, userId, promoCode, targetTier = 'pro', isPermanent = false) {
   const client = await pool.connect();
 
   try {
@@ -294,7 +294,8 @@ async function activatePromoSubscription(shopId, userId, promoCode, targetTier =
     }
 
     const now = new Date();
-    const periodEnd = addDays(now, SUBSCRIPTION_PERIOD_DAYS);
+    // For permanent subscriptions, period_end is NULL (never expires)
+    const periodEnd = isPermanent ? null : addDays(now, SUBSCRIPTION_PERIOD_DAYS);
     const promoTx = `promo-${shopId}-${Date.now()}`;
 
     // Record promo activation for idempotency

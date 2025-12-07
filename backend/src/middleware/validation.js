@@ -64,10 +64,10 @@ export const shopValidation = {
   create: [
     body('name')
       .trim()
-      .isLength({ min: 3, max: 30 })
-      .withMessage('Shop name must be 3-30 characters')
-      .matches(/^[a-zA-Z0-9_]+$/)
-      .withMessage('Shop name must contain only letters, numbers, and underscore'),
+      .isLength({ min: 3, max: 100 })
+      .withMessage('Shop name must be 3-100 characters')
+      .matches(/^[a-zA-Z0-9 _-]+$/)
+      .withMessage('Shop name must contain only Latin letters, numbers, spaces, underscore and dash'),
     body('description')
       .trim()
       .isLength({ max: 500 })
@@ -95,10 +95,10 @@ export const shopValidation = {
     body('name')
       .optional()
       .trim()
-      .isLength({ min: 3, max: 30 })
-      .withMessage('Shop name must be 3-30 characters')
-      .matches(/^[a-zA-Z0-9_]+$/)
-      .withMessage('Shop name must contain only letters, numbers, and underscore'),
+      .isLength({ min: 3, max: 100 })
+      .withMessage('Shop name must be 3-100 characters')
+      .matches(/^[a-zA-Z0-9 _-]+$/)
+      .withMessage('Shop name must contain only Latin letters, numbers, spaces, underscore and dash'),
     body('description')
       .optional()
       .trim()

@@ -101,19 +101,31 @@ hooks/useWebSocket.js → Real-time updates
 ### Database Schema
 ```
 users → shops → products → orders → order_items
-              ↘ shop_workers (PRO tier)
+              ↘ shop_workers (Max tier only)
               ↘ shop_follows → synced_products
-              ↘ subscriptions
+              ↘ shop_subscriptions
 ```
+
+---
+
+## Subscription Tiers
+
+| Tier | Price | Products | Follows | Workers | Analytics |
+|------|-------|----------|---------|---------|-----------|
+| **Pro** | $25/month | 50 | 2 | — | 30 days |
+| **Max** | $35/month | ∞ | ∞ | 5 | 365 days |
+
+**Additional:**
+- Free Trial: 7 days for new sellers
+- Grace Period: 2 days after expiration
+- Yearly: ~17% discount ($250 Pro, $350 Max)
 
 ---
 
 ## Business Rules
 
-- **Follows:** BASIC = 2, PRO = unlimited
-- **Workers:** PRO tier only
-- **Subscription grace:** 2 days
 - **Cloudflare tunnel required** for Mini App
+- **Crypto payments:** BTC, ETH, LTC, USDT (TRC20)
 
 ---
 

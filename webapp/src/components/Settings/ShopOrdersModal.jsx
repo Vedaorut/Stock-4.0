@@ -107,9 +107,9 @@ function OrderRow({ order, isExpanded, onToggle, onStatusUpdate, isUpdating, t }
               </span>
             </div>
             <p className="text-gray-500 text-[11px] mt-0.5">
-              {orderDate.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}
+              {orderDate.toLocaleDateString(t('locale') || 'ru-RU', { day: 'numeric', month: 'short' })}
               {' - '}
-              {orderDate.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
+              {orderDate.toLocaleTimeString(t('locale') || 'ru-RU', { hour: '2-digit', minute: '2-digit' })}
             </p>
           </div>
 
@@ -149,12 +149,17 @@ function OrderRow({ order, isExpanded, onToggle, onStatusUpdate, isUpdating, t }
             >
               <div className="pt-3 mt-3 border-t border-white/5 space-y-2.5">
                 {/* Buyer info */}
-                {order.buyer_username && (
-                  <div>
-                    <p className="text-[10px] text-gray-500 uppercase tracking-wider">{t('shopOrders.labels.buyer')}</p>
+                <div>
+                  <p className="text-[10px] text-gray-500 uppercase tracking-wider">{t('shopOrders.labels.buyer')}</p>
+                  {order.buyer_username && order.buyer_username !== 'Anonymous' ? (
                     <p className="text-white text-xs">@{order.buyer_username}</p>
-                  </div>
-                )}
+                  ) : (
+                    <div>
+                      <p className="text-white text-xs">@Anonymous</p>
+                      <p className="text-[10px] text-gray-500 mt-0.5">{t('shopOrders.labels.anonymousHint')}</p>
+                    </div>
+                  )}
+                </div>
 
                 {/* Product & Quantity */}
                 {order.product_name && (

@@ -52,21 +52,53 @@ export const CRYPTO_OPTIONS = [
   },
 ];
 
-// Helper regex for hash extraction (64 chars hex, optional 0x prefix)
-const HASH_REGEX = /\b(0x)?[a-fA-F0-9]{64}\b/;
+// Helper regex for hash extraction
+// Supports: 64-char hex (ETH/BTC/LTC/TRON), with optional 0x prefix
+// Also matches shorter hashes (32+ chars) for edge cases
+const HASH_REGEX_64 = /\b(0x)?[a-fA-F0-9]{64}\b/;
+const HASH_REGEX_FLEXIBLE = /\b(0x)?[a-fA-F0-9]{32,66}\b/;
 
 // Extract hash from any text (URL or raw hash)
 export const extractHashFromInput = (input) => {
   if (!input || typeof input !== 'string') return null;
-  const match = input.match(HASH_REGEX);
-  return match ? match[0] : null;
+
+  // First try exact 64-char match
+  const match64 = input.match(HASH_REGEX_64);
+  if (match64) return match64[0];
+
+  // Fallback to flexible match
+  const matchFlex = input.match(HASH_REGEX_FLEXIBLE);
+  return matchFlex ? matchFlex[0] : null;
 };
 
 // Validate transaction hash (or input containing one)
+// More lenient: accepts any hex string 32-66 chars (covers most blockchains)
 export const validateTxHash = (hash) => {
   if (!hash || typeof hash !== 'string') return false;
-  // Check if input contains a valid hash
-  return HASH_REGEX.test(hash);
+
+  const trimmed = hash.trim();
+
+  // If very short, reject
+  if (trimmed.length < 10) return false;
+
+  // Check if it looks like a blockchain explorer URL (valid even without exact hash match)
+  const explorerPatterns = [
+    /blockchair\.com/i,
+    /blockchain\.com/i,
+    /etherscan\.io/i,
+    /tronscan\.org/i,
+    /blockcypher\.com/i,
+    /btc\.com/i,
+    /blockstream\.info/i,
+    /mempool\.space/i,
+  ];
+
+  for (const pattern of explorerPatterns) {
+    if (pattern.test(trimmed)) return true;
+  }
+
+  // Check if input contains a valid hash (64 chars or 32+ chars hex)
+  return HASH_REGEX_FLEXIBLE.test(trimmed);
 };
 
 // Format transaction hash for display

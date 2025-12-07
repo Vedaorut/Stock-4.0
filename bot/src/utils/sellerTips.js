@@ -4,7 +4,7 @@
 import { t } from '../i18n/index.js';
 
 // Tips keys for rotation
-const TIP_KEYS = ['follow', 'resell', 'ai', 'stats', 'workers'];
+const TIP_KEYS = ['follow', 'resell', 'ai', 'stats', 'workers', 'discount'];
 
 // Contextual tips based on missing features
 const CONTEXTUAL_TIP_KEYS = ['addEth', 'addBtc', 'addUsdt', 'addWorker'];

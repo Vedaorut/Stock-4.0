@@ -80,10 +80,14 @@ export const paymentQueries = {
   },
 
   // Create payment for direct crypto
+  // P0 FIX: Added ON CONFLICT to prevent race condition with duplicate tx_hash
   createForDirectCrypto: async ({ orderId, txHash, amount, currency, recipientAddress, expectedCryptoAmount }) => {
     const result = await query(
       `INSERT INTO payments (order_id, tx_hash, amount, currency, status, verification_status, recipient_address, expected_crypto_amount)
        VALUES ($1, $2, $3, $4, 'pending', 'pending', $5, $6)
+       ON CONFLICT (tx_hash) DO UPDATE
+       SET updated_at = NOW()
+       WHERE payments.order_id = EXCLUDED.order_id
        RETURNING *`,
       [orderId, txHash, amount, currency, recipientAddress, expectedCryptoAmount]
     );

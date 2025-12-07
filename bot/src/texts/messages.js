@@ -658,10 +658,8 @@ const buildFormatters = () => ({
       return t('buyer.stockSectionEmpty', { shop: shopName }, lang);
     }
     const lines = products
-      .slice(0, 5)
       .map((product) => `${safe(product.name)} - $${Number(product.price ?? 0).toFixed(2)}`);
-    const extra = products.length > 5 ? `\n... +${products.length - 5}` : '';
-    return `${safe(shopName)} (${products.length}).\n${lines.join('\n')}${extra}`;
+    return `${safe(shopName)} (${products.length}).\n${lines.join('\n')}`;
   },
   salesList: (orders, shopName, lang = 'ru') => {
     if (!orders.length) {
@@ -693,11 +691,9 @@ const buildFormatters = () => ({
       : messages.buyer.stockSectionTitle(shopName, count, lang);
 
     const lines = products
-      .slice(0, 5)
       .map((product) => `${safe(product.name)} - $${Number(product.price ?? 0).toFixed(2)}`);
-    const extra = count > 5 ? `\n... +${count - 5}` : '';
 
-    return `${title}\n${lines.join('\n')}${extra}`;
+    return `${title}\n${lines.join('\n')}`;
   },
   shopInfo: (shop, sections, lang = 'ru') => {
     const seller = shop.seller_username
@@ -707,18 +703,13 @@ const buildFormatters = () => ({
     const preorder = sections.preorder || [];
 
     const stockLines = stock
-      .slice(0, 3)
       .map((p) => `${safe(p.name)} - $${Number(p.price || 0).toFixed(2)}`);
     const preorderLines = preorder
-      .slice(0, 3)
       .map((p) => `${safe(p.name)} - $${Number(p.price || 0).toFixed(2)}`);
 
-    const extraStock = stock.length > 3 ? `\n... +${stock.length - 3}` : '';
-    const extraPreorder = preorder.length > 3 ? `\n... +${preorder.length - 3}` : '';
-
-    const stockSection = stock.length ? `${stockLines.join('\n')}${extraStock}` : t('formatters.stockEmpty', {}, lang);
+    const stockSection = stock.length ? stockLines.join('\n') : t('formatters.stockEmpty', {}, lang);
     const preorderSection = preorder.length
-      ? `${preorderLines.join('\n')}${extraPreorder}`
+      ? preorderLines.join('\n')
       : t('formatters.preorderAwaiting', {}, lang);
 
     return `${safe(shop.name)} ${seller}\n\n${t('formatters.stockLabel', {}, lang)} - ${stock.length || 0}\n${stockSection}\n\n${t('formatters.preorderLabel', {}, lang)} - ${preorder.length || 0}\n${preorderSection}`;

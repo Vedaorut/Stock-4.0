@@ -19,6 +19,7 @@ const InviteLinkModalLazy = lazy(() => import('../components/Settings/InviteLink
 
 const MyOrdersModalLazy = lazy(() => import('../components/Settings/MyOrdersModal'));
 const ShopOrdersModalLazy = lazy(() => import('../components/Settings/ShopOrdersModal'));
+const FeedbackModalLazy = lazy(() => import('../components/Settings/FeedbackModal'));
 
 // Seller-only item IDs (hidden in buyer mode)
 const SELLER_ONLY_ITEMS = [
@@ -217,6 +218,21 @@ const getSettingsSections = (t, lang, viewMode) => {
           ),
           value: languageNames[lang] || 'Russian',
         },
+        {
+          id: 'feedback',
+          label: t('feedback.title'),
+          description: t('feedback.description'),
+          icon: (
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"
+              />
+            </svg>
+          ),
+        },
       ],
     },
   ];
@@ -250,6 +266,7 @@ export default function Settings() {
 
   const [showMyOrders, setShowMyOrders] = useState(false);
   const [showShopOrders, setShowShopOrders] = useState(false);
+  const [showFeedback, setShowFeedback] = useState(false);
 
   const settingsSections = useMemo(() => getSettingsSections(t, lang, viewMode), [t, lang, viewMode]);
 
@@ -290,6 +307,9 @@ export default function Settings() {
         break;
       case 'shop-orders':
         setShowShopOrders(true);
+        break;
+      case 'feedback':
+        setShowFeedback(true);
         break;
       default:
         break;
@@ -396,6 +416,20 @@ export default function Settings() {
         </div>
       </div>
 
+      {/* DEMO MODE ONLY: Role Switcher */}
+      {import.meta.env.VITE_DEMO_MODE === 'true' && (
+        <div className="fixed bottom-24 right-4 z-50">
+          <button
+            onClick={() => {
+              useStore.getState().setViewMode(viewMode === 'seller' ? 'buyer' : 'seller');
+            }}
+            className="bg-red-500 text-white px-4 py-2 rounded-full shadow-lg font-bold text-xs"
+          >
+            Demo: Switch Role ({viewMode})
+          </button>
+        </div>
+      )}
+
       {/* Modals - wrapped in Suspense for lazy loading */}
       <Suspense fallback={null}>
         {showAnalytics && (
@@ -427,6 +461,9 @@ export default function Settings() {
         )}
         {showShopOrders && (
           <ShopOrdersModalLazy isOpen={showShopOrders} onClose={() => setShowShopOrders(false)} />
+        )}
+        {showFeedback && (
+          <FeedbackModalLazy isOpen={showFeedback} onClose={() => setShowFeedback(false)} />
         )}
       </Suspense>
     </div>

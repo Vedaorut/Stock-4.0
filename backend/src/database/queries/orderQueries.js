@@ -92,7 +92,7 @@ export const orderQueries = {
        FROM orders o
        JOIN products p ON o.product_id = p.id
        JOIN shops s ON p.shop_id = s.id
-       JOIN users u ON o.buyer_id = u.id
+       LEFT JOIN users u ON o.buyer_id = u.id
        WHERE ${conditions.join(' AND ')}
        ORDER BY o.created_at DESC
        LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`,
@@ -132,7 +132,7 @@ export const orderQueries = {
        FROM orders o
        JOIN products p ON o.product_id = p.id
        JOIN shops s ON p.shop_id = s.id
-       JOIN users u ON o.buyer_id = u.id
+       LEFT JOIN users u ON o.buyer_id = u.id
        WHERE ${conditions.join(' AND ')}
        ORDER BY o.created_at DESC
        LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`,
@@ -167,7 +167,7 @@ export const orderQueries = {
        FROM orders o
        JOIN products p ON o.product_id = p.id
        JOIN shops s ON p.shop_id = s.id
-       JOIN users u ON o.buyer_id = u.id
+       LEFT JOIN users u ON o.buyer_id = u.id
        WHERE ${conditions.join(' AND ')}
        ORDER BY o.created_at DESC
        LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`,

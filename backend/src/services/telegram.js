@@ -436,6 +436,68 @@ ${t('subscription.pendingSetup.createShop', {}, lang)}`;
       throw error;
     }
   }
+
+  /**
+   * Send feedback message to admin
+   * @param {object} feedbackData - Feedback information
+   * @param {string} feedbackData.category - Feedback category (Bug Report, Feature Request, etc.)
+   * @param {string} feedbackData.message - Feedback message content
+   * @param {object} feedbackData.user - User information
+   * @param {number} feedbackData.user.id - User database ID
+   * @param {number} feedbackData.user.telegramId - User Telegram ID
+   * @param {string} feedbackData.user.username - User Telegram username
+   * @param {string} feedbackData.user.firstName - User first name
+   * @param {string} feedbackData.user.lastName - User last name
+   * @returns {Promise<object|null>} - Telegram API response or null if admin ID not configured
+   */
+  async sendFeedbackToAdmin(feedbackData) {
+    const adminTelegramId = config.telegram.adminTelegramId;
+
+    if (!adminTelegramId) {
+      logger.warn('Admin Telegram ID not configured, skipping feedback notification');
+      return null;
+    }
+
+    const { category, message, user } = feedbackData;
+
+    // Build user display string
+    const usernameDisplay = user.username ? `@${user.username.replace(/^@/, '')}` : 'No username';
+    const nameDisplay = [user.firstName, user.lastName].filter(Boolean).join(' ') || 'Anonymous';
+
+    const feedbackMessage = `<b>New Feedback</b>
+
+<b>From:</b> ${usernameDisplay} (${nameDisplay})
+<b>User ID:</b> ${user.id}
+<b>Telegram ID:</b> ${user.telegramId}
+<b>Category:</b> ${category}
+
+<b>Message:</b>
+${message}
+
+---
+<i>Sent via Status Stock</i>`;
+
+    try {
+      const result = await this.sendMessage(adminTelegramId, feedbackMessage, {
+        parse_mode: 'HTML',
+      });
+
+      logger.info('Feedback sent to admin', {
+        userId: user.id,
+        category,
+        adminTelegramId,
+      });
+
+      return result;
+    } catch (error) {
+      logger.error('Failed to send feedback to admin', {
+        error: error.response?.data || error.message,
+        userId: user.id,
+        category,
+      });
+      throw error;
+    }
+  }
 }
 
 export default new TelegramService();

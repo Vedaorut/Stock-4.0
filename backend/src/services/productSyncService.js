@@ -53,6 +53,89 @@ async function getShopProductCapacity(shopId) {
  */
 
 /**
+ * Normalize product name for comparison
+ * - Lowercase
+ * - Remove extra spaces
+ * - Remove common suffixes like "(копия N)", "(copy N)"
+ * @param {string} name - Product name
+ * @returns {string} Normalized name
+ */
+function normalizeProductName(name) {
+  if (!name) return '';
+
+  return name
+    .toLowerCase()
+    .trim()
+    // Remove (копия N), (copy N), (N) suffixes
+    .replace(/\s*\(копия\s*\d*\)\s*$/i, '')
+    .replace(/\s*\(copy\s*\d*\)\s*$/i, '')
+    .replace(/\s*\(\d+\)\s*$/, '')
+    // Normalize multiple spaces to single
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Calculate similarity between two strings (Jaccard-like word overlap)
+ * @param {string} str1 - First string
+ * @param {string} str2 - Second string
+ * @returns {number} Similarity score 0-1
+ */
+function calculateSimilarity(str1, str2) {
+  const words1 = new Set(str1.split(/\s+/).filter(w => w.length > 1));
+  const words2 = new Set(str2.split(/\s+/).filter(w => w.length > 1));
+
+  if (words1.size === 0 && words2.size === 0) return 1;
+  if (words1.size === 0 || words2.size === 0) return 0;
+
+  const intersection = [...words1].filter(w => words2.has(w)).length;
+  const union = new Set([...words1, ...words2]).size;
+
+  return intersection / union;
+}
+
+/**
+ * Find similar product in existing products
+ * @param {string} sourceName - Source product name to check
+ * @param {Map<string, {name: string, id: number}>} existingProductsMap - Map of normalized names to product info
+ * @param {number} threshold - Similarity threshold (0-1), default 0.7
+ * @returns {{name: string, id: number, similarity: number}|null} Similar product or null
+ */
+function findSimilarProduct(sourceName, existingProductsMap, threshold = 0.7) {
+  const normalizedSource = normalizeProductName(sourceName);
+
+  // First check exact normalized match
+  if (existingProductsMap.has(normalizedSource)) {
+    return { ...existingProductsMap.get(normalizedSource), similarity: 1.0 };
+  }
+
+  // Check prefix match (at least 10 chars or 80% of shorter name)
+  const minPrefixLen = Math.min(10, Math.floor(normalizedSource.length * 0.8));
+  const sourcePrefix = normalizedSource.substring(0, minPrefixLen);
+
+  let bestMatch = null;
+  let bestSimilarity = 0;
+
+  for (const [normalizedName, productInfo] of existingProductsMap) {
+    // Skip if names are too different in length (>50% difference)
+    const lenRatio = Math.min(normalizedName.length, normalizedSource.length) /
+                     Math.max(normalizedName.length, normalizedSource.length);
+    if (lenRatio < 0.5) continue;
+
+    // Check prefix match
+    if (normalizedName.startsWith(sourcePrefix) || normalizedSource.startsWith(normalizedName.substring(0, minPrefixLen))) {
+      const similarity = calculateSimilarity(normalizedSource, normalizedName);
+      if (similarity >= threshold && similarity > bestSimilarity) {
+        bestSimilarity = similarity;
+        bestMatch = { ...productInfo, similarity };
+      }
+    }
+  }
+
+  return bestMatch;
+}
+
+/**
  * Calculate price with markup
  * @param {number} sourcePrice - Original price
  * @param {string} markupType - Markup type ('percentage' or 'fixed')
@@ -336,7 +419,7 @@ export async function syncAllProductsForFollow(followId) {
       limit: 1000,
     });
 
-    const results = { synced: 0, skipped: 0, errors: 0, blockedCopies: 0, limitReached: false };
+    const results = { synced: 0, skipped: 0, errors: 0, blockedCopies: 0, duplicates: 0, limitReached: false };
 
     // Log if source has more products than follower can sync
     if (capacity.remaining !== Infinity && sourceProducts.length > capacity.remaining) {
@@ -353,9 +436,59 @@ export async function syncAllProductsForFollow(followId) {
     });
     const existingNames = new Set(existingProducts.map((p) => p.name.toLowerCase()));
 
+    // Build normalized names map for deduplication (partial matching)
+    const normalizedProductsMap = new Map();
+    for (const p of existingProducts) {
+      const normalizedName = normalizeProductName(p.name);
+      if (!normalizedProductsMap.has(normalizedName)) {
+        normalizedProductsMap.set(normalizedName, { name: p.name, id: p.id });
+      }
+    }
+
     // Process sequentially to correctly track new product names and avoid duplicates
     for (const product of sourceProducts) {
       try {
+        // DEDUPLICATION: Check for similar product before copying
+        const similarProduct = findSimilarProduct(product.name, normalizedProductsMap, 0.7);
+        if (similarProduct) {
+          // MERGE: Update existing similar product instead of skipping
+          const existingSync = await syncedProductQueries.findBySyncedProductId(similarProduct.id);
+
+          if (existingSync && existingSync.source_product_id === product.id) {
+            // Already synced from same source - just update
+            results.skipped++;
+            continue;
+          }
+
+          // Update the existing product with new source data (preserving custom markup if any)
+          const markupType = existingSync?.custom_markup_type || follow.markup_type || 'percentage';
+          const markupValue = existingSync?.custom_markup_type
+            ? (markupType === 'fixed' ? existingSync.custom_markup_fixed : existingSync.custom_markup_percentage)
+            : (markupType === 'fixed' ? follow.markup_fixed : follow.markup_percentage);
+          const newPrice = calculatePriceWithMarkup(product.price, markupType, markupValue);
+
+          await productQueries.update(similarProduct.id, {
+            price: newPrice,
+            stockQuantity: product.stock_quantity,
+            isActive: product.is_active,
+          });
+
+          // Create or update sync record
+          if (!existingSync) {
+            await syncedProductQueries.create({
+              followId,
+              syncedProductId: similarProduct.id,
+              sourceProductId: product.id,
+            });
+          } else {
+            await syncedProductQueries.updateLastSynced(existingSync.id);
+          }
+
+          logger.info(`[Sync] Merged: "${product.name}" → existing "${similarProduct.name}" (${Math.round(similarProduct.similarity * 100)}%)`);
+          results.duplicates++;
+          continue;
+        }
+
         const result = await copyProductWithMarkup(product.id, followId, existingNames);
 
         if (result === null) {
@@ -369,8 +502,12 @@ export async function syncAllProductsForFollow(followId) {
           logger.info(`[Sync] Product limit reached for shop ${follow.follower_shop_id}, stopping bulk sync`);
           break;
         } else if (result.name) {
-          // Newly synced - add name to set to prevent duplicates in subsequent iterations
+          // Newly synced - add name to set and normalized map to prevent duplicates in subsequent iterations
           existingNames.add(result.name.toLowerCase());
+          const normalizedNewName = normalizeProductName(result.name);
+          if (!normalizedProductsMap.has(normalizedNewName)) {
+            normalizedProductsMap.set(normalizedNewName, { name: result.name, id: result.synced_product_id });
+          }
           results.synced++;
         } else {
           // Already synced (existing record returned without name property)
@@ -387,7 +524,7 @@ export async function syncAllProductsForFollow(followId) {
     }
 
     logger.info(
-      `Bulk sync for follow ${followId}: ${results.synced} synced, ${results.skipped} skipped, ${results.blockedCopies} blocked (chain copies), ${results.errors} errors${results.limitReached ? `, LIMIT_REACHED (${capacity.tier}: ${capacity.limit})` : ''}`
+      `Bulk sync for follow ${followId}: ${results.synced} synced, ${results.skipped} skipped, ${results.duplicates} merged, ${results.blockedCopies} blocked (chain copies), ${results.errors} errors${results.limitReached ? `, LIMIT_REACHED (${capacity.tier}: ${capacity.limit})` : ''}`
     );
     return results;
   } catch (error) {

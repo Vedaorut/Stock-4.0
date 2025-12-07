@@ -89,7 +89,7 @@ const handleShopNameAndCreate = async (ctx) => {
       return;
     }
 
-    const validNamePattern = /^[\p{L}0-9 _-]+$/u;
+    const validNamePattern = /^[a-zA-Z0-9 _-]+$/;
     if (!validNamePattern.test(shopName)) {
       await cleanReply(
         ctx,
@@ -126,7 +126,8 @@ const createShop = async (ctx, shopName, lang = ctx.lang || ctx.session?.languag
     const trial = ctx.wizard.state.trial || false;
 
     // H10 FIX: Validate tier is present (must be set by chooseTier/paySubscription scene)
-    if (!tier) {
+    // EXCEPTION: If promoCode is provided, backend will determine tier from promo code
+    if (!tier && !promoCode) {
       logger.error('Missing tier when creating shop', {
         userId: ctx.from.id,
         wizardState: ctx.wizard.state,
@@ -162,7 +163,7 @@ const createShop = async (ctx, shopName, lang = ctx.lang || ctx.session?.languag
     const payload = {
       name: shopName,
       description: t('createShop.defaultDescription', { shopName }, lang),
-      tier: tier,
+      tier: tier || 'pro', // Default to 'pro', backend will override from promo code if present
     };
 
     // Add trial flag if present (free trial flow)
@@ -235,11 +236,21 @@ const createShop = async (ctx, shopName, lang = ctx.lang || ctx.session?.languag
       inviteLink: inviteLink.substring(0, 50),
     });
 
+    // Determine subscription type for onboarding text
+    // Priority: trial > promo > paid
+    let subscriptionType = 'paid'; // default
+    if (trial) {
+      subscriptionType = 'trial';
+    } else if (promoCode) {
+      subscriptionType = 'promo';
+    }
+
     // Store in session for reliable transfer
     ctx.session.__onboardingState = {
       shopId: shop.id,
       shopName: shop.name,
       inviteLink: inviteLink,
+      subscriptionType: subscriptionType,
     };
 
     return await ctx.scene.enter('shopOnboarding');

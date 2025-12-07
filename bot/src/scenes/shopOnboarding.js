@@ -26,7 +26,7 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // Step content generators - minimalist style
 const getStepContent = (step, state, lang = 'ru') => {
-  const { inviteLink } = state;
+  const { inviteLink, subscriptionType } = state;
 
   switch (step) {
     case 0:
@@ -63,10 +63,20 @@ const getStepContent = (step, state, lang = 'ru') => {
       };
 
     case 4:
-      // Step 5: Done with trial info
+      // Step 5: Done - dynamic text based on subscription type
+      // subscriptionType: 'trial' | 'promo' | 'paid'
+      let doneTextKey = 'shopOnboarding.doneText'; // fallback
+      if (subscriptionType === 'trial') {
+        doneTextKey = 'shopOnboarding.doneTextTrial';
+      } else if (subscriptionType === 'promo') {
+        doneTextKey = 'shopOnboarding.doneTextPromo';
+      } else if (subscriptionType === 'paid') {
+        doneTextKey = 'shopOnboarding.doneTextPaid';
+      }
+
       return {
         text: t('shopOnboarding.doneTitle', {}, lang) + '\n\n' +
-          t('shopOnboarding.doneText', {}, lang),
+          t(doneTextKey, {}, lang),
         keyboard: Markup.inlineKeyboard([
           [Markup.button.callback(t('shopOnboarding.openStoreButton', {}, lang), 'onboarding:finish')],
         ]),
@@ -159,6 +169,7 @@ shopOnboardingScene.enter(async (ctx) => {
     const shopId = sessionState.shopId || sceneState.shopId;
     const shopName = sessionState.shopName || sceneState.shopName;
     const inviteLink = sessionState.inviteLink || sceneState.inviteLink;
+    const subscriptionType = sessionState.subscriptionType || sceneState.subscriptionType || 'trial';
 
     // Debug logging to verify state transfer
     logger.info('shopOnboarding .enter() hook - state check', {
@@ -194,6 +205,7 @@ shopOnboardingScene.enter(async (ctx) => {
     ctx.wizard.state.shopId = shopId;
     ctx.wizard.state.shopName = shopName;
     ctx.wizard.state.inviteLink = inviteLink;
+    ctx.wizard.state.subscriptionType = subscriptionType;
     ctx.wizard.state.currentStep = 0;
     ctx.wizard.state.lang = lang;
 

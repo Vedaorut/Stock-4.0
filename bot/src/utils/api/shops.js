@@ -45,6 +45,14 @@ export const shopApi = {
     return data.data || data;
   },
 
+  // Update shop (rename, etc)
+  async updateShop(shopId, shopData, token) {
+    const { data } = await api.patch(`/shops/${shopId}`, shopData, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return data.data || data;
+  },
+
   // Get worker shops only (not owner)
   async getWorkerShops(token) {
     try {

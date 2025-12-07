@@ -9,10 +9,11 @@ import { broadcast } from '../../../utils/websocket.js';
 
 /**
  * Create new product
+ * Supports merge mode: if merge=true and product with same name exists, update it instead
  */
 export const create = asyncHandler(async (req, res) => {
   try {
-    const { shopId, name, description, price, is_preorder } = req.body;
+    const { shopId, name, description, price, is_preorder, merge } = req.body;
     const stockQuantity = req.body.stockQuantity ?? req.body.stock ?? 0;
     const currency = req.body.currency || 'USD';
 
@@ -29,25 +30,47 @@ export const create = asyncHandler(async (req, res) => {
       );
     }
 
-    const product = await productQueries.create({
-      shopId,
-      name,
-      description,
-      price,
-      currency,
-      stockQuantity,
-      isPreorder: is_preorder,
-    });
+    let product;
+    let isNew = true;
+
+    if (merge) {
+      // Use upsert - update existing product if name matches, else create new
+      const result = await productQueries.upsert({
+        shopId,
+        name,
+        description,
+        price,
+        currency,
+        stockQuantity,
+        isPreorder: is_preorder,
+      });
+      product = result.product;
+      isNew = result.isNew;
+    } else {
+      // Standard create (may fail on duplicate if there's a constraint)
+      product = await productQueries.create({
+        shopId,
+        name,
+        description,
+        price,
+        currency,
+        stockQuantity,
+        isPreorder: is_preorder,
+      });
+    }
 
     // Invalidate product limit cache after successful creation
-    invalidateProductLimitCache(shopId);
+    if (isNew) {
+      invalidateProductLimitCache(shopId);
+    }
 
     // Emit WebSocket event for real-time updates
-    broadcast('product_added', { shopId, productId: product.id });
+    broadcast(isNew ? 'product_added' : 'product_updated', { shopId, productId: product.id });
 
-    return res.status(201).json({
+    return res.status(isNew ? 201 : 200).json({
       success: true,
       data: product,
+      merged: !isNew,
     });
   } catch (error) {
     if (respondWithDbError(res, error)) {

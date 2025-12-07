@@ -71,13 +71,13 @@ export function generateProductAIPrompt(shopName, products = [], options = {}) {
   const ordersList =
     ordersToShow.length > 0
       ? ordersToShow
-          .map((order) => {
-            const buyer = order.buyer_username ? `@${order.buyer_username}` : 'buyer';
-            const price = order.total_price ?? order.totalPrice ?? null;
-            const priceText = price !== null ? ` - $${price}` : '';
-            return `#${order.id} - ${order.status}${priceText} - ${buyer}`;
-          })
-          .join('\n')
+        .map((order) => {
+          const buyer = order.buyer_username ? `@${order.buyer_username}` : 'buyer';
+          const price = order.total_price ?? order.totalPrice ?? null;
+          const priceText = price !== null ? ` - $${price}` : '';
+          return `#${order.id} - ${order.status}${priceText} - ${buyer}`;
+        })
+        .join('\n')
       : 'No orders yet - be ready to create the first one.';
 
   const summary =
@@ -138,6 +138,7 @@ ${ordersList}
 - Stock not specified -> set to 1. Price or discount < 0 or discount > 100 -> ask for correct value.
 - Request "pick any/random" -> choose a product yourself and suggest what to do next.
 - Questions about capabilities answer only if you hear explicit phrases: "what can you do", "help", "what commands". In all other cases, execute the request.
+- PREORDER logic: "Pre-order" status means "Stock 0". If user asks to "add as preorder" or "make it preorder", set stock_quantity to 0.
 - Commands "show products", "list products", "what products", "what's in stock" -> immediately call listProducts and show the actual catalog.
 - Questions like "how do discounts work?" explain in words; operations ("add", "delete", "discount", "rename", "show products") execute without describing capabilities.
 

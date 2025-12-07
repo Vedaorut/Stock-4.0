@@ -10,7 +10,10 @@ function ProductCard({ product, onEdit, onDelete, t }) {
 
   const handleDelete = async () => {
     triggerHaptic('medium');
-    const confirmed = await confirm(`Delete "${product.name}"?`);
+    const message = product.is_synced
+      ? `Remove synced product "${product.name}" from resell?`
+      : `Delete "${product.name}"?`;
+    const confirmed = await confirm(message);
     if (confirmed) {
       triggerHaptic('success');
       onDelete(product.id);
@@ -74,15 +77,13 @@ function ProductCard({ product, onEdit, onDelete, t }) {
             </svg>
           </motion.button>
           <motion.button
-            onClick={() => !product.is_synced && handleDelete()}
-            disabled={product.is_synced}
-            className={`w-9 h-9 rounded-xl flex items-center justify-center text-red-400 ${product.is_synced ? 'opacity-50 cursor-not-allowed' : ''}`}
+            onClick={() => handleDelete()}
+            className="w-9 h-9 rounded-xl flex items-center justify-center text-red-400"
             style={{
               background: 'rgba(255, 59, 48, 0.1)',
               border: '1px solid rgba(255, 59, 48, 0.2)',
             }}
-            whileTap={product.is_synced ? {} : { scale: 0.9 }}
-            title={product.is_synced ? t('product.syncedDeleteDisabled') : undefined}
+            whileTap={{ scale: 0.9 }}
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path

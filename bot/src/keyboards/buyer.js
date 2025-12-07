@@ -22,9 +22,11 @@ export const buyerMenu = (options = {}, lang = 'ru') => {
     [Markup.button.callback(t('buttons.settings', {}, lang), 'settings')],
   ];
 
-  // Only show "Switch Role" if user has a shop
+  // Show "Switch Role" if user has a shop, otherwise show "Create Shop"
   if (options.hasShop) {
     buttons.push([Markup.button.callback(t('buttons.switchRole', {}, lang), 'role:toggle')]);
+  } else {
+    buttons.push([Markup.button.callback(t('buttons.createShop', {}, lang), 'role:seller')]);
   }
 
   return Markup.inlineKeyboard(buttons);

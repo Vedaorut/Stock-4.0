@@ -4,9 +4,10 @@ import PageHeader from '../common/PageHeader';
 import { useTelegram } from '../../hooks/useTelegram';
 import { useApi } from '../../hooks/useApi';
 import { useBackButton } from '../../hooks/useBackButton';
+import { useTranslation } from '../../i18n/useTranslation';
 
 // Compact Plan Card
-function PlanCard({ name, price, features, isActive, onSelect, delay = 0 }) {
+function PlanCard({ name, price, features, isActive, onSelect, delay = 0, t }) {
   const { triggerHaptic } = useTelegram();
   const isMax = name === 'max';
   const isPro = name === 'pro';
@@ -21,9 +22,8 @@ function PlanCard({ name, price, features, isActive, onSelect, delay = 0 }) {
     >
       {/* Card */}
       <div
-        className={`relative flex-1 rounded-2xl p-4 overflow-hidden ${
-          isMax ? 'bg-gradient-to-br from-purple-500/20 via-purple-600/10 to-transparent' : isPro ? 'bg-gradient-to-br from-orange-500/20 via-orange-600/10 to-transparent' : 'bg-white/5'
-        }`}
+        className={`relative flex-1 rounded-2xl p-4 overflow-hidden ${isMax ? 'bg-gradient-to-br from-purple-500/20 via-purple-600/10 to-transparent' : isPro ? 'bg-gradient-to-br from-orange-500/20 via-orange-600/10 to-transparent' : 'bg-white/5'
+          }`}
         style={{
           border: isActive
             ? '2px solid rgba(34, 197, 94, 0.5)'
@@ -63,13 +63,12 @@ function PlanCard({ name, price, features, isActive, onSelect, delay = 0 }) {
         {/* Header */}
         <div className="flex items-center gap-2 mb-3">
           <div
-            className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-              isMax
-                ? 'bg-gradient-to-br from-purple-400 to-purple-600'
-                : isPro
-                  ? 'bg-gradient-to-br from-orange-400 to-orange-600'
-                  : 'bg-gray-600/50'
-            }`}
+            className={`w-8 h-8 rounded-lg flex items-center justify-center ${isMax
+              ? 'bg-gradient-to-br from-purple-400 to-purple-600'
+              : isPro
+                ? 'bg-gradient-to-br from-orange-400 to-orange-600'
+                : 'bg-gray-600/50'
+              }`}
           >
             {isMax ? (
               <span className="text-sm">👑</span>
@@ -111,7 +110,7 @@ function PlanCard({ name, price, features, isActive, onSelect, delay = 0 }) {
               >
                 <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
               </svg>
-              <span className="text-[11px] text-gray-400 leading-tight">{feature}</span>
+              <span className="text-[11px] text-gray-400 leading-tight">{t(feature)}</span>
             </motion.li>
           ))}
         </ul>
@@ -123,20 +122,19 @@ function PlanCard({ name, price, features, isActive, onSelect, delay = 0 }) {
               triggerHaptic('medium');
               onSelect?.();
             }}
-            className={`w-full py-2.5 rounded-xl text-xs font-bold transition-all ${
-              isMax
-                ? 'bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/25'
-                : isPro
-                  ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-lg shadow-orange-500/25'
-                  : 'bg-white/10 text-gray-300 hover:bg-white/15'
-            }`}
+            className={`w-full py-2.5 rounded-xl text-xs font-bold transition-all ${isMax
+              ? 'bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/25'
+              : isPro
+                ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-lg shadow-orange-500/25'
+                : 'bg-white/10 text-gray-300 hover:bg-white/15'
+              }`}
             whileTap={{ scale: 0.97 }}
           >
-            {isMax ? 'Switch to MAX' : isPro ? 'Switch to PRO' : 'Select'}
+            {isMax ? t('subscription.switchToMax') : isPro ? t('subscription.switchToPro') : t('subscription.select')}
           </motion.button>
         ) : (
           <div className="w-full py-2.5 rounded-xl text-xs font-bold text-center text-green-400 bg-green-500/10 border border-green-500/20">
-            Active Plan
+            {t('subscription.activePlan')}
           </div>
         )}
       </div>
@@ -148,6 +146,7 @@ function PlanCard({ name, price, features, isActive, onSelect, delay = 0 }) {
 export default function SubscriptionModal({ isOpen, onClose }) {
   const { alert } = useTelegram();
   const { fetchApi } = useApi();
+  const { t } = useTranslation();
 
   const [myShop, setMyShop] = useState(null);
   const [status, setStatus] = useState(null);
@@ -192,8 +191,8 @@ export default function SubscriptionModal({ isOpen, onClose }) {
 
   const handleSelectPlan = async (plan) => {
     await alert(plan === 'max'
-      ? 'To switch to MAX, use the bot'
-      : 'To change plan, use the bot'
+      ? t('subscription.goToBotMax')
+      : t('subscription.goToBotChange')
     );
   };
 
@@ -223,7 +222,7 @@ export default function SubscriptionModal({ isOpen, onClose }) {
                 >
                   <span className="text-3xl">🏪</span>
                 </motion.div>
-                <p className="text-gray-400 text-sm">Create a shop to access</p>
+                <p className="text-gray-400 text-sm">{t('common.createShop')}</p>
               </div>
             </div>
           </motion.div>
@@ -247,7 +246,7 @@ export default function SubscriptionModal({ isOpen, onClose }) {
           exit={{ x: '100%' }}
           transition={{ type: 'spring', damping: 30, stiffness: 300 }}
         >
-          <PageHeader title="Subscription" onBack={handleClose} variant="close" />
+          <PageHeader title={t('settings.items.subscription')} onBack={handleClose} variant="close" />
 
           <div
             className="flex-1 flex flex-col px-4"
@@ -278,7 +277,7 @@ export default function SubscriptionModal({ isOpen, onClose }) {
                     <div>
                       <span className="text-white font-semibold">{currentTier.toUpperCase()}</span>
                       {daysLeft !== null && (
-                        <span className="text-gray-500 text-xs ml-2">• {daysLeft}d</span>
+                        <span className="text-gray-500 text-xs ml-2">• {daysLeft}{t('subscription.daysLeft')}</span>
                       )}
                     </div>
                   </div>
@@ -300,6 +299,7 @@ export default function SubscriptionModal({ isOpen, onClose }) {
                       isActive={currentTier === 'pro'}
                       onSelect={() => handleSelectPlan('pro')}
                       delay={0}
+                      t={t}
                     />
                   )}
                   {pricing?.max && (
@@ -310,6 +310,7 @@ export default function SubscriptionModal({ isOpen, onClose }) {
                       isActive={currentTier === 'max'}
                       onSelect={() => handleSelectPlan('max')}
                       delay={0.1}
+                      t={t}
                     />
                   )}
                 </div>
@@ -326,7 +327,7 @@ export default function SubscriptionModal({ isOpen, onClose }) {
                       onClick={() => setShowHistory(!showHistory)}
                       className="w-full flex items-center justify-between text-xs text-gray-500 py-2"
                     >
-                      <span>Payment history ({history.length})</span>
+                      <span>{t('subscription.paymentHistory')} ({history.length})</span>
                       <motion.svg
                         className="w-4 h-4"
                         fill="none"

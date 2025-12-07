@@ -161,17 +161,25 @@ export const productQueries = {
   },
 
   // Update stock (with optional transaction client)
+  // P0 FIX: Added check to prevent negative stock when decrementing
   updateStock: async (id, quantity, client = null) => {
     const queryFn = client ? client.query.bind(client) : query;
+    // For decrements (negative quantity), ensure sufficient stock exists
+    const whereClause = quantity < 0
+      ? 'WHERE id = $1 AND stock_quantity >= $3'  // $3 = ABS(quantity)
+      : 'WHERE id = $1';
+    const params = quantity < 0
+      ? [id, quantity, Math.abs(quantity)]
+      : [id, quantity];
     const result = await queryFn(
       `UPDATE products
        SET stock_quantity = stock_quantity + $2,
            updated_at = NOW()
-       WHERE id = $1
+       ${whereClause}
        RETURNING id, shop_id, name, stock_quantity, reserved_quantity, is_active, updated_at`,
-      [id, quantity]
+      params
     );
-    return result.rows[0];
+    return result.rows[0]; // Returns undefined if stock insufficient (race prevented)
   },
 
   // Reserve stock (increase reserved_quantity)
@@ -345,6 +353,87 @@ export const productQueries = {
     );
 
     return result.rows;
+  },
+
+  /**
+   * Find product by name and shop ID (case-insensitive)
+   * @param {number} shopId - Shop ID
+   * @param {string} name - Product name
+   * @returns {Promise<Object|undefined>} Product if found
+   */
+  findByNameAndShop: async (shopId, name) => {
+    const result = await query(
+      `SELECT p.*,
+              s.name as shop_name,
+              CASE WHEN sp.id IS NOT NULL THEN true ELSE false END AS is_synced
+       FROM products p
+       JOIN shops s ON p.shop_id = s.id
+       LEFT JOIN synced_products sp ON sp.synced_product_id = p.id
+       WHERE p.shop_id = $1 AND LOWER(p.name) = LOWER($2)
+       LIMIT 1`,
+      [shopId, name]
+    );
+    return result.rows[0];
+  },
+
+  /**
+   * Create or update product (upsert by name)
+   * If product with same name exists in shop - update it
+   * If not - create new product
+   * @param {Object} productData - Product data
+   * @returns {Promise<{product: Object, isNew: boolean}>} Product and flag indicating if it was created
+   */
+  upsert: async (productData) => {
+    const shopId = productData.shopId ?? productData.shop_id;
+    const stockQuantity =
+      productData.stockQuantity ?? productData.stock ?? productData.stock_quantity ?? 0;
+    const currency = productData.currency ?? 'USD';
+    const { name, description, price, isPreorder } = productData;
+
+    if (!shopId || !name) {
+      throw new Error('shopId and name are required for upsert');
+    }
+
+    // Check if product with same name exists (case-insensitive, not synced)
+    const existingResult = await query(
+      `SELECT p.id, p.shop_id, p.name
+       FROM products p
+       WHERE p.shop_id = $1 AND LOWER(p.name) = LOWER($2)
+         AND NOT EXISTS (SELECT 1 FROM synced_products sp WHERE sp.synced_product_id = p.id)
+       LIMIT 1`,
+      [shopId, name]
+    );
+
+    if (existingResult.rows.length > 0) {
+      // Update existing product
+      // Note: stockQuantity=0 is valid (sold out), so we check !== undefined
+      const existingId = existingResult.rows[0].id;
+      const updated = await query(
+        `UPDATE products
+         SET description = COALESCE($2, description),
+             price = COALESCE($3, price),
+             currency = COALESCE($4, currency),
+             stock_quantity = $5,
+             is_preorder = COALESCE($6, is_preorder),
+             is_active = true,
+             updated_at = NOW()
+         WHERE id = $1
+         RETURNING *`,
+        [existingId, description, price, currency, stockQuantity, isPreorder]
+      );
+      logger.info(`[ProductUpsert] Updated existing product ${existingId} (name: ${name})`);
+      return { product: updated.rows[0], isNew: false };
+    }
+
+    // Create new product
+    const result = await query(
+      `INSERT INTO products (shop_id, name, description, price, currency, stock_quantity, reserved_quantity, is_preorder)
+       VALUES ($1, $2, $3, $4, $5, $6, 0, COALESCE($7, false))
+       RETURNING *`,
+      [shopId, name, description, price, currency, stockQuantity || 0, isPreorder]
+    );
+    logger.info(`[ProductUpsert] Created new product ${result.rows[0].id} (name: ${name})`);
+    return { product: result.rows[0], isNew: true };
   },
 
   /**

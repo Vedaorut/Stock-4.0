@@ -4,9 +4,11 @@ import PageHeader from '../common/PageHeader';
 import { useApi } from '../../hooks/useApi';
 import { useBackButton } from '../../hooks/useBackButton';
 import { useTelegram } from '../../hooks/useTelegram';
+import { useTranslation } from '../../i18n/useTranslation';
 
 export default function AnalyticsModal({ isOpen, onClose }) {
   const { get } = useApi();
+  const { t } = useTranslation();
   const { triggerHaptic } = useTelegram();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -230,7 +232,7 @@ export default function AnalyticsModal({ isOpen, onClose }) {
                 onClick={fetchAnalytics}
                 className="bg-orange-primary text-white px-6 py-3 rounded-xl"
               >
-                Try Again
+                {t('common.retry')}
               </button>
             </div>
           </motion.div>
@@ -252,7 +254,7 @@ export default function AnalyticsModal({ isOpen, onClose }) {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           >
-            <PageHeader title="Analytics" onBack={handleClose} variant="close" />
+            <PageHeader title={t('settings.items.analytics')} onBack={handleClose} variant="close" />
 
             <div
               style={{
@@ -268,12 +270,12 @@ export default function AnalyticsModal({ isOpen, onClose }) {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 }}
               >
-                <p className="text-sm text-gray-400 mb-2">Total Sales</p>
+                <p className="text-sm text-gray-400 mb-2">{t('analytics.totalSales')}</p>
                 <h1 className="text-4xl font-bold text-orange-primary mb-1">
                   {formatUSD(summary?.totalRevenue)}
                 </h1>
                 <p className="text-sm text-gray-400">
-                  {summary?.completedOrders || 0} orders - Avg order:{' '}
+                  {summary?.completedOrders || 0} {t('analytics.ordersCount')} - {t('analytics.avgCheck')}:{' '}
                   {formatUSD(summary?.avgOrderValue)}
                 </p>
               </motion.div>
@@ -284,25 +286,25 @@ export default function AnalyticsModal({ isOpen, onClose }) {
                   onClick={() => handlePeriodChange('7d')}
                   className={`period-btn flex-1 ${period === '7d' ? 'active' : ''}`}
                 >
-                  7 Days
+                  {t('analytics.period7d')}
                 </button>
                 <button
                   onClick={() => handlePeriodChange('1m')}
                   className={`period-btn flex-1 ${period === '1m' ? 'active' : ''}`}
                 >
-                  Month
+                  {t('analytics.period1m')}
                 </button>
                 <button
                   onClick={() => handlePeriodChange('custom')}
                   className={`period-btn flex-1 ${period === 'custom' ? 'active' : ''}`}
                 >
-                  Custom
+                  {t('analytics.periodCustom')}
                 </button>
               </div>
 
               {/* Top Products */}
               <div className="mt-6 mb-4">
-                <h2 className="text-lg font-semibold text-white mb-4">Top Products</h2>
+                <h2 className="text-lg font-semibold text-white mb-4">{t('analytics.topProducts')}</h2>
 
                 {topProducts && topProducts.length > 0 ? (
                   <div className="space-y-3">
@@ -331,13 +333,13 @@ export default function AnalyticsModal({ isOpen, onClose }) {
                           />
                         </div>
 
-                        <p className="text-xs text-gray-400">{product.quantity} sold</p>
+                        <p className="text-xs text-gray-400">{product.quantity} {t('analytics.soldCount')}</p>
                       </motion.div>
                     ))}
                   </div>
                 ) : (
                   <div className="glass-card p-8 text-center">
-                    <p className="text-gray-400">No data for selected period</p>
+                    <p className="text-gray-400">{t('analytics.noData')}</p>
                   </div>
                 )}
               </div>
@@ -361,11 +363,11 @@ export default function AnalyticsModal({ isOpen, onClose }) {
                 exit={{ y: '100%' }}
                 onClick={(e) => e.stopPropagation()}
               >
-                <h3 className="text-lg font-semibold text-white mb-4">Select Period</h3>
+                <h3 className="text-lg font-semibold text-white mb-4">{t('analytics.selectPeriod')}</h3>
 
                 <div className="space-y-4 w-full min-w-0">
                   <div>
-                    <label className="text-sm text-gray-400 mb-1 block">From</label>
+                    <label className="text-sm text-gray-400 mb-1 block">{t('analytics.from')}</label>
                     <input
                       type="date"
                       value={customRange.from}
@@ -377,7 +379,7 @@ export default function AnalyticsModal({ isOpen, onClose }) {
                   </div>
 
                   <div>
-                    <label className="text-sm text-gray-400 mb-1 block">To</label>
+                    <label className="text-sm text-gray-400 mb-1 block">{t('analytics.to')}</label>
                     <input
                       type="date"
                       value={customRange.to}
@@ -392,14 +394,14 @@ export default function AnalyticsModal({ isOpen, onClose }) {
                     onClick={() => setShowCustomPicker(false)}
                     className="flex-1 bg-dark-bg text-white px-4 py-3 sm:py-4 rounded-xl font-medium min-h-[44px]"
                   >
-                    Cancel
+                    {t('common.cancel')}
                   </button>
                   <button
                     onClick={handleCustomRangeApply}
                     className="flex-1 bg-orange-primary text-white px-4 py-3 sm:py-4 rounded-xl font-medium min-h-[44px]"
                     disabled={!customRange.from || !customRange.to}
                   >
-                    Apply
+                    {t('common.apply')}
                   </button>
                 </div>
               </motion.div>

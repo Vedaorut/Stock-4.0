@@ -285,7 +285,7 @@ export default function FollowsModal({ isOpen, onClose }) {
           exit={{ x: '100%' }}
           transition={{ type: 'spring', damping: 30, stiffness: 300 }}
         >
-          <PageHeader title="Follows" onBack={handleClose} variant="close" />
+          <PageHeader title={t('follows.title')} onBack={handleClose} variant="close" />
           <div
             className="flex-1 overflow-y-auto"
             style={{

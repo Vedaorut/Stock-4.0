@@ -1,4 +1,5 @@
 import { productQueries, shopQueries } from '../../../database/queries/index.js';
+import { syncedProductQueries } from '../../../models/syncedProductQueries.js';
 import { asyncHandler } from '../../../middleware/errorHandler.js';
 import { invalidateProductLimitCache } from '../../../middleware/productLimits.js';
 import { NotFoundError, UnauthorizedError } from '../../../utils/errors.js';
@@ -20,14 +21,6 @@ export const deleteProduct = asyncHandler(async (req, res) => {
       throw new NotFoundError('Product');
     }
 
-    if (existingProduct.is_synced) {
-      return res.status(403).json({
-        success: false,
-        error: 'Cannot delete synced product. Unfollow the shop first.',
-        code: 'SYNCED_PRODUCT_PROTECTED'
-      });
-    }
-
     const isAuthorized = await isAuthorizedToManageShop(existingProduct.shop_id, req.user.id);
     if (!isAuthorized) {
       throw new UnauthorizedError(
@@ -36,6 +29,13 @@ export const deleteProduct = asyncHandler(async (req, res) => {
     }
 
     const shopId = existingProduct.shop_id;
+
+    // If this is a synced product, remove the sync record first
+    if (existingProduct.is_synced) {
+      await syncedProductQueries.deleteBySyncedProductId(id);
+      logger.info(`Removed sync record for product ${id} before deletion`);
+    }
+
     await productQueries.delete(id);
 
     // Invalidate product limit cache after successful deletion

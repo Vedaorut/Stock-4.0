@@ -188,7 +188,8 @@ router.get('/:shopId/subscribers/count', apiLimiter, shopSubscriberController.ge
  * @desc    Get list of subscribers (shop owner only)
  * @access  Private (Shop owner only)
  */
-router.get('/:shopId/subscribers', verifyToken, shopSubscriberController.getSubscribers);
+// P0 SEC FIX: Added requireShopOwner to prevent IDOR vulnerability
+router.get('/:shopId/subscribers', verifyToken, requireShopOwner, shopSubscriberController.getSubscribers);
 
 // ============================================
 // End Shop Subscriber Routes
@@ -214,6 +215,13 @@ router.get('/:id', optionalAuth, shopValidation.getById, shopController.getById)
  * @access  Private (Shop owner only)
  */
 router.put('/:id', verifyToken, requireShopOwner, shopValidation.update, shopController.update);
+
+/**
+ * @route   PATCH /api/shops/:id
+ * @desc    Partial update shop (rename, etc)
+ * @access  Private (Shop owner only)
+ */
+router.patch('/:id', verifyToken, requireShopOwner, shopValidation.update, shopController.update);
 
 /**
  * @route   DELETE /api/shops/:id

@@ -1,9 +1,11 @@
 import { buyerMenu, shopActionsKeyboard } from '../../keyboards/buyer.js';
+import { languageMenu } from '../../keyboards/main.js';
 import { subscriptionApi, shopApi, authApi, orderApi, productApi } from '../../utils/api.js';
 import { splitProductsByAvailability } from '../../utils/minimalist.js';
 import logger from '../../utils/logger.js';
 import * as smartMessage from '../../utils/smartMessage.js';
 import { getMessages, formatters } from '../../texts/messages.js';
+import { t } from '../../i18n/index.js';
 
 /**
  * Get language with fallback (C5 fix: ctx.lang undefined)
@@ -139,6 +141,16 @@ export const handleBuyerRole = async (ctx, options = {}) => {
       keyboard: buyerMenu({ hasShop }, lang),
     });
     logger.info(`Buyer ${ctx.from.id} menu shown, hasShop=${hasShop}`);
+
+    // INVITE FLOW: Show language selection after buyer menu for invite users
+    if (ctx.session.pendingLanguageSelection) {
+      delete ctx.session.pendingLanguageSelection;
+      const detectedLang = ctx.from?.language_code?.startsWith('ru') ? 'ru' : 'en';
+      await ctx.reply(t('settings.selectLanguage', {}, detectedLang), {
+        reply_markup: languageMenu(detectedLang).reply_markup,
+      });
+      logger.info(`Showing language selection to invite user ${ctx.from.id}`);
+    }
   } catch (error) {
     logger.error('Error in buyer role handler:', error);
     // Local error handling - don't throw to avoid infinite spinner
@@ -437,7 +449,7 @@ const handleShopView = async (ctx) => {
 
     // P2-2 FIX: Answer callback query to remove spinner
     if (ctx.callbackQuery) {
-      await ctx.answerCbQuery(ctx.t('errors.loadError')).catch(() => {});
+      await ctx.answerCbQuery(ctx.t('errors.loadError')).catch(() => { });
     }
 
     await smartMessage.send(ctx, {
@@ -489,7 +501,7 @@ const handleShopSection = async (ctx, section) => {
 
     // P2-2 FIX: Answer callback query to remove spinner
     if (ctx.callbackQuery) {
-      await ctx.answerCbQuery(ctx.t('errors.loadError')).catch(() => {});
+      await ctx.answerCbQuery(ctx.t('errors.loadError')).catch(() => { });
     }
 
     await smartMessage.send(ctx, {

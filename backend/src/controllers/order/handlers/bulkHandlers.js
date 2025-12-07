@@ -26,7 +26,7 @@ export const bulkUpdateStatus = async (req, res) => {
          FROM orders o
          JOIN products p ON o.product_id = p.id
          JOIN shops s ON p.shop_id = s.id
-         JOIN users u ON o.buyer_id = u.id
+         LEFT JOIN users u ON o.buyer_id = u.id
          WHERE o.id = ANY($1::int[])`,
       [order_ids]
     );
