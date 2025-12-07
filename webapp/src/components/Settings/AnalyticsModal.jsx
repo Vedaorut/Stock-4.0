@@ -177,7 +177,6 @@ export default function AnalyticsModal({ isOpen, onClose }) {
             <PageHeader title="Analytics" onBack={handleClose} variant="close" />
             <div
               style={{
-                paddingTop: 'calc(env(safe-area-inset-top) + 56px)',
                 paddingBottom: 'var(--tabbar-total)',
               }}
               className="px-4"
@@ -224,7 +223,6 @@ export default function AnalyticsModal({ isOpen, onClose }) {
           >
             <PageHeader title="Analytics" onBack={handleClose} variant="close" />
             <div
-              style={{ paddingTop: 'calc(env(safe-area-inset-top) + 56px)' }}
               className="px-4 py-8 text-center"
             >
               <p className="text-red-500 mb-4">{error}</p>
@@ -258,7 +256,6 @@ export default function AnalyticsModal({ isOpen, onClose }) {
 
             <div
               style={{
-                paddingTop: 'calc(env(safe-area-inset-top) + 56px)',
                 paddingBottom: 'var(--tabbar-total)',
               }}
               className="px-4 overflow-y-auto h-full"

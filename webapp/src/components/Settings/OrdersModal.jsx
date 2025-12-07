@@ -234,7 +234,6 @@ export default function OrdersModal({ isOpen, onClose }) {
           <div
             className="flex-1 overflow-y-auto"
             style={{
-              paddingTop: 'calc(env(safe-area-inset-top) + 56px)',
               paddingBottom: 'calc(var(--tabbar-total) + 24px)',
               WebkitOverflowScrolling: 'touch',
             }}

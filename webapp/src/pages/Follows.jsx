@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { PlusIcon } from '@heroicons/react/24/outline';
-import Header from '../components/Layout/Header';
 import { useApi } from '../hooks/useApi';
 import { useStore } from '../store/useStore';
 import { useTelegram } from '../hooks/useTelegram';
@@ -191,30 +190,31 @@ export default function Follows() {
 
   return (
     <div
-      className="fixed inset-0 overflow-y-auto bg-[#181818]"
+      className="min-h-full bg-[#181818]"
       style={{
-        paddingTop: 'calc(env(safe-area-inset-top) + 56px)',
         paddingBottom: 'calc(var(--tabbar-total) + 20px)',
       }}
     >
-      <Header title={t('tabs.follows')} />
-
-      {/* Add button - fixed in header area with enhanced visuals */}
       <div
-        className="fixed top-0 right-0 z-50 pr-4"
-        style={{ paddingTop: 'calc(env(safe-area-inset-top) + 12px)' }}
+        className="flex items-center justify-between px-4 bg-[#181818]"
+        style={{ paddingTop: 'calc(env(safe-area-inset-top) + 36px)' }}
       >
-        <motion.button
-          onClick={handleAddShop}
-          className="w-10 h-10 flex items-center justify-center rounded-xl bg-gradient-to-br from-[#FF6B00]/20 to-[#FF6B00]/10 text-[#FF6B00] border border-[#FF6B00]/20 shadow-[0_0_15px_rgba(255,107,0,0.15)] backdrop-blur-sm"
-          whileTap={{ scale: 0.92 }}
-          whileHover={{ scale: 1.05 }}
-        >
-          <PlusIcon className="w-5 h-5 stroke-[2.5]" />
-        </motion.button>
+        <div className="flex-1" />
+        <h1 className="text-[22px] font-bold text-white tracking-tight py-3">
+          {t('tabs.follows')}
+        </h1>
+        <div className="flex-1 flex justify-end">
+          <motion.button
+            onClick={handleAddShop}
+            className="w-10 h-10 flex items-center justify-center rounded-xl bg-gradient-to-br from-[#FF6B00]/20 to-[#FF6B00]/10 text-[#FF6B00] border border-[#FF6B00]/20"
+            whileTap={{ scale: 0.92 }}
+          >
+            <PlusIcon className="w-5 h-5 stroke-[2.5]" />
+          </motion.button>
+        </div>
       </div>
 
-      <div className="px-4 py-6 min-h-[calc(100vh-100px)]">
+      <div className="px-4 py-6">
         {isLoading ? (
           <div className="flex items-center justify-center py-20">
             <div className="relative w-10 h-10">
