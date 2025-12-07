@@ -19,13 +19,12 @@ export default function PageHeader({ title, onBack, action, variant = 'back' }) 
 
   return (
     <div
-      className="fixed top-0 left-0 right-0 z-40"
+      className="bg-[#181818]"
       style={{
-        paddingTop: 'calc(env(safe-area-inset-top) + 30px)',
-        backgroundColor: '#181818',
+        paddingTop: 'calc(env(safe-area-inset-top) + 36px)',
       }}
     >
-      <div className="flex items-center justify-between px-4" style={{ height: '56px' }}>
+      <div className="flex items-center justify-between px-4 h-12">
         {/* Spacer for symmetry (Back button is now native-only) */}
         <div style={{ width: '40px', height: '40px' }} />
 

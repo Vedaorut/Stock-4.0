@@ -232,17 +232,7 @@ function App() {
 
   return (
     <LazyMotion features={domAnimation}>
-      <div
-        className="fixed inset-0 flex flex-col overflow-hidden min-h-0"
-        style={{ height: 'var(--vh-dynamic)' }}
-      >
-        <div
-          className="fixed inset-0 z-0"
-          style={{
-            background: '#181818',
-          }}
-        />
-
+      <div className="min-h-[100dvh] bg-[#181818] flex flex-col overflow-hidden">
         <div
           className="fixed inset-0 z-0 pointer-events-none"
           style={{
@@ -263,7 +253,7 @@ function App() {
         )}
 
         <div
-          className="scroll-container relative z-10 flex-1 min-h-0 overflow-y-auto"
+          className="flex-1 min-h-0 overflow-y-auto bg-[#181818] [-webkit-overflow-scrolling:touch]"
           data-platform={platform}
         >
           <Suspense fallback={<PageLoader />}>
