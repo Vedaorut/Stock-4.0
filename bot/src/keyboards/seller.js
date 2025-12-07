@@ -23,7 +23,7 @@ export const sellerMenu = (activeOrdersCount = 0, options = {}, lang = 'ru') => 
   buttons.push([Markup.button.callback(t('buttons.orderHistory', {}, lang), 'seller:order_history')]);
   buttons.push([Markup.button.callback(t('buttons.tools', {}, lang), 'seller:tools')]);
   buttons.push([Markup.button.callback(t('buttons.settings', {}, lang), 'settings')]);
-  buttons.push([Markup.button.callback(t('buttons.switchRole', {}, lang), 'role:toggle')]);
+  buttons.push([Markup.button.callback(t('buttons.switchToBuyer', {}, lang), 'role:toggle')]);
 
   return Markup.inlineKeyboard(buttons);
 };
