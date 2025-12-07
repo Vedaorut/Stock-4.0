@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { m as motion, AnimatePresence } from 'framer-motion';
 import PageHeader from '../common/PageHeader';
 import { useApi } from '../../hooks/useApi';
 import { useTelegram } from '../../hooks/useTelegram';
@@ -175,7 +175,10 @@ export default function OrdersModal({ isOpen, onClose }) {
   useEffect(() => {
     if (!isOpen) return;
 
-    setLoading(true);
+    // OPTIMIZATION: Only show loading if no cached data
+    if (orders.length === 0) {
+      setLoading(true);
+    }
     setError(null);
 
     const controller = new AbortController();
@@ -195,6 +198,7 @@ export default function OrdersModal({ isOpen, onClose }) {
       });
 
     return () => controller.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- orders.length check is for initial render only
   }, [isOpen, loadOrders]);
 
   // Handle retry with AbortController

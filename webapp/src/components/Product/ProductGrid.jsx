@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion';
+import { m as motion } from 'framer-motion';
 import { memo, useMemo, useRef } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import ProductCard from './ProductCard';
@@ -33,7 +33,8 @@ const ProductGrid = memo(function ProductGrid({
   const parentRef = useRef(null);
 
   // Determine if virtualization should be used
-  const useVirtualization = !loading && products && products.length > 100;
+  // Lowered threshold from 100 to 30 for better performance on mobile
+  const useVirtualization = !loading && products && products.length > 30;
 
   const virtualizer = useVirtualizer({
     count: useVirtualization ? products.length : 0,

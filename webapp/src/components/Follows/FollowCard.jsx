@@ -1,5 +1,5 @@
-import React from 'react';
-import { motion } from 'framer-motion';
+import { memo } from 'react';
+import { m as motion } from 'framer-motion';
 import { EyeIcon, ArrowPathIcon, BuildingStorefrontIcon } from '@heroicons/react/24/outline';
 import { useTranslation } from '../../i18n/useTranslation';
 
@@ -73,4 +73,4 @@ const FollowCard = ({ follow, onClick }) => {
   );
 };
 
-export default FollowCard;
+export default memo(FollowCard);

@@ -1,5 +1,5 @@
 import { useState, useMemo, lazy, Suspense } from 'react';
-import { motion } from 'framer-motion'; // Used in JSX
+import { m as motion } from 'framer-motion'; // Used in JSX
 import Header from '../components/Layout/Header';
 import { useTelegram } from '../hooks/useTelegram';
 import { useTranslation } from '../i18n/useTranslation';

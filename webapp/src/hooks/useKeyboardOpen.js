@@ -21,7 +21,7 @@ export function useKeyboardOpen() {
             }
         };
 
-        const handleBlur = (e) => {
+        const handleBlur = (_e) => {
             // Small delay to check if focus moved to another input
             setTimeout(() => {
                 if (

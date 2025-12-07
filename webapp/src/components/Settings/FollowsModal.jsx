@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { m as motion, AnimatePresence } from 'framer-motion';
 import PageHeader from '../common/PageHeader';
 import { useTelegram } from '../../hooks/useTelegram';
 import { useApi } from '../../hooks/useApi';
@@ -145,7 +145,10 @@ export default function FollowsModal({ isOpen, onClose }) {
   useEffect(() => {
     if (!isOpen) return;
 
-    setLoading(true);
+    // OPTIMIZATION: Only show loading if no cached data
+    if (follows.length === 0) {
+      setLoading(true);
+    }
 
     const controller = new AbortController();
 
@@ -162,6 +165,7 @@ export default function FollowsModal({ isOpen, onClose }) {
       });
 
     return () => controller.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- follows.length check is for initial render only
   }, [isOpen, loadData]);
 
   // Navigate to FollowDetail page

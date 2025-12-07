@@ -2,6 +2,7 @@
  * Mock API Adapter
  * Intercepts requests and returns mock data.
  */
+/* eslint-disable no-console */
 import { MOCK_USER, MOCK_SHOPS, MOCK_PRODUCTS, MOCK_ORDERS, MOCK_WALLETS, MOCK_SUBSCRIPTIONS, MOCK_WORKERS, MOCK_SEARCH_RESULTS } from './data';
 
 const DELAY_MS = 300; // Simulate network lag

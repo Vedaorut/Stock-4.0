@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { m as motion, AnimatePresence } from 'framer-motion';
 import PageHeader from '../common/PageHeader';
 import { useApi } from '../../hooks/useApi';
 import { useTelegram } from '../../hooks/useTelegram';
@@ -271,10 +271,13 @@ export default function ShopOrdersModal({ isOpen, onClose }) {
     const controller = new AbortController();
 
     const loadData = async (showSkeleton = true) => {
-      if (showSkeleton) {
+      // OPTIMIZATION: Only show loading if no cached data
+      if (showSkeleton && orders.length === 0) {
         setLoading(true);
         setError(null);
         setExpandedId(null);
+      } else if (showSkeleton) {
+        setError(null);
       }
 
       try {
@@ -320,7 +323,8 @@ export default function ShopOrdersModal({ isOpen, onClose }) {
           setOrders(Array.isArray(ordersData?.data) ? ordersData.data : []);
           setError(null);
         }
-      } catch (err) {
+      // eslint-disable-next-line no-unused-vars
+      } catch (_err) {
         if (!cancelled) {
           setError('Unexpected error');
         }
@@ -343,7 +347,8 @@ export default function ShopOrdersModal({ isOpen, onClose }) {
       controller.abort();
       clearInterval(intervalId);
     };
-  }, [isOpen, retryTrigger]); // Only these 2 deps!
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- orders.length check is for initial render only
+  }, [isOpen, retryTrigger]);
 
   // Retry handler
   const handleRetry = useCallback(() => {

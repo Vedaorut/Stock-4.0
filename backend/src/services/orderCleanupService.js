@@ -1,5 +1,4 @@
 import { query } from '../config/database.js';
-import { productQueries } from '../database/queries/index.js';
 import logger from '../utils/logger.js';
 
 /**
@@ -32,40 +31,53 @@ async function cancelUnpaidOrders() {
 
     logger.info(`Found ${orders.length} unpaid orders to cancel`);
 
-    // Cancel each order and unreserve stock
-    // FIX: Added atomic check in UPDATE to prevent race condition
-    // If order was paid between SELECT and UPDATE, this UPDATE will affect 0 rows
-    for (const order of orders) {
-      try {
-        // Atomic cancel: only if still pending AND still no payment
-        const cancelResult = await query(
-          `UPDATE orders
-           SET status = 'cancelled',
-               updated_at = NOW()
-           WHERE id = $1
-             AND status = 'pending'
-             AND NOT EXISTS (
-               SELECT 1 FROM payments pay
-               WHERE pay.order_id = $1
-               AND pay.tx_hash IS NOT NULL
-             )
-           RETURNING id`,
-          [order.id]
-        );
+    // OPTIMIZATION: Batch cancel orders instead of N+1 loop
+    // Atomic batch update - only cancels orders that are still pending and have no tx_hash
+    const orderIds = orders.map(o => o.id);
 
-        // Only unreserve stock if order was actually cancelled
-        if (cancelResult.rowCount > 0) {
-          await productQueries.unreserveStock(order.product_id, order.quantity);
-          logger.info(`Auto-cancelled order #${order.id} (${order.product_name})`);
-        } else {
-          logger.info(`Order #${order.id} was paid/changed before cancellation - skipped`);
-        }
-      } catch (err) {
-        logger.error(`Failed to cancel order #${order.id}:`, err);
-      }
+    // Batch cancel orders with atomic check
+    const cancelResult = await query(
+      `UPDATE orders
+       SET status = 'cancelled', updated_at = NOW()
+       WHERE id = ANY($1)
+         AND status = 'pending'
+         AND NOT EXISTS (
+           SELECT 1 FROM payments pay
+           WHERE pay.order_id = orders.id
+           AND pay.tx_hash IS NOT NULL
+         )
+       RETURNING id`,
+      [orderIds]
+    );
+
+    const cancelledIds = cancelResult.rows.map(r => r.id);
+    const skippedCount = orderIds.length - cancelledIds.length;
+
+    if (cancelledIds.length > 0) {
+      // Batch unreserve stock for cancelled orders
+      // Uses subquery to aggregate quantities per product
+      await query(
+        `UPDATE products p
+         SET reserved_quantity = GREATEST(0, p.reserved_quantity - sub.total_qty),
+             updated_at = NOW()
+         FROM (
+           SELECT product_id, SUM(quantity) as total_qty
+           FROM orders
+           WHERE id = ANY($1)
+           GROUP BY product_id
+         ) sub
+         WHERE p.id = sub.product_id`,
+        [cancelledIds]
+      );
+
+      logger.info(`Auto-cancelled ${cancelledIds.length} unpaid orders`, { cancelledIds });
     }
 
-    logger.info(`Successfully cancelled ${orders.length} unpaid orders`);
+    if (skippedCount > 0) {
+      logger.info(`Skipped ${skippedCount} orders (paid or status changed)`);
+    }
+
+    logger.info(`Successfully processed ${orders.length} unpaid orders`);
   } catch (error) {
     logger.error('Error in cancelUnpaidOrders:', error);
   }

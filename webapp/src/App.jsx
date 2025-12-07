@@ -1,5 +1,5 @@
 import { useEffect, useState, lazy, Suspense } from 'react';
-import { AnimatePresence, motion, LazyMotion, domAnimation } from 'framer-motion';
+import { AnimatePresence, LazyMotion, domAnimation } from 'framer-motion';
 import { useStore } from './store/useStore';
 import { useTelegram } from './hooks/useTelegram';
 import { useWebSocket } from './hooks/useWebSocket';
@@ -258,7 +258,7 @@ function App() {
         >
           <Suspense fallback={<PageLoader />}>
             <AnimatePresence mode="wait">
-              <motion.div
+              <m.div
                 key={followDetailId ? `follow-${followDetailId}` : activeTab}
                 initial="initial"
                 animate="enter"
@@ -267,7 +267,7 @@ function App() {
                 transition={pageTransition}
               >
                 {renderPage()}
-              </motion.div>
+              </m.div>
             </AnimatePresence>
           </Suspense>
         </div>

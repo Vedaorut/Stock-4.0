@@ -1,4 +1,4 @@
-import { motion, AnimatePresence, LazyMotion } from 'framer-motion';
+import { m as motion, AnimatePresence, LazyMotion, useReducedMotion } from 'framer-motion';
 import { useMemo, useEffect, useRef } from 'react';
 import { useStore } from '../../store/useStore';
 import { useShallow } from 'zustand/react/shallow';
@@ -30,11 +30,11 @@ const getCheckoutShadows = (android) => ({
     : '0 4px 8px rgba(255, 107, 0, 0.3), 0 8px 20px rgba(255, 107, 0, 0.25), 0 0 40px rgba(255, 107, 0, 0.2)',
 });
 
-const getEmptyEmojiVariants = (android) => ({
-  animate: android
+const getEmptyEmojiVariants = (android, shouldReduceMotion) => ({
+  animate: android || shouldReduceMotion
     ? { scale: 1, rotate: 0 }
     : { scale: [1, 1.1, 1], rotate: [0, -10, 10, 0] },
-  transition: android
+  transition: android || shouldReduceMotion
     ? { duration: 1.2, ease: 'easeOut' }
     : { duration: 2, repeat: Infinity, repeatDelay: 1 },
 });
@@ -58,6 +58,7 @@ export default function CartSheet() {
   const { t } = useTranslation();
   const platform = usePlatform();
   const android = isAndroid(platform);
+  const shouldReduceMotion = useReducedMotion();
   const checkoutTimeoutRef = useRef(null);
 
   // Derived Values
@@ -87,8 +88,8 @@ export default function CartSheet() {
   );
 
   const { animate: emptyAnimate, transition: emptyTransition } = useMemo(
-    () => getEmptyEmojiVariants(android),
-    [android]
+    () => getEmptyEmojiVariants(android, shouldReduceMotion),
+    [android, shouldReduceMotion]
   );
 
   // Lifecycle

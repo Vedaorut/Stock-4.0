@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { m as motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import PageHeader from '../common/PageHeader';
 import { useTelegram } from '../../hooks/useTelegram';
 import { useApi } from '../../hooks/useApi';
@@ -9,6 +9,7 @@ import { useTranslation } from '../../i18n/useTranslation';
 // Compact Plan Card
 function PlanCard({ name, price, features, isActive, onSelect, delay = 0, t }) {
   const { triggerHaptic } = useTelegram();
+  const shouldReduceMotion = useReducedMotion();
   const isMax = name === 'max';
   const isPro = name === 'pro';
   const isPremiumTier = isMax || isPro;
@@ -49,7 +50,7 @@ function PlanCard({ name, price, features, isActive, onSelect, delay = 0, t }) {
         )}
 
         {/* PRO/MAX shine effect */}
-        {isPremiumTier && (
+        {isPremiumTier && !shouldReduceMotion && (
           <motion.div
             className="absolute inset-0 pointer-events-none"
             style={{

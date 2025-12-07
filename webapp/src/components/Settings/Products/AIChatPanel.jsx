@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { motion } from 'framer-motion';
+import { m as motion } from 'framer-motion';
 import PageHeader from '../../common/PageHeader';
 import { useTelegram } from '../../../hooks/useTelegram';
 

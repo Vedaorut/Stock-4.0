@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { m as motion, AnimatePresence } from 'framer-motion';
 import PageHeader from '../../common/PageHeader';
 import { useTelegram } from '../../../hooks/useTelegram';
 import { useApi } from '../../../hooks/useApi';
@@ -54,7 +54,7 @@ export default function ProductsModal({ isOpen, onClose }) {
   });
 
   // AI Chat handlers
-  const handleOpenAIChat = () => {
+  const _handleOpenAIChat = () => {
     triggerHaptic('medium');
     setShowAIChat(true);
   };
@@ -166,7 +166,10 @@ export default function ProductsModal({ isOpen, onClose }) {
   useEffect(() => {
     if (!isOpen) return;
 
-    setLoading(true);
+    // OPTIMIZATION: Only show loading if no cached data
+    if (products.length === 0 && !myShop) {
+      setLoading(true);
+    }
     setError(null);
 
     const controller = new AbortController();
@@ -187,6 +190,7 @@ export default function ProductsModal({ isOpen, onClose }) {
       });
 
     return () => controller.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- products.length/myShop check is for initial render only
   }, [isOpen, loadData]);
 
   // Reset state when modal closes

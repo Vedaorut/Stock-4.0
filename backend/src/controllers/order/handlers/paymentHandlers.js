@@ -1,4 +1,4 @@
-import { orderQueries, shopQueries } from '../../../database/queries/index.js';
+import { orderQueries } from '../../../database/queries/index.js';
 import { asyncHandler } from '../../../middleware/errorHandler.js';
 import logger from '../../../utils/logger.js';
 import cryptoPriceService from '../../../services/cryptoPriceService.js';
@@ -245,20 +245,22 @@ export const submitPayment = asyncHandler(async (req, res) => {
 /**
  * GET /api/orders/:id/payment-status
  * Returns current verification status
+ * OPTIMIZATION: Combined 4 queries into 1 JOIN query
  */
 export const getPaymentStatus = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const userId = req.user.id;
 
+  // OPTIMIZATION: Single query with all JOINs instead of 4 sequential queries
+  // orderQueries.findById already returns owner_id from shops JOIN
   const order = await orderQueries.findById(id);
   if (!order) {
     throw new NotFoundError('Order');
   }
 
-  const orderData = await orderQueries.getInvoiceData(id);
-  const shop = orderData ? await shopQueries.findById(orderData.shop_id) : null;
+  // Check access - findById already has shop.owner_id via JOIN
   const isBuyer = order.buyer_id === userId;
-  const isSeller = shop?.owner_id === userId;
+  const isSeller = order.owner_id === userId;
 
   if (!isBuyer && !isSeller) {
     throw new UnauthorizedError('Access denied');

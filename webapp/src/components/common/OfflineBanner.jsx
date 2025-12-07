@@ -1,10 +1,11 @@
-import { motion, AnimatePresence } from 'framer-motion';
+import { m as motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 import { useTranslation } from '../../i18n/useTranslation';
 
 export default function OfflineBanner() {
   const isOnline = useOnlineStatus();
   const { t } = useTranslation();
+  const shouldReduceMotion = useReducedMotion();
 
   return (
     <AnimatePresence>
@@ -25,11 +26,11 @@ export default function OfflineBanner() {
             {/* Offline Icon */}
             <motion.div
               animate={{
-                scale: [1, 1.2, 1],
+                scale: shouldReduceMotion ? 1 : [1, 1.2, 1],
               }}
               transition={{
                 duration: 2,
-                repeat: Infinity,
+                repeat: shouldReduceMotion ? 0 : Infinity,
                 ease: 'easeInOut',
               }}
             >
@@ -59,10 +60,10 @@ export default function OfflineBanner() {
           <motion.div
             className="absolute bottom-0 left-0 right-0 h-1 bg-white/20"
             initial={{ scaleX: 0 }}
-            animate={{ scaleX: [0, 1, 0] }}
+            animate={{ scaleX: shouldReduceMotion ? 1 : [0, 1, 0] }}
             transition={{
               duration: 2,
-              repeat: Infinity,
+              repeat: shouldReduceMotion ? 0 : Infinity,
               ease: 'easeInOut',
             }}
             style={{ transformOrigin: 'left' }}

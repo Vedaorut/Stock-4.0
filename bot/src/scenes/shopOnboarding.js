@@ -21,8 +21,8 @@ import { detectCryptoType, validateCryptoAddress } from '../utils/validation.js'
 
 const TOTAL_STEPS = 5;
 
-// Delay helper for animations
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+// Delay helper for animations (used for typing effect)
+const _sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // Step content generators - minimalist style
 const getStepContent = (step, state, lang = 'ru') => {
@@ -62,7 +62,7 @@ const getStepContent = (step, state, lang = 'ru') => {
         keyboard: buildNavKeyboard(3, lang),
       };
 
-    case 4:
+    case 4: {
       // Step 5: Done - dynamic text based on subscription type
       // subscriptionType: 'trial' | 'promo' | 'paid'
       let doneTextKey = 'shopOnboarding.doneText'; // fallback
@@ -81,14 +81,15 @@ const getStepContent = (step, state, lang = 'ru') => {
           [Markup.button.callback(t('shopOnboarding.openStoreButton', {}, lang), 'onboarding:finish')],
         ]),
       };
+    }
 
     default:
       return null;
   }
 };
 
-// Animation frames for welcome step
-const getWelcomeAnimationFrames = (inviteLink, lang = 'ru') => [
+// Animation frames for welcome step (reserved for future typing animation)
+const _getWelcomeAnimationFrames = (inviteLink, lang = 'ru') => [
   t('shopOnboarding.shopCreated', {}, lang),
   t('shopOnboarding.shopCreated', {}, lang) + '\n\n' + t('shopOnboarding.preparing', {}, lang),
   t('shopOnboarding.linkTitle', {}, lang) + '\n\n' +
@@ -384,7 +385,7 @@ shopOnboardingScene.action('onboarding:finish', async (ctx) => {
     // Get shop health for tip generation
     let statusBar = '';
     try {
-      const shopHealth = await checkShopHealth(shopId, ctx.session?.token);
+      const shopHealth = await checkShopHealth(ctx.wizard.state.shopId || ctx.session?.shopId, ctx.session?.token);
       if (shopHealth) {
         statusBar = getTipForShop(ctx, shopHealth);
       }

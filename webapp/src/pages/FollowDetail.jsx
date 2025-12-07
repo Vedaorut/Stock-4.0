@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, useRef } from 'react';
-import { motion } from 'framer-motion';
+import { m as motion } from 'framer-motion';
 import Header from '../components/Layout/Header';
 import ActionsList from '../components/Follows/ActionsList';
 import ConfirmDialog from '../components/Follows/ConfirmDialog';
@@ -154,7 +154,10 @@ export default function FollowDetail() {
       return;
     }
 
-    setIsLoading(true);
+    // OPTIMIZATION: Only show loading if no cached data exists
+    if (!follow) {
+      setIsLoading(true);
+    }
     setError(null);
 
     const controller = new AbortController();
@@ -175,6 +178,7 @@ export default function FollowDetail() {
       });
 
     return () => controller.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- follow check is for initial render only
   }, [followDetailId, loadFollow, loadProducts]);
 
   // Handle markup update

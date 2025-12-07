@@ -6,7 +6,7 @@ import { query } from '../../config/database.js';
  */
 export const subscriptionQueries = {
   // Create subscription (user follows a shop)
-  create: async (userId, shopId, telegramId = null) => {
+  create: async (userId, shopId, _telegramId = null) => {
     try {
       const result = await query(
         `INSERT INTO shop_subscribers (user_id, shop_id)

@@ -4,7 +4,7 @@ import dotenv from 'dotenv';
 import config from './config/index.js';
 import logger from './utils/logger.js';
 import { reply as cleanReply } from './utils/cleanReply.js';
-import { logWebAppConfig, getWebAppUrl } from './utils/webappUrl.js';
+import { logWebAppConfig } from './utils/webappUrl.js';
 import { t } from './i18n/index.js';
 
 // Middleware

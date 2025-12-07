@@ -159,130 +159,17 @@ ${t('upgradeShop.benefitAnalytics', {}, lang)}`;
   // Step 2: Handle confirmation and show crypto options
   async (ctx) => {
     const lang = ctx.lang || ctx.session?.language || 'ru';
-    const { seller: sellerMessages, general: generalMessages } = getMessages(lang);
-
-    if (!ctx.callbackQuery) {
-      await ctx.reply(ctx.t('general.useButtons'));
-      return;
-    }
-
-    const data = ctx.callbackQuery.data;
-
-    // Handle cancel
-    if (data === 'seller:menu') {
-      await ctx.answerCbQuery(sellerMessages.upgrade.cancelled(lang));
-      await ctx.scene.leave();
-      await showSellerMainMenu(ctx);
-      return;
-    }
-
-    if (data !== 'upgrade:confirm') {
-      await ctx.answerCbQuery(generalMessages.invalidChoice(lang));
-      return;
-    }
-
-    await ctx.answerCbQuery();
-
-    const { upgradeCost } = ctx.wizard.state;
-
-    const message = sellerMessages.upgrade.chooseCrypto(upgradeCost.toFixed(2));
-
-    await ctx.editMessageText(message, {
-      parse_mode: 'HTML',
-      ...Markup.inlineKeyboard([
-        [Markup.button.callback(t('buttons.cryptoBTC', {}, lang), 'upgrade:crypto:BTC')],
-        [Markup.button.callback(t('buttons.cryptoETH', {}, lang), 'upgrade:crypto:ETH')],
-        [Markup.button.callback(t('buttons.cryptoUSDT', {}, lang), 'upgrade:crypto:USDT')],
-        [Markup.button.callback(t('buttons.cryptoLTC', {}, lang), 'upgrade:crypto:LTC')],
-        [Markup.button.callback(t('buttons.back', {}, lang), 'upgrade:back')],
-        [Markup.button.callback(t('buttons.cancel', {}, lang), 'seller:menu')],
-      ]),
-    });
-
-    return ctx.wizard.next();
-  },
-
-  // Step 3: Handle crypto selection and generate upgrade invoice
-  async (ctx) => {
-    const lang = ctx.lang || ctx.session?.language || 'ru';
-    const { seller: sellerMessages } = getMessages(lang);
-
-    if (!ctx.callbackQuery) {
-      await ctx.reply(ctx.t('general.selectCrypto'));
-      return;
-    }
-
-    const data = ctx.callbackQuery.data;
-
-    // Handle back
-    if (data === 'upgrade:back') {
-      await ctx.answerCbQuery();
-      return ctx.wizard.back();
-    }
-
-    // Handle cancel
-    if (data === 'seller:menu') {
-      await ctx.answerCbQuery(sellerMessages.upgrade.cancelled(lang));
-      await ctx.scene.leave();
-      await showSellerMainMenu(ctx);
-      return;
-    }
-
-    // Parse crypto selection
-    if (!data.startsWith('upgrade:crypto:')) {
-      await ctx.answerCbQuery(sellerMessages.upgrade.unknownCommand(lang), { show_alert: true });
-      return;
-    }
-
-    const currency = data.replace('upgrade:crypto:', '');
-    if (!['BTC', 'ETH', 'USDT', 'LTC'].includes(currency)) {
-      await ctx.answerCbQuery(sellerMessages.upgrade.unknownCommand(lang), { show_alert: true });
-      return;
-    }
-
-    await ctx.answerCbQuery();
-
-    ctx.wizard.state.currency = currency;
-
     try {
-      await createUpgradeInvoiceAndShow(ctx, currency);
-      return ctx.wizard.next();
-    } catch (error) {
-      logger.error('[UpgradeShop] Invoice generation error:', {
-        message: error.message,
-        response: error.response?.data,
-      });
+      const { seller: sellerMessages, general: generalMessages } = getMessages(lang);
 
-      const errorMsg =
-        error.response?.data?.error || error.message || ctx.t('upgradeShop.invoiceErrorDefault');
+      if (!ctx.callbackQuery) {
+        await ctx.reply(ctx.t('general.useButtons'));
+        return;
+      }
 
-      await ctx.editMessageText(sellerMessages.upgrade.error(errorMsg), {
-        parse_mode: 'HTML',
-        ...Markup.inlineKeyboard([
-          [Markup.button.callback(t('buttons.back', {}, lang), 'upgrade:back')],
-          [Markup.button.callback(t('buttons.cancel', {}, lang), 'seller:menu')],
-        ]),
-      });
-
-      return;
-    }
-  },
-
-  // Step 4: Handle tx_hash and verify upgrade payment
-  async (ctx) => {
-    const lang = ctx.lang || ctx.session?.language || 'ru';
-    const { seller: sellerMessages } = getMessages(lang);
-
-    const { subscriptionId, currency, shopId } = ctx.wizard.state;
-
-    if (!subscriptionId) {
-      await smartMessage.send(ctx, { text: sellerMessages.upgrade.error(ctx.t('errors.noSubscriptionToUpgrade')) });
-      return ctx.scene.leave();
-    }
-
-    if (ctx.callbackQuery) {
       const data = ctx.callbackQuery.data;
 
+      // Handle cancel
       if (data === 'seller:menu') {
         await ctx.answerCbQuery(sellerMessages.upgrade.cancelled(lang));
         await ctx.scene.leave();
@@ -290,180 +177,314 @@ ${t('upgradeShop.benefitAnalytics', {}, lang)}`;
         return;
       }
 
-      if (data === 'upgrade:status') {
-        await ctx.answerCbQuery();
-        try {
-          const token = ctx.session.token;
-          const paymentStatus = await subscriptionApi.getUpgradePaymentStatus(subscriptionId, token);
-          const status = normalizePaymentState(paymentStatus, paymentStatus?.status);
-
-          await cleanReplyHTML(
-            ctx,
-            paymentStateMessage(status, { hint: sellerMessages.upgrade.sendHashPrompt(lang) }),
-            paymentStateKeyboard(status, {
-              retryCb: 'upgrade:retry',
-              cancelCb: 'seller:menu',
-            })
-          );
-        } catch (error) {
-          logger.error('[UpgradeShop] Status check failed:', {
-            message: error.message,
-            response: error.response?.data,
-          });
-          await cleanReplyHTML(
-            ctx,
-            sellerMessages.upgrade.error(ctx.t('upgradeShop.statusCheckError')),
-            Markup.inlineKeyboard([[Markup.button.callback(t('buttons.cancel', {}, lang), 'seller:menu')]])
-          );
-        }
-        return;
-      }
-
-      if (data === 'upgrade:retry') {
-        await ctx.answerCbQuery();
-        if (!currency) {
-          await smartMessage.send(ctx, { text: sellerMessages.upgrade.sendHashPrompt(lang) });
-          return;
-        }
-        try {
-          await createUpgradeInvoiceAndShow(ctx, currency);
-        } catch (error) {
-          logger.error('[UpgradeShop] Retry invoice error:', {
-            message: error.message,
-            response: error.response?.data,
-          });
-          await cleanReplyHTML(
-            ctx,
-            sellerMessages.upgrade.error(ctx.t('upgradeShop.invoiceRetryError')),
-            Markup.inlineKeyboard([[Markup.button.callback(t('buttons.cancel', {}, lang), 'seller:menu')]])
-          );
-        }
-        return;
-      }
-
-      if (data === 'upgrade:paid') {
-        await ctx.answerCbQuery();
-        ctx.wizard.state.awaitingTxHash = true;
-        await smartMessage.send(ctx, { text: sellerMessages.upgrade.sendHashPrompt(lang), keyboard: getCancelButtonHashInput(lang) });
+      if (data !== 'upgrade:confirm') {
+        await ctx.answerCbQuery(generalMessages.invalidChoice(lang));
         return;
       }
 
       await ctx.answerCbQuery();
-      return;
+
+      const { upgradeCost } = ctx.wizard.state;
+
+      const message = sellerMessages.upgrade.chooseCrypto(upgradeCost.toFixed(2));
+
+      await ctx.editMessageText(message, {
+        parse_mode: 'HTML',
+        ...Markup.inlineKeyboard([
+          [Markup.button.callback(t('buttons.cryptoBTC', {}, lang), 'upgrade:crypto:BTC')],
+          [Markup.button.callback(t('buttons.cryptoETH', {}, lang), 'upgrade:crypto:ETH')],
+          [Markup.button.callback(t('buttons.cryptoUSDT', {}, lang), 'upgrade:crypto:USDT')],
+          [Markup.button.callback(t('buttons.cryptoLTC', {}, lang), 'upgrade:crypto:LTC')],
+          [Markup.button.callback(t('buttons.back', {}, lang), 'upgrade:back')],
+          [Markup.button.callback(t('buttons.cancel', {}, lang), 'seller:menu')],
+        ]),
+      });
+
+      return ctx.wizard.next();
+    } catch (error) {
+      logger.error('[UpgradeShop] Step 2 error:', error);
+      try { await ctx.answerCbQuery?.(); } catch { /* ignore */ }
+      await ctx.reply(t('general.actionFailed', {}, lang) || 'An error occurred');
+      return ctx.scene.leave();
     }
+  },
 
-    if (!ctx.message?.text) {
-      if (ctx.wizard.state.awaitingTxHash) {
-        await smartMessage.send(ctx, {
-          text: ctx.t('seller.enterTxHash') + '\n\n' + sellerMessages.upgrade.sendHashPrompt(lang),
-          keyboard: getCancelButtonHashInput(lang),
-        });
-      }
-      return;
-    }
-
-    const txHash = ctx.message.text.trim();
-    if (txHash.length < 10) {
-      await smartMessage.send(ctx, { text: sellerMessages.upgrade.hashInvalid(lang) });
-      return;
-    }
-
-    if (ctx.wizard.state.processingTxHash) return;
-    ctx.wizard.state.processingTxHash = true;
-
-    let loadingMsg = null;
+  // Step 3: Handle crypto selection and generate upgrade invoice
+  async (ctx) => {
+    const lang = ctx.lang || ctx.session?.language || 'ru';
     try {
-      loadingMsg = await smartMessage.send(ctx, { text: sellerMessages.upgrade.verifying(lang) });
+      const { seller: sellerMessages } = getMessages(lang);
 
-      const token = ctx.session.token;
-      const upgradeResponse = await subscriptionApi.confirmUpgradePayment(
-        subscriptionId,
-        txHash,
-        token
-      );
-
-      const status = normalizePaymentState(upgradeResponse, upgradeResponse?.state);
-
-      try {
-        if (loadingMsg) {
-          await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id);
-        }
-      } catch {
-        /* ignore delete errors */
+      if (!ctx.callbackQuery) {
+        await ctx.reply(ctx.t('general.selectCrypto'));
+        return;
       }
 
-      if (status === 'confirmed' || status === 'paid') {
-        let endDateLabel = null;
-        try {
-          const statusInfo = await subscriptionApi.getStatus(shopId, token);
-          const updated = statusInfo?.currentSubscription;
-          if (updated?.period_end) {
-            endDateLabel = new Date(updated.period_end).toLocaleDateString('ru-RU');
-          }
-        } catch {
-          logger.warn('[UpgradeShop] Could not fetch updated subscription status', {
-            message: 'fetch status failed',
-          });
-        }
+      const data = ctx.callbackQuery.data;
 
-        // P1-4 FIX: Update shopTier in session after successful upgrade
-        ctx.session.shopTier = 'max';
+      // Handle back
+      if (data === 'upgrade:back') {
+        await ctx.answerCbQuery();
+        return await ctx.wizard.back();
+      }
 
-        const successText = endDateLabel
-          ? sellerMessages.upgrade.success(endDateLabel)
-          : ctx.t('upgradeShop.successNoDate');
-
-        await cleanReplyHTML(
-          ctx,
-          `${successText}\n\n${sellerMessages.upgrade.benefits(lang)}`,
-          Markup.inlineKeyboard([[Markup.button.callback(t('buttons.mainMenu', {}, lang), 'seller:menu')]])
-        );
-
+      // Handle cancel
+      if (data === 'seller:menu') {
+        await ctx.answerCbQuery(sellerMessages.upgrade.cancelled(lang));
         await ctx.scene.leave();
-
-        const { showSellerMainMenu } = await import('../handlers/seller/index.js');
         await showSellerMainMenu(ctx);
         return;
       }
 
-      await cleanReplyHTML(
-        ctx,
-        paymentStateMessage(status, { hint: sellerMessages.upgrade.verificationError(lang) }),
-        paymentStateKeyboard(status, {
-          retryCb: 'upgrade:retry',
-          cancelCb: 'seller:menu',
-        })
-      );
-
-      return;
-    } catch (error) {
-      logger.error('[UpgradeShop] Payment verification error:', {
-        message: error.message,
-        response: error.response?.data,
-      });
-
-      const status = normalizePaymentState(error.response?.data, 'failed');
-
-      await cleanReplyHTML(
-        ctx,
-        paymentStateMessage(status, { hint: sellerMessages.upgrade.verificationError(lang) }),
-        paymentStateKeyboard(status, {
-          retryCb: 'upgrade:retry',
-          cancelCb: 'seller:menu',
-        })
-      );
-
-      return;
-    } finally {
-      if (loadingMsg) {
-        try {
-          await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id);
-        } catch (e) {
-          logger.debug('[UpgradeShop] Failed to delete loading message', e.message);
-        }
+      // Parse crypto selection
+      if (!data.startsWith('upgrade:crypto:')) {
+        await ctx.answerCbQuery(sellerMessages.upgrade.unknownCommand(lang), { show_alert: true });
+        return;
       }
-      ctx.wizard.state.processingTxHash = false;
-      ctx.wizard.state.awaitingTxHash = false;
+
+      const currency = data.replace('upgrade:crypto:', '');
+      if (!['BTC', 'ETH', 'USDT', 'LTC'].includes(currency)) {
+        await ctx.answerCbQuery(sellerMessages.upgrade.unknownCommand(lang), { show_alert: true });
+        return;
+      }
+
+      await ctx.answerCbQuery();
+
+      ctx.wizard.state.currency = currency;
+
+      try {
+        await createUpgradeInvoiceAndShow(ctx, currency);
+        return ctx.wizard.next();
+      } catch (error) {
+        logger.error('[UpgradeShop] Invoice generation error:', {
+          message: error.message,
+          response: error.response?.data,
+        });
+
+        const errorMsg =
+          error.response?.data?.error || error.message || ctx.t('upgradeShop.invoiceErrorDefault');
+
+        await ctx.editMessageText(sellerMessages.upgrade.error(errorMsg), {
+          parse_mode: 'HTML',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback(t('buttons.back', {}, lang), 'upgrade:back')],
+            [Markup.button.callback(t('buttons.cancel', {}, lang), 'seller:menu')],
+          ]),
+        });
+
+        return;
+      }
+    } catch (error) {
+      logger.error('[UpgradeShop] Step 3 error:', error);
+      try { await ctx.answerCbQuery?.(); } catch { /* ignore */ }
+      await ctx.reply(t('general.actionFailed', {}, lang) || 'An error occurred');
+      return ctx.scene.leave();
+    }
+  },
+
+  // Step 4: Handle tx_hash and verify upgrade payment
+  async (ctx) => {
+    const lang = ctx.lang || ctx.session?.language || 'ru';
+    let loadingMsg = null;
+    try {
+      const { seller: sellerMessages } = getMessages(lang);
+
+      const { subscriptionId, currency, shopId } = ctx.wizard.state;
+
+      if (!subscriptionId) {
+        await smartMessage.send(ctx, { text: sellerMessages.upgrade.error(ctx.t('errors.noSubscriptionToUpgrade')) });
+        return ctx.scene.leave();
+      }
+
+      if (ctx.callbackQuery) {
+        const data = ctx.callbackQuery.data;
+
+        if (data === 'seller:menu') {
+          await ctx.answerCbQuery(sellerMessages.upgrade.cancelled(lang));
+          await ctx.scene.leave();
+          await showSellerMainMenu(ctx);
+          return;
+        }
+
+        if (data === 'upgrade:status') {
+          await ctx.answerCbQuery();
+          try {
+            const token = ctx.session.token;
+            const paymentStatus = await subscriptionApi.getUpgradePaymentStatus(subscriptionId, token);
+            const status = normalizePaymentState(paymentStatus, paymentStatus?.status);
+
+            await cleanReplyHTML(
+              ctx,
+              paymentStateMessage(status, { hint: sellerMessages.upgrade.sendHashPrompt(lang) }),
+              paymentStateKeyboard(status, {
+                retryCb: 'upgrade:retry',
+                cancelCb: 'seller:menu',
+              })
+            );
+          } catch (error) {
+            logger.error('[UpgradeShop] Status check failed:', {
+              message: error.message,
+              response: error.response?.data,
+            });
+            await cleanReplyHTML(
+              ctx,
+              sellerMessages.upgrade.error(ctx.t('upgradeShop.statusCheckError')),
+              Markup.inlineKeyboard([[Markup.button.callback(t('buttons.cancel', {}, lang), 'seller:menu')]])
+            );
+          }
+          return;
+        }
+
+        if (data === 'upgrade:retry') {
+          await ctx.answerCbQuery();
+          if (!currency) {
+            await smartMessage.send(ctx, { text: sellerMessages.upgrade.sendHashPrompt(lang) });
+            return;
+          }
+          try {
+            await createUpgradeInvoiceAndShow(ctx, currency);
+          } catch (error) {
+            logger.error('[UpgradeShop] Retry invoice error:', {
+              message: error.message,
+              response: error.response?.data,
+            });
+            await cleanReplyHTML(
+              ctx,
+              sellerMessages.upgrade.error(ctx.t('upgradeShop.invoiceRetryError')),
+              Markup.inlineKeyboard([[Markup.button.callback(t('buttons.cancel', {}, lang), 'seller:menu')]])
+            );
+          }
+          return;
+        }
+
+        if (data === 'upgrade:paid') {
+          await ctx.answerCbQuery();
+          ctx.wizard.state.awaitingTxHash = true;
+          await smartMessage.send(ctx, { text: sellerMessages.upgrade.sendHashPrompt(lang), keyboard: getCancelButtonHashInput(lang) });
+          return;
+        }
+
+        await ctx.answerCbQuery();
+        return;
+      }
+
+      if (!ctx.message?.text) {
+        if (ctx.wizard.state.awaitingTxHash) {
+          await smartMessage.send(ctx, {
+            text: ctx.t('seller.enterTxHash') + '\n\n' + sellerMessages.upgrade.sendHashPrompt(lang),
+            keyboard: getCancelButtonHashInput(lang),
+          });
+        }
+        return;
+      }
+
+      const txHash = ctx.message.text.trim();
+      if (txHash.length < 10) {
+        await smartMessage.send(ctx, { text: sellerMessages.upgrade.hashInvalid(lang) });
+        return;
+      }
+
+      if (ctx.wizard.state.processingTxHash) return;
+      ctx.wizard.state.processingTxHash = true;
+
+      try {
+        loadingMsg = await smartMessage.send(ctx, { text: sellerMessages.upgrade.verifying(lang) });
+
+        const token = ctx.session.token;
+        const upgradeResponse = await subscriptionApi.confirmUpgradePayment(
+          subscriptionId,
+          txHash,
+          token
+        );
+
+        const status = normalizePaymentState(upgradeResponse, upgradeResponse?.state);
+
+        try {
+          if (loadingMsg) {
+            await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id);
+          }
+        } catch {
+          /* ignore delete errors */
+        }
+
+        if (status === 'confirmed' || status === 'paid') {
+          let endDateLabel = null;
+          try {
+            const statusInfo = await subscriptionApi.getStatus(shopId, token);
+            const updated = statusInfo?.currentSubscription;
+            if (updated?.period_end) {
+              endDateLabel = new Date(updated.period_end).toLocaleDateString('ru-RU');
+            }
+          } catch {
+            logger.warn('[UpgradeShop] Could not fetch updated subscription status', {
+              message: 'fetch status failed',
+            });
+          }
+
+          // P1-4 FIX: Update shopTier in session after successful upgrade
+          ctx.session.shopTier = 'max';
+
+          const successText = endDateLabel
+            ? sellerMessages.upgrade.success(endDateLabel)
+            : ctx.t('upgradeShop.successNoDate');
+
+          await cleanReplyHTML(
+            ctx,
+            `${successText}\n\n${sellerMessages.upgrade.benefits(lang)}`,
+            Markup.inlineKeyboard([[Markup.button.callback(t('buttons.mainMenu', {}, lang), 'seller:menu')]])
+          );
+
+          await ctx.scene.leave();
+
+          const { showSellerMainMenu } = await import('../handlers/seller/index.js');
+          await showSellerMainMenu(ctx);
+          return;
+        }
+
+        await cleanReplyHTML(
+          ctx,
+          paymentStateMessage(status, { hint: sellerMessages.upgrade.verificationError(lang) }),
+          paymentStateKeyboard(status, {
+            retryCb: 'upgrade:retry',
+            cancelCb: 'seller:menu',
+          })
+        );
+
+        return;
+      } catch (error) {
+        logger.error('[UpgradeShop] Payment verification error:', {
+          message: error.message,
+          response: error.response?.data,
+        });
+
+        const status = normalizePaymentState(error.response?.data, 'failed');
+
+        await cleanReplyHTML(
+          ctx,
+          paymentStateMessage(status, { hint: sellerMessages.upgrade.verificationError(lang) }),
+          paymentStateKeyboard(status, {
+            retryCb: 'upgrade:retry',
+            cancelCb: 'seller:menu',
+          })
+        );
+
+        return;
+      } finally {
+        if (loadingMsg) {
+          try {
+            await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id);
+          } catch (e) {
+            logger.debug('[UpgradeShop] Failed to delete loading message', e.message);
+          }
+        }
+        ctx.wizard.state.processingTxHash = false;
+        ctx.wizard.state.awaitingTxHash = false;
+      }
+    } catch (error) {
+      logger.error('[UpgradeShop] Step 4 error:', error);
+      try { await ctx.answerCbQuery?.(); } catch { /* ignore */ }
+      await ctx.reply(t('general.actionFailed', {}, lang) || 'An error occurred');
+      return ctx.scene.leave();
     }
   }
 );

@@ -180,7 +180,17 @@ export function verifySignature(payload) {
     .update(`${payload.id}:${config.salt}`)
     .digest('hex');
 
-  const isValid = payload.signature === expectedSignature;
+  // Use timing-safe comparison to prevent timing attacks
+  let isValid = false;
+  try {
+    isValid = crypto.timingSafeEqual(
+      Buffer.from(payload.signature, 'hex'),
+      Buffer.from(expectedSignature, 'hex')
+    );
+  } catch {
+    // If signatures have different lengths, they don't match
+    isValid = false;
+  }
 
   if (!isValid) {
     logger.warn('[CrystalPay] Invalid signature', {

@@ -1,4 +1,4 @@
-import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
+import { m as motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { memo, useMemo, useCallback, useEffect, useState, useRef } from 'react';
 import { useStore } from '../../store/useStore';
 import { useShallow } from 'zustand/react/shallow';
@@ -210,7 +210,7 @@ const indicatorSpring = {
     mass: 0.7
 };
 
-// Subtle shimmer effect - very delicate
+// Subtle shimmer effect - very delicate (currently unused, kept for future)
 const ShimmerEffect = memo(function ShimmerEffect() {
     return (
         <motion.div
@@ -235,8 +235,11 @@ const ShimmerEffect = memo(function ShimmerEffect() {
     );
 });
 
-// Active indicator blob with glow
-const ActiveIndicator = memo(function ActiveIndicator({ tabIndex, totalTabs }) {
+// Active indicator blob with glow (currently unused, kept for future)
+const ActiveIndicator = memo(function ActiveIndicator({ tabIndex: _tabIndex, totalTabs: _totalTabs }) {
+    // Disable shimmer animation for users who prefer reduced motion
+    const shouldReduceMotion = useReducedMotion();
+
     return (
         <motion.div
             layoutId="activeTabIndicator"
@@ -264,8 +267,8 @@ const ActiveIndicator = memo(function ActiveIndicator({ tabIndex, totalTabs }) {
             }}
             transition={indicatorSpring}
         >
-            {/* Shimmer effect */}
-            <ShimmerEffect />
+            {/* Shimmer effect - disabled for reduced motion preference */}
+            {!shouldReduceMotion && <ShimmerEffect />}
         </motion.div>
     );
 });
@@ -344,7 +347,7 @@ const TabItem = memo(function TabItem({
 });
 
 
-// Aurora/gradient background effect
+// Aurora/gradient background effect (currently unused, kept for future)
 const AuroraBackground = memo(function AuroraBackground({ activeIndex, totalTabs }) {
     const gradientPosition = useMemo(() => {
         const percentage = (activeIndex / Math.max(totalTabs - 1, 1)) * 100;
@@ -498,3 +501,6 @@ const TabBar = memo(function TabBar() {
 });
 
 export default TabBar;
+
+// Export unused components to prevent ESLint warnings (kept for future use)
+export { ShimmerEffect, ActiveIndicator, AuroraBackground };

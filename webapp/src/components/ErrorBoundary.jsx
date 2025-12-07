@@ -1,5 +1,5 @@
 import { Component } from 'react';
-import { motion } from 'framer-motion'; // Used in JSX
+import { m as motion } from 'framer-motion'; // Used in JSX
 import { t } from '../i18n';
 import { captureException } from '../lib/sentry';
 

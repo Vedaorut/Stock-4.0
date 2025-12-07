@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion'; // Used in JSX
+import { useState, useEffect, useMemo, useCallback, useRef, memo } from 'react';
+import { m as motion, AnimatePresence } from 'framer-motion'; // Used in JSX
 import { useShallow } from 'zustand/react/shallow';
 import ProductGrid from '../components/Product/ProductGrid';
 import CartButton from '../components/Cart/CartButton';
@@ -27,8 +27,8 @@ function ProductCardSkeleton() {
   );
 }
 
-// Search result item component
-function SearchResultItem({ product, onClick, t }) {
+// Search result item component - memoized to prevent re-renders during search
+const SearchResultItem = memo(function SearchResultItem({ product, onClick, t }) {
   const price = typeof product.price === 'number' ? product.price : parseFloat(product.price) || 0;
 
   return (
@@ -71,7 +71,7 @@ function SearchResultItem({ product, onClick, t }) {
       </svg>
     </motion.button>
   );
-}
+});
 
 export default function Catalog() {
   const [loading, setLoading] = useState(false);
@@ -330,7 +330,12 @@ export default function Catalog() {
       return;
     }
 
-    setLoading(true);
+    // OPTIMIZATION: Only show loading spinner if no cached data
+    // This allows instant display of existing products while refreshing in background
+    const hasExistingData = products.length > 0;
+    if (!hasExistingData) {
+      setLoading(true);
+    }
     setError(null);
 
     const controller = new AbortController();
@@ -338,40 +343,46 @@ export default function Catalog() {
 
     const fetchData = async () => {
       try {
-        // 1. Load My Shop (if not already known or needed context)
+        // Step 1: Load my shops first (needed to determine ownership)
         const shopResult = await loadMyShop(signal);
         if (signal.aborted) return;
+
         if (shopResult.status === 'error' && !currentShop) {
           // Only block if we have absolutely no shop to show
           setError(shopResult.error);
           return;
         }
 
-        // 2. Determine target shop ID
-        let shop = currentShop || shopResult.shop;
+        // Determine target shop
+        const targetShop = currentShop || shopResult.shop;
+        if (!targetShop) {
+          return; // No shops available
+        }
 
-        // 3. If viewing external shop (not own), load full shop data for availableCryptos
-        // This is needed for payment flow to know which crypto wallets are available
-        // Get myShops from store directly to avoid dependency cycle
+        // Check if viewing own shop (use store directly to avoid dependency cycle)
         const currentMyShops = useStore.getState().myShops;
-        if (currentShop && currentShop.id && !currentShop.availableCryptos) {
-          const isOwnShop = currentMyShops.some(s => s.id === currentShop.id);
-          if (!isOwnShop) {
-            // Load full shop data for external shops (needed for payment wallets)
-            const fullShopResult = await loadShopById(currentShop.id, signal);
-            if (signal.aborted) return;
-            if (fullShopResult.status === 'success' && fullShopResult.shop) {
-              shop = fullShopResult.shop;
-            }
-          }
+        const isOwnShop = currentMyShops.some(s => s.id === targetShop.id);
+        const needsFullShopData = currentShop && currentShop.id && !currentShop.availableCryptos && !isOwnShop;
+
+        // Step 2: Parallel fetch - products AND shop details (if needed)
+        const promises = [
+          loadProducts(targetShop.id, signal)
+        ];
+
+        // Only fetch shop details if viewing external shop without full data
+        if (needsFullShopData) {
+          promises.push(loadShopById(targetShop.id, signal));
         }
 
-        if (shop) {
-          const prodResult = await loadProducts(shop.id, signal);
-          if (!signal.aborted && prodResult.status === 'error') {
-            setError(prodResult.error);
-          }
+        const results = await Promise.all(promises);
+        if (signal.aborted) return;
+
+        // Handle products result (first promise)
+        const productsResult = results[0];
+        if (productsResult.status === 'error') {
+          setError(productsResult.error);
         }
+
       } finally {
         if (!signal.aborted) setLoading(false);
       }
@@ -397,8 +408,8 @@ export default function Catalog() {
   }, [triggerHaptic, setCurrentShop, setActiveTab]);
 
   // Derived State (displayShop moved up for searchProducts dependency)
-  const displayShopLogo = displayShop?.logo || displayShop?.image || null;
-  const isViewingOwnShop = !currentShop && myShop;
+  const _displayShopLogo = displayShop?.logo || displayShop?.image || null;
+  const _isViewingOwnShop = !currentShop && myShop;
 
   // Check if currentShop belongs to user (using myShops array for multi-shop ownership)
   const isCurrentShopOwned = currentShop && myShops.some(s => s.id === currentShop.id);

@@ -26,12 +26,14 @@ export function initSentry() {
   // Skip initialization if no DSN or in development
   if (!dsn) {
     if (isProd) {
+      // eslint-disable-next-line no-console
       console.warn('[Sentry] VITE_SENTRY_DSN not configured - error tracking disabled');
     }
     return;
   }
 
   if (!isProd) {
+    // eslint-disable-next-line no-console
     console.info('[Sentry] Skipping initialization in development mode');
     return;
   }
@@ -95,6 +97,7 @@ export function initSentry() {
     },
   });
 
+  // eslint-disable-next-line no-console
   console.info('[Sentry] Initialized for error tracking');
 }
 
@@ -142,6 +145,7 @@ export function captureException(error, context = {}) {
  */
 export function captureMessage(message, level = 'info', context = {}) {
   if (!dsn || !isProd) {
+    // eslint-disable-next-line no-console
     console.info('[Sentry] Would log:', message, context);
     return;
   }

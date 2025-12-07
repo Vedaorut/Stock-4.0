@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion';
+import { m as motion } from 'framer-motion';
 import { useTelegram } from '../../hooks/useTelegram';
 
 /**
@@ -9,10 +9,10 @@ import { useTelegram } from '../../hooks/useTelegram';
  * @param {ReactNode} action - Optional element for right side of header
  * @param {'back'|'close'} variant - Button type: 'back' (back arrow) or 'close' (x icon)
  */
-export default function PageHeader({ title, onBack, action, variant = 'back' }) {
+export default function PageHeader({ title, onBack, action, variant: _variant = 'back' }) {
   const { triggerHaptic } = useTelegram();
 
-  const handleBack = () => {
+  const _handleBack = () => {
     triggerHaptic('light');
     onBack();
   };

@@ -62,6 +62,16 @@ export function setupSettingsHandlers(bot) {
       });
     } catch (error) {
       logger.error('Error in settings handler:', error);
+      // Always try to answer callback to stop spinner
+      try { await ctx.answerCbQuery(); } catch { /* ignore */ }
+      // Provide fallback UI
+      try {
+        const lang = ctx.session?.language || 'ru';
+        await smartMessage.send(ctx, {
+          text: t('general.actionFailed', {}, lang) || 'An error occurred. Please try again.',
+          keyboard: settingsMenu({}, lang),
+        });
+      } catch { /* fallback failed */ }
     }
   });
 
@@ -77,6 +87,16 @@ export function setupSettingsHandlers(bot) {
       });
     } catch (error) {
       logger.error('Error in language selection:', error);
+      // Always try to answer callback to stop spinner
+      try { await ctx.answerCbQuery(); } catch { /* ignore */ }
+      // Provide fallback UI
+      try {
+        const lang = ctx.session?.language || 'ru';
+        await smartMessage.send(ctx, {
+          text: t('general.actionFailed', {}, lang) || 'An error occurred. Please try again.',
+          keyboard: settingsMenu({}, lang),
+        });
+      } catch { /* fallback failed */ }
     }
   });
 
@@ -132,6 +152,16 @@ export function setupSettingsHandlers(bot) {
       }
     } catch (error) {
       logger.error('Error changing language:', error);
+      // Always try to answer callback to stop spinner
+      try { await ctx.answerCbQuery(); } catch { /* ignore */ }
+      // Provide fallback UI
+      try {
+        const lang = ctx.session?.language || 'ru';
+        await smartMessage.send(ctx, {
+          text: t('general.actionFailed', {}, lang) || 'An error occurred. Please try again.',
+          keyboard: settingsMenu({}, lang),
+        });
+      } catch { /* fallback failed */ }
     }
   });
 
@@ -145,6 +175,16 @@ export function setupSettingsHandlers(bot) {
       await ctx.editMessageText(t('settings.title', {}, lang), settingsMenu(shopContext, lang));
     } catch (error) {
       logger.error('Error returning to settings:', error);
+      // Always try to answer callback to stop spinner
+      try { await ctx.answerCbQuery(); } catch { /* ignore */ }
+      // Provide fallback UI
+      try {
+        const lang = ctx.session?.language || 'ru';
+        await smartMessage.send(ctx, {
+          text: t('general.actionFailed', {}, lang) || 'An error occurred. Please try again.',
+          keyboard: settingsMenu({}, lang),
+        });
+      } catch { /* fallback failed */ }
     }
   });
 
@@ -165,6 +205,16 @@ export function setupSettingsHandlers(bot) {
       await ctx.scene.enter('pay_subscription', { renewal: true });
     } catch (error) {
       logger.error('Error in renew subscription:', error);
+      // Always try to answer callback to stop spinner
+      try { await ctx.answerCbQuery(); } catch { /* ignore */ }
+      // Provide fallback UI
+      try {
+        const lang = ctx.session?.language || 'ru';
+        await smartMessage.send(ctx, {
+          text: t('general.actionFailed', {}, lang) || 'An error occurred. Please try again.',
+          keyboard: settingsMenu({}, lang),
+        });
+      } catch { /* fallback failed */ }
     }
   });
 
@@ -177,6 +227,16 @@ export function setupSettingsHandlers(bot) {
       await ctx.scene.enter('pay_subscription', { exitTrial: true });
     } catch (error) {
       logger.error('Error in exit trial:', error);
+      // Always try to answer callback to stop spinner
+      try { await ctx.answerCbQuery(); } catch { /* ignore */ }
+      // Provide fallback UI
+      try {
+        const lang = ctx.session?.language || 'ru';
+        await smartMessage.send(ctx, {
+          text: t('general.actionFailed', {}, lang) || 'An error occurred. Please try again.',
+          keyboard: settingsMenu({}, lang),
+        });
+      } catch { /* fallback failed */ }
     }
   });
 
@@ -202,6 +262,16 @@ export function setupSettingsHandlers(bot) {
       }
     } catch (error) {
       logger.error('Error in settings back:', error);
+      // Always try to answer callback to stop spinner
+      try { await ctx.answerCbQuery(); } catch { /* ignore */ }
+      // Provide fallback UI
+      try {
+        const lang = ctx.session?.language || 'ru';
+        await smartMessage.send(ctx, {
+          text: t('general.actionFailed', {}, lang) || 'An error occurred. Please try again.',
+          keyboard: settingsMenu({}, lang),
+        });
+      } catch { /* fallback failed */ }
     }
   });
 

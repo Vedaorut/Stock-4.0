@@ -66,14 +66,15 @@ const BLOCKCHAIN_CONFIG = {
     baseUrl: 'https://api.trongrid.io',
     minConfirmations: SUPPORTED_CURRENCIES.USDT.confirmations,
     decimals: SUPPORTED_CURRENCIES.USDT.decimals,
-    contractAddress: 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t', // USDT TRC20 contract
+    // USDT TRC20 contract - configurable via env for flexibility
+    contractAddress: process.env.USDT_TRC20_CONTRACT || 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t',
   },
   USDT_TRC20: {
     provider: 'trongrid',
     baseUrl: 'https://api.trongrid.io',
     minConfirmations: SUPPORTED_CURRENCIES.USDT.confirmations,
     decimals: SUPPORTED_CURRENCIES.USDT.decimals,
-    contractAddress: 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t',
+    contractAddress: process.env.USDT_TRC20_CONTRACT || 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t',
   },
 };
 

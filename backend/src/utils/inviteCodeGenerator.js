@@ -51,7 +51,7 @@ const translitMap = {
  * @returns {string} - Transliterated text
  */
 function transliterate(text) {
-  if (!text) return '';
+  if (!text) {return '';}
 
   let result = '';
   for (const char of text) {
@@ -78,7 +78,7 @@ function transliterate(text) {
  * @returns {string} - Cleaned text
  */
 function cleanText(text) {
-  if (!text) return '';
+  if (!text) {return '';}
 
   // Remove any character that's not alphanumeric, underscore, or hyphen
   let cleaned = text.replace(/[^a-zA-Z0-9_-]/g, '');
@@ -163,7 +163,7 @@ export function generateInviteCode(shopName, existingCodes = []) {
  * @returns {boolean} - True if it looks like an invite code
  */
 export function isInviteCode(code) {
-  if (!code) return false;
+  if (!code) {return false;}
 
   // Legacy format: shop_123 (starts with "shop_" followed by digits only)
   const legacyPattern = /^shop_\d+$/;
@@ -182,7 +182,7 @@ export function isInviteCode(code) {
  * @returns {{ type: 'id' | 'invite_code', value: number | string } | null}
  */
 export function parseShopPayload(payload) {
-  if (!payload) return null;
+  if (!payload) {return null;}
 
   // Check for legacy format: shop_123
   const legacyMatch = payload.match(/^shop_(\d+)$/);

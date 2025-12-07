@@ -1,10 +1,10 @@
-import { motion } from 'framer-motion';
+import { m as motion } from 'framer-motion';
 import { useTranslation } from '../../../i18n/useTranslation';
 
 /**
  * ProductEmptyState - Empty state when no products exist
  */
-function ProductEmptyState({ onOpenAIChat }) {
+function ProductEmptyState({ onOpenAIChat: _onOpenAIChat }) {
   const { t } = useTranslation();
 
   return (

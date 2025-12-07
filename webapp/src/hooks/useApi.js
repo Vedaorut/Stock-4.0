@@ -8,6 +8,77 @@ import { mockApi } from '../mock/api'; // Import mock adapter
 // Base API URL (can be moved to .env)
 const API_BASE_URL = getApiBaseUrl();
 
+// ============================================
+// API Response Cache
+// ============================================
+const apiCache = new Map();
+const MAX_CACHE_SIZE = 100;
+
+/**
+ * Set cache with LRU limit
+ * @param {string} key - Cache key
+ * @param {object} value - Value to cache
+ */
+function setCacheWithLimit(key, value) {
+  // Prune expired entries first
+  const now = Date.now();
+  for (const [k, v] of apiCache.entries()) {
+    if (now > v.expiry) {
+      apiCache.delete(k);
+    }
+  }
+
+  // If still over limit, remove oldest
+  if (apiCache.size >= MAX_CACHE_SIZE) {
+    const firstKey = apiCache.keys().next().value;
+    apiCache.delete(firstKey);
+  }
+
+  apiCache.set(key, value);
+}
+
+const CACHE_TTL = {
+  '/shops/my': 5 * 60 * 1000,      // 5 minutes
+  '/shops/': 5 * 60 * 1000,         // 5 minutes for shop details
+  '/products': 2 * 60 * 1000,       // 2 minutes
+  '/follows': 3 * 60 * 1000,        // 3 minutes
+  '/orders': 1 * 60 * 1000,         // 1 minute
+  default: 60 * 1000                 // 1 minute default
+};
+
+function getCacheKey(method, endpoint) {
+  return `${method}:${endpoint}`;
+}
+
+function getCacheTTL(endpoint) {
+  for (const [pattern, ttl] of Object.entries(CACHE_TTL)) {
+    if (pattern !== 'default' && endpoint.startsWith(pattern)) {
+      return ttl;
+    }
+  }
+  return CACHE_TTL.default;
+}
+
+function shouldCache(method) {
+  return method === 'GET';
+}
+
+/**
+ * Invalidate cache entries matching a pattern
+ * @param {string|null} pattern - Pattern to match (null clears all)
+ */
+export function invalidateCache(pattern = null) {
+  if (pattern) {
+    for (const key of apiCache.keys()) {
+      if (key.includes(pattern)) {
+        apiCache.delete(key);
+      }
+    }
+  } else {
+    apiCache.clear();
+  }
+}
+
 // Demo mode flag
 const IS_DEMO_MODE = import.meta.env.VITE_DEMO_MODE === 'true';
 
@@ -34,12 +105,26 @@ export function useApi() {
 
           // DEMO MODE INTERCEPTION
           if (IS_DEMO_MODE) {
+            // eslint-disable-next-line no-console
             console.log(`[DemoMode] Intercepting ${method} ${endpoint}`);
             const apiMethod = mockApi[method.toLowerCase()];
             if (apiMethod) {
               return await apiMethod(endpoint, data);
             }
             return { error: 'Method not implemented in mock' };
+          }
+
+          // Check cache for GET requests
+          const cacheKey = getCacheKey(method, endpoint);
+          if (shouldCache(method)) {
+            const cached = apiCache.get(cacheKey);
+            if (cached && Date.now() - cached.timestamp < getCacheTTL(endpoint)) {
+              if (import.meta.env.DEV) {
+                // eslint-disable-next-line no-console
+                console.log(`[Cache] HIT for ${endpoint}`);
+              }
+              return { data: cached.data, error: null };
+            }
           }
 
           // Helper function to make the actual request
@@ -73,6 +158,20 @@ export function useApi() {
           try {
             const currentToken = tokenGetter();
             const response = await makeRequest(currentToken);
+
+            // Cache successful GET responses
+            if (shouldCache(method)) {
+              setCacheWithLimit(cacheKey, {
+                data: response.data,
+                timestamp: Date.now(),
+                expiry: Date.now() + getCacheTTL(endpoint)
+              });
+              if (import.meta.env.DEV) {
+                // eslint-disable-next-line no-console
+                console.log(`[Cache] STORED ${endpoint}`);
+              }
+            }
+
             return { data: response.data, error: null };
           } catch (err) {
             if (import.meta.env.DEV) {
@@ -120,6 +219,16 @@ export function useApi() {
 
                 // Retry the request with new token (mark as retry to prevent infinite loop)
                 const retryResponse = await makeRequest(newToken);
+
+                // Cache successful GET responses after retry
+                if (shouldCache(method)) {
+                  setCacheWithLimit(cacheKey, {
+                    data: retryResponse.data,
+                    timestamp: Date.now(),
+                    expiry: Date.now() + getCacheTTL(endpoint)
+                  });
+                }
+
                 return { data: retryResponse.data, error: null };
               } catch (refreshError) {
                 if (import.meta.env.DEV) {
@@ -152,24 +261,45 @@ export function useApi() {
         return await request('GET', endpoint, null, config);
       },
 
-      // POST request
+      // POST request - invalidates cache on success
       post: async (endpoint, data, config = {}) => {
-        return await request('POST', endpoint, data, config);
+        const result = await request('POST', endpoint, data, config);
+        if (!result.error) {
+          // Invalidate related cache entries
+          const basePath = '/' + endpoint.split('/')[1]; // e.g., /orders -> /orders
+          invalidateCache(basePath);
+        }
+        return result;
       },
 
-      // PUT request
+      // PUT request - invalidates cache on success
       put: async (endpoint, data, config = {}) => {
-        return await request('PUT', endpoint, data, config);
+        const result = await request('PUT', endpoint, data, config);
+        if (!result.error) {
+          const basePath = '/' + endpoint.split('/')[1];
+          invalidateCache(basePath);
+        }
+        return result;
       },
 
-      // DELETE request
+      // DELETE request - invalidates cache on success
       delete: async (endpoint, config = {}) => {
-        return await request('DELETE', endpoint, null, config);
+        const result = await request('DELETE', endpoint, null, config);
+        if (!result.error) {
+          const basePath = '/' + endpoint.split('/')[1];
+          invalidateCache(basePath);
+        }
+        return result;
       },
 
-      // PATCH request
+      // PATCH request - invalidates cache on success
       patch: async (endpoint, data, config = {}) => {
-        return await request('PATCH', endpoint, data, config);
+        const result = await request('PATCH', endpoint, data, config);
+        if (!result.error) {
+          const basePath = '/' + endpoint.split('/')[1];
+          invalidateCache(basePath);
+        }
+        return result;
       },
 
       // Universal fetchApi wrapper (for compatibility with Settings modals)

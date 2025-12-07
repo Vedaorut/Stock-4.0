@@ -1,7 +1,7 @@
 import { Markup } from 'telegraf';
 import { sellerMenu, sellerMenuNoShop, sellerToolsMenu } from '../../keyboards/seller.js';
 import { manageWorkersMenu, confirmWorkerRemoval } from '../../keyboards/workspace.js';
-import { shopApi, authApi, orderApi, workerApi, followApi } from '../../utils/api.js';
+import { shopApi, orderApi, workerApi, followApi } from '../../utils/api.js';
 import logger from '../../utils/logger.js';
 import { messages } from '../../texts/messages.js';
 import { t } from '../../i18n/index.js';
@@ -230,7 +230,7 @@ export { getSellerMenu, getSellerMenuKeyboard };
  * @param {Object} options - Options
  * @param {boolean} options.skipRoleUpdate - Skip PATCH /auth/role (already called by caller)
  */
-export const handleSellerRole = async (ctx, options = {}) => {
+export const handleSellerRole = async (ctx, _options = {}) => {
   try {
     // M12 FIX: Only answer callback query if this is actually a callback query
     if (ctx.callbackQuery) {

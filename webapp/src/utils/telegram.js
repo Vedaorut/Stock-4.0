@@ -61,12 +61,17 @@ export function initTelegramApp() {
       });
     }
 
+    // Detect device performance class (Android only, Mini Apps 2.0)
+    // LOW | AVERAGE | HIGH - used to optimize animations
+    const performanceClass = detectPerformanceClass();
+
     return {
       user: tg.initDataUnsafe?.user || null,
       tg,
       platform: tg.platform,
       version: tg.version,
       isExpanded: tg.isExpanded,
+      performanceClass,
     };
   } catch (error) {
     if (import.meta.env.DEV) {
@@ -213,4 +218,44 @@ export function openTelegramLink(url) {
   }
 
   tg.openTelegramLink(url);
+}
+
+/**
+ * Detect device performance class from Telegram User-Agent
+ * Mini Apps 2.0 feature - Android only
+ *
+ * User-Agent format includes: {performance_class}
+ * Values: LOW | AVERAGE | HIGH
+ *
+ * @returns {'low' | 'average' | 'high'} Performance class
+ */
+export function detectPerformanceClass() {
+  // Check User-Agent for performance class (Android Mini Apps 2.0)
+  const ua = navigator.userAgent;
+
+  // Look for performance class in User-Agent
+  if (ua.includes('performance_class=LOW') || ua.includes('{LOW}')) {
+    return 'low';
+  }
+  if (ua.includes('performance_class=AVERAGE') || ua.includes('{AVERAGE}')) {
+    return 'average';
+  }
+  if (ua.includes('performance_class=HIGH') || ua.includes('{HIGH}')) {
+    return 'high';
+  }
+
+  // Fallback: use hardware concurrency as heuristic
+  const cores = navigator.hardwareConcurrency || 4;
+  if (cores <= 2) return 'low';
+  if (cores <= 4) return 'average';
+  return 'high';
+}
+
+/**
+ * Check if animations should be reduced based on device performance
+ * @returns {boolean} True if animations should be reduced
+ */
+export function shouldReduceAnimations() {
+  const perfClass = detectPerformanceClass();
+  return perfClass === 'low';
 }

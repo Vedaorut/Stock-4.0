@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion';
+import { m as motion } from 'framer-motion';
 import { useTelegram } from '../../../hooks/useTelegram';
 import SyncedBadge from './SyncedBadge';
 

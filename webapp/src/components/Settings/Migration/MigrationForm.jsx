@@ -1,4 +1,4 @@
-import { motion, AnimatePresence } from 'framer-motion';
+import { m as motion, AnimatePresence } from 'framer-motion';
 import { parseChannelInput } from './useMigration';
 import { useTranslation } from '../../../i18n/useTranslation';
 

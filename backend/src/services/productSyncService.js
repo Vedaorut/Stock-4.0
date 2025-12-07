@@ -61,7 +61,7 @@ async function getShopProductCapacity(shopId) {
  * @returns {string} Normalized name
  */
 function normalizeProductName(name) {
-  if (!name) return '';
+  if (!name) {return '';}
 
   return name
     .toLowerCase()
@@ -85,8 +85,8 @@ function calculateSimilarity(str1, str2) {
   const words1 = new Set(str1.split(/\s+/).filter(w => w.length > 1));
   const words2 = new Set(str2.split(/\s+/).filter(w => w.length > 1));
 
-  if (words1.size === 0 && words2.size === 0) return 1;
-  if (words1.size === 0 || words2.size === 0) return 0;
+  if (words1.size === 0 && words2.size === 0) {return 1;}
+  if (words1.size === 0 || words2.size === 0) {return 0;}
 
   const intersection = [...words1].filter(w => words2.has(w)).length;
   const union = new Set([...words1, ...words2]).size;
@@ -120,7 +120,7 @@ function findSimilarProduct(sourceName, existingProductsMap, threshold = 0.7) {
     // Skip if names are too different in length (>50% difference)
     const lenRatio = Math.min(normalizedName.length, normalizedSource.length) /
                      Math.max(normalizedName.length, normalizedSource.length);
-    if (lenRatio < 0.5) continue;
+    if (lenRatio < 0.5) {continue;}
 
     // Check prefix match
     if (normalizedName.startsWith(sourcePrefix) || normalizedSource.startsWith(normalizedName.substring(0, minPrefixLen))) {

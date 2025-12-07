@@ -88,12 +88,14 @@ export function stopPaymentVerificationWorker() {
  */
 async function recoverStuckPayments() {
   try {
+    // FIX: Use parameterized query to prevent SQL injection
     const result = await query(
       `UPDATE payments
        SET status = 'pending', updated_at = NOW()
        WHERE status = 'processing'
-         AND updated_at < NOW() - INTERVAL '${STUCK_PAYMENT_TIMEOUT_MINUTES} minutes'
-       RETURNING id, order_id, currency`
+         AND updated_at < NOW() - make_interval(mins => $1)
+       RETURNING id, order_id, currency`,
+      [STUCK_PAYMENT_TIMEOUT_MINUTES]
     );
 
     if (result.rows.length > 0) {
@@ -125,6 +127,7 @@ async function processPendingPayments() {
     // ETH/USDT: Check every 2 minutes (faster blocks)
     await client.query('BEGIN');
 
+    // FIX: Use parameterized query for all dynamic values
     const pendingResult = await client.query(
       `UPDATE payments p
        SET status = 'processing', updated_at = NOW()
@@ -135,20 +138,21 @@ async function processPendingPayments() {
          WHERE p2.status = 'pending'
            AND p2.subscription_id IS NULL
            AND o.status = 'pending'
-           AND p2.created_at > NOW() - INTERVAL '${MAX_AGE_HOURS} hours'
+           AND p2.created_at > NOW() - make_interval(hours => $1)
            AND (
-             p2.last_checked_at IS NULL 
+             p2.last_checked_at IS NULL
              OR (p2.currency IN ('BTC', 'LTC') AND p2.last_checked_at < NOW() - INTERVAL '10 minutes')
              OR (p2.currency NOT IN ('BTC', 'LTC') AND p2.last_checked_at < NOW() - INTERVAL '2 minutes')
            )
          ORDER BY p2.created_at ASC
-         LIMIT ${BATCH_SIZE}
+         LIMIT $2
          FOR UPDATE OF p2 SKIP LOCKED
        ) selected
        WHERE p.id = selected.id
        RETURNING p.id, p.order_id, p.tx_hash, p.currency, p.amount,
                  p.recipient_address, p.expected_crypto_amount,
-                 p.blockchain_confirmations`
+                 p.blockchain_confirmations`,
+      [MAX_AGE_HOURS, BATCH_SIZE]
     );
 
     await client.query('COMMIT');

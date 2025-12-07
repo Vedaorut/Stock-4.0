@@ -1,13 +1,14 @@
-import { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useState, useEffect, useRef, memo } from 'react';
+import { m as motion, AnimatePresence } from 'framer-motion';
 import { useFollowsApi } from '../../hooks/useApi';
 import { useTranslation } from '../../i18n/useTranslation';
 
 /**
  * Compact products preview for FollowCard
  * Shows products with prices - works for both monitor and resell modes
+ * Wrapped in memo to prevent re-renders when parent updates
  */
-export default function ProductsPreview({ followId, mode, maxProducts = 5 }) {
+function ProductsPreview({ followId, mode, maxProducts = 5 }) {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [totalCount, setTotalCount] = useState(0);
@@ -156,3 +157,5 @@ export default function ProductsPreview({ followId, mode, maxProducts = 5 }) {
     </AnimatePresence>
   );
 }
+
+export default memo(ProductsPreview);

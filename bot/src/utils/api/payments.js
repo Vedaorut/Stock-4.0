@@ -39,7 +39,7 @@ export const subscriptionApi = {
   },
 
   // Subscribe to shop (buyer follows a shop)
-  async subscribe(shopId, token, telegramId = null) {
+  async subscribe(shopId, token, _telegramId = null) {
     // FIX: Use /shops/:shopId/subscribe which writes to shop_subscribers table
     // (not /subscriptions which writes to subscriptions table - seller payment subscriptions)
     const { data } = await api.post(

@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion';
+import { m as motion } from 'framer-motion';
 import PageHeader from '../../common/PageHeader';
 import { useTranslation } from '../../../i18n/useTranslation';
 

@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef, memo } from 'react';
+import { useMemo, memo } from 'react';
+import { useGlobalTimer } from '../../hooks/useGlobalTimer';
 
 /**
  * Live countdown timer for temporary discounts
@@ -10,59 +11,39 @@ import { useState, useEffect, useRef, memo } from 'react';
  * - Orange (>3 hours): calm color
  * - Red (1-3 hours): more vibrant
  * - Red + pulse (<1 hour): urgency
+ *
+ * Performance: Uses global timer (single setInterval for all instances)
  */
 const CountdownTimer = memo(function CountdownTimer({ expiresAt }) {
-  const [timeLeft, setTimeLeft] = useState(null);
-  const isMountedRef = useRef(true);
+  // Subscribe to global 1-second timer (shared across all countdown instances)
+  const tick = useGlobalTimer();
 
-  useEffect(() => {
-    // Set mounted flag
-    isMountedRef.current = true;
+  // Recalculate time left on each tick
+  const timeLeft = useMemo(() => {
+    if (!expiresAt) return null;
 
-    // Input validation
-    if (!expiresAt) return;
+    const now = new Date();
+    const end = new Date(expiresAt);
+    const diff = end - now; // milliseconds
 
-    const calculateTimeLeft = () => {
-      const now = new Date();
-      const end = new Date(expiresAt);
-      const diff = end - now; // milliseconds
+    // If time expired - hide timer
+    if (diff <= 0) {
+      return null;
+    }
 
-      // Check if component is still mounted before updating state
-      if (!isMountedRef.current) {
-        return;
-      }
+    const totalSeconds = Math.floor(diff / 1000);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
 
-      // If time expired - hide timer
-      if (diff <= 0) {
-        setTimeLeft(null);
-        return;
-      }
-
-      const totalSeconds = Math.floor(diff / 1000);
-      const hours = Math.floor(totalSeconds / 3600);
-      const minutes = Math.floor((totalSeconds % 3600) / 60);
-      const seconds = totalSeconds % 60;
-
-      setTimeLeft({
-        hours,
-        minutes,
-        seconds,
-        totalHours: diff / (1000 * 60 * 60), // for color coding
-      });
+    return {
+      hours,
+      minutes,
+      seconds,
+      totalHours: diff / (1000 * 60 * 60), // for color coding
     };
-
-    // Initial calculation
-    calculateTimeLeft();
-
-    // Update every second
-    const interval = setInterval(calculateTimeLeft, 1000);
-
-    // Cleanup on unmount
-    return () => {
-      isMountedRef.current = false;
-      clearInterval(interval);
-    };
-  }, [expiresAt]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- tick is intentionally used to force recalculation
+  }, [expiresAt, tick]);
 
   // If time expired or no data - don't show
   if (!timeLeft) return null;

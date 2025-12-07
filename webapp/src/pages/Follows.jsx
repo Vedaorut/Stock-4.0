@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, useRef } from 'react';
-import { motion } from 'framer-motion';
+import { m as motion } from 'framer-motion';
 import { PlusIcon } from '@heroicons/react/24/outline';
 import { useApi } from '../hooks/useApi';
 import { useStore } from '../store/useStore';
@@ -109,7 +109,11 @@ export default function Follows() {
       return;
     }
 
-    setIsLoading(true);
+    // OPTIMIZATION: Only show loading if no cached data exists
+    const hasExistingData = follows.length > 0 || subscriptions.length > 0;
+    if (!hasExistingData) {
+      setIsLoading(true);
+    }
     setError(null);
 
     const controller = new AbortController();
@@ -129,6 +133,7 @@ export default function Follows() {
       });
 
     return () => controller.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- follows/subscriptions check is for initial render only
   }, [token, loadFollows]);
 
   const handleFollowClick = useCallback(

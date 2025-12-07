@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { m as motion, AnimatePresence } from 'framer-motion';
 import Header from '../components/Layout/Header';
 import { useApi } from '../hooks/useApi';
 import { useStore } from '../store/useStore';
@@ -225,7 +225,13 @@ export default function Subscriptions() {
       return;
     }
 
-    setLoading(true);
+    // OPTIMIZATION: Only show loading if no cached data exists
+    const hasExistingData = viewMode === 'buyer'
+      ? buyerSubscriptions.length > 0
+      : (myShop !== null || follows.length > 0);
+    if (!hasExistingData) {
+      setLoading(true);
+    }
     setError(null);
 
     const controller = new AbortController();
@@ -243,6 +249,7 @@ export default function Subscriptions() {
       });
 
     return () => controller.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- cached data check is for initial render only
   }, [token, loadData]);
 
   // Click on MY shop (seller mode)
@@ -361,11 +368,19 @@ export default function Subscriptions() {
   }, [isSearchActive]);
 
   // Auto-refresh subscriptions when webapp gains focus (for invite link flow)
+  // Debounced to prevent excessive refetches - only refetch if >30s since last fetch
+  const lastFetchTimeRef = useRef(Date.now());
+
   useEffect(() => {
     const handleVisibility = () => {
       if (document.visibilityState === 'visible' && token && !loading) {
-        const controller = new AbortController();
-        loadData(controller.signal);
+        const timeSinceLastFetch = Date.now() - lastFetchTimeRef.current;
+        // Only refetch if more than 30 seconds have passed
+        if (timeSinceLastFetch > 30000) {
+          lastFetchTimeRef.current = Date.now();
+          const controller = new AbortController();
+          loadData(controller.signal);
+        }
       }
     };
     document.addEventListener('visibilitychange', handleVisibility);
