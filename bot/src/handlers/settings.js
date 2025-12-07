@@ -99,6 +99,17 @@ export function setupSettingsHandlers(bot) {
         }
       }
 
+      // Update bot commands for this user with new language
+      try {
+        await ctx.telegram.setMyCommands(
+          [{ command: 'start', description: t('general.mainMenu', {}, newLang) }],
+          { scope: { type: 'chat', chat_id: ctx.chat.id } }
+        );
+        logger.debug(`Commands updated for user ${ctx.chat.id} to ${newLang}`);
+      } catch (cmdError) {
+        logger.error('Failed to update commands:', cmdError);
+      }
+
       // Show confirmation and redirect to main menu (role-based)
       await smartMessage.send(ctx, {
         text: t('settings.languageChanged', {}, newLang),

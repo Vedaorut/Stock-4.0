@@ -143,7 +143,9 @@ searchShopScene.action('cancel_scene', async (ctx) => {
     await ctx.scene.leave();
 
     const lang = ctx.lang || ctx.session?.language || 'ru';
-    await ctx.editMessageText(t('general.actionCancelled', {}, lang), buyerMenu(lang));
+    // Use hasShop from session to show correct menu (prevents keyboard width change)
+    const hasShop = ctx.session?.shopId ? true : false;
+    await ctx.editMessageText(t('general.actionCancelled', {}, lang), buyerMenu({ hasShop }, lang));
   } catch (error) {
     logger.error('Error in cancel_scene handler:', error);
     try {
@@ -162,7 +164,9 @@ searchShopScene.action('cancel', async (ctx) => {
     await ctx.scene.leave();
 
     const lang = ctx.lang || ctx.session?.language || 'ru';
-    await ctx.editMessageText(t('general.actionCancelled', {}, lang), buyerMenu(lang));
+    // Use hasShop from session to show correct menu (prevents keyboard width change)
+    const hasShop = ctx.session?.shopId ? true : false;
+    await ctx.editMessageText(t('general.actionCancelled', {}, lang), buyerMenu({ hasShop }, lang));
   } catch (error) {
     logger.error('Error in cancel handler:', error);
     try {

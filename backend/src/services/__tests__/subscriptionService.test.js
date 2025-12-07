@@ -600,7 +600,7 @@ describe('Subscription Service', () => {
 
       expect(result).toEqual(mockSubscriptions);
       expect(mockPool.query).toHaveBeenCalledWith(
-        expect.stringContaining('FROM subscriptions'),
+        expect.stringContaining('FROM shop_subscribers'),
         [123]
       );
     });

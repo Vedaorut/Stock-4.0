@@ -2,18 +2,27 @@ import { query } from '../../config/database.js';
 
 /**
  * Subscription database queries
+ * Uses shop_subscribers table (unified subscription system)
  */
 export const subscriptionQueries = {
-  // Create subscription
+  // Create subscription (user follows a shop)
   create: async (userId, shopId, telegramId = null) => {
     try {
       const result = await query(
-        `INSERT INTO subscriptions (user_id, shop_id, telegram_id)
-         VALUES ($1, $2, $3)
-         ON CONFLICT (user_id, shop_id) DO UPDATE SET telegram_id = EXCLUDED.telegram_id
+        `INSERT INTO shop_subscribers (user_id, shop_id)
+         VALUES ($1, $2)
+         ON CONFLICT (user_id, shop_id) DO NOTHING
          RETURNING *`,
-        [userId, shopId, telegramId]
+        [userId, shopId]
       );
+      // If conflict occurred (already subscribed), fetch existing record
+      if (result.rows.length === 0) {
+        const existing = await query(
+          'SELECT * FROM shop_subscribers WHERE user_id = $1 AND shop_id = $2',
+          [userId, shopId]
+        );
+        return existing.rows[0];
+      }
       return result.rows[0];
     } catch (error) {
       if (error.code === '23505') {
@@ -26,13 +35,13 @@ export const subscriptionQueries = {
   // Find subscriptions by user ID
   findByUserId: async (userId, limit = 50, offset = 0) => {
     const result = await query(
-      `SELECT s.*, sh.name as shop_name, sh.description as shop_description,
+      `SELECT ss.*, sh.name as shop_name, sh.description as shop_description,
               u.username as shop_owner_username
-       FROM subscriptions s
-       JOIN shops sh ON s.shop_id = sh.id
+       FROM shop_subscribers ss
+       JOIN shops sh ON ss.shop_id = sh.id
        JOIN users u ON sh.owner_id = u.id
-       WHERE s.user_id = $1 AND sh.is_active = true
-       ORDER BY s.created_at DESC
+       WHERE ss.user_id = $1 AND sh.is_active = true
+       ORDER BY ss.created_at DESC
        LIMIT $2 OFFSET $3`,
       [userId, limit, offset]
     );
@@ -42,11 +51,11 @@ export const subscriptionQueries = {
   // Find subscriptions by shop ID
   findByShopId: async (shopId, limit = 50, offset = 0) => {
     const result = await query(
-      `SELECT s.*, u.username, u.first_name, u.last_name
-       FROM subscriptions s
-       JOIN users u ON s.user_id = u.id
-       WHERE s.shop_id = $1
-       ORDER BY s.created_at DESC
+      `SELECT ss.*, u.username, u.first_name, u.last_name
+       FROM shop_subscribers ss
+       JOIN users u ON ss.user_id = u.id
+       WHERE ss.shop_id = $1
+       ORDER BY ss.created_at DESC
        LIMIT $2 OFFSET $3`,
       [shopId, limit, offset]
     );
@@ -56,7 +65,7 @@ export const subscriptionQueries = {
   // Check if subscription exists
   exists: async (userId, shopId) => {
     const result = await query(
-      'SELECT EXISTS(SELECT 1 FROM subscriptions WHERE user_id = $1 AND shop_id = $2)',
+      'SELECT EXISTS(SELECT 1 FROM shop_subscribers WHERE user_id = $1 AND shop_id = $2)',
       [userId, shopId]
     );
     return result.rows[0].exists;
@@ -65,22 +74,22 @@ export const subscriptionQueries = {
   // Find subscription by user and shop (for check endpoint)
   findByUserAndShop: async (userId, shopId) => {
     const result = await query(
-      `SELECT s.*, sh.name as shop_name, sh.description as shop_description,
+      `SELECT ss.*, sh.name as shop_name, sh.description as shop_description,
               u.username as shop_owner_username
-       FROM subscriptions s
-       JOIN shops sh ON s.shop_id = sh.id
+       FROM shop_subscribers ss
+       JOIN shops sh ON ss.shop_id = sh.id
        JOIN users u ON sh.owner_id = u.id
-       WHERE s.user_id = $1 AND s.shop_id = $2 AND sh.is_active = true
+       WHERE ss.user_id = $1 AND ss.shop_id = $2 AND sh.is_active = true
        LIMIT 1`,
       [userId, shopId]
     );
     return result.rows[0] || null;
   },
 
-  // Delete subscription
+  // Delete subscription (unfollow shop)
   delete: async (userId, shopId) => {
     const result = await query(
-      'DELETE FROM subscriptions WHERE user_id = $1 AND shop_id = $2 RETURNING *',
+      'DELETE FROM shop_subscribers WHERE user_id = $1 AND shop_id = $2 RETURNING *',
       [userId, shopId]
     );
     return result.rows[0];

@@ -108,29 +108,21 @@ async function sendWithRetry(sendFn, maxRetries = MAX_RETRIES) {
 
 /**
  * Get all subscribers for a shop with their telegram_id and language preference
- * FIX: Now queries BOTH old 'subscriptions' table AND new 'shop_subscribers' table
- * to ensure all subscribers (legacy and new invite-based) receive broadcasts
+ * Uses shop_subscribers table (unified subscription system)
  * @param {number} shopId - Shop ID
  * @returns {Promise<Array<{user_id: number, telegram_id: string, language: string}>>}
  */
 async function getShopSubscribers(shopId) {
   try {
-    // UNION both tables to get all subscribers (legacy + new invite system)
-    // DISTINCT to avoid sending duplicate messages if user is in both tables
     const result = await pool.query(
-      `SELECT DISTINCT ON (u.telegram_id)
-         sub.user_id,
+      `SELECT
+         ss.user_id,
          u.telegram_id,
          COALESCE(u.language, 'ru') as language
-       FROM (
-         -- Legacy subscriptions table
-         SELECT user_id FROM subscriptions WHERE shop_id = $1
-         UNION
-         -- New shop_subscribers table (invite-based)
-         SELECT user_id FROM shop_subscribers WHERE shop_id = $1
-       ) sub
-       JOIN users u ON u.id = sub.user_id
-       WHERE u.telegram_id IS NOT NULL`,
+       FROM shop_subscribers ss
+       JOIN users u ON u.id = ss.user_id
+       WHERE ss.shop_id = $1
+         AND u.telegram_id IS NOT NULL`,
       [shopId]
     );
 
@@ -281,32 +273,28 @@ async function sendMigrationMessage(
     if (error.response?.error_code === 403) {
       logger.warn(`[Broadcast] User ${telegramId} blocked the bot`);
       if (shopId && userId) {
-        // Cleanup from both tables to avoid orphan records
-        await Promise.all([
-          pool.query('DELETE FROM subscriptions WHERE shop_id = $1 AND user_id = $2', [shopId, userId]),
-          pool.query('DELETE FROM shop_subscribers WHERE shop_id = $1 AND user_id = $2', [shopId, userId]),
-        ]).catch((cleanupErr) =>
-          logger.error('[Broadcast] Failed to cleanup blocked subscriber', {
-            shopId,
-            userId,
-            error: cleanupErr.message,
-          })
-        );
+        // Cleanup from shop_subscribers to avoid orphan records
+        await pool.query('DELETE FROM shop_subscribers WHERE shop_id = $1 AND user_id = $2', [shopId, userId])
+          .catch((cleanupErr) =>
+            logger.error('[Broadcast] Failed to cleanup blocked subscriber', {
+              shopId,
+              userId,
+              error: cleanupErr.message,
+            })
+          );
       }
     } else if (error.response?.error_code === 400) {
       logger.warn(`[Broadcast] User ${telegramId} not found or chat invalid`);
       if (shopId && userId) {
-        // Cleanup from both tables to avoid orphan records
-        await Promise.all([
-          pool.query('DELETE FROM subscriptions WHERE shop_id = $1 AND user_id = $2', [shopId, userId]),
-          pool.query('DELETE FROM shop_subscribers WHERE shop_id = $1 AND user_id = $2', [shopId, userId]),
-        ]).catch((cleanupErr) =>
-          logger.error('[Broadcast] Failed to cleanup invalid subscriber', {
-            shopId,
-            userId,
-            error: cleanupErr.message,
-          })
-        );
+        // Cleanup from shop_subscribers to avoid orphan records
+        await pool.query('DELETE FROM shop_subscribers WHERE shop_id = $1 AND user_id = $2', [shopId, userId])
+          .catch((cleanupErr) =>
+            logger.error('[Broadcast] Failed to cleanup invalid subscriber', {
+              shopId,
+              userId,
+              error: cleanupErr.message,
+            })
+          );
       }
     } else {
       logger.error(`[Broadcast] Error sending to ${telegramId}:`, error.message);

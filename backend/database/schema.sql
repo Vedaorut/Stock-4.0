@@ -9,14 +9,15 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 DROP TABLE IF EXISTS synced_products CASCADE;
 DROP TABLE IF EXISTS shop_follows CASCADE;
 DROP TABLE IF EXISTS payments CASCADE;
-DROP TABLE IF EXISTS shop_subscriptions CASCADE; -- Added
-DROP TABLE IF EXISTS channel_migrations CASCADE; -- Added
-DROP TABLE IF EXISTS shop_workers CASCADE; -- Added
-DROP TABLE IF EXISTS invoices CASCADE; -- Added
-DROP TABLE IF EXISTS processed_webhooks CASCADE; -- Added
-DROP TABLE IF EXISTS promo_activations CASCADE; -- Added
-DROP TABLE IF EXISTS promo_codes CASCADE; -- Added
-DROP TABLE IF EXISTS subscriptions CASCADE;
+DROP TABLE IF EXISTS shop_subscriptions CASCADE;
+DROP TABLE IF EXISTS channel_migrations CASCADE;
+DROP TABLE IF EXISTS shop_workers CASCADE;
+DROP TABLE IF EXISTS invoices CASCADE;
+DROP TABLE IF EXISTS processed_webhooks CASCADE;
+DROP TABLE IF EXISTS promo_activations CASCADE;
+DROP TABLE IF EXISTS promo_codes CASCADE;
+DROP TABLE IF EXISTS shop_subscribers CASCADE;
+DROP TABLE IF EXISTS refresh_tokens CASCADE;
 DROP TABLE IF EXISTS order_items CASCADE;
 DROP TABLE IF EXISTS orders CASCADE;
 DROP TABLE IF EXISTS products CASCADE;
@@ -222,18 +223,41 @@ COMMENT ON COLUMN order_items.product_name IS 'Cached product name (in case prod
 COMMENT ON COLUMN order_items.stock_deducted IS 'Tracks if stock was actually deducted for this item (prevents double deduction on race conditions)';
 
 -- ============================================
--- Subscriptions table
+-- Shop Subscribers table (unified subscription system)
 -- ============================================
-CREATE TABLE subscriptions (
+CREATE TABLE shop_subscribers (
   id SERIAL PRIMARY KEY,
   user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   shop_id INT NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
-  telegram_id BIGINT,
-  created_at TIMESTAMP DEFAULT NOW(),
+  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
   UNIQUE(user_id, shop_id)
 );
 
-COMMENT ON TABLE subscriptions IS 'Stores user subscriptions to shops for notifications';
+COMMENT ON TABLE shop_subscribers IS 'Stores user subscriptions to shops for notifications (unified system)';
+COMMENT ON COLUMN shop_subscribers.user_id IS 'User who subscribes to the shop';
+COMMENT ON COLUMN shop_subscribers.shop_id IS 'Shop being subscribed to';
+
+CREATE INDEX IF NOT EXISTS idx_shop_subscribers_user ON shop_subscribers(user_id);
+CREATE INDEX IF NOT EXISTS idx_shop_subscribers_shop ON shop_subscribers(shop_id);
+
+-- ============================================
+-- Refresh Tokens table (for JWT refresh)
+-- ============================================
+CREATE TABLE refresh_tokens (
+  id SERIAL PRIMARY KEY,
+  user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  token_hash VARCHAR(255) NOT NULL UNIQUE,
+  expires_at TIMESTAMP NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+COMMENT ON TABLE refresh_tokens IS 'Stores hashed refresh tokens for JWT authentication';
+COMMENT ON COLUMN refresh_tokens.token_hash IS 'SHA256 hash of the refresh token';
+COMMENT ON COLUMN refresh_tokens.expires_at IS 'Token expiration timestamp';
+
+CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user ON refresh_tokens(user_id);
+CREATE INDEX IF NOT EXISTS idx_refresh_tokens_token_hash ON refresh_tokens(token_hash);
+CREATE INDEX IF NOT EXISTS idx_refresh_tokens_expires ON refresh_tokens(expires_at);
 
 -- ============================================
 -- Shop Subscriptions table (Recurring Payments)
@@ -559,9 +583,7 @@ CREATE INDEX IF NOT EXISTS idx_products_availability ON products(id, stock_quant
 CREATE INDEX IF NOT EXISTS idx_products_discount_active ON products(shop_id, discount_percentage, discount_expires_at) WHERE discount_percentage > 0;
 -- Partial index for preorder products
 CREATE INDEX IF NOT EXISTS idx_products_preorder ON products(shop_id, is_preorder) WHERE is_preorder = true;
-CREATE INDEX IF NOT EXISTS idx_subscriptions_user ON subscriptions(user_id);
-CREATE INDEX IF NOT EXISTS idx_subscriptions_shop ON subscriptions(shop_id);
-CREATE INDEX IF NOT EXISTS idx_subscriptions_telegram_id ON subscriptions(telegram_id);
+-- shop_subscribers indexes are created with table definition above
 CREATE INDEX IF NOT EXISTS idx_orders_buyer ON orders(buyer_id);
 CREATE INDEX IF NOT EXISTS idx_orders_product ON orders(product_id);
 CREATE INDEX IF NOT EXISTS idx_payments_order_status ON payments(order_id, status);

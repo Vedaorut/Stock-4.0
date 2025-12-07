@@ -113,7 +113,7 @@
     "searchContext": "Shop Search\n\nEnter the shop ID or name.\n\nExamples:\n12345 (Shop ID)\nShopName (name)\n\nAfter searching, you can open the catalog and add items to cart.",
     "ordersContext": "My Orders\n\nHere are all your orders:\nAwaiting shipment\nShipped (with tracking)\nDelivered\n\nClick on an order for details.",
     "cartContext": "Cart\n\nHere are the items you added from shop catalogs.\n\nTo checkout, click \"Place Order\" - the system will generate a crypto payment address.",
-    "panel": "Welcome!\n\nOpen the app to search products, place orders and track your purchases.",
+    "panel": "🛒 Buyer Mode\n\nOpen the app to search products, place orders and track your purchases.",
     "noSubscriptions": "No subscriptions. Click \"Find Shop\" to add your first.",
     "listSubscriptionsTitle": "My Subscriptions ({count}).",
     "ordersTitle": "Orders ({count}).",

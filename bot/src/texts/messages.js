@@ -154,7 +154,9 @@ const buildMessages = () => ({
     shopPanelWithStats: (shop, revenue, activeOrders, statusBar = null, lang = 'ru') => {
       const lines = [];
 
-      // Shop name first
+      // Role indicator + Shop name
+      const roleLabel = lang === 'ru' ? '🏪 Ваш магазин' : '🏪 Your Shop';
+      lines.push(roleLabel);
       lines.push(safe(shop));
       lines.push('');
 

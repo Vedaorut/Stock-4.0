@@ -334,20 +334,20 @@ router.get('/subscriptions/:telegramId', verifyInternalSecret, async (req, res) 
       });
     }
 
-    // Get subscriptions from subscriptions table (buyer subscriptions)
+    // Get subscriptions from shop_subscribers table (unified subscription system)
     const { query } = await import('../config/database.js');
     const result = await query(
       `SELECT
-         sub.id,
-         sub.shop_id,
+         ss.id,
+         ss.shop_id,
          s.name as shop_name,
          s.logo as shop_logo,
          s.description as shop_description,
-         sub.created_at
-       FROM subscriptions sub
-       LEFT JOIN shops s ON sub.shop_id = s.id
-       WHERE sub.user_id = $1
-       ORDER BY sub.created_at DESC`,
+         ss.created_at
+       FROM shop_subscribers ss
+       LEFT JOIN shops s ON ss.shop_id = s.id
+       WHERE ss.user_id = $1
+       ORDER BY ss.created_at DESC`,
       [user.id]
     );
 

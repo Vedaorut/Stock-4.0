@@ -150,3 +150,19 @@ users → shops → products → orders → order_items
 - Use MCP tools for file ops
 - Run tests after changes
 - Keep changes minimal and focused
+
+---
+
+## Context Optimization
+
+**Delegate search and exploration to subagents to save context:**
+- Use `Task` with `Explore` agent for codebase searches
+- Use `Task` with specialized agents for investigation tasks
+- Only read files directly after agent provides specific locations
+- Review agent output and apply minimal targeted fixes
+
+**Workflow:**
+1. User request → Delegate to subagent for research/search
+2. Subagent returns findings → Review and verify
+3. Apply minimal edits directly (no need to delegate simple fixes)
+4. Restart services and confirm

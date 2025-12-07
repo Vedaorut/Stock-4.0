@@ -303,25 +303,27 @@ const ProductCard = memo(function ProductCard({ product, onPreorder: _onPreorder
         </h3>
 
         <div
-          className={`flex items-end mt-auto ${isWide ? 'gap-6 ml-auto' : 'justify-between gap-5'}`}
+          className={`flex items-end mt-auto ${isWide ? 'gap-4 ml-auto' : 'justify-between gap-3'}`}
         >
-          <div className="flex flex-col min-w-fit max-w-[calc(100%-60px)]">
+          {/* Price section - flex-1 allows it to take available space but not push button */}
+          <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
             {hasDiscount ? (
               <div className="space-y-0.5">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-xs text-gray-400 line-through font-medium">
+                {/* Discount row - original price + badge */}
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-xs text-gray-400 line-through font-medium whitespace-nowrap">
                     ${Math.floor(parseFloat(originalPrice))}
                   </span>
-                  <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-500 text-white">
+                  <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-500 text-white flex-shrink-0">
                     -{Math.round(discountPercentage)}%
                   </span>
                 </div>
+                {/* Current price */}
                 <span
-                  className={`text-red-500 font-bold leading-tight ${priceSizeClass}`}
+                  className={`text-red-500 font-bold leading-tight ${priceSizeClass} truncate`}
                   style={{
                     letterSpacing: '-0.02em',
                     fontVariantNumeric: 'tabular-nums',
-                    whiteSpace: 'nowrap',
                   }}
                 >
                   ${parseFloat(product.price) % 1 === 0 ? Math.floor(parseFloat(product.price)) : parseFloat(product.price).toFixed(2)}
@@ -329,11 +331,10 @@ const ProductCard = memo(function ProductCard({ product, onPreorder: _onPreorder
               </div>
             ) : (
               <span
-                className={`text-orange-primary font-bold leading-tight ${priceSizeClass}`}
+                className={`text-orange-primary font-bold leading-tight ${priceSizeClass} truncate`}
                 style={{
                   letterSpacing: '-0.02em',
                   fontVariantNumeric: 'tabular-nums',
-                  whiteSpace: 'nowrap',
                 }}
               >
                 ${parseFloat(product.price) % 1 === 0 ? Math.floor(parseFloat(product.price)) : parseFloat(product.price).toFixed(2)}
@@ -354,6 +355,7 @@ const ProductCard = memo(function ProductCard({ product, onPreorder: _onPreorder
             )}
           </div>
 
+          {/* Add to cart button - fixed size, never shrinks */}
           <motion.button
             onClick={handleAddToCart}
             disabled={isDisabled}

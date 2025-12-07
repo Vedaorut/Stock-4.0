@@ -177,6 +177,167 @@ export async function handleAddProduct(args, shopId, token) {
 }
 
 /**
+ * Process single product with timeout
+ * @param {Object} product - Product data
+ * @param {number} shopId - Shop ID
+ * @param {string} token - Auth token
+ * @param {number} timeout - Timeout in ms (default 10000)
+ * @returns {Promise<Object>} Result with success/failure
+ */
+async function processProductWithTimeout(product, shopId, token, timeout = 10000) {
+  const { name, price: rawPrice, stock, is_preorder, discount_percentage } = product;
+  const normalizedStock = stock === undefined || stock === null ? 1 : stock;
+
+  // Apply price fallback
+  let price = rawPrice;
+  if (!price || price <= 0) {
+    logger.warn('bulkAddProducts: invalid price detected, applying fallback', {
+      providedPrice: price,
+      fallbackPrice: 0.01,
+      productName: name,
+      shopId,
+    });
+    price = 0.01;
+  }
+
+  // Validate individual product
+  if (!name || name.length < 3) {
+    return {
+      success: false,
+      name: name || 'unnamed',
+      error: {
+        code: 'VALIDATION_ERROR',
+        message: 'Name must be at least 3 characters',
+        field: 'name',
+      },
+    };
+  }
+
+  if (!Number.isFinite(normalizedStock) || normalizedStock < 0) {
+    return {
+      success: false,
+      name,
+      error: {
+        code: 'VALIDATION_ERROR',
+        message: 'Stock quantity must be zero or a positive integer',
+        field: 'stock',
+        value: stock,
+      },
+    };
+  }
+
+  // Auto-transliterate
+  const transliteratedName = autoTransliterateProductName(name);
+  const translitInfo = getTransliterationInfo(name, transliteratedName);
+
+  if (translitInfo.changed) {
+    logger.info('product_name_transliterated', {
+      original: name,
+      transliterated: transliteratedName,
+      shopId,
+    });
+  }
+
+  // Create product with timeout
+  const createPromise = safeApiCall(
+    productApi.createProduct,
+    {
+      name: transliteratedName,
+      price,
+      currency: 'USD',
+      shopId,
+      stockQuantity: normalizedStock,
+      isPreorder: is_preorder || false,
+      merge: true,
+    },
+    token
+  );
+
+  const timeoutPromise = new Promise((_, reject) =>
+    setTimeout(() => reject(new Error('Product creation timeout')), timeout)
+  );
+
+  let apiResult;
+  try {
+    apiResult = await Promise.race([createPromise, timeoutPromise]);
+  } catch (err) {
+    return {
+      success: false,
+      name,
+      error: {
+        code: 'TIMEOUT_ERROR',
+        message: err.message,
+      },
+    };
+  }
+
+  if (!apiResult.success) {
+    return {
+      success: false,
+      name,
+      error: {
+        code: 'API_ERROR',
+        message: apiResult.error,
+      },
+    };
+  }
+
+  const createdProduct = apiResult.data;
+
+  // Apply discount if requested
+  let finalPrice = createdProduct.price;
+  let originalPrice = null;
+  let discountApplied = false;
+
+  if (
+    discount_percentage &&
+    discount_percentage >= 1 &&
+    discount_percentage <= 99 &&
+    createdProduct.id
+  ) {
+    try {
+      const discountedPrice = createdProduct.price * (1 - discount_percentage / 100);
+      const discountResult = await safeApiCall(
+        productApi.updateProduct,
+        createdProduct.id,
+        {
+          discountPercentage: discount_percentage,
+          originalPrice: createdProduct.price,
+          price: discountedPrice,
+          discountExpiresAt: null,
+        },
+        token
+      );
+
+      if (discountResult.success) {
+        discountApplied = true;
+        originalPrice = createdProduct.price;
+        finalPrice = discountedPrice;
+      }
+    } catch (discountError) {
+      logger.warn('Exception applying discount to bulk-created product:', {
+        productId: createdProduct.id,
+        error: discountError.message,
+      });
+    }
+  }
+
+  return {
+    success: true,
+    data: {
+      name: transliteratedName,
+      originalName: translitInfo.changed ? name : null,
+      price: finalPrice,
+      original_price: discountApplied ? originalPrice : null,
+      discount_percentage: discountApplied ? discount_percentage : null,
+      stock_quantity: createdProduct.stock_quantity,
+      id: createdProduct.id,
+      transliterated: translitInfo.changed,
+    },
+  };
+}
+
+/**
  * Bulk add products handler
  */
 export async function handleBulkAddProducts(args, shopId, token) {
@@ -215,153 +376,40 @@ export async function handleBulkAddProducts(args, shopId, token) {
     failed: [],
   };
 
-  // Process each product
-  for (const product of products) {
-    const { name, price, stock, is_preorder, discount_percentage } = product;
-    const normalizedStock = stock === undefined || stock === null ? 1 : stock;
+  // Parallel processing with concurrency limit
+  const CONCURRENCY_LIMIT = 3;
+  const PRODUCT_TIMEOUT = 10000; // 10 seconds per product
 
-    // Validate individual product
-    if (!name || name.length < 3) {
-      results.failed.push({
-        name: name || 'unnamed',
-        error: {
-          code: 'VALIDATION_ERROR',
-          message: 'Name must be at least 3 characters',
-          field: 'name',
-        },
-      });
-      continue;
-    }
+  // Process in batches for controlled concurrency
+  for (let i = 0; i < products.length; i += CONCURRENCY_LIMIT) {
+    const batch = products.slice(i, i + CONCURRENCY_LIMIT);
 
-    // KRITICHNO: Zashchita ot price=0 (Bug #2 fix)
-    if (!price || price <= 0) {
-      logger.warn('bulkAddProducts: invalid price detected, applying fallback', {
-        providedPrice: price,
-        fallbackPrice: 0.01,
-        productName: name,
-        shopId,
-      });
-
-      // Ustanavlivaem minimal'nuyu tsenu vmesto otkaza
-      product.price = 0.01;
-    }
-
-    if (!Number.isFinite(normalizedStock) || normalizedStock < 0) {
-      results.failed.push({
-        name,
-        error: {
-          code: 'VALIDATION_ERROR',
-          message: 'Stock quantity must be zero or a positive integer',
-          field: 'stock',
-          value: stock,
-        },
-      });
-      continue;
-    }
-
-    // Auto-transliterate
-    const transliteratedName = autoTransliterateProductName(name);
-    const translitInfo = getTransliterationInfo(name, transliteratedName);
-
-    // Log transliteration if occurred
-    if (translitInfo.changed) {
-      logger.info('product_name_transliterated', {
-        original: name,
-        transliterated: transliteratedName,
-        shopId,
-      });
-    }
-
-    const apiResult = await safeApiCall(
-      productApi.createProduct,
-      {
-        name: transliteratedName,
-        price,
-        currency: 'USD',
-        shopId,
-        stockQuantity: normalizedStock,
-        isPreorder: is_preorder || false,
-        merge: true, // MERGE: Update existing product with same name instead of creating duplicate
-      },
-      token
+    const batchResults = await Promise.allSettled(
+      batch.map((product) => processProductWithTimeout(product, shopId, token, PRODUCT_TIMEOUT))
     );
 
-    if (!apiResult.success) {
-      results.failed.push({
-        name,
-        error: {
-          code: 'API_ERROR',
-          message: apiResult.error,
-        },
-      });
-      continue;
-    }
-
-    const createdProduct = apiResult.data;
-
-    // Apply discount if requested during creation
-    let finalPrice = createdProduct.price;
-    let originalPrice = null;
-    let discountApplied = false;
-
-    if (
-      discount_percentage &&
-      discount_percentage >= 1 &&
-      discount_percentage <= 99 &&
-      createdProduct.id
-    ) {
-      try {
-        const discountedPrice = createdProduct.price * (1 - discount_percentage / 100);
-        const discountUpdateData = {
-          discountPercentage: discount_percentage,
-          originalPrice: createdProduct.price,
-          price: discountedPrice,
-          discountExpiresAt: null,
-        };
-
-        const discountResult = await safeApiCall(
-          productApi.updateProduct,
-          createdProduct.id,
-          discountUpdateData,
-          token
-        );
-
-        if (discountResult.success) {
-          discountApplied = true;
-          originalPrice = createdProduct.price;
-          finalPrice = discountedPrice;
-          logger.info('Discount applied to bulk-created product', {
-            productId: createdProduct.id,
-            productName: transliteratedName,
-            discount_percentage,
-            originalPrice,
-            finalPrice,
-          });
+    for (const result of batchResults) {
+      if (result.status === 'fulfilled') {
+        const productResult = result.value;
+        if (productResult.success) {
+          results.successful.push(productResult.data);
         } else {
-          logger.warn('Failed to apply discount to bulk-created product', {
-            productId: createdProduct.id,
-            productName: transliteratedName,
-            error: discountResult.error,
+          results.failed.push({
+            name: productResult.name,
+            error: productResult.error,
           });
         }
-      } catch (discountError) {
-        logger.warn('Exception applying discount to bulk-created product:', {
-          productId: createdProduct.id,
-          error: discountError.message,
+      } else {
+        // Promise rejected (unexpected error)
+        results.failed.push({
+          name: 'unknown',
+          error: {
+            code: 'UNEXPECTED_ERROR',
+            message: result.reason?.message || 'Unknown error',
+          },
         });
       }
     }
-
-    results.successful.push({
-      name: transliteratedName,
-      originalName: translitInfo.changed ? name : null,
-      price: finalPrice,
-      original_price: discountApplied ? originalPrice : null,
-      discount_percentage: discountApplied ? discount_percentage : null,
-      stock_quantity: createdProduct.stock_quantity,
-      id: createdProduct.id,
-      transliterated: translitInfo.changed,
-    });
   }
 
   // Build result

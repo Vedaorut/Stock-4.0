@@ -93,18 +93,30 @@ export async function handleAIProductCommand(ctx) {
       return;
     }
 
-    // Race condition guard - prevent concurrent AI calls
+    // Race condition guard with auto-recovery
+    // If aiProcessing stuck for > 2 minutes, auto-reset
     if (ctx.session.aiProcessing) {
-      logger.debug('ai_concurrent_blocked', {
-        userId: ctx.from.id,
-        message: userMessage.slice(0, 50),
-      });
-      await smartMessage.send(ctx, { text: ctx.t('aiProducts.processing') });
-      return;
+      const processingAge = Date.now() - (ctx.session.aiProcessingStarted || 0);
+      if (processingAge > 120000) { // 2 minutes
+        logger.warn('Auto-recovering stuck aiProcessing flag', {
+          userId: ctx.from.id,
+          stuckFor: processingAge,
+        });
+        ctx.session.aiProcessing = false;
+        ctx.session.aiProcessingStarted = null;
+      } else {
+        logger.debug('ai_concurrent_blocked', {
+          userId: ctx.from.id,
+          message: userMessage.slice(0, 50),
+        });
+        await smartMessage.send(ctx, { text: ctx.t('aiProducts.processing') });
+        return;
+      }
     }
 
-    // Mark as processing
+    // Mark as processing with timestamp
     ctx.session.aiProcessing = true;
+    ctx.session.aiProcessingStarted = Date.now();
 
     // Rate limiting - max 10 AI commands per minute
     if (!ctx.session.aiCommands) {
@@ -256,9 +268,10 @@ export async function handleAIProductCommand(ctx) {
       logger.error('Failed to send error message:', replyError);
     }
   } finally {
-    // Always clear processing flag
+    // Always clear processing flag and timestamp
     if (ctx.session) {
       ctx.session.aiProcessing = false;
+      ctx.session.aiProcessingStarted = null;
     }
   }
 }

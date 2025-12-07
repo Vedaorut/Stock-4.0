@@ -18,8 +18,8 @@ export const settingsMenu = (options = {}, lang = 'ru') => {
     ]);
   }
 
-  // Show subscription renewal for shop owners not on trial
-  if (options.hasShop && !options.isTrial) {
+  // Show subscription renewal for SELLERS only (not buyers) who are not on trial
+  if (options.hasShop && !options.isTrial && options.role === 'seller') {
     const tierLabel = (options.tier || 'pro').toUpperCase();
     buttons.push([
       Markup.button.callback(
@@ -29,8 +29,8 @@ export const settingsMenu = (options = {}, lang = 'ru') => {
     ]);
   }
 
-  // Show exit trial option for users on trial
-  if (options.isTrial) {
+  // Show exit trial option for SELLERS on trial only
+  if (options.isTrial && options.role === 'seller') {
     buttons.push([
       Markup.button.callback(t('settings.exitTrial', {}, lang), 'settings:exit_trial'),
     ]);
