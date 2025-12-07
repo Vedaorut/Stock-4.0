@@ -93,12 +93,13 @@ export default function PaymentHashModal() {
             style={overlayStyle}
           />
 
-          {/* Modal Container - Fixed positioning */}
+          {/* Modal Container - Full screen for keyboard support */}
           <motion.div
-            className="fixed inset-x-0 z-50 flex flex-col"
+            className="fixed inset-x-0 bottom-0 z-50 flex flex-col"
             style={{
-              bottom: 'var(--tabbar-total, 80px)',
-              maxHeight: 'calc(100vh - env(safe-area-inset-top) - var(--tabbar-total, 80px) - 20px)',
+              // Use dynamic viewport height to handle keyboard
+              height: 'calc(var(--vh-dynamic, 100vh) - env(safe-area-inset-top, 0px))',
+              maxHeight: 'calc(var(--vh-dynamic, 100vh) - env(safe-area-inset-top, 0px))',
             }}
             initial={{ y: '100%' }}
             animate={{ y: 0 }}
@@ -109,7 +110,7 @@ export default function PaymentHashModal() {
               damping: 30,
             }}
           >
-            <div className="rounded-t-3xl flex flex-col overflow-hidden" style={modalStyle}>
+            <div className="rounded-t-3xl flex flex-col overflow-hidden h-full" style={modalStyle}>
               {/* ============================================
                   FIXED HEADER - Always visible navigation
                   ============================================ */}
@@ -253,35 +254,7 @@ export default function PaymentHashModal() {
                   </motion.div>
                 )}
 
-                {/* Icon */}
-                <motion.div
-                  initial={{ scale: 0.8, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={{ type: 'spring', stiffness: 300, damping: 20, delay: 0.1 }}
-                  className="flex justify-center"
-                >
-                  <div
-                    className="w-16 h-16 rounded-2xl flex items-center justify-center relative overflow-hidden"
-                    style={{
-                      background: 'linear-gradient(135deg, #FF6B00 0%, #FF8F3D 100%)',
-                      boxShadow: '0 8px 24px rgba(255, 107, 0, 0.25)',
-                    }}
-                  >
-                    {/* Shimmer effect */}
-                    <div
-                      className="absolute inset-0 opacity-30"
-                      style={{
-                        background: 'linear-gradient(110deg, transparent 25%, rgba(255,255,255,0.4) 50%, transparent 75%)',
-                        animation: 'shimmer 2s infinite',
-                      }}
-                    />
-                    <svg className="w-8 h-8 text-white relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                    </svg>
-                  </div>
-                </motion.div>
-
-                {/* Input Section */}
+                {/* Input Section - Compact */}
                 <motion.div
                   initial={{ y: 10, opacity: 0 }}
                   animate={{ y: 0, opacity: 1 }}
@@ -304,7 +277,7 @@ export default function PaymentHashModal() {
                       value={txHash}
                       onChange={handleChange}
                       placeholder={t('payment.txHashPlaceholder')}
-                      rows={4}
+                      rows={3}
                       className="w-full px-4 py-4 rounded-2xl font-mono text-sm leading-relaxed text-white placeholder-gray-600 resize-none focus:outline-none transition-all duration-200"
                       style={{
                         background: 'rgba(255, 255, 255, 0.04)',
@@ -338,38 +311,13 @@ export default function PaymentHashModal() {
 
                   <p className="text-gray-500 text-xs px-1">{t('payment.txHashMin')}</p>
                 </motion.div>
-
-                {/* Info Box */}
-                <motion.div
-                  initial={{ y: 10, opacity: 0 }}
-                  animate={{ y: 0, opacity: 1 }}
-                  transition={{ delay: 0.25 }}
-                  className="flex items-start gap-3 p-4 rounded-2xl"
-                  style={{
-                    background: 'rgba(59, 130, 246, 0.06)',
-                    border: '1px solid rgba(59, 130, 246, 0.12)',
-                  }}
-                >
-                  <div
-                    className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-                    style={{ background: 'rgba(59, 130, 246, 0.15)' }}
-                  >
-                    <svg className="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </div>
-                  <p className="text-gray-400 text-sm leading-relaxed">
-                    <span className="text-blue-400 font-semibold">{t('payment.txHashHow')}</span>{' '}
-                    {t('payment.txHashHowDesc')}
-                  </p>
-                </motion.div>
               </div>
 
               {/* ============================================
                   FIXED FOOTER - Submit button
                   ============================================ */}
               <div
-                className="shrink-0 p-4"
+                className="shrink-0 px-4 pt-3 pb-[max(12px,env(safe-area-inset-bottom))]"
                 style={{
                   borderTop: '1px solid rgba(255, 255, 255, 0.06)',
                   background: 'rgba(22, 22, 22, 0.98)',
@@ -378,7 +326,7 @@ export default function PaymentHashModal() {
                 <motion.button
                   onClick={handleSubmit}
                   disabled={!isValidTxHash || isVerifying}
-                  className="w-full h-14 text-white font-bold text-base rounded-2xl overflow-hidden disabled:opacity-40 disabled:cursor-not-allowed relative"
+                  className="w-full h-12 text-white font-bold text-base rounded-xl overflow-hidden disabled:opacity-40 disabled:cursor-not-allowed relative"
                   style={{
                     background: isValidTxHash && !isVerifying
                       ? 'linear-gradient(135deg, #FF6B00 0%, #FF8F3D 100%)'
