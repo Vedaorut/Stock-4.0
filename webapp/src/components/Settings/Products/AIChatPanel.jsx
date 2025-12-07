@@ -72,6 +72,7 @@ function AIChatPanel({
       <PageHeader title="AI Assistant" onBack={onClose} variant="close" />
       <div
         className="flex flex-col min-h-screen"
+        style={{ paddingTop: 'calc(env(safe-area-inset-top) + 56px)' }}
       >
         <div className="flex-1 px-4 pt-6 pb-36 overflow-y-auto space-y-4">
           {aiHistory.map((entry, index) => (

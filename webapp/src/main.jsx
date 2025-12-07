@@ -14,10 +14,6 @@ try {
   tg?.setBackgroundColor?.('#181818');
   tg?.setHeaderColor?.('#181818');
   tg?.setBottomBarColor?.('#181818');
-
-  // Set safe area CSS variable for header/content positioning
-  const safeTop = tg?.safeAreaInset?.top ?? 0;
-  document.documentElement.style.setProperty('--safe-top', `${safeTop}px`);
 } catch {
   // Ignore errors if methods not available
 }

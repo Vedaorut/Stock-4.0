@@ -94,6 +94,7 @@ export default function MigrationModal({ isOpen, onClose }) {
 
           <div
             className="px-4 pb-8"
+            style={{ paddingTop: 'calc(env(safe-area-inset-top) + 72px)' }}
           >
             <AnimatePresence mode="wait">
               {/* STEP 1: Hero Screen */}

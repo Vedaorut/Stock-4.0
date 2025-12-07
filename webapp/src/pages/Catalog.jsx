@@ -461,8 +461,9 @@ export default function Catalog() {
   if (!displayShop) {
     return (
       <div
-        className="min-h-full bg-[#181818]"
+        className="fixed inset-0 overflow-y-auto bg-[#181818]"
         style={{
+          paddingTop: 'calc(env(safe-area-inset-top) + 80px)',
           paddingBottom: 'calc(var(--tabbar-total) + 20px)',
         }}
       >
@@ -505,8 +506,9 @@ export default function Catalog() {
 
   return (
     <div
-      className="min-h-full bg-[#181818]"
+      className="fixed inset-0 overflow-y-auto bg-[#181818]"
       style={{
+        paddingTop: 'calc(env(safe-area-inset-top) + 80px)',
         paddingBottom: 'calc(var(--tabbar-total) + 20px)',
       }}
     >

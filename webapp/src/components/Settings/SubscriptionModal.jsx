@@ -210,7 +210,8 @@ export default function SubscriptionModal({ isOpen, onClose }) {
           >
             <PageHeader title="Subscription" onBack={handleClose} variant="close" />
             <div
-              className="flex items-center justify-center pt-20"
+              className="flex items-center justify-center"
+              style={{ paddingTop: 'calc(env(safe-area-inset-top) + 80px)' }}
             >
               <div className="text-center px-8">
                 <motion.div
@@ -250,6 +251,7 @@ export default function SubscriptionModal({ isOpen, onClose }) {
           <div
             className="flex-1 flex flex-col px-4"
             style={{
+              paddingTop: 'calc(env(safe-area-inset-top) + 60px)',
               paddingBottom: 'calc(var(--tabbar-total, 80px) + 16px)',
             }}
           >

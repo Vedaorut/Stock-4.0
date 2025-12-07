@@ -320,6 +320,7 @@ export default function Settings() {
     <div
       className="scroll-smooth"
       style={{
+        paddingTop: 'calc(env(safe-area-inset-top) + 56px)',
         paddingBottom: 'var(--tabbar-total)',
         scrollBehavior: 'smooth',
       }}

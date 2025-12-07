@@ -4,13 +4,11 @@ import { useStore } from '../../store/useStore';
 import { useShallow } from 'zustand/react/shallow';
 import { useTelegram } from '../../hooks/useTelegram';
 import { useTranslation } from '../../i18n/useTranslation';
-import { useKeyboardOpen } from '../../hooks/useKeyboardOpen';
 
 export default function CartButton({ onClick }) {
   const cart = useStore(useShallow((state) => state.cart));
   const { triggerHaptic } = useTelegram();
   const { t } = useTranslation();
-  const isKeyboardOpen = useKeyboardOpen();
 
   const itemCount = useMemo(() => cart.reduce((count, item) => count + item.quantity, 0), [cart]);
 
@@ -26,7 +24,7 @@ export default function CartButton({ onClick }) {
 
   return (
     <AnimatePresence>
-      {itemCount > 0 && !isKeyboardOpen && (
+      {itemCount > 0 && (
         <motion.button
           initial={{ y: 100, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}

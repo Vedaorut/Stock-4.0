@@ -5,8 +5,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { useTelegram } from '../../hooks/useTelegram';
 import { useTranslation } from '../../i18n/useTranslation';
 import { usePlatform } from '../../hooks/usePlatform';
-import { isAndroid } from '../../utils/platform';
-import { useKeyboardOpen } from '../../hooks/useKeyboardOpen';
+import { getSurfaceStyle, getSpringPreset, isAndroid } from '../../utils/platform';
 
 // --- Icons ---
 const Icons = {
@@ -38,7 +37,7 @@ const TabBar = memo(function TabBar() {
   const { t } = useTranslation();
   const platform = usePlatform();
   const { triggerHaptic } = useTelegram();
-
+  
   const {
     activeTab,
     setActiveTab,
@@ -95,35 +94,23 @@ const TabBar = memo(function TabBar() {
   }, [triggerHaptic, setCartOpen, setPaymentStep, setFollowDetailId, setActiveTab]);
 
   // Styles & Animations
-  // Standard iOS Spring Physics - Clean & Predictable
-  const indicatorSpring = {
-    type: "spring",
-    bounce: 0.2,
-    duration: 0.6
-  };
-
+  const containerStyle = useMemo(() => ({
+    ...getSurfaceStyle('tabbar', platform),
+    paddingBottom: 'var(--safe-bottom)',
+  }), [platform]);
+  
+  const activeIndicatorStyle = useMemo(() => getSurfaceStyle('accentGlow', platform), [platform]);
+  const tapSpring = useMemo(() => getSpringPreset('quick', platform), [platform]);
+  const indicatorSpring = useMemo(() => getSpringPreset('press', platform), [platform]);
   const android = isAndroid(platform);
-  const isKeyboardOpen = useKeyboardOpen();
 
-  // Hide during payment or when keyboard is open
-  if (paymentStep !== 'idle' || isKeyboardOpen) return null;
+  // Hide during payment
+  if (paymentStep !== 'idle') return null;
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 pointer-events-none z-50 flex justify-center pb-[max(20px,env(safe-area-inset-bottom))]">
-      {/* 
-        Minimalist "Liquid Glass" Container 
-        - Pure Blur (3xl)
-        - High Transparency (neutral-900/50)
-        - Hairline Border (white/5)
-      */}
-      <div
-        className="pointer-events-auto relative px-1 py-1 rounded-full overflow-hidden backdrop-blur-3xl border border-white/5 shadow-2xl shadow-black/20"
-        style={{
-          background: 'rgba(20, 20, 20, 0.5)',
-          width: 'min(90%, 360px)',
-        }}
-      >
-        <div className="flex items-center justify-between relative">
+    <div className="tabbar">
+      <div className="rounded-t-3xl" style={containerStyle}>
+        <div className="flex items-center justify-around px-4 py-3">
           {tabs.map(({ id, label, Icon: TabItemIcon }) => {
             const isActive = activeTab === id;
 
@@ -131,32 +118,32 @@ const TabBar = memo(function TabBar() {
               <button
                 key={id}
                 onClick={() => handleTabChange(id)}
-                className="relative flex-1 flex flex-col items-center justify-center h-[52px] z-10"
+                className="relative px-2"
                 title={label}
                 aria-label={label}
               >
-                {/* Active "Liquid" Bubble */}
-                {isActive && (
-                  <motion.div
-                    className="absolute inset-0 rounded-full bg-white/10"
-                    layoutId="activeTab"
-                    initial={false}
-                    transition={indicatorSpring}
-                    style={{ zIndex: -1 }} // Ensure it stays behind text/icon
-                  />
-                )}
-
-                {/* Icon & Label */}
-                <div
-                  className={`flex flex-col items-center gap-0.5 transition-colors duration-300 ${isActive ? 'text-white' : 'text-neutral-400'
-                    }`}
+                <motion.div
+                  className={`flex flex-col items-center gap-1 relative px-4 py-2 ${
+                    isActive ? 'text-orange-primary' : 'text-gray-400'
+                  }`}
+                  whileTap={{ scale: android ? 0.95 : 0.92 }}
+                  transition={tapSpring}
                 >
+                  {isActive && (
+                    <motion.div
+                      className="absolute inset-0 rounded-xl pointer-events-none"
+                      layoutId="activeTab"
+                      initial={false}
+                      transition={indicatorSpring}
+                      style={{ willChange: 'transform', ...activeIndicatorStyle, zIndex: -1 }}
+                    />
+                  )}
+
                   <TabItemIcon />
-                  {/* Label: Only noticeable when active to reduce clutter, or keep minimal */}
-                  <span className="text-[10px] font-medium tracking-wide">
+                  <span className="text-xs font-semibold hidden sm:inline" style={{ letterSpacing: '0.02em' }}>
                     {label}
                   </span>
-                </div>
+                </motion.div>
               </button>
             );
           })}
