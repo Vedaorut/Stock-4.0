@@ -125,16 +125,25 @@ export function hapticFeedback(type = 'light') {
   }
 }
 
+// Store current BackButton handler for proper cleanup
+let currentBackButtonHandler = null;
+
 /**
  * Show Back Button
  * @param {Function} onClick - Click handler
  */
 export function showBackButton(onClick) {
   const tg = window.Telegram?.WebApp;
-  if (!tg) return;
+  if (!tg?.BackButton) return;
 
-  tg.BackButton.show();
+  // Remove previous handler if exists
+  if (currentBackButtonHandler) {
+    tg.BackButton.offClick(currentBackButtonHandler);
+  }
+
+  currentBackButtonHandler = onClick;
   tg.BackButton.onClick(onClick);
+  tg.BackButton.show();
 }
 
 /**
@@ -142,10 +151,15 @@ export function showBackButton(onClick) {
  */
 export function hideBackButton() {
   const tg = window.Telegram?.WebApp;
-  if (!tg) return;
+  if (!tg?.BackButton) return;
+
+  // Remove handler with reference
+  if (currentBackButtonHandler) {
+    tg.BackButton.offClick(currentBackButtonHandler);
+    currentBackButtonHandler = null;
+  }
 
   tg.BackButton.hide();
-  tg.BackButton.offClick();
 }
 
 /**

@@ -1,48 +1,55 @@
 import winston from 'winston';
+import DailyRotateFile from 'winston-daily-rotate-file';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
+import config from '../config/index.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const { combine, timestamp, printf, colorize, errors } = winston.format;
-
-// Custom log format
-const logFormat = printf(({ level, message, timestamp, stack }) => {
-  if (stack) {
-    return `${timestamp} [${level}]: ${message}\n${stack}`;
-  }
-  return `${timestamp} [${level}]: ${message}`;
-});
-
-// Create logger instance
-const logger = winston.createLogger({
-  level: process.env.LOG_LEVEL || 'info',
-  format: combine(errors({ stack: true }), timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }), logFormat),
-  transports: [
-    // Console transport with colors
-    new winston.transports.Console({
-      format: combine(colorize(), timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }), logFormat),
-    }),
-
-    // File transport for errors
-    new winston.transports.File({
-      filename: path.join(__dirname, '../../logs/error.log'),
-      level: 'error',
-    }),
-
-    // File transport for all logs
-    new winston.transports.File({
-      filename: path.join(__dirname, '../../logs/combined.log'),
-    }),
-  ],
-});
-
 // Create logs directory if it doesn't exist
-import fs from 'fs';
 const logsDir = path.join(__dirname, '../../logs');
 if (!fs.existsSync(logsDir)) {
   fs.mkdirSync(logsDir, { recursive: true });
+}
+
+// Daily rotate transports
+const fileRotateTransport = new DailyRotateFile({
+  filename: path.join(__dirname, '../../logs/combined-%DATE%.log'),
+  datePattern: 'YYYY-MM-DD',
+  maxFiles: '14d',
+  level: 'info',
+});
+
+const errorRotateTransport = new DailyRotateFile({
+  filename: path.join(__dirname, '../../logs/error-%DATE%.log'),
+  datePattern: 'YYYY-MM-DD',
+  maxFiles: '30d',
+  level: 'error',
+});
+
+// JSON format for file logs
+const logFormat = winston.format.combine(
+  winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
+  winston.format.errors({ stack: true }),
+  winston.format.json()
+);
+
+// Create logger instance
+const logger = winston.createLogger({
+  level: config.nodeEnv === 'production' ? 'info' : config.logLevel,
+  format: logFormat,
+  transports: [fileRotateTransport, errorRotateTransport],
+});
+
+// Console transport for development
+if (config.nodeEnv !== 'production') {
+  logger.add(
+    new winston.transports.Console({
+      format: winston.format.combine(winston.format.colorize(), winston.format.simple()),
+    })
+  );
 }
 
 export default logger;

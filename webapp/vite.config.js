@@ -24,6 +24,11 @@ function envValidationPlugin() {
         warnings.push('VITE_BOT_USERNAME not set - bot links may not work correctly');
       }
 
+      // VITE_SENTRY_DSN - info if not set (optional for error tracking)
+      if (!process.env.VITE_SENTRY_DSN && process.env.NODE_ENV === 'production') {
+        warnings.push('VITE_SENTRY_DSN not set - error tracking disabled in production');
+      }
+
       // Log warnings via console.error (ESLint only allows console.error)
       if (warnings.length > 0) {
         console.error('\n[Vite Build] Environment warnings:');

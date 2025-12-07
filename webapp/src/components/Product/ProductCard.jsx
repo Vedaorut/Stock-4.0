@@ -23,19 +23,20 @@ const calculatePriceDetails = (product) => {
     product.original_price &&
     parseFloat(product.original_price) > 0 &&
     (product.discount_percentage || 0) > 0;
-  
+
   const originalPrice = hasDiscount ? product.original_price : product.price;
   const discountPercentage = hasDiscount ? product.discount_percentage || 0 : 0;
   const isTimerDiscount = hasDiscount && product.discount_expires_at;
-  
+
   const rawPrice = product.price ?? '';
   const priceString = typeof rawPrice === 'number' ? String(rawPrice) : `${rawPrice}`;
   const numericPriceLength = priceString.replace(/[^0-9]/g, '').length;
 
-  let priceSizeClass = 'text-2xl';
-  if (numericPriceLength >= 10) priceSizeClass = 'text-base';
-  else if (numericPriceLength >= 7) priceSizeClass = 'text-lg';
-  else if (numericPriceLength >= 4) priceSizeClass = 'text-xl';
+  // Adaptive font sizing for "Clean Luxury" layout
+  let priceSizeClass = 'text-xl'; // Default
+  if (numericPriceLength >= 9) priceSizeClass = 'text-sm';
+  else if (numericPriceLength >= 7) priceSizeClass = 'text-base';
+  else if (numericPriceLength >= 5) priceSizeClass = 'text-lg';
 
   return {
     hasDiscount,
@@ -80,9 +81,8 @@ const SyncedBadge = ({ sourceName, t }) => (
 
 const StockBadge = ({ stock, lowStock, pcsLabel }) => (
   <div
-    className={`flex items-center gap-1 px-2 py-1 rounded-full border ${
-      lowStock ? 'border-orange-400/70 bg-orange-500/12' : 'border-white/12 bg-black/35'
-    } shadow-[0_8px_24px_rgba(12,12,12,0.35)] backdrop-blur`}
+    className={`flex items-center gap-1 px-2 py-1 rounded-full border ${lowStock ? 'border-orange-400/70 bg-orange-500/12' : 'border-white/12 bg-black/35'
+      } shadow-[0_8px_24px_rgba(12,12,12,0.35)] backdrop-blur`}
   >
     <span
       className={`w-1 h-1 rounded-full ${lowStock ? 'bg-orange-400 animate-pulse' : 'bg-emerald-400'}`}
@@ -176,8 +176,8 @@ const ProductCard = memo(function ProductCard({ product, onPreorder: _onPreorder
   useEffect(() => {
     if (isHighlighted && cardRef.current) {
       setTimeout(() => {
-        cardRef.current?.scrollIntoView({ 
-          behavior: 'smooth', 
+        cardRef.current?.scrollIntoView({
+          behavior: 'smooth',
           block: 'center',
           inline: 'nearest'
         });
@@ -222,9 +222,8 @@ const ProductCard = memo(function ProductCard({ product, onPreorder: _onPreorder
       whileTap={{ scale: android ? 0.99 : 0.98 }}
       transition={quickSpring}
       ref={cardRef}
-      className={`relative min-h-[200px] rounded-3xl overflow-hidden group ${
-        hasDiscount ? 'ring-2 ring-red-500/50 shadow-[0_0_20px_rgba(255,71,87,0.25)]' : ''
-      } ${isHighlighted ? 'ring-4 ring-white z-10 shadow-[0_0_60px_rgba(255,255,255,0.8),0_0_100px_rgba(255,255,255,0.4)] animate-[highlight-glow_1s_ease-in-out_infinite]' : ''}`}
+      className={`relative h-[200px] rounded-3xl overflow-hidden group ${hasDiscount ? 'ring-2 ring-red-500/50 shadow-[0_0_20px_rgba(255,71,87,0.25)]' : ''
+        } ${isHighlighted ? 'ring-4 ring-white z-10 shadow-[0_0_60px_rgba(255,255,255,0.8),0_0_100px_rgba(255,255,255,0.4)] animate-[highlight-glow_1s_ease-in-out_infinite]' : ''}`}
       style={backgroundStyle}
     >
       {!android && (
@@ -246,7 +245,11 @@ const ProductCard = memo(function ProductCard({ product, onPreorder: _onPreorder
       </div>
 
       <div className="absolute top-3 right-3 z-10 flex flex-col gap-2 items-end">
-        {isPreorder ? (
+        {isTimerDiscount ? (
+          <div className="px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md border border-red-500/30 shadow-lg flex items-center justify-center">
+            <CountdownTimer expiresAt={product.discount_expires_at} />
+          </div>
+        ) : isPreorder ? (
           <PreorderIcon />
         ) : (
           stock > 0 && <StockBadge stock={stock} lowStock={lowStock} pcsLabel={t('shopOrders.labels.pcs')} />
@@ -280,14 +283,12 @@ const ProductCard = memo(function ProductCard({ product, onPreorder: _onPreorder
 
       {/* Content */}
       <div
-        className={`relative h-full ${isWide ? 'p-6' : 'p-5'} flex ${
-          isWide ? 'flex-row items-center gap-5' : 'flex-col gap-3'
-        }`}
+        className={`relative h-full ${isWide ? 'p-6' : 'p-5'} flex ${isWide ? 'flex-row items-center gap-5' : 'flex-col gap-3'
+          }`}
       >
         <h3
-          className={`text-white font-semibold leading-snug ${
-            isWide ? 'text-sm mt-1' : 'text-base mt-4'
-          }`}
+          className={`text-white font-semibold leading-snug flex-shrink-0 ${isWide ? 'text-sm mt-1' : 'text-[15px] mt-4'
+            }`}
           style={{
             letterSpacing: '-0.02em',
             display: '-webkit-box',
@@ -296,7 +297,8 @@ const ProductCard = memo(function ProductCard({ product, onPreorder: _onPreorder
             overflow: 'hidden',
             textOverflow: 'ellipsis',
             wordBreak: 'break-word',
-            minHeight: isWide ? 'auto' : '2.6em',
+            height: isWide ? 'auto' : '2.4em',
+            lineHeight: '1.2',
           }}
         >
           {product.name}
@@ -305,22 +307,22 @@ const ProductCard = memo(function ProductCard({ product, onPreorder: _onPreorder
         <div
           className={`flex items-end mt-auto ${isWide ? 'gap-4 ml-auto' : 'justify-between gap-3'}`}
         >
-          {/* Price section - flex-1 allows it to take available space but not push button */}
-          <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
+          {/* Price section */}
+          <div className="flex flex-col justify-end flex-1 min-w-0">
             {hasDiscount ? (
-              <div className="space-y-0.5">
-                {/* Discount row - original price + badge */}
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="text-xs text-gray-400 line-through font-medium whitespace-nowrap">
+              <div className="flex flex-col justify-end h-full">
+                {/* Old Price + Badge Row */}
+                <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                  <span className="text-[11px] text-gray-400 line-through font-medium whitespace-nowrap">
                     ${Math.floor(parseFloat(originalPrice))}
                   </span>
-                  <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-500 text-white flex-shrink-0">
+                  <span className="px-1.5 py-0.5 rounded-[4px] text-[9px] font-bold bg-red-500/90 text-white shadow-sm backdrop-blur-sm whitespace-nowrap">
                     -{Math.round(discountPercentage)}%
                   </span>
                 </div>
                 {/* Current price */}
                 <span
-                  className={`text-red-500 font-bold leading-tight ${priceSizeClass} truncate`}
+                  className={`text-red-500 font-bold leading-tight ${priceSizeClass} whitespace-nowrap`}
                   style={{
                     letterSpacing: '-0.02em',
                     fontVariantNumeric: 'tabular-nums',
@@ -328,34 +330,37 @@ const ProductCard = memo(function ProductCard({ product, onPreorder: _onPreorder
                 >
                   ${parseFloat(product.price) % 1 === 0 ? Math.floor(parseFloat(product.price)) : parseFloat(product.price).toFixed(2)}
                 </span>
-              </div>
-            ) : (
-              <span
-                className={`text-orange-primary font-bold leading-tight ${priceSizeClass} truncate`}
-                style={{
-                  letterSpacing: '-0.02em',
-                  fontVariantNumeric: 'tabular-nums',
-                }}
-              >
-                ${parseFloat(product.price) % 1 === 0 ? Math.floor(parseFloat(product.price)) : parseFloat(product.price).toFixed(2)}
-              </span>
-            )}
 
-            {isTimerDiscount ? (
-              <div className="mt-1">
-                <CountdownTimer expiresAt={product.discount_expires_at} />
+                <span
+                  className="mt-0.5 text-[10px] uppercase font-medium text-gray-500"
+                  style={{ letterSpacing: '0.05em' }}
+                >
+                  {product.currency || 'USD'}
+                </span>
               </div>
             ) : (
-              <span
-                className="mt-1 text-xs uppercase font-medium text-gray-500"
-                style={{ letterSpacing: '0.05em' }}
-              >
-                {product.currency || 'USD'}
-              </span>
+              <div className="flex flex-col justify-end h-full">
+                <span
+                  className={`text-orange-primary font-bold leading-tight ${priceSizeClass}`}
+                  style={{
+                    letterSpacing: '-0.02em',
+                    fontVariantNumeric: 'tabular-nums',
+                    wordBreak: 'break-word',
+                  }}
+                >
+                  ${parseFloat(product.price) % 1 === 0 ? Math.floor(parseFloat(product.price)) : parseFloat(product.price).toFixed(2)}
+                </span>
+                <span
+                  className="mt-1 text-[10px] uppercase font-medium text-gray-500"
+                  style={{ letterSpacing: '0.05em' }}
+                >
+                  {product.currency || 'USD'}
+                </span>
+              </div>
             )}
           </div>
 
-          {/* Add to cart button - fixed size, never shrinks */}
+          {/* Add to cart button - ALWAYS aligned to bottom */}
           <motion.button
             onClick={handleAddToCart}
             disabled={isDisabled}

@@ -21,7 +21,8 @@ export default function PageHeader({ title, onBack, action, variant = 'back' }) 
     <div
       className="fixed top-0 left-0 right-0 z-40"
       style={{
-        paddingTop: 'env(safe-area-inset-top)',
+        paddingTop: 'calc(env(safe-area-inset-top) + 30px)',
+        backgroundColor: '#181818',
       }}
     >
       <div className="flex items-center justify-between px-4" style={{ height: '56px' }}>
@@ -30,8 +31,8 @@ export default function PageHeader({ title, onBack, action, variant = 'back' }) 
 
         {/* Title */}
         <h1
-          className="flex-1 text-center text-lg font-bold text-white"
-          style={{ letterSpacing: '-0.02em' }}
+          className="flex-1 text-center text-lg font-bold text-white px-2"
+          style={{ letterSpacing: '-0.02em', lineHeight: '1.2' }}
         >
           {title}
         </h1>

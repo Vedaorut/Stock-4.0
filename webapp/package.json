@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",
+    "@sentry/react": "^10.29.0",
     "@tanstack/react-virtual": "^3.13.12",
     "axios": "^1.6.0",
     "framer-motion": "^10.16.0",

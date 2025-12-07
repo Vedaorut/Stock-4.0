@@ -24,6 +24,7 @@ import {
   closeApp,
 } from '../utils/telegram';
 import { t } from '../i18n';
+import { setSentryUser } from '../lib/sentry';
 
 const TelegramContext = createContext(null);
 
@@ -93,6 +94,9 @@ export function TelegramProvider({ children }) {
 
       // Store backend user locally for context (includes selected_role)
       setBackendUser(user);
+
+      // Set Sentry user context for error tracking
+      setSentryUser(user);
 
       setError(null);
     } catch (err) {

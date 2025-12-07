@@ -1,5 +1,4 @@
 import { motion } from 'framer-motion';
-import { useMemo } from 'react';
 
 /**
  * Refined Dark Header
@@ -11,23 +10,24 @@ import { useMemo } from 'react';
  * - Clean typography with proper weight hierarchy
  */
 export default function Header({ title, subtitle, showAccent = true }) {
-  // Memoized gradient style with noise overlay
-  const headerStyle = useMemo(() => ({
-    paddingTop: 'env(safe-area-inset-top)',
-    background: `
-      linear-gradient(
-        180deg,
-        rgba(24, 24, 24, 0.98) 0%,
-        rgba(24, 24, 24, 0.95) 50%,
-        rgba(24, 24, 24, 0.85) 100%
-      )
-    `,
-    backdropFilter: 'blur(20px) saturate(180%)',
-    WebkitBackdropFilter: 'blur(20px) saturate(180%)',
-  }), []);
-
   return (
-    <header className="fixed top-0 left-0 right-0 z-40" style={headerStyle}>
+    <header
+      className="fixed top-0 left-0 right-0 z-40"
+      style={{
+        paddingTop: 'calc(env(safe-area-inset-top) + 12px)',
+        backgroundColor: '#181818',
+      }}
+    >
+      {/* Background extension to cover area above safe-area-inset (for overscroll) */}
+      <div
+        className="absolute left-0 right-0 pointer-events-none"
+        style={{
+          top: '-200px',
+          height: '200px',
+          background: '#181818',
+        }}
+      />
+
       {/* Main header content */}
       <div
         className="flex items-center justify-center px-5 relative"

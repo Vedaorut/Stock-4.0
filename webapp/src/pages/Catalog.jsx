@@ -463,7 +463,7 @@ export default function Catalog() {
       <div
         className="h-screen overflow-y-auto bg-[#181818]"
         style={{
-          paddingTop: 'calc(env(safe-area-inset-top) + 56px)',
+          paddingTop: 'calc(env(safe-area-inset-top) + 80px)',
           paddingBottom: 'calc(var(--tabbar-total) + 20px)',
         }}
       >
@@ -508,45 +508,55 @@ export default function Catalog() {
     <div
       className="h-screen overflow-y-auto bg-[#181818]"
       style={{
-        paddingTop: 'calc(env(safe-area-inset-top) + 56px)',
+        paddingTop: 'calc(env(safe-area-inset-top) + 80px)',
         paddingBottom: 'calc(var(--tabbar-total) + 20px)',
       }}
     >
       <Header title={t('catalog.title')} />
 
-      {/* Shop Info & Search - Redesigned */}
+      {/* Shop Info & Search - Premium E-commerce Header */}
       <div className="relative z-10">
         <div className="px-4 py-4 space-y-4">
-          {/* Shop Info Card */}
-          <div className="flex items-center gap-4 p-4 rounded-2xl bg-white/5 border border-white/5 backdrop-blur-sm">
-            {displayShopLogo ? (
-              <div className="w-14 h-14 rounded-full bg-dark-elevated overflow-hidden flex-shrink-0 shadow-lg ring-2 ring-white/10">
-                <img src={displayShopLogo} alt={displayShop.name} className="w-full h-full object-cover" />
-              </div>
-            ) : (
-              <div className="w-14 h-14 rounded-full bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center text-white text-xl font-bold shadow-lg ring-2 ring-white/10">
-                {displayShop.name.charAt(0)}
-              </div>
-            )}
-            <div className="flex-1 min-w-0">
-              <h2 className="text-white text-xl font-bold truncate leading-tight">
+          {/* Shop Hero Card - Modern Glassmorphism */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+            className="relative overflow-hidden rounded-3xl"
+          >
+            {/* Gradient Background - Premium Dark */}
+            <div
+              className="absolute inset-0"
+              style={{
+                background: 'linear-gradient(135deg, #1A1A1A 0%, #111111 100%)',
+              }}
+            />
+
+            {/* Ambient Glow Effects */}
+            <div className="absolute -top-12 -right-12 w-48 h-48 bg-orange-500/10 blur-[60px] rounded-full pointer-events-none" />
+            <div className="absolute -bottom-12 -left-12 w-40 h-40 bg-blue-500/5 blur-[50px] rounded-full pointer-events-none" />
+
+            {/* Content */}
+            <div className="relative p-8 flex flex-col items-center justify-center text-center min-h-[120px]">
+              {/* Shop Name */}
+              <h2
+                className="text-3xl font-bold text-white tracking-tight leading-snug whitespace-normal break-words max-w-full"
+                style={{
+                  fontFamily: "'SF Pro Display', sans-serif",
+                  letterSpacing: '-0.02em',
+                  background: 'linear-gradient(180deg, #FFFFFF 0%, #D1D1D1 100%)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  textShadow: '0 2px 10px rgba(0,0,0,0.2)'
+                }}
+              >
                 {displayShop.name}
               </h2>
-              {isViewingOwnShop && (
-                <span className="inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-orange-500/20 text-orange-400">
-                  {t('catalog.myShop')}
-                </span>
-              )}
             </div>
-            <div className="text-right">
-              <div className="text-2xl font-bold text-white leading-none">
-                {activeSection === 'preorder' ? preorderProducts.length : stockProducts.length}
-              </div>
-              <div className="text-[10px] items-center text-gray-400 font-medium uppercase tracking-wider mt-1">
-                {activeSection === 'preorder' ? t('catalog.inPreorder') : t('catalog.inStock')}
-              </div>
-            </div>
-          </div>
+
+            {/* Bottom accent line */}
+            <div className="absolute bottom-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+          </motion.div>
 
           {/* Enhanced Search & Filters Area */}
           <div className="space-y-3 sticky top-0 z-20">
@@ -630,30 +640,63 @@ export default function Catalog() {
               </AnimatePresence>
             </div>
 
-            {/* Tabs */}
-            <div className="relative flex bg-[#242424] rounded-2xl p-1.5 border border-white/5 shadow-inner">
+            {/* Tabs - Premium Segmented Control */}
+            <div
+              className="relative flex rounded-2xl p-1"
+              style={{
+                background: 'linear-gradient(145deg, rgba(36, 36, 36, 0.9) 0%, rgba(28, 28, 28, 0.95) 100%)',
+                border: '1px solid rgba(255, 255, 255, 0.06)',
+                boxShadow: 'inset 0 1px 3px rgba(0, 0, 0, 0.3)',
+              }}
+            >
               {['stock', 'preorder'].map((sectionId) => {
                 const isActive = activeSection === sectionId;
                 const label = sectionId === 'stock' ? t('catalog.tabs.stock') : t('catalog.tabs.preorder');
+                const count = sectionId === 'stock' ? stockProducts.length : preorderProducts.length;
 
                 return (
                   <button
                     key={sectionId}
                     type="button"
                     onClick={() => handleSectionChange(sectionId)}
-                    className={`relative flex-1 py-3 rounded-xl transition-all duration-300 ${isActive ? 'text-white' : 'text-gray-500 hover:text-gray-300'
+                    className={`relative flex-1 py-3 px-4 rounded-xl transition-all duration-200 ${isActive ? 'text-white' : 'text-gray-500 hover:text-gray-300'
                       }`}
                   >
                     {isActive && (
                       <motion.div
                         layoutId="catalog-section-highlight"
-                        className="absolute inset-0 bg-white/10 shadow-[0_4px_12px_rgba(0,0,0,0.2)] rounded-xl border border-white/10"
-                        transition={{ type: 'spring', stiffness: 350, damping: 25 }}
+                        className="absolute inset-0 rounded-xl"
+                        style={{
+                          background: 'linear-gradient(135deg, rgba(255, 107, 0, 0.15) 0%, rgba(255, 107, 0, 0.08) 100%)',
+                          border: '1px solid rgba(255, 107, 0, 0.3)',
+                          boxShadow: '0 4px 12px rgba(255, 107, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
+                        }}
+                        transition={{ type: 'spring', stiffness: 400, damping: 30 }}
                       />
                     )}
                     <div className="relative z-10 flex items-center justify-center gap-2">
-                      <span className="text-sm font-bold tracking-wide">
+                      {/* Icon */}
+                      {sectionId === 'stock' ? (
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                        </svg>
+                      ) : (
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                          <circle cx="12" cy="12" r="9" />
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 7v5l3 3" />
+                        </svg>
+                      )}
+                      <span className="text-sm font-semibold" style={{ letterSpacing: '-0.01em' }}>
                         {label}
+                      </span>
+                      {/* Count badge */}
+                      <span
+                        className={`text-xs font-bold px-1.5 py-0.5 rounded-md ${isActive
+                          ? 'bg-orange-500/30 text-orange-300'
+                          : 'bg-white/5 text-gray-500'
+                          }`}
+                      >
+                        {count}
                       </span>
                     </div>
                   </button>

@@ -25,7 +25,7 @@ const FollowDetailPage = lazy(() => import('./pages/FollowDetail'));
 // Loading fallback component
 function PageLoader() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#0A0A0A]">
+    <div className="min-h-screen flex items-center justify-center bg-[#181818]">
       <div className="text-center">
         <div className="w-12 h-12 border-4 border-[#FF6B00] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
         <p className="text-white/60 text-sm">Loading...</p>
@@ -97,8 +97,8 @@ function App() {
         tg.enableClosingConfirmation();
       }
 
-      tg.setHeaderColor('#0A0A0A');
-      tg.setBackgroundColor('#0A0A0A');
+      tg.setHeaderColor('#181818');
+      tg.setBackgroundColor('#181818');
     }
   }, []);
 
@@ -206,7 +206,7 @@ function App() {
   // Show loading state during validation or i18n loading
   if (isValidating || !isReady || !isI18nReady) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#0A0A0A]">
+      <div className="min-h-screen flex items-center justify-center bg-[#181818]">
         <div className="text-center">
           <div className="w-12 h-12 border-4 border-[#FF6B00] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
         </div>
@@ -217,7 +217,7 @@ function App() {
   // Show error state if authentication failed
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#0A0A0A] p-4">
+      <div className="min-h-screen flex items-center justify-center bg-[#181818] p-4">
         <div className="text-center max-w-md">
           <div className="text-6xl mb-4">⚠️</div>
           <h1 className="text-white text-xl font-bold mb-2">Authentication Failed</h1>
@@ -239,7 +239,7 @@ function App() {
         <div
           className="fixed inset-0 z-0"
           style={{
-            background: 'linear-gradient(180deg, #0A0A0A 0%, #17212b 100%)',
+            background: '#181818',
           }}
         />
 

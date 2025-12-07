@@ -1,6 +1,7 @@
 import { Component } from 'react';
 import { motion } from 'framer-motion'; // Used in JSX
 import { t } from '../i18n';
+import { captureException } from '../lib/sentry';
 
 class ErrorBoundary extends Component {
   constructor(props) {
@@ -9,6 +10,7 @@ class ErrorBoundary extends Component {
       hasError: false,
       error: null,
       errorInfo: null,
+      eventId: null,
     };
   }
 
@@ -26,7 +28,13 @@ class ErrorBoundary extends Component {
       errorInfo,
     });
 
-    // Send error to monitoring service (e.g., Sentry)
+    // Send error to Sentry
+    captureException(error, {
+      componentStack: errorInfo?.componentStack,
+      source: 'ErrorBoundary',
+    });
+
+    // Show Telegram alert for user feedback
     if (window.Telegram?.WebApp) {
       window.Telegram.WebApp.showAlert(
         t('errors.errorOccurred', { message: error.message })
