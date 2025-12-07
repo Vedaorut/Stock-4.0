@@ -326,7 +326,7 @@ export default function FollowDetail() {
 
   return (
     <div
-      className="h-screen overflow-y-auto bg-[#181818]"
+      className="fixed inset-0 overflow-y-auto bg-[#181818]"
       style={{
         paddingTop: 'calc(env(safe-area-inset-top) + 56px)',
         paddingBottom: 'calc(var(--tabbar-total) + 20px)',
