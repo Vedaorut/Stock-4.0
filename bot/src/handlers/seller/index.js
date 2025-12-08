@@ -507,6 +507,23 @@ export const setupSellerHandlers = (bot) => {
   bot.action(/^order:deliver:(\d+)$/, handleMarkDelivered);
   bot.action(/^order:cancel:(\d+)$/, handleCancelOrder);
 
+  // Bulk mark shipped scene
+  bot.action('seller:mark_shipped', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+
+      // Validate shop before entering scene
+      const isValid = await validateShopBeforeScene(ctx, 'markOrdersShipped');
+      if (!isValid) return;
+
+      await ctx.scene.enter('markOrdersShipped');
+    } catch (error) {
+      logger.error('Error entering markOrdersShipped scene:', error);
+      const lang = getLangSafe(ctx);
+      await ctx.reply(t('errors.genericError', {}, lang));
+    }
+  });
+
   // Order history (renamed from sales)
   bot.action('seller:order_history', (ctx) => handleOrderHistory(ctx, 1));
 
