@@ -1,11 +1,17 @@
 # Status Stock 4.0 - Found Bugs Report
 
 Generated: 2025-12-08
+Updated: 2025-12-08 (comprehensive QA fix session)
 
 ## Summary
 - **Total bugs found**: 63+
-- **Fixed**: 12 (P0-P1 priority bugs)
-- **Remaining**: 51+ (mostly P2-P3)
+- **Fixed**: 45+ (P0-P3 priority bugs)
+- **Remaining**: ~15 (edge cases, cosmetic issues)
+
+## Test Results
+- **Backend**: 84 tests passing
+- **Bot**: 521 tests passing, 18 skipped
+- **WebApp**: Build successful
 
 ---
 
@@ -35,10 +41,11 @@ Generated: 2025-12-08
 
 ### Auth & Security
 
-#### BUG-AUTH-001
+#### BUG-AUTH-001 [FIXED]
 **Location**: `backend/src/controllers/authController.js`
 **Issue**: Refresh token reuse - no rotation after use
 **Impact**: Stolen refresh tokens remain valid indefinitely
+**Fix**: Implemented token rotation - old token invalidated before new one issued
 
 #### BUG-AUTH-006 [VERIFIED SAFE]
 **Location**: `backend/src/database/queries/refreshTokenQueries.js`
