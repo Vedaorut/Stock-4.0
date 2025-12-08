@@ -89,6 +89,16 @@ jest.unstable_mockModule('../../src/validators/orderValidator.js', () => ({
   validateStatusUpdate: jest.fn(),
 }));
 
+jest.unstable_mockModule('../../src/services/blockchainVerificationService.js', () => ({
+  verifyPayment: jest.fn(),
+  VERIFICATION_STATUS: {
+    SUCCESS: 'success',
+    TX_NOT_FOUND: 'tx_not_found',
+    TX_INVALID: 'tx_invalid',
+    API_ERROR: 'api_error',
+  },
+}));
+
 jest.unstable_mockModule('../../src/services/orderService.js', () => ({
   createOrderWithItems: jest.fn(),
   updateOrderStatusWithStockLogic: jest.fn(),
@@ -104,6 +114,8 @@ const {
 } = await import('../../src/database/queries/index.js');
 
 const { validateOrderAccess } = await import('../../src/validators/orderValidator.js');
+
+const { verifyPayment } = await import('../../src/services/blockchainVerificationService.js');
 
 const { orderController } = await import('../../src/controllers/orderController.js');
 
@@ -543,12 +555,20 @@ describe('Order Controller', () => {
           status: 'pending',
           total_price: '100.00',
           crypto_amount: 0.002,
+          updated_at: new Date(), // Fresh invoice
         });
 
         paymentQueries.findByTxHash.mockResolvedValue(null);
 
         orderQueries.getInvoiceData.mockResolvedValue({
           wallet_btc: 'bc1qwallet',
+        });
+
+        verifyPayment.mockResolvedValue({
+          resultStatus: 'success',
+          verified: false,
+          confirmations: 0,
+          amount: 0.002,
         });
 
         paymentQueries.createForDirectCrypto.mockResolvedValue({
@@ -565,8 +585,10 @@ describe('Order Controller', () => {
           success: true,
           data: {
             paymentId: 456,
-            status: 'pending',
-            message: 'Payment submitted. Verification in progress.',
+            status: 'pending_confirmations',
+            confirmations: 0,
+            required: 3,
+            message: 'Payment verified. Waiting for 3 confirmations.',
           },
         });
       });
@@ -609,6 +631,8 @@ describe('Order Controller', () => {
           buyer_id: 1,
           status: 'pending',
           total_price: '100.00',
+          crypto_amount: 0.002,
+          updated_at: new Date(), // Fresh invoice
         });
 
         const existingPayment = {
@@ -623,6 +647,13 @@ describe('Order Controller', () => {
           wallet_btc: 'bc1qwallet',
         });
 
+        verifyPayment.mockResolvedValue({
+          resultStatus: 'success',
+          verified: false,
+          confirmations: 1,
+          amount: 0.002,
+        });
+
         orderQueries.updatePaymentHash.mockResolvedValue({});
 
         await orderController.submitPayment(req, res);
@@ -634,8 +665,10 @@ describe('Order Controller', () => {
           success: true,
           data: {
             paymentId: 456,
-            status: 'pending',
-            message: 'Payment submitted. Verification in progress.',
+            status: 'pending_confirmations',
+            confirmations: 1,
+            required: 3,
+            message: 'Payment verified. Waiting for 3 confirmations.',
           },
         });
       });
@@ -651,6 +684,8 @@ describe('Order Controller', () => {
           id: 123,
           buyer_id: 1,
           status: 'pending',
+          crypto_amount: 0.002,
+          updated_at: new Date(), // Fresh invoice
         });
 
         paymentQueries.findByTxHash.mockResolvedValue({
@@ -658,6 +693,9 @@ describe('Order Controller', () => {
           order_id: 999, // Different order!
           tx_hash: 'abc123def456',
         });
+
+        // ConflictError is thrown BEFORE verifyPayment is called
+        // because findByTxHash returns payment with different order_id
 
         await expect(orderController.submitPayment(req, res)).rejects.toThrow(ConflictError);
       });
@@ -751,20 +789,13 @@ describe('Order Controller', () => {
           user: { id: 1 },
         });
 
+        // findById now returns owner_id via JOIN with shops table
         orderQueries.findById.mockResolvedValue({
           id: 123,
           buyer_id: 1,
+          owner_id: 2, // Seller - from shops JOIN
           status: 'pending',
           payment_hash: null,
-        });
-
-        orderQueries.getInvoiceData.mockResolvedValue({
-          shop_id: 1,
-        });
-
-        shopQueries.findById.mockResolvedValue({
-          id: 1,
-          owner_id: 2,
         });
 
         await orderController.getPaymentStatus(req, res);
@@ -784,20 +815,13 @@ describe('Order Controller', () => {
           user: { id: 2 },
         });
 
+        // findById now returns owner_id via JOIN with shops table
         orderQueries.findById.mockResolvedValue({
           id: 123,
           buyer_id: 1,
+          owner_id: 2, // Seller - from shops JOIN
           status: 'pending',
           payment_hash: null,
-        });
-
-        orderQueries.getInvoiceData.mockResolvedValue({
-          shop_id: 1,
-        });
-
-        shopQueries.findById.mockResolvedValue({
-          id: 1,
-          owner_id: 2, // Seller
         });
 
         await orderController.getPaymentStatus(req, res);
@@ -817,19 +841,12 @@ describe('Order Controller', () => {
           user: { id: 999 },
         });
 
+        // findById now returns owner_id via JOIN with shops table
         orderQueries.findById.mockResolvedValue({
           id: 123,
           buyer_id: 1,
+          owner_id: 2, // Seller - from shops JOIN
           status: 'pending',
-        });
-
-        orderQueries.getInvoiceData.mockResolvedValue({
-          shop_id: 1,
-        });
-
-        shopQueries.findById.mockResolvedValue({
-          id: 1,
-          owner_id: 2,
         });
 
         await expect(orderController.getPaymentStatus(req, res)).rejects.toThrow(UnauthorizedError);
@@ -843,20 +860,13 @@ describe('Order Controller', () => {
           user: { id: 1 },
         });
 
+        // findById now returns owner_id via JOIN with shops table
         orderQueries.findById.mockResolvedValue({
           id: 123,
           buyer_id: 1,
+          owner_id: 2, // Seller - from shops JOIN
           status: 'pending',
           payment_hash: null,
-        });
-
-        orderQueries.getInvoiceData.mockResolvedValue({
-          shop_id: 1,
-        });
-
-        shopQueries.findById.mockResolvedValue({
-          id: 1,
-          owner_id: 2,
         });
 
         await orderController.getPaymentStatus(req, res);
@@ -876,19 +886,12 @@ describe('Order Controller', () => {
           user: { id: 1 },
         });
 
+        // findById now returns owner_id via JOIN with shops table
         orderQueries.findById.mockResolvedValue({
           id: 123,
           buyer_id: 1,
+          owner_id: 2, // Seller - from shops JOIN
           status: 'confirmed',
-        });
-
-        orderQueries.getInvoiceData.mockResolvedValue({
-          shop_id: 1,
-        });
-
-        shopQueries.findById.mockResolvedValue({
-          id: 1,
-          owner_id: 2,
         });
 
         await orderController.getPaymentStatus(req, res);
@@ -908,20 +911,13 @@ describe('Order Controller', () => {
           user: { id: 1 },
         });
 
+        // findById now returns owner_id via JOIN with shops table
         orderQueries.findById.mockResolvedValue({
           id: 123,
           buyer_id: 1,
+          owner_id: 2, // Seller - from shops JOIN
           status: 'pending',
           payment_hash: 'tx123',
-        });
-
-        orderQueries.getInvoiceData.mockResolvedValue({
-          shop_id: 1,
-        });
-
-        shopQueries.findById.mockResolvedValue({
-          id: 1,
-          owner_id: 2,
         });
 
         paymentQueries.findByTxHash.mockResolvedValue({

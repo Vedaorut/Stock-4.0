@@ -333,6 +333,80 @@ export const requireAdmin = async (req, res, next) => {
   }
 };
 
+/**
+ * Require shop to have active subscription (not 'inactive')
+ * Blocks API access for deactivated shops
+ * Must be used AFTER verifyToken and requireShopOwner/requireShopAccess
+ *
+ * CRITICAL: This prevents sellers from managing products/settings
+ * when subscription has expired and grace period ended
+ */
+export const requireActiveShop = async (req, res, next) => {
+  try {
+    // Shop already attached by requireShopOwner or requireShopAccess
+    let shop = req.shop;
+
+    // If not attached, try to get shopId from explicit sources
+    // NOTE: Do NOT use req.params.id as fallback - it may be productId, orderId, etc.
+    // Only use explicit shopId params to avoid confusion
+    if (!shop) {
+      const shopId = req.params.shopId || req.body.shopId;
+
+      if (!shopId) {
+        // No explicit shop context - let handler decide (it may load shop from product/order)
+        return next();
+      }
+
+      shop = await shopQueries.findById(shopId);
+
+      if (!shop) {
+        return res.status(404).json({
+          success: false,
+          error: 'Shop not found',
+        });
+      }
+    }
+
+    // Check if shop is deactivated (subscription_status = 'inactive')
+    const status = shop.subscription_status;
+
+    if (status === 'inactive') {
+      logger.warn('[requireActiveShop] Blocked access to inactive shop', {
+        shopId: shop.id,
+        shopName: shop.name,
+        userId: req.user?.id,
+        path: req.path,
+        method: req.method,
+      });
+
+      return res.status(402).json({
+        success: false,
+        error: 'SUBSCRIPTION_INACTIVE',
+        message: 'Your subscription has expired. Please renew to continue managing your shop.',
+        code: 'SHOP_INACTIVE',
+        renewUrl: '/api/payments/subscription/crystalpay',
+      });
+    }
+
+    // Attach shop to request if not already
+    if (!req.shop) {
+      req.shop = shop;
+    }
+
+    next();
+  } catch (error) {
+    logger.error('[requireActiveShop] Error checking shop status', {
+      error: error.message,
+      userId: req.user?.id,
+      path: req.path,
+    });
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to verify shop status',
+    });
+  }
+};
+
 export default {
   verifyToken,
   authenticate,
@@ -340,4 +414,5 @@ export default {
   requireShopOwner,
   requireShopAccess,
   requireAdmin,
+  requireActiveShop,
 };

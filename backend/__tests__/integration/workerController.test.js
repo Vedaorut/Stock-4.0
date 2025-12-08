@@ -1,14 +1,15 @@
 /**
  * Integration Tests: Worker Controller
- * Tests BUG-W1 fix: PRO tier check for workspace feature
+ * Tests BUG-W1 fix: MAX tier check for workspace feature
+ *
+ * REFACTORED: Uses full server app (like productController.test.js)
+ * to ensure proper JWT authentication and middleware chain
  */
 
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
-import express from 'express';
+import app from '../../src/server.js';
 import { config } from '../../src/config/env.js';
-import workerRoutes from '../../src/routes/workers.js';
-import { errorHandler } from '../../src/middleware/errorHandler.js';
 import {
   getTestPool,
   closeTestDb,
@@ -17,26 +18,15 @@ import {
   createTestShop,
 } from '../helpers/testDb.js';
 
-// Create minimal test app
-const createTestApp = () => {
-  const app = express();
-  app.use(express.json());
-  app.use('/api/shops', workerRoutes);
-  app.use(errorHandler);
-  return app;
-};
-
 describe('Worker Controller - Integration Tests', () => {
-  let app;
   let pool;
   let ownerUser;
   let workerUser;
   let freeShop;
-  let proShop;
+  let maxShop;
   let ownerToken;
 
   beforeAll(async () => {
-    app = createTestApp();
     pool = getTestPool();
   });
 
@@ -57,20 +47,20 @@ describe('Worker Controller - Integration Tests', () => {
       selectedRole: 'seller',
     });
 
-    // Create FREE tier shop
+    // Create FREE tier shop (default tier)
     freeShop = await createTestShop(ownerUser.id, {
       name: 'Free Shop',
       description: 'FREE tier shop',
     });
 
-    // Create PRO tier shop
-    proShop = await createTestShop(ownerUser.id, {
-      name: 'Pro Shop',
-      description: 'PRO tier shop',
+    // Create MAX tier shop
+    maxShop = await createTestShop(ownerUser.id, {
+      name: 'Max Shop',
+      description: 'MAX tier shop',
     });
 
-    // Upgrade proShop to PRO tier
-    await pool.query(`UPDATE shops SET tier = 'pro' WHERE id = $1`, [proShop.id]);
+    // Upgrade maxShop to MAX tier
+    await pool.query(`UPDATE shops SET tier = 'max' WHERE id = $1`, [maxShop.id]);
 
     // Generate JWT token for owner
     ownerToken = jwt.sign(
@@ -89,18 +79,18 @@ describe('Worker Controller - Integration Tests', () => {
     await closeTestDb();
   });
 
-  describe('POST /api/shops/:shopId/workers', () => {
-    describe('BUG-W1: PRO tier check', () => {
+  describe('POST /api/workers/:shopId/workers', () => {
+    describe('BUG-W1: MAX tier check', () => {
       it('should reject worker addition for FREE tier shop', async () => {
         const response = await request(app)
-          .post(`/api/shops/${freeShop.id}/workers`)
+          .post(`/api/workers/${freeShop.id}/workers`)
           .set('Authorization', `Bearer ${ownerToken}`)
           .send({ telegram_id: workerUser.telegram_id })
           .expect(403);
 
-        // Check essential properties (response may have additional fields like 'details', 'stack')
+        // Check essential properties
         expect(response.body.success).toBe(false);
-        expect(response.body.error).toMatch(/PRO subscription/i);
+        expect(response.body.error).toMatch(/MAX subscription/i);
 
         // Verify worker was NOT added
         const workers = await pool.query('SELECT * FROM shop_workers WHERE shop_id = $1', [
@@ -109,16 +99,16 @@ describe('Worker Controller - Integration Tests', () => {
         expect(workers.rows).toHaveLength(0);
       });
 
-      it('should allow worker addition for PRO tier shop', async () => {
+      it('should allow worker addition for MAX tier shop', async () => {
         const response = await request(app)
-          .post(`/api/shops/${proShop.id}/workers`)
+          .post(`/api/workers/${maxShop.id}/workers`)
           .set('Authorization', `Bearer ${ownerToken}`)
           .send({ telegram_id: workerUser.telegram_id })
           .expect(201);
 
         expect(response.body.success).toBe(true);
         expect(response.body.data).toMatchObject({
-          shop_id: proShop.id,
+          shop_id: maxShop.id,
           worker_user_id: workerUser.id,
           telegram_id: workerUser.telegram_id,
         });
@@ -126,21 +116,21 @@ describe('Worker Controller - Integration Tests', () => {
         // Verify worker was added to database
         const workers = await pool.query(
           'SELECT * FROM shop_workers WHERE shop_id = $1 AND worker_user_id = $2',
-          [proShop.id, workerUser.id]
+          [maxShop.id, workerUser.id]
         );
         expect(workers.rows).toHaveLength(1);
       });
 
-      it('should enforce PRO check before other validations', async () => {
+      it('should enforce MAX check before other validations', async () => {
         // Try to add owner as worker (invalid) on FREE shop
-        // Should fail with PRO error, not "owner cannot be worker" error
+        // Should fail with MAX error, not "owner cannot be worker" error
         const response = await request(app)
-          .post(`/api/shops/${freeShop.id}/workers`)
+          .post(`/api/workers/${freeShop.id}/workers`)
           .set('Authorization', `Bearer ${ownerToken}`)
           .send({ telegram_id: ownerUser.telegram_id })
           .expect(403);
 
-        expect(response.body.error).toContain('PRO subscription');
+        expect(response.body.error).toContain('MAX subscription');
       });
     });
 
@@ -158,7 +148,7 @@ describe('Worker Controller - Integration Tests', () => {
         );
 
         const response = await request(app)
-          .post(`/api/shops/${proShop.id}/workers`)
+          .post(`/api/workers/${maxShop.id}/workers`)
           .set('Authorization', `Bearer ${otherToken}`)
           .send({ telegram_id: workerUser.telegram_id })
           .expect(403);
@@ -168,7 +158,7 @@ describe('Worker Controller - Integration Tests', () => {
 
       it('should reject if shop not found', async () => {
         const response = await request(app)
-          .post('/api/shops/999999/workers')
+          .post('/api/workers/999999/workers')
           .set('Authorization', `Bearer ${ownerToken}`)
           .send({ telegram_id: workerUser.telegram_id })
           .expect(404);
@@ -180,7 +170,7 @@ describe('Worker Controller - Integration Tests', () => {
     describe('Worker validation', () => {
       it('should reject if telegram_id not provided', async () => {
         const response = await request(app)
-          .post(`/api/shops/${proShop.id}/workers`)
+          .post(`/api/workers/${maxShop.id}/workers`)
           .set('Authorization', `Bearer ${ownerToken}`)
           .send({})
           .expect(400);
@@ -190,7 +180,7 @@ describe('Worker Controller - Integration Tests', () => {
 
       it('should reject if worker user not found', async () => {
         const response = await request(app)
-          .post(`/api/shops/${proShop.id}/workers`)
+          .post(`/api/workers/${maxShop.id}/workers`)
           .set('Authorization', `Bearer ${ownerToken}`)
           .send({ telegram_id: '8888888888' })
           .expect(404);
@@ -200,7 +190,7 @@ describe('Worker Controller - Integration Tests', () => {
 
       it('should reject if owner tries to add themselves', async () => {
         const response = await request(app)
-          .post(`/api/shops/${proShop.id}/workers`)
+          .post(`/api/workers/${maxShop.id}/workers`)
           .set('Authorization', `Bearer ${ownerToken}`)
           .send({ telegram_id: ownerUser.telegram_id })
           .expect(400);
@@ -211,14 +201,14 @@ describe('Worker Controller - Integration Tests', () => {
       it('should reject duplicate worker addition', async () => {
         // Add worker first time
         await request(app)
-          .post(`/api/shops/${proShop.id}/workers`)
+          .post(`/api/workers/${maxShop.id}/workers`)
           .set('Authorization', `Bearer ${ownerToken}`)
           .send({ telegram_id: workerUser.telegram_id })
           .expect(201);
 
         // Try to add same worker again
         const response = await request(app)
-          .post(`/api/shops/${proShop.id}/workers`)
+          .post(`/api/workers/${maxShop.id}/workers`)
           .set('Authorization', `Bearer ${ownerToken}`)
           .send({ telegram_id: workerUser.telegram_id })
           .expect(409);
@@ -228,17 +218,17 @@ describe('Worker Controller - Integration Tests', () => {
     });
   });
 
-  describe('GET /api/shops/:shopId/workers', () => {
+  describe('GET /api/workers/:shopId/workers', () => {
     it('should list workers for shop owner', async () => {
       // Add a worker first
       await pool.query(
         `INSERT INTO shop_workers (shop_id, worker_user_id, telegram_id, added_by)
          VALUES ($1, $2, $3, $4)`,
-        [proShop.id, workerUser.id, workerUser.telegram_id, ownerUser.id]
+        [maxShop.id, workerUser.id, workerUser.telegram_id, ownerUser.id]
       );
 
       const response = await request(app)
-        .get(`/api/shops/${proShop.id}/workers`)
+        .get(`/api/workers/${maxShop.id}/workers`)
         .set('Authorization', `Bearer ${ownerToken}`)
         .expect(200);
 
@@ -262,7 +252,7 @@ describe('Worker Controller - Integration Tests', () => {
       );
 
       const response = await request(app)
-        .get(`/api/shops/${proShop.id}/workers`)
+        .get(`/api/workers/${maxShop.id}/workers`)
         .set('Authorization', `Bearer ${otherToken}`)
         .expect(403);
 
@@ -270,7 +260,7 @@ describe('Worker Controller - Integration Tests', () => {
     });
   });
 
-  describe('DELETE /api/shops/:shopId/workers/:workerId', () => {
+  describe('DELETE /api/workers/:shopId/workers/:workerId', () => {
     let workerId;
 
     beforeEach(async () => {
@@ -279,14 +269,14 @@ describe('Worker Controller - Integration Tests', () => {
         `INSERT INTO shop_workers (shop_id, worker_user_id, telegram_id, added_by)
          VALUES ($1, $2, $3, $4)
          RETURNING id`,
-        [proShop.id, workerUser.id, workerUser.telegram_id, ownerUser.id]
+        [maxShop.id, workerUser.id, workerUser.telegram_id, ownerUser.id]
       );
       workerId = result.rows[0].id;
     });
 
     it('should remove worker successfully', async () => {
       const response = await request(app)
-        .delete(`/api/shops/${proShop.id}/workers/${workerId}`)
+        .delete(`/api/workers/${maxShop.id}/workers/${workerId}`)
         .set('Authorization', `Bearer ${ownerToken}`)
         .expect(200);
 
@@ -310,7 +300,7 @@ describe('Worker Controller - Integration Tests', () => {
       );
 
       const response = await request(app)
-        .delete(`/api/shops/${proShop.id}/workers/${workerId}`)
+        .delete(`/api/workers/${maxShop.id}/workers/${workerId}`)
         .set('Authorization', `Bearer ${otherToken}`)
         .expect(403);
 
@@ -319,7 +309,7 @@ describe('Worker Controller - Integration Tests', () => {
 
     it('should reject if worker not found', async () => {
       const response = await request(app)
-        .delete(`/api/shops/${proShop.id}/workers/999999`)
+        .delete(`/api/workers/${maxShop.id}/workers/999999`)
         .set('Authorization', `Bearer ${ownerToken}`)
         .expect(404);
 

@@ -91,8 +91,9 @@ export const createFollow = asyncHandler(async (req, res) => {
       throw new ValidationError('Cannot create circular follow relationship');
     }
 
-    const followerTier = (followerShop.tier || '').toLowerCase();
-    const isPro = followerTier === 'pro';
+    const followerTier = (followerShop.tier || 'pro').toLowerCase();
+    // FIX: Max tier has unlimited follows, only check limits for other tiers
+    const isMaxTier = followerTier === 'max';
 
     const client = await getClient();
     let follow;
@@ -100,7 +101,8 @@ export const createFollow = asyncHandler(async (req, res) => {
     try {
       await client.query('BEGIN ISOLATION LEVEL SERIALIZABLE');
 
-      if (!isPro) {
+      // Max tier = unlimited follows, Pro tier = PRO_TIER_FOLLOW_LIMIT (2)
+      if (!isMaxTier) {
         const activeRows = await client.query(
           `SELECT id FROM shop_follows WHERE follower_shop_id = $1 AND status = 'active' FOR UPDATE`,
           [followerId]

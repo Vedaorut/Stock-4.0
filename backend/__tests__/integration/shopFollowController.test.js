@@ -1,6 +1,8 @@
 /**
  * Integration Tests: Shop Follow Controller
- * Tests BUG-F1 fix: PRO users get unlimited follows, FREE users limited to 2
+ * Tests follow limits by tier:
+ * - PRO tier: 2 follows limit
+ * - MAX tier: unlimited follows
  */
 
 import request from 'supertest';
@@ -31,16 +33,16 @@ const createTestApp = () => {
 describe('Shop Follow Controller - Integration Tests', () => {
   let app;
   let pool;
-  let freeUser;
   let proUser;
-  let freeShop;
+  let maxUser;
   let proShop;
+  let maxShop;
   let sourceShop1;
   let sourceShop2;
   let sourceShop3;
   let sourceProduct1;
-  let freeToken;
   let proToken;
+  let maxToken;
 
   beforeAll(async () => {
     app = createTestApp();
@@ -50,34 +52,37 @@ describe('Shop Follow Controller - Integration Tests', () => {
   beforeEach(async () => {
     await cleanupTestData();
 
-    // Create FREE tier user
-    freeUser = await createTestUser({
-      telegramId: '9000002001',
-      username: 'freeuser',
-      selectedRole: 'seller',
-    });
-
-    // Create PRO tier user
+    // Create PRO tier user (has 2 follows limit)
     proUser = await createTestUser({
-      telegramId: '9000002002',
+      telegramId: '9000002001',
       username: 'prouser',
       selectedRole: 'seller',
     });
 
-    // Create shops for FREE user
-    freeShop = await createTestShop(freeUser.id, {
-      name: 'Free User Shop',
-      description: 'FREE tier follower shop',
+    // Create MAX tier user (has unlimited follows)
+    maxUser = await createTestUser({
+      telegramId: '9000002002',
+      username: 'maxuser',
+      selectedRole: 'seller',
     });
 
-    // Create shops for PRO user
+    // Create shop for PRO user
     proShop = await createTestShop(proUser.id, {
       name: 'Pro User Shop',
       description: 'PRO tier follower shop',
     });
 
-    // Upgrade PRO shop to PRO tier
+    // Create shop for MAX user
+    maxShop = await createTestShop(maxUser.id, {
+      name: 'Max User Shop',
+      description: 'MAX tier follower shop',
+    });
+
+    // Set tier for PRO shop (default is already 'pro')
     await pool.query(`UPDATE shops SET tier = 'pro' WHERE id = $1`, [proShop.id]);
+
+    // Upgrade MAX shop to MAX tier
+    await pool.query(`UPDATE shops SET tier = 'max' WHERE id = $1`, [maxShop.id]);
 
     // Create source shops to follow
     const sourceUser = await createTestUser({
@@ -104,11 +109,11 @@ describe('Shop Follow Controller - Integration Tests', () => {
     });
 
     // Generate JWT tokens
-    freeToken = jwt.sign({ id: freeUser.id, telegramId: freeUser.telegram_id }, config.jwt.secret, {
+    proToken = jwt.sign({ id: proUser.id, telegramId: proUser.telegram_id }, config.jwt.secret, {
       expiresIn: config.jwt.expiresIn,
     });
 
-    proToken = jwt.sign({ id: proUser.id, telegramId: proUser.telegram_id }, config.jwt.secret, {
+    maxToken = jwt.sign({ id: maxUser.id, telegramId: maxUser.telegram_id }, config.jwt.secret, {
       expiresIn: config.jwt.expiresIn,
     });
   });
@@ -119,12 +124,12 @@ describe('Shop Follow Controller - Integration Tests', () => {
   });
 
   describe('GET /api/follows/check-limit', () => {
-    describe('BUG-F1: PRO users unlimited follows', () => {
-      it('should return unlimited limit for PRO tier shop', async () => {
+    describe('Tier-based follow limits', () => {
+      it('should return unlimited limit for MAX tier shop', async () => {
         const response = await request(app)
           .get('/api/follows/check-limit')
-          .query({ shopId: proShop.id })
-          .set('Authorization', `Bearer ${proToken}`)
+          .query({ shopId: maxShop.id })
+          .set('Authorization', `Bearer ${maxToken}`)
           .expect(200);
         expect(response.body.data).toMatchObject({
           limit: null, // null = unlimited
@@ -132,15 +137,15 @@ describe('Shop Follow Controller - Integration Tests', () => {
           remaining: null, // null = unlimited
           reached: false,
           canFollow: true,
-          tier: 'PRO',
+          tier: 'MAX',
         });
       });
 
-      it('should return limited (2) for FREE tier shop', async () => {
+      it('should return limited (2) for PRO tier shop', async () => {
         const response = await request(app)
           .get('/api/follows/check-limit')
-          .query({ shopId: freeShop.id })
-          .set('Authorization', `Bearer ${freeToken}`)
+          .query({ shopId: proShop.id })
+          .set('Authorization', `Bearer ${proToken}`)
           .expect(200);
 
         expect(response.body.data).toMatchObject({
@@ -149,66 +154,16 @@ describe('Shop Follow Controller - Integration Tests', () => {
           remaining: 2,
           reached: false,
           canFollow: true,
-          tier: 'FREE',
+          tier: 'PRO',
         });
       });
 
-      it('should show correct remaining count for FREE tier', async () => {
+      it('should show correct remaining count for PRO tier', async () => {
         // Create 1 follow
         await pool.query(
-          `INSERT INTO shop_follows (follower_shop_id, source_shop_id, mode, status)
-           VALUES ($1, $2, 'monitor', 'active')`,
-          [freeShop.id, sourceShop1.id]
-        );
-
-        const response = await request(app)
-          .get('/api/follows/check-limit')
-          .query({ shopId: freeShop.id })
-          .set('Authorization', `Bearer ${freeToken}`)
-          .expect(200);
-
-        expect(response.body.data).toMatchObject({
-          limit: 2,
-          count: 1,
-          remaining: 1,
-          reached: false,
-          canFollow: true,
-          tier: 'FREE',
-        });
-      });
-
-      it('should show limit reached for FREE tier with 2 follows', async () => {
-        // Create 2 follows
-        await pool.query(
-          `INSERT INTO shop_follows (follower_shop_id, source_shop_id, mode, status)
-           VALUES ($1, $2, 'monitor', 'active'), ($3, $4, 'monitor', 'active')`,
-          [freeShop.id, sourceShop1.id, freeShop.id, sourceShop2.id]
-        );
-
-        const response = await request(app)
-          .get('/api/follows/check-limit')
-          .query({ shopId: freeShop.id })
-          .set('Authorization', `Bearer ${freeToken}`)
-          .expect(200);
-
-        expect(response.body.data).toMatchObject({
-          limit: 2,
-          count: 2,
-          remaining: 0,
-          reached: true,
-          canFollow: false,
-          tier: 'FREE',
-        });
-      });
-
-      it('should allow PRO tier to have 3+ follows', async () => {
-        // Create 3 follows for PRO user
-        await pool.query(
-          `INSERT INTO shop_follows (follower_shop_id, source_shop_id, mode, status)
-           VALUES ($1, $2, 'monitor', 'active'),
-                  ($1, $3, 'monitor', 'active'),
-                  ($1, $4, 'monitor', 'active')`,
-          [proShop.id, sourceShop1.id, sourceShop2.id, sourceShop3.id]
+          `INSERT INTO shop_follows (follower_shop_id, source_shop_id, mode, markup_percentage, status)
+           VALUES ($1, $2, 'monitor', 0, 'active')`,
+          [proShop.id, sourceShop1.id]
         );
 
         const response = await request(app)
@@ -218,32 +173,82 @@ describe('Shop Follow Controller - Integration Tests', () => {
           .expect(200);
 
         expect(response.body.data).toMatchObject({
+          limit: 2,
+          count: 1,
+          remaining: 1,
+          reached: false,
+          canFollow: true,
+          tier: 'PRO',
+        });
+      });
+
+      it('should show limit reached for PRO tier with 2 follows', async () => {
+        // Create 2 follows
+        await pool.query(
+          `INSERT INTO shop_follows (follower_shop_id, source_shop_id, mode, markup_percentage, status)
+           VALUES ($1, $2, 'monitor', 0, 'active'), ($1, $3, 'monitor', 0, 'active')`,
+          [proShop.id, sourceShop1.id, sourceShop2.id]
+        );
+
+        const response = await request(app)
+          .get('/api/follows/check-limit')
+          .query({ shopId: proShop.id })
+          .set('Authorization', `Bearer ${proToken}`)
+          .expect(200);
+
+        expect(response.body.data).toMatchObject({
+          limit: 2,
+          count: 2,
+          remaining: 0,
+          reached: true,
+          canFollow: false,
+          tier: 'PRO',
+        });
+      });
+
+      it('should allow MAX tier to have 3+ follows', async () => {
+        // Create 3 follows for MAX user
+        await pool.query(
+          `INSERT INTO shop_follows (follower_shop_id, source_shop_id, mode, markup_percentage, status)
+           VALUES ($1, $2, 'monitor', 0, 'active'),
+                  ($1, $3, 'monitor', 0, 'active'),
+                  ($1, $4, 'monitor', 0, 'active')`,
+          [maxShop.id, sourceShop1.id, sourceShop2.id, sourceShop3.id]
+        );
+
+        const response = await request(app)
+          .get('/api/follows/check-limit')
+          .query({ shopId: maxShop.id })
+          .set('Authorization', `Bearer ${maxToken}`)
+          .expect(200);
+
+        expect(response.body.data).toMatchObject({
           limit: null,
           count: 3,
           remaining: null,
           reached: false,
           canFollow: true,
-          tier: 'PRO',
+          tier: 'MAX',
         });
       });
     });
   });
 
   describe('POST /api/follows', () => {
-    describe('BUG-F1: Follow creation limits by tier', () => {
-      it('should allow FREE tier to create first follow', async () => {
+    describe('Follow creation limits by tier', () => {
+      it('should allow PRO tier to create first follow', async () => {
         const response = await request(app)
           .post('/api/follows')
-          .set('Authorization', `Bearer ${freeToken}`)
+          .set('Authorization', `Bearer ${proToken}`)
           .send({
-            followerShopId: freeShop.id,
+            followerShopId: proShop.id,
             sourceShopId: sourceShop1.id,
             mode: 'monitor',
           })
           .expect(201);
 
         expect(response.body.data).toMatchObject({
-          follower_shop_id: freeShop.id,
+          follower_shop_id: proShop.id,
           source_shop_id: sourceShop1.id,
           mode: 'monitor',
           status: 'active',
@@ -251,54 +256,54 @@ describe('Shop Follow Controller - Integration Tests', () => {
 
         // Verify in database
         const follows = await pool.query('SELECT * FROM shop_follows WHERE follower_shop_id = $1', [
-          freeShop.id,
+          proShop.id,
         ]);
         expect(follows.rows).toHaveLength(1);
       });
 
-      it('should allow FREE tier to create second follow', async () => {
+      it('should allow PRO tier to create second follow', async () => {
         // Create first follow
         await pool.query(
-          `INSERT INTO shop_follows (follower_shop_id, source_shop_id, mode, status)
-           VALUES ($1, $2, 'monitor', 'active')`,
-          [freeShop.id, sourceShop1.id]
+          `INSERT INTO shop_follows (follower_shop_id, source_shop_id, mode, markup_percentage, status)
+           VALUES ($1, $2, 'monitor', 0, 'active')`,
+          [proShop.id, sourceShop1.id]
         );
 
         const response = await request(app)
           .post('/api/follows')
-          .set('Authorization', `Bearer ${freeToken}`)
+          .set('Authorization', `Bearer ${proToken}`)
           .send({
-            followerShopId: freeShop.id,
+            followerShopId: proShop.id,
             sourceShopId: sourceShop2.id,
             mode: 'monitor',
           })
           .expect(201);
 
         expect(response.body.data).toMatchObject({
-          follower_shop_id: freeShop.id,
+          follower_shop_id: proShop.id,
           source_shop_id: sourceShop2.id,
         });
       });
 
-      it('should reject FREE tier third follow (limit reached)', async () => {
+      it('should reject PRO tier third follow (limit reached)', async () => {
         // Create 2 follows (at limit)
         await pool.query(
-          `INSERT INTO shop_follows (follower_shop_id, source_shop_id, mode, status)
-           VALUES ($1, $2, 'monitor', 'active'), ($1, $3, 'monitor', 'active')`,
-          [freeShop.id, sourceShop1.id, sourceShop2.id]
+          `INSERT INTO shop_follows (follower_shop_id, source_shop_id, mode, markup_percentage, status)
+           VALUES ($1, $2, 'monitor', 0, 'active'), ($1, $3, 'monitor', 0, 'active')`,
+          [proShop.id, sourceShop1.id, sourceShop2.id]
         );
 
         const response = await request(app)
           .post('/api/follows')
-          .set('Authorization', `Bearer ${freeToken}`)
+          .set('Authorization', `Bearer ${proToken}`)
           .send({
-            followerShopId: freeShop.id,
+            followerShopId: proShop.id,
             sourceShopId: sourceShop3.id,
             mode: 'monitor',
           })
           .expect(402); // 402 Payment Required
 
-        expect(response.body.error).toBe('FREE tier limit reached');
+        expect(response.body.error).toBe('PRO tier limit reached');
         expect(response.body.data).toMatchObject({
           limit: 2,
           count: 2,
@@ -309,18 +314,18 @@ describe('Shop Follow Controller - Integration Tests', () => {
 
         // Verify third follow was NOT created
         const follows = await pool.query('SELECT * FROM shop_follows WHERE follower_shop_id = $1', [
-          freeShop.id,
+          proShop.id,
         ]);
         expect(follows.rows).toHaveLength(2); // Still 2
       });
 
-      it('should allow PRO tier to create 3+ follows', async () => {
+      it('should allow MAX tier to create 3+ follows', async () => {
         // Create 3 follows
         const follow1 = await request(app)
           .post('/api/follows')
-          .set('Authorization', `Bearer ${proToken}`)
+          .set('Authorization', `Bearer ${maxToken}`)
           .send({
-            followerShopId: proShop.id,
+            followerShopId: maxShop.id,
             sourceShopId: sourceShop1.id,
             mode: 'monitor',
           })
@@ -328,9 +333,9 @@ describe('Shop Follow Controller - Integration Tests', () => {
 
         const follow2 = await request(app)
           .post('/api/follows')
-          .set('Authorization', `Bearer ${proToken}`)
+          .set('Authorization', `Bearer ${maxToken}`)
           .send({
-            followerShopId: proShop.id,
+            followerShopId: maxShop.id,
             sourceShopId: sourceShop2.id,
             mode: 'monitor',
           })
@@ -338,26 +343,26 @@ describe('Shop Follow Controller - Integration Tests', () => {
 
         const follow3 = await request(app)
           .post('/api/follows')
-          .set('Authorization', `Bearer ${proToken}`)
+          .set('Authorization', `Bearer ${maxToken}`)
           .send({
-            followerShopId: proShop.id,
+            followerShopId: maxShop.id,
             sourceShopId: sourceShop3.id,
             mode: 'monitor',
           })
           .expect(201);
 
-        expect(follow1.body.data).toMatchObject({ follower_shop_id: proShop.id });
-        expect(follow2.body.data).toMatchObject({ follower_shop_id: proShop.id });
-        expect(follow3.body.data).toMatchObject({ follower_shop_id: proShop.id });
+        expect(follow1.body.data).toMatchObject({ follower_shop_id: maxShop.id });
+        expect(follow2.body.data).toMatchObject({ follower_shop_id: maxShop.id });
+        expect(follow3.body.data).toMatchObject({ follower_shop_id: maxShop.id });
 
         // Verify 3 follows created
         const follows = await pool.query('SELECT * FROM shop_follows WHERE follower_shop_id = $1', [
-          proShop.id,
+          maxShop.id,
         ]);
         expect(follows.rows).toHaveLength(3);
       });
 
-      it('should allow PRO tier unlimited follows (10+ test)', async () => {
+      it('should allow MAX tier unlimited follows (10+ test)', async () => {
         // Create 10 source shops
         const sourceUser = await createTestUser({
           telegramId: '9000002099',
@@ -372,13 +377,13 @@ describe('Shop Follow Controller - Integration Tests', () => {
           sourceShops.push(shop);
         }
 
-        // Create 10 follows for PRO user
+        // Create 10 follows for MAX user
         for (const shop of sourceShops) {
           await request(app)
             .post('/api/follows')
-            .set('Authorization', `Bearer ${proToken}`)
+            .set('Authorization', `Bearer ${maxToken}`)
             .send({
-              followerShopId: proShop.id,
+              followerShopId: maxShop.id,
               sourceShopId: shop.id,
               mode: 'monitor',
             })
@@ -387,7 +392,7 @@ describe('Shop Follow Controller - Integration Tests', () => {
 
         // Verify 10 follows created
         const follows = await pool.query('SELECT * FROM shop_follows WHERE follower_shop_id = $1', [
-          proShop.id,
+          maxShop.id,
         ]);
         expect(follows.rows.length).toBeGreaterThanOrEqual(10);
       });
@@ -397,7 +402,7 @@ describe('Shop Follow Controller - Integration Tests', () => {
       it('should reject if follower shop not found', async () => {
         const response = await request(app)
           .post('/api/follows')
-          .set('Authorization', `Bearer ${freeToken}`)
+          .set('Authorization', `Bearer ${proToken}`)
           .send({
             followerShopId: 999999,
             sourceShopId: sourceShop1.id,
@@ -411,9 +416,9 @@ describe('Shop Follow Controller - Integration Tests', () => {
       it('should reject if source shop not found', async () => {
         const response = await request(app)
           .post('/api/follows')
-          .set('Authorization', `Bearer ${freeToken}`)
+          .set('Authorization', `Bearer ${proToken}`)
           .send({
-            followerShopId: freeShop.id,
+            followerShopId: proShop.id,
             sourceShopId: 999999,
             mode: 'monitor',
           })
@@ -425,10 +430,10 @@ describe('Shop Follow Controller - Integration Tests', () => {
       it('should reject self-follow', async () => {
         const response = await request(app)
           .post('/api/follows')
-          .set('Authorization', `Bearer ${freeToken}`)
+          .set('Authorization', `Bearer ${proToken}`)
           .send({
-            followerShopId: freeShop.id,
-            sourceShopId: freeShop.id,
+            followerShopId: proShop.id,
+            sourceShopId: proShop.id,
             mode: 'monitor',
           })
           .expect(400);
@@ -439,16 +444,16 @@ describe('Shop Follow Controller - Integration Tests', () => {
       it('should reject duplicate follow', async () => {
         // Create first follow
         await pool.query(
-          `INSERT INTO shop_follows (follower_shop_id, source_shop_id, mode, status)
-           VALUES ($1, $2, 'monitor', 'active')`,
-          [freeShop.id, sourceShop1.id]
+          `INSERT INTO shop_follows (follower_shop_id, source_shop_id, mode, markup_percentage, status)
+           VALUES ($1, $2, 'monitor', 0, 'active')`,
+          [proShop.id, sourceShop1.id]
         );
 
         const response = await request(app)
           .post('/api/follows')
-          .set('Authorization', `Bearer ${freeToken}`)
+          .set('Authorization', `Bearer ${proToken}`)
           .send({
-            followerShopId: freeShop.id,
+            followerShopId: proShop.id,
             sourceShopId: sourceShop1.id,
             mode: 'monitor',
           })
@@ -460,9 +465,9 @@ describe('Shop Follow Controller - Integration Tests', () => {
       it('should require markup percentage for resell mode', async () => {
         const response = await request(app)
           .post('/api/follows')
-          .set('Authorization', `Bearer ${freeToken}`)
+          .set('Authorization', `Bearer ${proToken}`)
           .send({
-            followerShopId: freeShop.id,
+            followerShopId: proShop.id,
             sourceShopId: sourceShop1.id,
             mode: 'resell',
             // Missing markupPercentage
@@ -475,9 +480,9 @@ describe('Shop Follow Controller - Integration Tests', () => {
       it('should validate markup percentage range', async () => {
         const response = await request(app)
           .post('/api/follows')
-          .set('Authorization', `Bearer ${freeToken}`)
+          .set('Authorization', `Bearer ${proToken}`)
           .send({
-            followerShopId: freeShop.id,
+            followerShopId: proShop.id,
             sourceShopId: sourceShop1.id,
             mode: 'resell',
             markupPercentage: 600, // Too high
@@ -493,33 +498,26 @@ describe('Shop Follow Controller - Integration Tests', () => {
     it('should return list of active follows', async () => {
       // Create follows
       await pool.query(
-        `INSERT INTO shop_follows (follower_shop_id, source_shop_id, mode, status)
-         VALUES ($1, $2, 'monitor', 'active'), ($1, $3, 'resell', 'active')`,
-        [freeShop.id, sourceShop1.id, sourceShop2.id]
-      );
-
-      // Update markup for resell follow
-      await pool.query(
-        `UPDATE shop_follows SET markup_percentage = 50
-         WHERE follower_shop_id = $1 AND source_shop_id = $2`,
-        [freeShop.id, sourceShop2.id]
+        `INSERT INTO shop_follows (follower_shop_id, source_shop_id, mode, markup_percentage, status)
+         VALUES ($1, $2, 'monitor', 0, 'active'), ($1, $3, 'resell', 50, 'active')`,
+        [proShop.id, sourceShop1.id, sourceShop2.id]
       );
 
       const response = await request(app)
         .get('/api/follows/my')
-        .query({ shopId: freeShop.id })
-        .set('Authorization', `Bearer ${freeToken}`)
+        .query({ shopId: proShop.id })
+        .set('Authorization', `Bearer ${proToken}`)
         .expect(200);
 
       expect(response.body.data).toHaveLength(2);
 
-      // Найти follows по mode (независимо от порядка сортировки)
+      // Find follows by mode (independent of sort order)
       const monitorFollow = response.body.data.find((f) => f.mode === 'monitor');
       const resellFollow = response.body.data.find((f) => f.mode === 'resell');
 
       expect(monitorFollow).toBeDefined();
       expect(monitorFollow).toMatchObject({
-        follower_shop_id: freeShop.id,
+        follower_shop_id: proShop.id,
         source_shop_id: sourceShop1.id,
         mode: 'monitor',
         status: 'active',
@@ -527,7 +525,7 @@ describe('Shop Follow Controller - Integration Tests', () => {
 
       expect(resellFollow).toBeDefined();
       expect(resellFollow).toMatchObject({
-        follower_shop_id: freeShop.id,
+        follower_shop_id: proShop.id,
         source_shop_id: sourceShop2.id,
         mode: 'resell',
         status: 'active',
@@ -539,25 +537,25 @@ describe('Shop Follow Controller - Integration Tests', () => {
   describe('GET /api/shop-follows', () => {
     it('returns follows using alias endpoint with shop_id query', async () => {
       const insertResult = await pool.query(
-        `INSERT INTO shop_follows (follower_shop_id, source_shop_id, mode, status)
-         VALUES ($1, $2, 'monitor', 'active')
+        `INSERT INTO shop_follows (follower_shop_id, source_shop_id, mode, markup_percentage, status)
+         VALUES ($1, $2, 'monitor', 0, 'active')
          RETURNING id`,
-        [freeShop.id, sourceShop1.id]
+        [proShop.id, sourceShop1.id]
       );
 
       const followId = insertResult.rows[0].id;
 
       const response = await request(app)
         .get('/api/shop-follows')
-        .query({ shop_id: freeShop.id })
-        .set('Authorization', `Bearer ${freeToken}`)
+        .query({ shop_id: proShop.id })
+        .set('Authorization', `Bearer ${proToken}`)
         .expect(200);
 
       expect(Array.isArray(response.body.data)).toBe(true);
       expect(response.body.data).toHaveLength(1);
       expect(response.body.data[0]).toMatchObject({
         id: followId,
-        follower_shop_id: freeShop.id,
+        follower_shop_id: proShop.id,
         source_shop_id: sourceShop1.id,
       });
     });
@@ -566,17 +564,17 @@ describe('Shop Follow Controller - Integration Tests', () => {
   describe('GET /api/follows/:id/products', () => {
     it('returns source products for monitor mode', async () => {
       const followResult = await pool.query(
-        `INSERT INTO shop_follows (follower_shop_id, source_shop_id, mode, status)
-         VALUES ($1, $2, 'monitor', 'active')
+        `INSERT INTO shop_follows (follower_shop_id, source_shop_id, mode, markup_percentage, status)
+         VALUES ($1, $2, 'monitor', 0, 'active')
          RETURNING id`,
-        [freeShop.id, sourceShop1.id]
+        [proShop.id, sourceShop1.id]
       );
 
       const followId = followResult.rows[0].id;
 
       const response = await request(app)
         .get(`/api/follows/${followId}/products`)
-        .set('Authorization', `Bearer ${freeToken}`)
+        .set('Authorization', `Bearer ${proToken}`)
         .expect(200);
 
       expect(response.body.data.mode).toBe('monitor');
@@ -591,10 +589,10 @@ describe('Shop Follow Controller - Integration Tests', () => {
         `INSERT INTO shop_follows (follower_shop_id, source_shop_id, mode, markup_percentage, status)
          VALUES ($1, $2, 'resell', 25, 'active')
          RETURNING id`,
-        [freeShop.id, sourceShop1.id]
+        [proShop.id, sourceShop1.id]
       );
 
-      const followerProduct = await createTestProduct(freeShop.id, {
+      const followerProduct = await createTestProduct(proShop.id, {
         name: 'Synced Gadget',
         price: '65.00',
         stock_quantity: 3,
@@ -608,7 +606,7 @@ describe('Shop Follow Controller - Integration Tests', () => {
 
       const response = await request(app)
         .get(`/api/follows/${resellFollow.rows[0].id}/products`)
-        .set('Authorization', `Bearer ${freeToken}`)
+        .set('Authorization', `Bearer ${proToken}`)
         .expect(200);
 
       expect(response.body.data.mode).toBe('resell');

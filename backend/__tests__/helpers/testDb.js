@@ -8,6 +8,7 @@ const { Pool } = pkg;
 
 let testPool = null;
 let testUserCounter = 0; // Counter to ensure unique test user IDs
+let testShopCounter = 0; // Counter to ensure unique test shop names
 
 /**
  * Get test database pool
@@ -110,12 +111,18 @@ export const createTestUser = async (userData = {}) => {
 
 /**
  * Create test shop
+ * Generates unique name with counter+timestamp to avoid unique constraint violations
  */
 export const createTestShop = async (ownerId, shopData = {}) => {
   const pool = getTestPool();
 
+  // Generate unique shop name to avoid unique constraint violations
+  testShopCounter++;
+  const uniqueSuffix = `${testShopCounter}_${Date.now() % 100000}`;
+  const baseName = shopData.name || 'Test Shop';
+
   const shop = {
-    name: shopData.name || 'Test Shop',
+    name: `${baseName}_${uniqueSuffix}`,
     description: shopData.description || 'Test shop description',
     owner_id: ownerId,
     is_active: shopData.is_active !== undefined ? shopData.is_active : true,

@@ -36,6 +36,20 @@ export const deleteProduct = asyncHandler(async (req, res) => {
       logger.info(`Removed sync record for product ${id} before deletion`);
     }
 
+    // FIX: If this is a SOURCE product for synced products, deactivate them
+    // Find all synced products derived from this source
+    const syncedFromSource = await syncedProductQueries.findBySourceProductId(id);
+    if (syncedFromSource.length > 0) {
+      // Deactivate synced products (mark as inactive, don't delete)
+      for (const synced of syncedFromSource) {
+        await productQueries.update(synced.synced_product_id, { isActive: false });
+        logger.info(`Deactivated synced product ${synced.synced_product_id} (source ${id} deleted)`);
+      }
+      // Delete sync records
+      await syncedProductQueries.deleteBySourceProductId(id);
+      logger.info(`Cleaned up ${syncedFromSource.length} sync records for deleted source product ${id}`);
+    }
+
     await productQueries.delete(id);
 
     // Invalidate product limit cache after successful deletion

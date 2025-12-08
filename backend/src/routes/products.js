@@ -1,7 +1,7 @@
 import express from 'express';
 import { productController } from '../controllers/productController.js';
 import { productValidation, validateBulkOperation } from '../middleware/validation.js';
-import { verifyToken } from '../middleware/auth.js';
+import { verifyToken, requireActiveShop } from '../middleware/auth.js';
 import { productCreationLimiter, apiLimiter } from '../middleware/rateLimiter.js';
 import { checkProductLimit, getProductLimitStatus } from '../middleware/productLimits.js';
 
@@ -15,6 +15,7 @@ const router = express.Router();
 router.post(
   '/',
   verifyToken,
+  requireActiveShop,
   productCreationLimiter,
   checkProductLimit,
   productValidation.create,
@@ -75,14 +76,14 @@ router.get('/:id', apiLimiter, productValidation.getById, productController.getB
  * @desc    Update product
  * @access  Private (Shop owner or worker)
  */
-router.put('/:id', verifyToken, productValidation.update, productController.update);
+router.put('/:id', verifyToken, requireActiveShop, productValidation.update, productController.update);
 
 /**
  * @route   DELETE /api/products/:id
  * @desc    Delete product
  * @access  Private (Shop owner or worker)
  */
-router.delete('/:id', verifyToken, productValidation.getById, productController.delete);
+router.delete('/:id', verifyToken, requireActiveShop, productValidation.getById, productController.delete);
 
 /**
  * @route   POST /api/products/bulk-delete-all
@@ -92,6 +93,7 @@ router.delete('/:id', verifyToken, productValidation.getById, productController.
 router.post(
   '/bulk-delete-all',
   verifyToken,
+  requireActiveShop,
   productValidation.bulkDeleteAll,
   productController.bulkDeleteAll
 );
@@ -104,6 +106,7 @@ router.post(
 router.post(
   '/bulk-delete-by-ids',
   verifyToken,
+  requireActiveShop,
   validateBulkOperation,
   productValidation.bulkDeleteByIds,
   productController.bulkDeleteByIds
@@ -114,14 +117,14 @@ router.post(
  * @desc    Apply bulk discount to all products in a shop
  * @access  Private (Shop owner or worker)
  */
-router.post('/bulk-discount', verifyToken, productController.applyBulkDiscount);
+router.post('/bulk-discount', verifyToken, requireActiveShop, productController.applyBulkDiscount);
 
 /**
  * @route   POST /api/products/bulk-discount/remove
  * @desc    Remove bulk discount from all products in a shop
  * @access  Private (Shop owner or worker)
  */
-router.post('/bulk-discount/remove', verifyToken, productController.removeBulkDiscount);
+router.post('/bulk-discount/remove', verifyToken, requireActiveShop, productController.removeBulkDiscount);
 
 /**
  * @route   POST /api/products/bulk-update
@@ -131,6 +134,7 @@ router.post('/bulk-discount/remove', verifyToken, productController.removeBulkDi
 router.post(
   '/bulk-update',
   verifyToken,
+  requireActiveShop,
   validateBulkOperation,
   productController.bulkUpdateProducts
 );

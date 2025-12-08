@@ -6,7 +6,7 @@ import { productController } from '../controllers/productController.js';
 import { orderController } from '../controllers/orderController.js';
 import { shopValidation } from '../middleware/validation.js';
 import { productValidation } from '../middleware/validation.js';
-import { verifyToken, optionalAuth, requireShopOwner, requireShopAccess } from '../middleware/auth.js';
+import { verifyToken, optionalAuth, requireShopOwner, requireShopAccess, requireActiveShop } from '../middleware/auth.js';
 import { shopCreationLimiter, apiLimiter } from '../middleware/rateLimiter.js';
 import { checkProductLimit } from '../middleware/productLimits.js';
 import * as migrationController from '../controllers/migrationController.js';
@@ -95,6 +95,7 @@ router.post(
   '/:shopId/products',
   verifyToken,
   requireShopAccess,
+  requireActiveShop,
   setShopIdInBody,
   checkProductLimit,
   productValidation.create,
@@ -110,6 +111,7 @@ router.put(
   '/:shopId/products/:id',
   verifyToken,
   requireShopAccess,
+  requireActiveShop,
   ensureProductBelongsToShop,
   productValidation.update,
   productController.update
@@ -124,6 +126,7 @@ router.delete(
   '/:shopId/products/:id',
   verifyToken,
   requireShopAccess,
+  requireActiveShop,
   ensureProductBelongsToShop,
   productValidation.getById,
   productController.delete
@@ -221,14 +224,14 @@ router.get('/:id', optionalAuth, shopValidation.getById, shopController.getById)
  * @desc    Update shop
  * @access  Private (Shop owner only)
  */
-router.put('/:id', verifyToken, requireShopOwner, shopValidation.update, shopController.update);
+router.put('/:id', verifyToken, requireShopOwner, requireActiveShop, shopValidation.update, shopController.update);
 
 /**
  * @route   PATCH /api/shops/:id
  * @desc    Partial update shop (rename, etc)
  * @access  Private (Shop owner only)
  */
-router.patch('/:id', verifyToken, requireShopOwner, shopValidation.update, shopController.update);
+router.patch('/:id', verifyToken, requireShopOwner, requireActiveShop, shopValidation.update, shopController.update);
 
 /**
  * @route   DELETE /api/shops/:id
@@ -242,7 +245,7 @@ router.delete('/:id', verifyToken, requireShopOwner, shopValidation.getById, sho
  * @desc    Update shop wallets
  * @access  Private (Shop owner only)
  */
-router.put('/:id/wallets', verifyToken, requireShopOwner, shopController.updateWallets);
+router.put('/:id/wallets', verifyToken, requireShopOwner, requireActiveShop, shopController.updateWallets);
 
 /**
  * @route   GET /api/shops/:shopId/migration/check

@@ -13,7 +13,6 @@ import {
   cleanupTestData,
   createTestUser,
   createTestShop,
-  createTestProduct,
 } from '../helpers/testDb.js';
 
 describe('Product Controller - Integration Tests', () => {
@@ -70,13 +69,7 @@ describe('Product Controller - Integration Tests', () => {
       [shop.id, workerUser.id, workerUser.telegram_id, ownerUser.id]
     );
 
-    // Create a test product
-    product = await createTestProduct(shop.id, {
-      name: 'Test Product',
-      price: '50.00',
-    });
-
-    // Generate JWT tokens
+    // Generate JWT tokens FIRST (needed for API product creation)
     ownerToken = jwt.sign(
       { id: ownerUser.id, telegramId: ownerUser.telegram_id, username: ownerUser.username },
       config.jwt.secret,
@@ -94,6 +87,21 @@ describe('Product Controller - Integration Tests', () => {
       config.jwt.secret,
       { expiresIn: config.jwt.expiresIn }
     );
+
+    // Create a test product VIA API (not direct DB) so it's visible to the server
+    const productResponse = await request(app)
+      .post('/api/products')
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({
+        shopId: shop.id,
+        name: 'Test Product',
+        description: 'Test product for integration tests',
+        price: '50.00',
+        currency: 'USD',
+        stockQuantity: 10,
+      });
+
+    product = productResponse.body.data;
   });
 
   afterAll(async () => {
@@ -268,9 +276,15 @@ describe('Product Controller - Integration Tests', () => {
 
   describe('POST /api/products/bulk-delete-all', () => {
     beforeEach(async () => {
-      // Create multiple products
-      await createTestProduct(shop.id, { name: 'Product 2' });
-      await createTestProduct(shop.id, { name: 'Product 3' });
+      // Create multiple products VIA API
+      await request(app)
+        .post('/api/products')
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .send({ shopId: shop.id, name: 'Product 2', price: '25.00', currency: 'USD', stockQuantity: 5 });
+      await request(app)
+        .post('/api/products')
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .send({ shopId: shop.id, name: 'Product 3', price: '30.00', currency: 'USD', stockQuantity: 5 });
     });
 
     it('should allow shop owner to bulk delete all products', async () => {
@@ -319,8 +333,18 @@ describe('Product Controller - Integration Tests', () => {
     let product3;
 
     beforeEach(async () => {
-      product2 = await createTestProduct(shop.id, { name: 'Product 2' });
-      product3 = await createTestProduct(shop.id, { name: 'Product 3' });
+      // Create products VIA API
+      const res2 = await request(app)
+        .post('/api/products')
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .send({ shopId: shop.id, name: 'Product 2', price: '25.00', currency: 'USD', stockQuantity: 5 });
+      product2 = res2.body.data;
+
+      const res3 = await request(app)
+        .post('/api/products')
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .send({ shopId: shop.id, name: 'Product 3', price: '30.00', currency: 'USD', stockQuantity: 5 });
+      product3 = res3.body.data;
     });
 
     it('should allow shop owner to bulk delete specific products', async () => {

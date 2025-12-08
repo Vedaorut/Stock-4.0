@@ -65,7 +65,7 @@ describe('POST /api/shops - Shop Name Validation', () => {
       expect(response.body.data.name).toBe('test_shop_123');
     });
 
-    test('should reject shop name with spaces', async () => {
+    test('should accept shop name with spaces', async () => {
       const testUser = await createTestUser();
       const authToken = generateToken(testUser.id);
 
@@ -73,21 +73,14 @@ describe('POST /api/shops - Shop Name Validation', () => {
         .post('/api/shops')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
-          name: 'test shop invalid',
+          name: 'test shop valid',
           description: 'Test shop',
         });
 
-      expect(response.status).toBe(400);
-      expect(response.body.success).toBe(false);
-      expect(response.body.error).toBe('Validation failed');
-      expect(response.body.details).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({
-            field: 'name',
-            message: 'Shop name must contain only letters, numbers, and underscore',
-          }),
-        ])
-      );
+      // Spaces are now allowed in shop names
+      expect(response.status).toBe(201);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.name).toBe('test shop valid');
     });
 
     test('should reject shop name with special characters', async () => {
@@ -108,7 +101,7 @@ describe('POST /api/shops - Shop Name Validation', () => {
         expect.arrayContaining([
           expect.objectContaining({
             field: 'name',
-            message: 'Shop name must contain only letters, numbers, and underscore',
+            message: 'Shop name must contain only Latin letters, numbers, spaces, underscore and dash',
           }),
         ])
       );
@@ -132,21 +125,24 @@ describe('POST /api/shops - Shop Name Validation', () => {
         expect.arrayContaining([
           expect.objectContaining({
             field: 'name',
-            message: 'Shop name must be 3-30 characters',
+            message: 'Shop name must be 3-100 characters',
           }),
         ])
       );
     });
 
-    test('should reject shop name longer than 30 characters', async () => {
+    test('should reject shop name longer than 100 characters', async () => {
       const testUser = await createTestUser();
       const authToken = generateToken(testUser.id);
+
+      // Create a name that's 101+ characters
+      const longName = 'test_shop_' + 'a'.repeat(95);
 
       const response = await request(app)
         .post('/api/shops')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
-          name: 'test_shop_with_very_long_name_123456789',
+          name: longName,
           description: 'Test shop',
         });
 
@@ -156,7 +152,7 @@ describe('POST /api/shops - Shop Name Validation', () => {
         expect.arrayContaining([
           expect.objectContaining({
             field: 'name',
-            message: 'Shop name must be 3-30 characters',
+            message: 'Shop name must be 3-100 characters',
           }),
         ])
       );
@@ -352,7 +348,7 @@ describe('PUT /api/shops/:id - Update Shop Name Validation', () => {
       .put(`/api/shops/${testShop.id}`)
       .set('Authorization', `Bearer ${authToken}`)
       .send({
-        name: 'invalid name!', // Contains space and special character
+        name: 'invalid name@#$!', // Contains special characters (spaces are allowed now)
       });
 
     expect(response.status).toBe(400);
@@ -361,7 +357,7 @@ describe('PUT /api/shops/:id - Update Shop Name Validation', () => {
       expect.arrayContaining([
         expect.objectContaining({
           field: 'name',
-          message: 'Shop name must contain only letters, numbers, and underscore',
+          message: 'Shop name must contain only Latin letters, numbers, spaces, underscore and dash',
         }),
       ])
     );

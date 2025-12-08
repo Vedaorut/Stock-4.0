@@ -7,7 +7,11 @@ import { RATE_LIMITS, ERROR_MESSAGES } from '../utils/constants.js';
  */
 const createRateLimiter = (windowMs, maxRequests, message) => {
   // FIX: Require explicit flag to disable rate limiting, and never in production
-  if (process.env.DISABLE_RATE_LIMIT === 'true' && process.env.NODE_ENV !== 'production') {
+  // Also skip in test environment to allow integration tests to run properly
+  if (
+    (process.env.DISABLE_RATE_LIMIT === 'true' && process.env.NODE_ENV !== 'production') ||
+    process.env.NODE_ENV === 'test'
+  ) {
     return (_req, _res, next) => next();
   }
 
