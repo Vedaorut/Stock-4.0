@@ -55,12 +55,14 @@ describe('Buyer Subscriptions Flow (P0)', () => {
   describe('Subscribe to Shop', () => {
     it('должен подписаться на магазин (checkSubscription → false)', async () => {
       // Step 1: Check subscription (not subscribed)
-      mock.onGet(/\/subscriptions\/check\/123/).reply(200, {
+      // FIX: Use correct API path /shops/:shopId/subscribed
+      mock.onGet(/\/shops\/123\/subscribed/).reply(200, {
         data: { subscribed: false },
       });
 
       // Step 2: Subscribe
-      mock.onPost('/subscriptions').reply(200, {
+      // FIX: Use correct API path /shops/:shopId/subscribe
+      mock.onPost('/shops/123/subscribe').reply(200, {
         data: { shopId: 123, userId: 2 },
       });
 
@@ -99,7 +101,8 @@ describe('Buyer Subscriptions Flow (P0)', () => {
 
     it('already subscribed → noop toast (идемпотентность)', async () => {
       // Already subscribed
-      mock.onGet(/\/subscriptions\/check\/123/).reply(200, {
+      // FIX: Use correct API path /shops/:shopId/subscribed
+      mock.onGet(/\/shops\/123\/subscribed/).reply(200, {
         data: { subscribed: true },
       });
 
@@ -129,7 +132,8 @@ describe('Buyer Subscriptions Flow (P0)', () => {
   describe('Unsubscribe', () => {
     it('должен отписаться от магазина', async () => {
       // Unsubscribe API
-      mock.onDelete('/subscriptions/123').reply(200, {
+      // FIX: Use correct API path /shops/:shopId/subscribe (DELETE)
+      mock.onDelete('/shops/123/subscribe').reply(200, {
         data: { unsubscribed: true },
       });
 
@@ -194,7 +198,8 @@ describe('Buyer Subscriptions Flow (P0)', () => {
         { shop_id: 2, shop_name: 'Shop B', tier: 'basic' },
       ];
 
-      mock.onGet('/subscriptions').reply(200, {
+      // FIX: Use correct API path /users/subscriptions
+      mock.onGet('/users/subscriptions').reply(200, {
         data: mockSubscriptions,
       });
 
@@ -214,7 +219,8 @@ describe('Buyer Subscriptions Flow (P0)', () => {
     });
 
     it('empty state → no subscriptions message', async () => {
-      mock.onGet('/subscriptions').reply(200, { data: [] });
+      // FIX: Use correct API path /users/subscriptions
+      mock.onGet('/users/subscriptions').reply(200, { data: [] });
 
       await testBot.handleUpdate(callbackUpdate('buyer:subscriptions'));
 
@@ -253,12 +259,14 @@ describe('Buyer Subscriptions Flow (P0)', () => {
   describe('Edge Cases', () => {
     it('subscribe to own shop → error', async () => {
       // Check subscription
-      mock.onGet(/\/subscriptions\/check\/123/).reply(200, {
+      // FIX: Use correct API path /shops/:shopId/subscribed
+      mock.onGet(/\/shops\/123\/subscribed/).reply(200, {
         data: { subscribed: false },
       });
 
       // Subscribe returns error
-      mock.onPost('/subscriptions').reply(400, {
+      // FIX: Use correct API path /shops/:shopId/subscribe
+      mock.onPost('/shops/123/subscribe').reply(400, {
         error: 'Cannot subscribe to your own shop',
       });
 
@@ -276,12 +284,14 @@ describe('Buyer Subscriptions Flow (P0)', () => {
 
     it('subscription limit (BASIC) → upgrade prompt', async () => {
       // Check subscription
-      mock.onGet(/\/subscriptions\/check\/123/).reply(200, {
+      // FIX: Use correct API path /shops/:shopId/subscribed
+      mock.onGet(/\/shops\/123\/subscribed/).reply(200, {
         data: { subscribed: false },
       });
 
       // Subscribe returns limit error
-      mock.onPost('/subscriptions').reply(400, {
+      // FIX: Use correct API path /shops/:shopId/subscribe
+      mock.onPost('/shops/123/subscribe').reply(400, {
         error: 'Subscription limit reached',
       });
 
@@ -299,7 +309,8 @@ describe('Buyer Subscriptions Flow (P0)', () => {
 
     it('API error при получении подписок → error message', async () => {
       // API returns error
-      mock.onGet('/subscriptions').reply(500, {
+      // FIX: Use correct API path /users/subscriptions
+      mock.onGet('/users/subscriptions').reply(500, {
         error: 'Internal server error',
       });
 
@@ -315,7 +326,8 @@ describe('Buyer Subscriptions Flow (P0)', () => {
 
     it('API error при отписке → error alert', async () => {
       // Unsubscribe API returns error
-      mock.onDelete('/subscriptions/123').reply(500, {
+      // FIX: Use correct API path /shops/:shopId/subscribe (DELETE)
+      mock.onDelete('/shops/123/subscribe').reply(500, {
         error: 'Internal server error',
       });
 
@@ -337,7 +349,8 @@ describe('Buyer Subscriptions Flow (P0)', () => {
       // Step 1: View shop (not subscribed)
       mock.onGet('/shops/123').reply(200, { data: mockShop });
       mock.onGet('/products').reply(200, { data: mockProducts });
-      mock.onGet(/\/subscriptions\/check\/123/).reply(200, {
+      // FIX: Use correct API path /shops/:shopId/subscribed
+      mock.onGet(/\/shops\/123\/subscribed/).reply(200, {
         data: { subscribed: false },
       });
 
@@ -352,10 +365,11 @@ describe('Buyer Subscriptions Flow (P0)', () => {
       testBot.captor.reset();
 
       // Step 2: Subscribe
-      mock.onGet(/\/subscriptions\/check\/123/).reply(200, {
+      // FIX: Use correct API paths
+      mock.onGet(/\/shops\/123\/subscribed/).reply(200, {
         data: { subscribed: false },
       });
-      mock.onPost('/subscriptions').reply(200, {
+      mock.onPost('/shops/123/subscribe').reply(200, {
         data: { shopId: 123, userId: 2 },
       });
       mock.onGet('/shops/123').reply(200, { data: mockShop });
@@ -372,7 +386,8 @@ describe('Buyer Subscriptions Flow (P0)', () => {
       testBot.captor.reset();
 
       // Step 3: Try to subscribe again (idempotency)
-      mock.onGet(/\/subscriptions\/check\/123/).reply(200, {
+      // FIX: Use correct API path /shops/:shopId/subscribed
+      mock.onGet(/\/shops\/123\/subscribed/).reply(200, {
         data: { subscribed: true },
       });
       mock.onGet('/shops/123').reply(200, { data: mockShop });
@@ -388,7 +403,8 @@ describe('Buyer Subscriptions Flow (P0)', () => {
       testBot.captor.reset();
 
       // Step 4: Unsubscribe
-      mock.onDelete('/subscriptions/123').reply(200, {
+      // FIX: Use correct API path /shops/:shopId/subscribe (DELETE)
+      mock.onDelete('/shops/123/subscribe').reply(200, {
         data: { unsubscribed: true },
       });
       mock.onGet('/shops/123').reply(200, { data: mockShop });

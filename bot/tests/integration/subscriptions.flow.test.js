@@ -50,7 +50,8 @@ describe('Subscriptions Flow - Subscribe/Unsubscribe/Idempotency (P0)', () => {
     mock.onGet(`/shops/${shopId}`).reply(200, { data: mockShop });
     // ✅ FIX: API использует /products?shopId=X, а НЕ /products/shop/X
     mock.onGet('/products').reply(200, { data: mockProducts });
-    mock.onGet(`/subscriptions/check/${shopId}`).reply(200, {
+    // FIX: Use correct API path /shops/:shopId/subscribed
+    mock.onGet(`/shops/${shopId}/subscribed`).reply(200, {
       data: { subscribed: false },
     });
 
@@ -71,9 +72,11 @@ describe('Subscriptions Flow - Subscribe/Unsubscribe/Idempotency (P0)', () => {
     testBot.captor.reset();
 
     // Step 2: Subscribe to shop
-    mock.onPost(`/subscriptions`).reply(200, { data: { shopId, userId: 1 } });
+    // FIX: Use correct API path /shops/:shopId/subscribe
+    mock.onPost(`/shops/${shopId}/subscribe`).reply(200, { data: { shopId, userId: 1 } });
     mock.onGet(`/shops/${shopId}`).reply(200, { data: mockShop });
-    mock.onGet(`/subscriptions/check/${shopId}`).reply(200, {
+    // FIX: Use correct API path /shops/:shopId/subscribed
+    mock.onGet(`/shops/${shopId}/subscribed`).reply(200, {
       data: { subscribed: false }, // Before subscribe
     });
 
@@ -105,7 +108,8 @@ describe('Subscriptions Flow - Subscribe/Unsubscribe/Idempotency (P0)', () => {
     testBot.captor.reset();
 
     // Step 3: Попытка повторной подписки (идемпотентность)
-    mock.onGet(`/subscriptions/check/${shopId}`).reply(200, {
+    // FIX: Use correct API path /shops/:shopId/subscribed
+    mock.onGet(`/shops/${shopId}/subscribed`).reply(200, {
       data: { subscribed: true }, // Already subscribed
     });
     mock.onGet(`/shops/${shopId}`).reply(200, { data: mockShop });
@@ -127,7 +131,8 @@ describe('Subscriptions Flow - Subscribe/Unsubscribe/Idempotency (P0)', () => {
     testBot.captor.reset();
 
     // Step 4: Unsubscribe from shop
-    mock.onDelete(`/subscriptions/${shopId}`).reply(200, { data: { success: true } });
+    // FIX: Use correct API path /shops/:shopId/subscribe (DELETE)
+    mock.onDelete(`/shops/${shopId}/subscribe`).reply(200, { data: { success: true } });
     mock.onGet(`/shops/${shopId}`).reply(200, { data: mockShop });
 
     await testBot.handleUpdate(callbackUpdate(`unsubscribe:${shopId}`));
@@ -151,10 +156,12 @@ describe('Subscriptions Flow - Subscribe/Unsubscribe/Idempotency (P0)', () => {
 
   it('нельзя подписаться на свой магазин', async () => {
     // Mock subscribe API with error
-    mock.onGet(`/subscriptions/check/${shopId}`).reply(200, {
+    // FIX: Use correct API path /shops/:shopId/subscribed
+    mock.onGet(`/shops/${shopId}/subscribed`).reply(200, {
       data: { subscribed: false },
     });
-    mock.onPost(`/subscriptions`).reply(400, {
+    // FIX: Use correct API path /shops/:shopId/subscribe
+    mock.onPost(`/shops/${shopId}/subscribe`).reply(400, {
       error: 'Cannot subscribe to your own shop',
     });
 
