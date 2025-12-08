@@ -59,7 +59,7 @@ const saveNewName = async (ctx) => {
     // Validate length
     if (newName.length < 3 || newName.length > 100) {
       await smartMessage.send(ctx, {
-        text: t('createShopNameInvalidLength', {}, lang),
+        text: t('seller.createShopNameInvalidLength', {}, lang),
         keyboard: cancelButton(lang),
       });
       return;

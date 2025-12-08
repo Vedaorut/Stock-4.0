@@ -27,7 +27,9 @@
     "products": "products",
     "more": "more",
     "locale": "en-US",
-    "createShop": "Create Shop"
+    "createShop": "Create Shop",
+    "authRequired": "Authorization required",
+    "restartBot": "Restart the bot"
   },
   "product": {
     "syncedFrom": "from {shop}",
@@ -191,7 +193,16 @@
     "item": "item",
     "cannotOrderOwn": "You cannot order products from your own shop",
     "browseCatalog": "Browse Catalog",
-    "clearForOtherShop": "Clear cart to shop from another store"
+    "clearForOtherShop": "Clear cart to shop from another store",
+    "validationError": "Cart validation error",
+    "shopNotFound": "Shop not found",
+    "invalidPrice": "Invalid price",
+    "invalidQuantity": "Invalid quantity",
+    "stockLimited": "Only {{count}} available",
+    "missingProductId": "Missing product ID",
+    "missingShopInfo": "Missing shop information",
+    "multipleShops": "Cart contains items from multiple shops",
+    "zeroTotal": "Cart total must be greater than zero"
   },
   "subscriptions": {
     "title": "My Subscriptions",
@@ -263,7 +274,23 @@
     "noWalletsDesc": "This shop hasn't configured payment wallets yet",
     "orderDataLost": "Order data lost",
     "orderDataLostDesc": "Please restart checkout",
-    "backToCart": "Back to cart"
+    "backToCart": "Back to cart",
+    "alreadyCreating": "Order already being created",
+    "connectionError": "Connection error",
+    "exchangeUnavailable": "Exchange rate service temporarily unavailable",
+    "timeout": "Request timed out",
+    "invoiceExpired": "Invoice expired, please create a new one",
+    "timeoutInvoice": "Invoice generation timeout",
+    "alreadySubmitting": "Payment already being submitted",
+    "timeoutVerify": "Payment verification timeout",
+    "txNotConfirmed": "Transaction not yet confirmed",
+    "amountMismatch": "Payment amount mismatch",
+    "invalidWallet": "Invalid wallet address",
+    "windowExpired": "Payment window expired",
+    "invalidTxHash": "Invalid transaction hash",
+    "verifyError": "Payment verification error",
+    "errorTitle": "Payment Error",
+    "unexpectedError": "An unexpected error occurred"
   },
   "subscription": {
     "title": "Subscription",
@@ -469,7 +496,8 @@
     "switchTo": "To",
     "dangerZone": "Danger zone",
     "deleteSubscription": "Delete subscription",
-    "irreversible": "This action is irreversible"
+    "irreversible": "This action is irreversible",
+    "productMarkupError": "Product markup error"
   },
   "myOrders": {
     "title": "My Orders",

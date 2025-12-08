@@ -132,7 +132,7 @@ const buildWorkersListKeyboard = (workers, lang = 'ru') => {
 
 const showWorkersList = async (ctx, options = {}) => {
   const lang = getLangSafe(ctx);
-  const shopName = ctx.session.shopName || t('general.shop', {}, lang);
+  const shopName = ctx.session.shopName || t('minimalist.shop', {}, lang);
   const successPrefix = options.successMessage ? `${options.successMessage}\n\n` : '';
 
   try {

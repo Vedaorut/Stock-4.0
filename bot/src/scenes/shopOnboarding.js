@@ -340,7 +340,7 @@ shopOnboardingScene.action('onboarding:open_shop', async (ctx) => {
 
     await ctx.editMessageText(t('shopOnboarding.shopReady', {}, lang), {
       parse_mode: 'HTML',
-      ...Markup.inlineKeyboard([[Markup.button.callback(t('shopOnboarding.openStoreButton', {}, lang), 'seller:my_shop')]]),
+      ...Markup.inlineKeyboard([[Markup.button.callback(t('shopOnboarding.openStoreButton', {}, lang), 'onboarding:finish')]]),
     });
 
     return await ctx.scene.leave();

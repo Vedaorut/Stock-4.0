@@ -101,6 +101,12 @@ export const confirmUpgradePaymentWithTxHash = asyncHandler(async (req, res) => 
   const subscriptionId = parseInt(req.params.id, 10);
   const { txHash, paymentLink } = ensurePaymentProof(req.body);
 
+  // SECURITY FIX: Add ownership verification to prevent IDOR attacks
+  const ownershipCheck = await verifySubscriptionOwnership(subscriptionId, req.user.id);
+  if (!ownershipCheck.success) {
+    return res.status(ownershipCheck.status).json({ error: ownershipCheck.error });
+  }
+
   const activeInvoice = await subscriptionInvoiceService.findActiveInvoiceForSubscription(
     subscriptionId,
     subscriptionInvoiceService.INVOICE_PURPOSES.UPGRADE

@@ -2,6 +2,7 @@ import axios from 'axios';
 import { useToastStore } from '../../hooks/useToast';
 import { getApiBaseUrl } from '../../utils/apiBase';
 import { normalizeOrder } from '../useStore';
+import { t } from '../../i18n';
 
 const API_URL = getApiBaseUrl();
 
@@ -35,7 +36,7 @@ export const createPaymentSlice = (set, get) => ({
       if (import.meta.env.DEV) {
         console.error('[startCheckout] Invalid cart items:', invalidItems);
       }
-      toast('Some items in cart are invalid', 'error');
+      toast(t('errors.cartInvalid'), 'error');
       return { success: false, error: 'invalid_items' };
     }
 
@@ -45,7 +46,7 @@ export const createPaymentSlice = (set, get) => ({
       if (import.meta.env.DEV) {
         console.error('[startCheckout] Invalid cart total:', total);
       }
-      toast('Cart total must be greater than zero', 'error');
+      toast(t('cart.zeroTotal'), 'error');
       return { success: false, error: 'invalid_total' };
     }
 
@@ -60,7 +61,7 @@ export const createPaymentSlice = (set, get) => ({
           items: cart.map((i) => ({ id: i.id, name: i.name, shopId: i.shopId })),
         });
       }
-      toast('Cannot checkout items from multiple shops', 'error');
+      toast(t('cart.multipleShops'), 'error');
       return { success: false, error: 'multi_shop' };
     }
 
@@ -75,7 +76,7 @@ export const createPaymentSlice = (set, get) => ({
 
       // Reopen cart so user can take action
       set({ isCartOpen: true });
-      toast('Shop information missing. Please re-add items to cart.', 'error');
+      toast(t('cart.missingShopInfo'), 'error');
       return { success: false, error: 'no_shop' };
     }
 
@@ -128,12 +129,12 @@ export const createPaymentSlice = (set, get) => ({
 
       // Check BOTH store state AND closure variable for race prevention
       if (isCreatingOrder || orderInProgress) {
-        toast('Order already being created', 'warning');
+        toast(t('payment.alreadyCreating'), 'warning');
         return null;
       }
 
       if (cart.length === 0) {
-        toast('Cart is empty', 'warning');
+        toast(t('cart.empty'), 'warning');
         return null;
       }
 
@@ -171,7 +172,7 @@ export const createPaymentSlice = (set, get) => ({
           console.error('[createOrder] Invalid items in cart!', invalidItems);
           console.error('Full cart state:', cart);
         }
-        toast('Invalid items in cart', 'error');
+        toast(t('cart.validationError'), 'error');
         return null;
       }
 
@@ -214,13 +215,13 @@ export const createPaymentSlice = (set, get) => ({
         const toast = useToastStore.getState().addToast;
 
         if (errorData?.error === 'Malformed JSON payload') {
-          toast('Order data error', 'error');
+          toast(t('payment.orderDataError'), 'error');
         } else if (errorData?.error?.includes('cannot order your own')) {
           // User trying to order their own products
-          toast('Cannot order your own products', 'warning');
+          toast(t('cart.cannotOrderOwn'), 'warning');
         } else if (errorData?.error?.includes('Insufficient stock')) {
           // Extract product name and show specific error
-          toast('Insufficient stock available', 'error');
+          toast(t('payment.insufficientStock'), 'error');
         } else if (errorData?.error) {
           // Show backend error message if available
           toast(errorData.error, 'error');
@@ -229,7 +230,7 @@ export const createPaymentSlice = (set, get) => ({
         }
       } else {
         const toast = useToastStore.getState().addToast;
-        toast('Connection error', 'error');
+        toast(t('payment.connectionError'), 'error');
       }
 
       throw error;
@@ -358,7 +359,7 @@ export const createPaymentSlice = (set, get) => ({
         if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
           set({
             paymentStep: 'method',
-            verifyError: 'Timeout generating invoice',
+            verifyError: t('payment.timeoutInvoice'),
           });
           throw error;
         }
@@ -366,7 +367,7 @@ export const createPaymentSlice = (set, get) => ({
         // FIX: Show error toast to user with specific messages
         const errorMsg = error.response?.data?.error || error.message;
         if (errorMsg?.includes('price_service_error') || errorMsg?.includes('exchange rate')) {
-          toast({ type: 'error', message: 'Exchange rate service temporarily unavailable. Try again in a minute.', duration: 4000 });
+          toast({ type: 'error', message: t('payment.exchangeUnavailable'), duration: 4000 });
         } else if (errorMsg?.includes('Invalid currency')) {
           toast({ type: 'error', message: 'Unsupported currency', duration: 3000 });
         } else if (errorMsg?.includes('does not accept')) {
@@ -376,15 +377,15 @@ export const createPaymentSlice = (set, get) => ({
         } else if (errorMsg?.includes('wallet') || errorMsg?.includes('address')) {
           toast({ type: 'error', message: 'Address generation error', duration: 3000 });
         } else if (errorMsg?.includes('timeout') || errorMsg?.includes('network')) {
-          toast({ type: 'error', message: 'Timeout: please try again', duration: 3000 });
+          toast({ type: 'error', message: t('payment.timeout'), duration: 3000 });
         } else if (errorMsg?.includes('expired')) {
-          toast({ type: 'error', message: 'Invoice expired, create a new one', duration: 3000 });
+          toast({ type: 'error', message: t('payment.invoiceExpired'), duration: 3000 });
         } else {
           // Log unknown errors for debugging
           if (import.meta.env.DEV) {
             console.error('[selectCrypto] Unknown error type:', errorMsg);
           }
-          toast({ type: 'error', message: 'Invoice generation error. Please try again.', duration: 3000 });
+          toast({ type: 'error', message: t('payment.invoiceError'), duration: 3000 });
         }
 
         set({
@@ -416,7 +417,7 @@ export const createPaymentSlice = (set, get) => ({
 
       // Check BOTH store state AND closure variable for race prevention
       if (isVerifying || submitInProgress) {
-        toast('Payment already being submitted', 'warning');
+        toast(t('payment.alreadySubmitting'), 'warning');
         return;
       }
 
@@ -475,7 +476,7 @@ export const createPaymentSlice = (set, get) => ({
         // Handle timeout/abort
         if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
           set({
-            verifyError: 'Timeout verifying payment',
+            verifyError: t('payment.timeoutVerify'),
           });
           return; // Don't throw, just return
         }
@@ -483,22 +484,22 @@ export const createPaymentSlice = (set, get) => ({
         // Detailed error messages for different error types
         const errorMsg = error.response?.data?.error || error.message;
         const statusCode = error.response?.status;
-        let userFriendlyError = 'Payment verification error';
+        let userFriendlyError = t('payment.verifyError');
 
         if (statusCode === 404) {
-          userFriendlyError = 'Order not found. Please try again.';
+          userFriendlyError = t('errors.orderNotFound');
         } else if (errorMsg?.includes('confirmation')) {
-          userFriendlyError = 'Transaction not yet confirmed. Please wait and try again.';
+          userFriendlyError = t('payment.txNotConfirmed');
         } else if (errorMsg?.includes('amount')) {
-          userFriendlyError = 'Payment amount mismatch. Check the exact amount sent.';
+          userFriendlyError = t('payment.amountMismatch');
         } else if (errorMsg?.includes('address') || errorMsg?.includes('wallet')) {
-          userFriendlyError = 'Invalid wallet address. Check recipient address.';
+          userFriendlyError = t('payment.invalidWallet');
         } else if (errorMsg?.includes('expired')) {
-          userFriendlyError = 'Payment window expired. Please create a new order.';
+          userFriendlyError = t('payment.windowExpired');
         } else if (errorMsg?.includes('timeout') || errorMsg?.includes('network')) {
-          userFriendlyError = 'Network error. Check your connection and try again.';
+          userFriendlyError = t('errors.networkError');
         } else if (errorMsg?.includes('invalid') || errorMsg?.includes('hash')) {
-          userFriendlyError = 'Invalid transaction hash. Check and re-enter.';
+          userFriendlyError = t('payment.invalidTxHash');
         } else if (errorMsg) {
           userFriendlyError = errorMsg;
         }

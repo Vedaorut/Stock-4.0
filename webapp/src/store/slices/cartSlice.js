@@ -1,4 +1,5 @@
 import { useToastStore } from '../../hooks/useToast';
+import { t } from '../../i18n';
 
 export const createCartSlice = (set, get) => ({
   // Cart
@@ -10,7 +11,7 @@ export const createCartSlice = (set, get) => ({
     const productShopId = currentShop?.id || product.shop_id || product.shopId || productsShopId;
     if (currentCart.length > 0 && currentCart[0].shopId !== productShopId) {
       const toast = useToastStore.getState().addToast;
-      toast({ type: 'warning', message: 'Clear the cart to shop from another store', duration: 3000 });
+      toast({ type: 'warning', message: t('cart.clearForOtherShop'), duration: 3000 });
       if (import.meta.env.DEV) {
         console.error('[addToCart] Cannot add product from different shop. Cart shopId:', currentCart[0].shopId, 'Product shopId:', productShopId);
       }
@@ -44,7 +45,7 @@ export const createCartSlice = (set, get) => ({
       if (!shopId) {
         // P1 FIX: Show user-visible error instead of silent failure
         const toast = useToastStore.getState().addToast;
-        toast({ type: 'error', message: 'Cannot add to cart - shop not found', duration: 3000 });
+        toast({ type: 'error', message: t('cart.shopNotFound'), duration: 3000 });
 
         if (import.meta.env.DEV) {
           console.error('[addToCart] CRITICAL: Cannot add to cart - shopId missing!', product);
@@ -121,7 +122,7 @@ export const createCartSlice = (set, get) => ({
     const invalidItems = [];
 
     if (cart.length === 0) {
-      return { valid: false, errors: ['Cart is empty'], invalidItems: [] };
+      return { valid: false, errors: [t('cart.empty')], invalidItems: [] };
     }
 
     // Check each item
@@ -130,12 +131,12 @@ export const createCartSlice = (set, get) => ({
 
       // Check price validity
       if (!item.price || item.price <= 0) {
-        itemErrors.push('Invalid price');
+        itemErrors.push(t('cart.invalidPrice'));
       }
 
       // Check quantity validity
       if (!item.quantity || item.quantity <= 0) {
-        itemErrors.push('Invalid quantity');
+        itemErrors.push(t('cart.invalidQuantity'));
       }
 
       // Check stock (for non-preorder items)
@@ -143,16 +144,16 @@ export const createCartSlice = (set, get) => ({
       const stock = item.stock_quantity || item.stock || 0;
 
       if (!isPreorder && item.quantity > stock) {
-        itemErrors.push(`Only ${stock} available`);
+        itemErrors.push(t('cart.stockLimited', { count: stock }));
       }
 
       // Check if item has required data
       if (!item.id) {
-        itemErrors.push('Missing product ID');
+        itemErrors.push(t('cart.missingProductId'));
       }
 
       if (!item.shopId) {
-        itemErrors.push('Missing shop information');
+        itemErrors.push(t('cart.missingShopInfo'));
       }
 
       if (itemErrors.length > 0) {
@@ -170,20 +171,20 @@ export const createCartSlice = (set, get) => ({
       const isOwnShop = myShops.some((shop) => shop.id === cartShopId);
 
       if (isOwnShop) {
-        errors.push('Cannot order from your own shop');
+        errors.push(t('cart.cannotOrderOwn'));
       }
     }
 
     // Check all items from same shop
     const shopIds = [...new Set(cart.map((item) => item.shopId).filter(Boolean))];
     if (shopIds.length > 1) {
-      errors.push('Cart contains items from multiple shops');
+      errors.push(t('cart.multipleShops'));
     }
 
     // Calculate total
     const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
     if (total <= 0) {
-      errors.push('Cart total must be greater than zero');
+      errors.push(t('cart.zeroTotal'));
     }
 
     const hasInvalidItems = invalidItems.length > 0;

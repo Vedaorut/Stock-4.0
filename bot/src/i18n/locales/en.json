@@ -83,7 +83,8 @@
     "exitTrial": "Exit Trial",
     "feedback": "Feedback",
     "sendFeedback": "Send Feedback",
-    "cancelFeedback": "Cancel"
+    "cancelFeedback": "Cancel",
+    "checkPayment": "Check Payment"
   },
   "start": {
     "welcome": "Status Stock. Choose a role to continue."
@@ -493,7 +494,18 @@
   "errors": {
     "shopRequired": "Please create a shop first",
     "invalidPaymentMethod": "Invalid payment method",
-    "noSubscriptionToUpgrade": "No subscription to upgrade"
+    "noSubscriptionToUpgrade": "No subscription to upgrade",
+    "invalidShopId": "Invalid shop ID",
+    "loadError": "Loading error",
+    "authRequired": "Authorization required",
+    "loadShopsError": "Failed to load shops",
+    "accessCheckError": "Access check error",
+    "noShopAccess": "You don't have access to this shop",
+    "genericError": "An error occurred",
+    "shopAccessDenied": "Shop access denied. You are not the owner.",
+    "sessionExpired": "Session expired. Please restart the bot.",
+    "serverUnavailable": "Server temporarily unavailable",
+    "authenticationFailed": "Authentication failed"
   },
   "stats": {
     "revenue7days": "💰 {amount} last 7 days",
@@ -685,18 +697,6 @@
     "worker": "I'm a worker",
     "chooseRole": "Choose your role:"
   },
-  "errors": {
-    "shopRequired": "Please create a shop first",
-    "invalidPaymentMethod": "Invalid payment method",
-    "noSubscriptionToUpgrade": "No subscription to upgrade",
-    "invalidShopId": "Invalid shop ID",
-    "loadError": "Loading error",
-    "authRequired": "Authorization required",
-    "loadShopsError": "Failed to load shops",
-    "accessCheckError": "Access check error",
-    "noShopAccess": "You don't have access to this shop",
-    "genericError": "An error occurred"
-  },
   "orders": {
     "activeTitle": "Active Orders",
     "activeEmpty": "Active Orders\n\nNo active orders.\n\nOrders will appear here after buyer payment.",
@@ -779,6 +779,7 @@
   "formatters": {
     "statusActive": "Active",
     "statusInactive": "Inactive",
+    "revenueLabel": "revenue",
     "ordersActive1": "{count} active order",
     "ordersActive24": "{count} active orders",
     "ordersActive5": "{count} active orders",
@@ -970,8 +971,5 @@
     "unauthorized": "You are not authorized. Try again later.",
     "serverUnavailable": "Server unavailable. Try again later.",
     "defaultError": "Failed to generate QR code"
-  },
-  "errors": {
-    "shopAccessDenied": "Shop access denied. You are not the owner."
   }
 }

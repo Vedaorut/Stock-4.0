@@ -83,7 +83,8 @@
     "feedback": "Обратная связь",
     "sendFeedback": "Отправить",
     "cancelFeedback": "Отмена",
-    "exitTrial": "Выйти из Trial"
+    "exitTrial": "Выйти из Trial",
+    "checkPayment": "Проверить платеж"
   },
   "start": {
     "welcome": "Status Stock. Выберите роль, чтобы продолжить."
@@ -491,7 +492,20 @@
     "trialInfo": "У вас бесплатный trial до {date}"
   },
   "errors": {
-    "shopRequired": "Сначала создайте магазин"
+    "shopRequired": "Сначала создайте магазин",
+    "invalidPaymentMethod": "Неверный метод оплаты",
+    "noSubscriptionToUpgrade": "Нет подписки для апгрейда",
+    "invalidShopId": "Некорректный ID магазина",
+    "loadError": "Ошибка загрузки",
+    "authRequired": "Требуется авторизация",
+    "loadShopsError": "Ошибка загрузки магазинов",
+    "accessCheckError": "Ошибка проверки доступа",
+    "noShopAccess": "У вас нет доступа к этому магазину",
+    "genericError": "Произошла ошибка",
+    "shopAccessDenied": "Доступ к магазину запрещён. Вы не являетесь владельцем.",
+    "sessionExpired": "Сессия истекла. Перезапустите бота.",
+    "serverUnavailable": "Сервер временно недоступен",
+    "authenticationFailed": "Ошибка аутентификации"
   },
   "stats": {
     "revenue7days": "💰 {amount} за последние 7 дней",
@@ -683,18 +697,6 @@
     "worker": "Я сотрудник",
     "chooseRole": "Выберите роль:"
   },
-  "errors": {
-    "shopRequired": "Сначала создайте магазин",
-    "invalidPaymentMethod": "Неверный метод оплаты",
-    "noSubscriptionToUpgrade": "Нет подписки для апгрейда",
-    "invalidShopId": "Некорректный ID магазина",
-    "loadError": "Ошибка загрузки",
-    "authRequired": "Требуется авторизация",
-    "loadShopsError": "Ошибка загрузки магазинов",
-    "accessCheckError": "Ошибка проверки доступа",
-    "noShopAccess": "У вас нет доступа к этому магазину",
-    "genericError": "Произошла ошибка"
-  },
   "orders": {
     "activeTitle": "Активные заказы",
     "activeEmpty": "Активные заказы\n\nНет активных заказов.\n\nЗаказы появятся здесь после оплаты покупателем.",
@@ -777,6 +779,7 @@
   "formatters": {
     "statusActive": "Активна",
     "statusInactive": "Неактивна",
+    "revenueLabel": "выручка",
     "ordersActive1": "{count} активный заказ",
     "ordersActive24": "{count} активных заказа",
     "ordersActive5": "{count} активных заказов",
@@ -968,8 +971,5 @@
     "unauthorized": "Вы не авторизованы. Попробуйте позже.",
     "serverUnavailable": "Сервер недоступен. Попробуйте позже.",
     "defaultError": "Не удалось сформировать QR-код"
-  },
-  "errors": {
-    "shopAccessDenied": "Доступ к магазину запрещён. Вы не являетесь владельцем."
   }
 }

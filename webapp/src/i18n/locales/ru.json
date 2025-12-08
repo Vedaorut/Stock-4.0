@@ -27,7 +27,9 @@
     "products": "товаров",
     "more": "ещё",
     "locale": "ru-RU",
-    "createShop": "Создайте магазин для доступа"
+    "createShop": "Создайте магазин для доступа",
+    "authRequired": "Требуется авторизация",
+    "restartBot": "Перезапустите бота"
   },
   "product": {
     "syncedFrom": "из {shop}",
@@ -191,7 +193,16 @@
     "item": "товар",
     "cannotOrderOwn": "Нельзя заказать товары из своего магазина",
     "browseCatalog": "Открыть каталог",
-    "clearForOtherShop": "Очистите корзину для покупок в другом магазине"
+    "clearForOtherShop": "Очистите корзину для покупок в другом магазине",
+    "validationError": "Ошибка валидации корзины",
+    "shopNotFound": "Магазин не найден",
+    "invalidPrice": "Неверная цена",
+    "invalidQuantity": "Неверное количество",
+    "stockLimited": "Доступно только {{count}}",
+    "missingProductId": "Отсутствует ID товара",
+    "missingShopInfo": "Отсутствует информация о магазине",
+    "multipleShops": "Корзина содержит товары из разных магазинов",
+    "zeroTotal": "Сумма заказа должна быть больше нуля"
   },
   "subscriptions": {
     "title": "Мои подписки",
@@ -263,7 +274,23 @@
     "noWalletsDesc": "Магазин ещё не настроил платёжные кошельки",
     "orderDataLost": "Данные заказа потеряны",
     "orderDataLostDesc": "Пожалуйста, повторите оформление",
-    "backToCart": "Вернуться в корзину"
+    "backToCart": "Вернуться в корзину",
+    "alreadyCreating": "Заказ уже создается",
+    "connectionError": "Ошибка соединения",
+    "exchangeUnavailable": "Сервис обмена временно недоступен",
+    "timeout": "Превышено время ожидания",
+    "invoiceExpired": "Счет истек, создайте новый",
+    "timeoutInvoice": "Таймаут генерации счета",
+    "alreadySubmitting": "Платеж уже отправляется",
+    "timeoutVerify": "Таймаут проверки платежа",
+    "txNotConfirmed": "Транзакция еще не подтверждена",
+    "amountMismatch": "Несоответствие суммы платежа",
+    "invalidWallet": "Неверный адрес кошелька",
+    "windowExpired": "Окно оплаты истекло",
+    "invalidTxHash": "Неверный хеш транзакции",
+    "verifyError": "Ошибка проверки платежа",
+    "errorTitle": "Ошибка платежа",
+    "unexpectedError": "Произошла непредвиденная ошибка"
   },
   "subscription": {
     "title": "Подписка",
@@ -469,7 +496,8 @@
     "switchTo": "На",
     "dangerZone": "Опасная зона",
     "deleteSubscription": "Удалить подписку",
-    "irreversible": "Действие необратимо"
+    "irreversible": "Действие необратимо",
+    "productMarkupError": "Ошибка наценки товара"
   },
   "myOrders": {
     "title": "Мои заказы",

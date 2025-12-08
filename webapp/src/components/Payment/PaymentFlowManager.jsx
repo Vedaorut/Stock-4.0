@@ -5,6 +5,7 @@ import PaymentDetailsModal from './PaymentDetailsModal';
 import PaymentHashModal from './PaymentHashModal';
 import OrderStatusModal from './OrderStatusModal';
 import { useStore } from '../../store/useStore';
+import { t } from '../../i18n';
 
 /**
  * Error Boundary for payment flow
@@ -40,15 +41,15 @@ class PaymentErrorBoundary extends React.Component {
         >
           <div className="text-center max-w-md p-6">
             <div className="text-6xl mb-4">⚠️</div>
-            <h1 className="text-white text-xl font-bold mb-2">Payment Error</h1>
-            <p className="text-white/60 mb-6">An unexpected error occurred. Please try again.</p>
+            <h1 className="text-white text-xl font-bold mb-2">{t('payment.errorTitle')}</h1>
+            <p className="text-white/60 mb-6">{t('payment.unexpectedError')}</p>
             <motion.button
               onClick={this.handleReset}
               className="px-6 py-3 rounded-xl font-semibold text-white"
               style={{ background: 'linear-gradient(135deg, #FF6B00 0%, #FF8533 100%)' }}
               whileTap={{ scale: 0.95 }}
             >
-              Try again
+              {t('common.retry')}
             </motion.button>
           </div>
         </div>
