@@ -211,8 +211,8 @@ export default function PaymentHashModal() {
                           <div className="absolute inset-0 w-16 h-16 border-4 border-orange-primary border-t-transparent rounded-full animate-spin" />
                         </div>
                         <div className="text-center">
-                          <p className="text-white font-semibold">Verifying transaction...</p>
-                          <p className="text-gray-400 text-sm mt-1">This may take a few seconds</p>
+                          <p className="text-white font-semibold">{t('payment.verifyingTransaction')}</p>
+                          <p className="text-gray-400 text-sm mt-1">{t('payment.verifyingDesc')}</p>
                         </div>
                       </div>
                     </motion.div>
@@ -240,7 +240,7 @@ export default function PaymentHashModal() {
                         </svg>
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-red-400 font-semibold text-sm">Verification Failed</p>
+                        <p className="text-red-400 font-semibold text-sm">{t('payment.verifyError')}</p>
                         <p className="text-gray-400 text-sm mt-1 break-words">{verifyError}</p>
                         <motion.button
                           onClick={handleRetry}
@@ -251,7 +251,7 @@ export default function PaymentHashModal() {
                           }}
                           whileTap={{ scale: 0.95 }}
                         >
-                          Try Again
+                          {t('common.retry')}
                         </motion.button>
                       </div>
                     </div>
@@ -267,7 +267,7 @@ export default function PaymentHashModal() {
                 >
                   <label className="flex items-center justify-between px-1">
                     <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                      Transaction Link or Hash
+                      {t('payment.txHashLabel')}
                     </span>
                     {txHash.length > 0 && (
                       <span className="text-xs text-gray-500 font-mono tabular-nums">
