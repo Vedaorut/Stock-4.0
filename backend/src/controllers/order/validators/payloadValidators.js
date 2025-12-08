@@ -35,10 +35,10 @@ export function extractTxHashFromUrl(input) {
     /bscscan\.com\/tx\/([a-fA-F0-9x]+)/i,
     // Polygonscan - polygonscan.com/tx/0x...
     /polygonscan\.com\/tx\/([a-fA-F0-9x]+)/i,
-    // TronScan (USDT TRC20) - tronscan.org/#/transaction/...
-    /tronscan\.org\/#\/transaction\/([a-fA-F0-9]+)/i,
-    // TronScan alternative - tronscan.io/...
-    /tronscan\.io\/(?:#\/)?transaction\/([a-fA-F0-9]+)/i,
+    // BUG-PAY-002 FIX: TronScan (USDT TRC20) - all TronScan domains (.org, .io, .com, etc.)
+    /tronscan\.(?:org|io|com)\/#\/transaction\/([a-fA-F0-9]+)/i,
+    // TronScan without hash prefix - tronscan.*/transaction/...
+    /tronscan\.(?:org|io|com)\/(?:#\/)?transaction\/([a-fA-F0-9]+)/i,
     // Blockchair (multi-chain) - blockchair.com/bitcoin/transaction/...
     /blockchair\.com\/[a-z-]+\/transaction\/([a-fA-F0-9]+)/i,
     // Blockchain.com (BTC) - blockchain.com/btc/tx/...
@@ -89,7 +89,7 @@ export function extractTxHashFromUrl(input) {
   return trimmed;
 }
 
-export function validateTxHash(txHash) {
+export function validateTxHash(txHash, currency = null) {
   if (!txHash || typeof txHash !== 'string' || txHash.length < 10) {
     throw new ValidationError('Valid transaction hash required');
   }
@@ -99,6 +99,35 @@ export function validateTxHash(txHash) {
 
   if (!extractedHash || extractedHash.length < 10) {
     throw new ValidationError('Could not extract valid transaction hash from provided input');
+  }
+
+  // BUG-PAY-001 FIX: Validate hexadecimal format to prevent non-hex characters
+  // This prevents accepting arbitrary strings like "test_hash_123"
+  const trimmedHash = extractedHash.trim();
+
+  // Basic hex validation - all chains use hex format (with optional 0x prefix for ETH)
+  const isHexHash = /^(0x)?[a-fA-F0-9]+$/.test(trimmedHash);
+  if (!isHexHash) {
+    throw new ValidationError('Transaction hash must contain only hexadecimal characters (0-9, a-f)');
+  }
+
+  // Chain-specific length validation (if currency provided)
+  if (currency) {
+    const currencyUpper = currency.toUpperCase();
+    const expectedLengths = {
+      BTC: 64,
+      LTC: 64,
+      ETH: 66, // 0x + 64 hex chars
+      USDT: 64, // TRON
+      USDT_TRC20: 64,
+    };
+
+    const expectedLength = expectedLengths[currencyUpper];
+    if (expectedLength && trimmedHash.length !== expectedLength) {
+      throw new ValidationError(
+        `Invalid ${currencyUpper} transaction hash length (expected ${expectedLength} characters, got ${trimmedHash.length})`
+      );
+    }
   }
 
   return extractedHash;

@@ -22,7 +22,29 @@ class TelegramService {
     try {
       const urlParams = new URLSearchParams(initData);
       const hash = urlParams.get('hash');
+      const authDate = urlParams.get('auth_date');
       urlParams.delete('hash');
+
+      // BUG-AUTH-002 FIX: Validate auth_date to prevent replay attacks
+      // Reject initData older than 5 minutes (300 seconds)
+      if (!authDate) {
+        logger.warn('Init data verification failed: missing auth_date');
+        return false;
+      }
+
+      const authTimestamp = parseInt(authDate, 10);
+      const currentTimestamp = Math.floor(Date.now() / 1000);
+      const maxAge = 5 * 60; // 5 minutes in seconds
+
+      if (isNaN(authTimestamp) || currentTimestamp - authTimestamp > maxAge) {
+        logger.warn('Init data verification failed: auth_date too old or invalid', {
+          authDate: authTimestamp,
+          currentTime: currentTimestamp,
+          ageSeconds: currentTimestamp - authTimestamp,
+          maxAgeSeconds: maxAge,
+        });
+        return false;
+      }
 
       // Sort params alphabetically
       const dataCheckString = Array.from(urlParams.entries())

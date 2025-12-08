@@ -136,7 +136,9 @@ export const productValidation = {
       .trim()
       .isLength({ max: 1000 })
       .withMessage('Description must not exceed 1000 characters'),
-    body('price').isFloat({ min: 0.01 }).withMessage('Price must be greater than 0'),
+    body('price')
+      .isFloat({ min: 0.01, max: 999999.99 })
+      .withMessage('Price must be between 0.01 and 999999.99'),
     body('currency')
       .optional()
       .isIn(['BTC', 'ETH', 'USDT', 'LTC', 'USD'])
@@ -169,7 +171,14 @@ export const productValidation = {
       .trim()
       .isLength({ max: 1000 })
       .withMessage('Description must not exceed 1000 characters'),
-    body('price').optional().isFloat({ min: 0.01 }).withMessage('Price must be greater than 0'),
+    body('price')
+      .optional()
+      .isFloat({ min: 0.01, max: 999999.99 })
+      .withMessage('Price must be between 0.01 and 999999.99'),
+    body('currency')
+      .optional()
+      .isIn(['BTC', 'ETH', 'USDT', 'LTC', 'USD'])
+      .withMessage('Currency must be BTC, ETH, USDT, LTC, or USD'),
     body('stockQuantity')
       .optional()
       .isInt({ min: 0 })

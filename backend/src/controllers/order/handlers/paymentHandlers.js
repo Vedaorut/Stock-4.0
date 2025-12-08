@@ -133,8 +133,8 @@ export const submitPayment = asyncHandler(async (req, res) => {
   // validateTxHash now extracts hash from URL if needed and returns the clean hash
   let cleanTxHash, currencyUpper;
   try {
-    cleanTxHash = validateTxHash(tx_hash);
     currencyUpper = validateCurrencyParam(currency);
+    cleanTxHash = validateTxHash(tx_hash, currencyUpper); // BUG-PAY-001: Pass currency for strict validation
     logger.info('[submitPayment] Validation passed', { cleanTxHash: cleanTxHash?.substring(0, 20), currencyUpper });
   } catch (validationError) {
     logger.error('[submitPayment] Validation failed', { error: validationError.message });

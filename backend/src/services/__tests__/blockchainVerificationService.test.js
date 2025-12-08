@@ -330,7 +330,7 @@ describe('Blockchain Verification Service', () => {
       // Mock eth_blockNumber
       mockAxios.mockResolvedValueOnce({
         data: {
-          result: '0x10C', // 12 blocks ahead
+          result: '0x10C', // 268 - current block (256 + 12 = 268, so 13 confirmations with +1 fix)
         },
       });
 
@@ -342,7 +342,7 @@ describe('Blockchain Verification Service', () => {
 
       expect(result.verified).toBe(true);
       expect(result.status).toBe('confirmed');
-      expect(result.confirmations).toBe(12);
+      expect(result.confirmations).toBe(13); // BUG-PAY-003 FIX: Off-by-one corrected
       expect(parseFloat(result.amount)).toBeCloseTo(1.0, 5);
     });
 

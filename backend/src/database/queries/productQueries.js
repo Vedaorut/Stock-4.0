@@ -17,6 +17,11 @@ export const productQueries = {
       throw new Error('shopId is required to create a product');
     }
 
+    // BUG-PROD-004 FIX: Validate stock quantity is non-negative
+    if (stockQuantity < 0) {
+      throw new Error('Stock quantity cannot be negative');
+    }
+
     const result = await query(
       `INSERT INTO products (shop_id, name, description, price, currency, stock_quantity, reserved_quantity, is_preorder)
        VALUES ($1, $2, $3, $4, $5, $6, 0, COALESCE($7, false))
@@ -96,6 +101,11 @@ export const productQueries = {
       originalPrice,
       isPreorder,
     } = productData;
+
+    // BUG-PROD-004 FIX: Validate stock quantity is non-negative
+    if (stockQuantity !== undefined && stockQuantity !== null && stockQuantity < 0) {
+      throw new Error('Stock quantity cannot be negative');
+    }
 
     // Преобразовать undefined → null для корректной работы SQL
     const params = [

@@ -512,14 +512,14 @@ describe('Blockchain Verification Service', () => {
             data: { result: { status: '0x1', blockNumber: '0x100' } },
           })
           .mockResolvedValueOnce({
-            data: { result: '0x110' }, // 16 confirmations
+            data: { result: '0x110' }, // 272 - current block (256 + 16 = 272, so 17 confirmations)
           });
 
         const result = await verifyEthereumPayment('eth_tx', '0xRecipient', '1.0');
 
         expect(result.verified).toBe(true);
         expect(result.status).toBe('confirmed');
-        expect(result.confirmations).toBe(16);
+        expect(result.confirmations).toBe(17); // BUG-PAY-003 FIX: Off-by-one corrected
       });
 
       it('should handle case-insensitive address matching', async () => {

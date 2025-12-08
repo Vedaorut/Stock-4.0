@@ -66,9 +66,10 @@ router.post('/refresh', authController.refreshToken);
 /**
  * @route   POST /api/auth/logout
  * @desc    Logout and revoke refresh token
- * @access  Public (optionally authenticated)
+ * @access  Private (requires authentication)
+ * @security BUG-AUTH-005 FIX: Added verifyToken middleware to prevent unauthorized logout attempts
  */
-router.post('/logout', authController.logout);
+router.post('/logout', verifyToken, authController.logout);
 
 /**
  * @route   PATCH /api/auth/language

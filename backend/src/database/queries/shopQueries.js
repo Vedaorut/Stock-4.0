@@ -1,4 +1,5 @@
 import { query } from '../../config/database.js';
+import { generateInviteCode } from '../../utils/inviteCodeGenerator.js';
 
 /**
  * Shop database queries
@@ -132,11 +133,16 @@ export const shopQueries = {
     return result.rows[0];
   },
 
-  // Delete shop
+  // Delete shop (soft delete to preserve order history)
+  // BUG-SHOP-003 FIX: Set is_active=false instead of hard delete to preserve FK relationships
   delete: async (id) => {
-    const result = await query('DELETE FROM shops WHERE id = $1 RETURNING id, owner_id, name', [
-      id,
-    ]);
+    const result = await query(
+      `UPDATE shops
+       SET is_active = false, updated_at = NOW()
+       WHERE id = $1
+       RETURNING id, owner_id, name`,
+      [id]
+    );
     return result.rows[0];
   },
 
@@ -172,16 +178,40 @@ export const shopQueries = {
     return result.rows.map((row) => row.invite_code);
   },
 
-  // Update shop invite code
-  updateInviteCode: async (id, inviteCode) => {
-    const result = await query(
-      `UPDATE shops
-       SET invite_code = $2, updated_at = NOW()
-       WHERE id = $1
-       RETURNING id, invite_code`,
-      [id, inviteCode]
-    );
-    return result.rows[0];
+  // Update shop invite code with retry on conflict
+  // BUG-SHOP-005 FIX: Handle race condition with unique constraint
+  updateInviteCode: async (id, shopName) => {
+    const maxRetries = 5;
+    let lastError;
+
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        // Generate fresh code on each attempt
+        const existingCodes = await shopQueries.getAllInviteCodes();
+        const inviteCode = generateInviteCode(shopName, existingCodes);
+
+        const result = await query(
+          `UPDATE shops
+           SET invite_code = $2, updated_at = NOW()
+           WHERE id = $1
+           RETURNING id, invite_code`,
+          [id, inviteCode]
+        );
+        return result.rows[0];
+      } catch (error) {
+        // Check if it's a unique constraint violation on invite_code
+        if (error.code === '23505' && error.constraint === 'idx_shops_invite_code') {
+          lastError = error;
+          // Retry with new code
+          continue;
+        }
+        // Other errors - throw immediately
+        throw error;
+      }
+    }
+
+    // If all retries failed, throw the last error
+    throw lastError || new Error('Failed to generate unique invite code after maximum retries');
   },
 
   // Update shop wallets

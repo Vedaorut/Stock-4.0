@@ -578,7 +578,8 @@ export async function verifyEthereumPayment(txHash, expectedAddress, expectedAmo
   const blockNumber = parseInt(receipt.blockNumber, 16);
   const currentBlock = parseInt(currentBlockData.result, 16);
 
-  const confirmations = currentBlock - blockNumber;
+  // BUG-PAY-003 FIX: Off-by-one error - include the block itself in confirmations
+  const confirmations = currentBlock - blockNumber + 1;
   const verified = confirmations >= config.minConfirmations;
 
   return {

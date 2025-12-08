@@ -15,6 +15,7 @@ import {
   SUBSCRIPTION_PERIOD_DAYS,
   GRACE_PERIOD_DAYS,
   TRIAL_PERIOD_DAYS,
+  SUBSCRIPTION_TIERS,
 } from '../config/subscriptionPricing.js';
 // paymentVerificationService removed - only CrystalPay payments supported
 
@@ -192,9 +193,24 @@ async function deactivateShop(shopId, client = null) {
  * @param {number} userId - User ID (shop owner)
  * @returns {Promise<{shopId: number, trialEndsAt: Date}>}
  */
-async function activateFreeTrial(shopId, _userId) {
+async function activateFreeTrial(shopId, userId) {
   const client = await pool.connect();
   try {
+    await client.query('BEGIN');
+
+    // FIX BUG-SUB-003: Check if user already used trial (track by user_id, not shop_id)
+    const trialCheck = await client.query(
+      `SELECT COUNT(*) as trial_count
+       FROM shops
+       WHERE owner_id = $1
+       AND (is_trial = true OR trial_ends_at IS NOT NULL)`,
+      [userId]
+    );
+
+    if (trialCheck.rows[0].trial_count > 0) {
+      throw new Error('User has already used free trial');
+    }
+
     const now = new Date();
     const trialEnd = addDays(now, TRIAL_PERIOD_DAYS);
 
@@ -211,9 +227,13 @@ async function activateFreeTrial(shopId, _userId) {
       [trialEnd, shopId]
     );
 
+    await client.query('COMMIT');
     logger.info(`[Subscription] Free trial activated for shop ${shopId} until ${trialEnd.toISOString()}`);
 
     return { shopId, trialEndsAt: trialEnd };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
   } finally {
     client.release();
   }
@@ -304,11 +324,17 @@ async function activatePromoSubscription(shopId, userId, promoCode, targetTier =
       [userId, shopId, promoCode]
     );
 
+    // FIX BUG-SUB-008: Use ON CONFLICT to prevent race condition
     await client.query(
       `INSERT INTO shop_subscriptions (user_id, shop_id, tier, amount, tx_hash, currency, period_start, period_end, status, verified_at)
-       VALUES ($1, $2, $3, 0, $4, 'USDT', $5, $6, 'active', NOW())`,
+       VALUES ($1, $2, $3, 0, $4, 'USDT', $5, $6, 'active', NOW())
+       ON CONFLICT (tx_hash) DO NOTHING`,
       [userId, shopId, targetTier, promoTx, now, periodEnd]
     );
+
+    // FIX BUG-SUB-005: Handle NULL period_end (permanent promo)
+    // If permanent (period_end is NULL), set next_payment_due far in future instead of NULL
+    const nextPayment = periodEnd || addDays(now, 365 * 100); // 100 years for permanent
 
     const updatedShop = await client.query(
       `UPDATE shops
@@ -321,7 +347,7 @@ async function activatePromoSubscription(shopId, userId, promoCode, targetTier =
            updated_at = NOW()
        WHERE id = $1
        RETURNING *`,
-      [shopId, targetTier, periodEnd]
+      [shopId, targetTier, nextPayment]
     );
 
     await client.query('COMMIT');
@@ -437,12 +463,13 @@ async function getSubscriptionStatus(shopId) {
   const shop = shopResult.rows[0];
 
   // Get current active subscription
+  // FIX BUG-SUB-005: Handle NULL period_end (permanent promo)
   const subResult = await pool.query(
     `SELECT * FROM shop_subscriptions
      WHERE shop_id = $1
      AND status = 'active'
-     AND period_end > NOW()
-     ORDER BY period_end DESC
+     AND (period_end IS NULL OR period_end > NOW())
+     ORDER BY period_end DESC NULLS FIRST
      LIMIT 1`,
     [shopId]
   );
@@ -510,20 +537,30 @@ async function calculateUpgradeCost(shopId) {
 
   const shop = shopResult.rows[0];
 
-  if (shop.tier === 'max') {
+  // FIX BUG-SUB-007: Make upgrade logic flexible using SUBSCRIPTION_TIERS from config
+  const currentTierIndex = SUBSCRIPTION_TIERS.indexOf(shop.tier);
+
+  if (currentTierIndex === -1) {
+    throw new Error('Invalid current tier');
+  }
+
+  if (currentTierIndex === SUBSCRIPTION_TIERS.length - 1) {
     return {
       alreadyMax: true,
       amount: 0,
+      currentTier: shop.tier,
     };
   }
+
+  const newTier = SUBSCRIPTION_TIERS[currentTierIndex + 1];
 
   // Get current subscription
   const subResult = await pool.query(
     `SELECT * FROM shop_subscriptions
      WHERE shop_id = $1
      AND status = 'active'
-     AND period_end > NOW()
-     ORDER BY period_end DESC
+     AND (period_end IS NULL OR period_end > NOW())
+     ORDER BY period_end DESC NULLS FIRST
      LIMIT 1`,
     [shopId]
   );
@@ -534,19 +571,19 @@ async function calculateUpgradeCost(shopId) {
 
   const currentSub = subResult.rows[0];
 
-  // Calculate prorated upgrade from pro to max tier
+  // Calculate prorated upgrade
   const amount = calculateUpgradeAmount(
     currentSub.period_start,
     currentSub.period_end,
-    SUBSCRIPTION_PRICES.pro,
-    SUBSCRIPTION_PRICES.max
+    SUBSCRIPTION_PRICES[shop.tier],
+    SUBSCRIPTION_PRICES[newTier]
   );
 
   return {
     alreadyMax: false,
     amount,
-    currentTier: 'pro',
-    newTier: 'max',
+    currentTier: shop.tier,
+    newTier,
     periodStart: currentSub.period_start,
     periodEnd: currentSub.period_end,
     remainingDays: Math.ceil((currentSub.period_end - new Date()) / (1000 * 60 * 60 * 24)),

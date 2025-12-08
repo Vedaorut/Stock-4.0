@@ -48,9 +48,15 @@ export const shopController = {
         throw new ValidationError('User already has a shop');
       }
 
-      // Validate shop name
+      // Validate shop name (allow Unicode letters, numbers, spaces, underscores, hyphens)
       if (!name || name.trim().length < 3) {
         throw new ValidationError('Shop name must be at least 3 characters');
+      }
+
+      // BUG-SHOP-002 FIX: Support Cyrillic and other Unicode characters
+      const nameRegex = /^[\p{L}\p{N}\s_-]+$/u;
+      if (!nameRegex.test(name.trim())) {
+        throw new ValidationError('Shop name can only contain letters, numbers, spaces, underscores, and hyphens');
       }
 
       // Check if shop name is already taken
@@ -62,86 +68,107 @@ export const shopController = {
       // Handle subscription-based creation
       if (subscriptionId) {
         const { getClient } = await import('../config/database.js');
-        const client = await getClient();
 
-        try {
-          await client.query('BEGIN');
+        // BUG-SHOP-005 FIX: Retry on invite code collision
+        const maxRetries = 5;
+        let lastError;
 
-          // Verify subscription exists and belongs to user
-          const subscriptionCheck = await client.query(
-            `SELECT id, tier, status, user_id, shop_id
-             FROM shop_subscriptions
-             WHERE id = $1`,
-            [subscriptionId]
-          );
+        for (let attempt = 0; attempt < maxRetries; attempt++) {
+          const client = await getClient();
 
-          if (subscriptionCheck.rows.length === 0) {
+          try {
+            await client.query('BEGIN');
+
+            // Verify subscription exists and belongs to user
+            const subscriptionCheck = await client.query(
+              `SELECT id, tier, status, user_id, shop_id
+               FROM shop_subscriptions
+               WHERE id = $1`,
+              [subscriptionId]
+            );
+
+            if (subscriptionCheck.rows.length === 0) {
+              await client.query('ROLLBACK');
+              throw new NotFoundError('Subscription');
+            }
+
+            const subscription = subscriptionCheck.rows[0];
+
+            // Verify subscription belongs to user
+            if (subscription.user_id !== req.user.id) {
+              await client.query('ROLLBACK');
+              throw new UnauthorizedError('Subscription belongs to another user');
+            }
+
+            // Verify subscription is paid
+            if (subscription.status !== 'paid') {
+              await client.query('ROLLBACK');
+              throw new ValidationError(`Subscription not paid yet (status: ${subscription.status})`);
+            }
+
+            // Verify subscription not already linked
+            if (subscription.shop_id !== null) {
+              await client.query('ROLLBACK');
+              throw new ValidationError('Subscription already linked to a shop');
+            }
+
+            // Generate unique invite code
+            const existingCodes = await shopQueries.getAllInviteCodes();
+            const inviteCode = generateInviteCode(name.trim(), existingCodes);
+
+            // Create shop
+            const shopResult = await client.query(
+              `INSERT INTO shops
+               (owner_id, name, description, logo, tier, subscription_status, is_active, registration_paid, invite_code)
+               VALUES ($1, $2, $3, $4, $5, 'active', true, true, $6)
+               RETURNING *`,
+              [req.user.id, name.trim(), description, logo, subscription.tier, inviteCode]
+            );
+
+            const shop = shopResult.rows[0];
+
+            // Link subscription to shop
+            await client.query(
+              `UPDATE shop_subscriptions
+               SET shop_id = $1
+               WHERE id = $2`,
+              [shop.id, subscriptionId]
+            );
+
+            await client.query('COMMIT');
+
+            logger.info('[ShopController] Shop created and linked to subscription:', {
+              shopId: shop.id,
+              subscriptionId,
+              userId: req.user.id,
+              inviteCode: shop.invite_code,
+            });
+
+            return res.status(201).json({
+              success: true,
+              data: shop,
+            });
+          } catch (error) {
             await client.query('ROLLBACK');
-            throw new NotFoundError('Subscription');
+
+            // BUG-SHOP-005: Retry on invite code collision
+            if (error.code === '23505' && error.constraint === 'idx_shops_invite_code') {
+              lastError = error;
+              client.release();
+              continue; // Retry with new code
+            }
+
+            client.release();
+            throw error;
+          } finally {
+            if (!client._released) {
+              client.release();
+            }
           }
-
-          const subscription = subscriptionCheck.rows[0];
-
-          // Verify subscription belongs to user
-          if (subscription.user_id !== req.user.id) {
-            await client.query('ROLLBACK');
-            throw new UnauthorizedError('Subscription belongs to another user');
-          }
-
-          // Verify subscription is paid
-          if (subscription.status !== 'paid') {
-            await client.query('ROLLBACK');
-            throw new ValidationError(`Subscription not paid yet (status: ${subscription.status})`);
-          }
-
-          // Verify subscription not already linked
-          if (subscription.shop_id !== null) {
-            await client.query('ROLLBACK');
-            throw new ValidationError('Subscription already linked to a shop');
-          }
-
-          // Generate unique invite code
-          const existingCodes = await shopQueries.getAllInviteCodes();
-          const inviteCode = generateInviteCode(name.trim(), existingCodes);
-
-          // Create shop
-          const shopResult = await client.query(
-            `INSERT INTO shops
-             (owner_id, name, description, logo, tier, subscription_status, is_active, registration_paid, invite_code)
-             VALUES ($1, $2, $3, $4, $5, 'active', true, true, $6)
-             RETURNING *`,
-            [req.user.id, name.trim(), description, logo, subscription.tier, inviteCode]
-          );
-
-          const shop = shopResult.rows[0];
-
-          // Link subscription to shop
-          await client.query(
-            `UPDATE shop_subscriptions
-             SET shop_id = $1
-             WHERE id = $2`,
-            [shop.id, subscriptionId]
-          );
-
-          await client.query('COMMIT');
-
-          logger.info('[ShopController] Shop created and linked to subscription:', {
-            shopId: shop.id,
-            subscriptionId,
-            userId: req.user.id,
-            inviteCode: shop.invite_code,
-          });
-
-          return res.status(201).json({
-            success: true,
-            data: shop,
-          });
-        } catch (error) {
-          await client.query('ROLLBACK');
-          throw error;
-        } finally {
-          client.release();
         }
+
+        // All retries failed
+        throw lastError || new Error('Failed to create shop after maximum retries');
       }
 
       // Handle FREE TRIAL - 7 days PRO for new sellers
@@ -152,67 +179,88 @@ export const shopController = {
 
         // Check if user EVER had a trial (prevent abuse)
         const { getClient } = await import('../config/database.js');
-        const client = await getClient();
 
-        try {
-          await client.query('BEGIN');
+        // BUG-SHOP-005 FIX: Retry on invite code collision
+        const maxRetries = 5;
+        let lastError;
 
-          // FIX H4: Check for previous trials INCLUDING deleted shops to prevent trial abuse
-          const previousTrial = await client.query(
-            `SELECT id FROM shops WHERE owner_id = $1 AND (is_trial = true OR trial_ends_at IS NOT NULL)`,
-            [req.user.id]
-          );
+        for (let attempt = 0; attempt < maxRetries; attempt++) {
+          const client = await getClient();
 
-          if (previousTrial.rows.length > 0) {
+          try {
+            await client.query('BEGIN');
+
+            // FIX H4: Check for previous trials INCLUDING deleted shops to prevent trial abuse
+            const previousTrial = await client.query(
+              `SELECT id FROM shops WHERE owner_id = $1 AND (is_trial = true OR trial_ends_at IS NOT NULL)`,
+              [req.user.id]
+            );
+
+            if (previousTrial.rows.length > 0) {
+              await client.query('ROLLBACK');
+              throw new ValidationError('Free trial already used. Please subscribe to continue.');
+            }
+
+            // Generate unique invite code
+            const existingCodes = await shopQueries.getAllInviteCodes();
+            const inviteCode = generateInviteCode(name.trim(), existingCodes);
+
+            // Create shop with trial fields in single transaction
+            const shopResult = await client.query(
+              `INSERT INTO shops (
+                 owner_id,
+                 name,
+                 description,
+                 logo,
+                 tier,
+                 is_trial,
+                 trial_ends_at,
+                 subscription_status,
+                 is_active,
+                 next_payment_due,
+                 invite_code
+               )
+               VALUES ($1, $2, $3, $4, $5, true, $6, 'active', true, $7, $8)
+               RETURNING *`,
+              [req.user.id, name.trim(), description, logo, trialTier, trialEndsAt, trialEndsAt, inviteCode]
+            );
+
+            await client.query('COMMIT');
+            const shop = shopResult.rows[0];
+
+            logger.info('[ShopController] Free trial activated:', {
+              shopId: shop.id,
+              userId: req.user.id,
+              trialEndsAt: shop.trial_ends_at,
+              tier: shop.tier,
+              inviteCode: shop.invite_code,
+            });
+
+            return res.status(201).json({
+              success: true,
+              data: shop,
+            });
+          } catch (error) {
             await client.query('ROLLBACK');
-            throw new ValidationError('Free trial already used. Please subscribe to continue.');
+
+            // BUG-SHOP-005: Retry on invite code collision
+            if (error.code === '23505' && error.constraint === 'idx_shops_invite_code') {
+              lastError = error;
+              client.release();
+              continue; // Retry with new code
+            }
+
+            client.release();
+            throw error;
+          } finally {
+            if (!client._released) {
+              client.release();
+            }
           }
-
-          // Generate unique invite code
-          const existingCodes = await shopQueries.getAllInviteCodes();
-          const inviteCode = generateInviteCode(name.trim(), existingCodes);
-
-          // Create shop with trial fields in single transaction
-          const shopResult = await client.query(
-            `INSERT INTO shops (
-               owner_id,
-               name,
-               description,
-               logo,
-               tier,
-               is_trial,
-               trial_ends_at,
-               subscription_status,
-               is_active,
-               next_payment_due,
-               invite_code
-             )
-             VALUES ($1, $2, $3, $4, $5, true, $6, 'active', true, $7, $8)
-             RETURNING *`,
-            [req.user.id, name.trim(), description, logo, trialTier, trialEndsAt, trialEndsAt, inviteCode]
-          );
-
-          await client.query('COMMIT');
-          const shop = shopResult.rows[0];
-
-          logger.info('[ShopController] Free trial activated:', {
-            shopId: shop.id,
-            userId: req.user.id,
-            trialEndsAt: shop.trial_ends_at,
-            tier: shop.tier,
-            inviteCode: shop.invite_code,
-          });
-
-          return res.status(201).json({
-            success: true,
-            data: shop,
-          });
-        } catch (error) {
-          await client.query('ROLLBACK');
-          throw error;
-        } finally {
-          client.release();
         }
+
+        // All retries failed
+        throw lastError || new Error('Failed to create shop after maximum retries');
       }
 
       // Handle promo code - promo code DETERMINES the tier
@@ -247,11 +295,9 @@ export const shopController = {
         tier: effectiveTier, // Use tier from promo code or request
       });
 
-      // Generate and set invite code
-      const existingCodes = await shopQueries.getAllInviteCodes();
-      const inviteCode = generateInviteCode(name.trim(), existingCodes);
-      await shopQueries.updateInviteCode(shop.id, inviteCode);
-      shop.invite_code = inviteCode;
+      // Generate and set invite code with retry logic (BUG-SHOP-005 fix)
+      const updatedShop = await shopQueries.updateInviteCode(shop.id, name.trim());
+      shop.invite_code = updatedShop.invite_code;
 
       // Activate promo subscription if promo code was used
       if (promoValidation && promoValidation.valid) {
