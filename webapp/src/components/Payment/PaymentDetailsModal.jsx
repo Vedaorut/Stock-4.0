@@ -15,6 +15,7 @@ import {
   isIOS,
 } from '../../utils/platform';
 import { useBackButton } from '../../hooks/useBackButton';
+import { useScrollLock } from '../../hooks/useScrollLock';
 
 // Lazy load QR code library (14KB gzipped)
 const QRCodeSVG = lazy(() =>
@@ -88,6 +89,9 @@ export default function PaymentDetailsModal() {
   };
 
   useBackButton(isOpen ? handleClose : null);
+
+  // BUG-WEBAPP-007: Properly manage scroll lock
+  useScrollLock(isOpen);
 
   // Universal copy with fallback for Telegram WebApp iframe
   const copyToClipboard = async (text) => {

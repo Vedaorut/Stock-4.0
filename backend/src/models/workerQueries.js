@@ -7,17 +7,19 @@ import { query } from '../config/database.js';
 export const workerQueries = {
   /**
    * Add worker to shop
+   * BUG-WORKER-003 FIX: Use ON CONFLICT to prevent race condition when adding same worker concurrently
    * @param {Object} data - {shopId, workerUserId, telegramId, addedBy}
-   * @returns {Object} Created worker record
+   * @returns {Object} Created worker record or null if already exists
    */
   create: async ({ shopId, workerUserId, telegramId, addedBy }) => {
     const result = await query(
       `INSERT INTO shop_workers (shop_id, worker_user_id, telegram_id, added_by)
        VALUES ($1, $2, $3, $4)
+       ON CONFLICT (shop_id, worker_user_id) DO NOTHING
        RETURNING *`,
       [shopId, workerUserId, telegramId, addedBy]
     );
-    return result.rows[0];
+    return result.rows[0] || null;
   },
 
   /**

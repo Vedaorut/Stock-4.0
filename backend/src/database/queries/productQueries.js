@@ -1,5 +1,6 @@
 import { query } from '../../config/database.js';
 import logger from '../../utils/logger.js';
+import { normalizePrice } from '../../utils/helpers.js';
 
 /**
  * Product database queries
@@ -22,11 +23,14 @@ export const productQueries = {
       throw new Error('Stock quantity cannot be negative');
     }
 
+    // BUG-PROD-007 FIX: Normalize price to 2 decimal places
+    const normalizedPrice = normalizePrice(price);
+
     const result = await query(
       `INSERT INTO products (shop_id, name, description, price, currency, stock_quantity, reserved_quantity, is_preorder)
        VALUES ($1, $2, $3, $4, $5, $6, 0, COALESCE($7, false))
        RETURNING id, shop_id, name, description, price, currency, stock_quantity, reserved_quantity, is_active, is_preorder, created_at, updated_at`,
-      [shopId, name, description, price, currency, stockQuantity || 0, isPreorder]
+      [shopId, name, description, normalizedPrice, currency, stockQuantity || 0, isPreorder]
     );
     return result.rows[0];
   },
@@ -107,16 +111,20 @@ export const productQueries = {
       throw new Error('Stock quantity cannot be negative');
     }
 
+    // BUG-PROD-007 FIX: Normalize prices to 2 decimal places
+    const normalizedPrice = price !== undefined && price !== null ? normalizePrice(price) : null;
+    const normalizedOriginalPrice = originalPrice !== undefined && originalPrice !== null ? normalizePrice(originalPrice) : null;
+
     // Преобразовать undefined → null для корректной работы SQL
     const params = [
       id,
       name ?? null,
       description ?? null,
-      price ?? null,
+      normalizedPrice,
       stockQuantity ?? null,
       isActive ?? null,
       discountPercentage ?? null,
-      originalPrice ?? null,
+      normalizedOriginalPrice,
       discountExpiresAt ?? null,
       isPreorder ?? null,
     ];
@@ -404,6 +412,9 @@ export const productQueries = {
       throw new Error('shopId and name are required for upsert');
     }
 
+    // BUG-PROD-007 FIX: Normalize price to 2 decimal places
+    const normalizedPrice = normalizePrice(price);
+
     // Check if product with same name exists (case-insensitive, not synced)
     const existingResult = await query(
       `SELECT p.id, p.shop_id, p.name
@@ -429,7 +440,7 @@ export const productQueries = {
              updated_at = NOW()
          WHERE id = $1
          RETURNING *`,
-        [existingId, description, price, currency, stockQuantity, isPreorder]
+        [existingId, description, normalizedPrice, currency, stockQuantity, isPreorder]
       );
       logger.info(`[ProductUpsert] Updated existing product ${existingId} (name: ${name})`);
       return { product: updated.rows[0], isNew: false };
@@ -440,7 +451,7 @@ export const productQueries = {
       `INSERT INTO products (shop_id, name, description, price, currency, stock_quantity, reserved_quantity, is_preorder)
        VALUES ($1, $2, $3, $4, $5, $6, 0, COALESCE($7, false))
        RETURNING *`,
-      [shopId, name, description, price, currency, stockQuantity || 0, isPreorder]
+      [shopId, name, description, normalizedPrice, currency, stockQuantity || 0, isPreorder]
     );
     logger.info(`[ProductUpsert] Created new product ${result.rows[0].id} (name: ${name})`);
     return { product: result.rows[0], isNew: true };

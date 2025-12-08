@@ -5,6 +5,8 @@ import { useApi } from '../../hooks/useApi';
 import { useTelegram } from '../../hooks/useTelegram';
 import { useBackButton } from '../../hooks/useBackButton';
 import { useTranslation } from '../../i18n/useTranslation';
+import { useScrollLock } from '../../hooks/useScrollLock';
+import { ListLoadingState } from '../common/LoadingSpinner';
 
 // Compact status config with dot indicators (labels will be replaced with t() in component)
 const STATUS_CONFIG = {
@@ -224,6 +226,9 @@ export default function MyOrdersModal({ isOpen, onClose }) {
 
   useBackButton(isOpen ? handleClose : null);
 
+  // BUG-WEBAPP-007: Properly manage scroll lock
+  useScrollLock(isOpen);
+
   const loadOrders = useCallback(async (signal) => {
     const { data, error } = await get('/orders/my', { signal });
     if (signal?.aborted) return { status: 'aborted' };
@@ -311,20 +316,7 @@ export default function MyOrdersModal({ isOpen, onClose }) {
 
               {/* Loading skeleton */}
               {loading && orders.length === 0 && (
-                <div className="space-y-2">
-                  {[...Array(3)].map((_, i) => (
-                    <div key={i} className="glass-card rounded-xl p-3 animate-pulse">
-                      <div className="flex items-center gap-3">
-                        <div className="w-2.5 h-2.5 rounded-full bg-white/10" />
-                        <div className="flex-1 space-y-2">
-                          <div className="h-3 bg-white/10 rounded w-24" />
-                          <div className="h-2 bg-white/5 rounded w-16" />
-                        </div>
-                        <div className="h-4 bg-white/10 rounded w-16" />
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <ListLoadingState itemCount={3} />
               )}
 
               {/* Error */}

@@ -101,19 +101,19 @@ export const workerController = {
         throw new ValidationError('Shop owner cannot be added as worker');
       }
 
-      // Check if already a worker
-      const existing = await workerQueries.findByShopAndUser(shopId, workerUser.id);
-      if (existing) {
-        throw new ConflictError('User is already a worker in this shop');
-      }
-
-      // Add worker
+      // BUG-WORKER-003 FIX: Use atomic insert with ON CONFLICT to prevent race condition
+      // This replaces the check-then-insert pattern which was vulnerable to race conditions
       const worker = await workerQueries.create({
         shopId: parseInt(shopId, 10),
         workerUserId: workerUser.id,
         telegramId: workerTelegramId,
         addedBy: req.user.id,
       });
+
+      // If create returns null, worker already exists (ON CONFLICT DO NOTHING)
+      if (!worker) {
+        throw new ConflictError('User is already a worker in this shop');
+      }
 
       logger.info('Worker added to shop', {
         shopId,

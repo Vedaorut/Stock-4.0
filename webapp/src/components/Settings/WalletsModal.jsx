@@ -5,6 +5,8 @@ import { useTelegram } from '../../hooks/useTelegram';
 import { useTranslation } from '../../i18n/useTranslation';
 import { useBackButton } from '../../hooks/useBackButton';
 import { useApi } from '../../hooks/useApi';
+import { useScrollLock } from '../../hooks/useScrollLock';
+import LoadingSpinner from '../common/LoadingSpinner';
 
 const WALLET_PATTERNS = {
   BTC: /^(1|3|bc1)[a-zA-HJ-NP-Z0-9]{25,62}$/,
@@ -353,6 +355,8 @@ export default function WalletsModal({ isOpen, onClose }) {
 
   useBackButton(isOpen ? handleBackButton : null);
 
+  // BUG-WEBAPP-007: Properly manage scroll lock
+  useScrollLock(isOpen);
 
   const walletList = useMemo(() => {
     return orderedWalletTypes
@@ -594,7 +598,7 @@ export default function WalletsModal({ isOpen, onClose }) {
 
               {loading ? (
                 <div className="flex items-center justify-center py-10">
-                  <div className="w-12 h-12 border-4 border-orange-primary border-t-transparent rounded-full animate-spin" />
+                  <LoadingSpinner size="lg" />
                 </div>
               ) : (
                 <>

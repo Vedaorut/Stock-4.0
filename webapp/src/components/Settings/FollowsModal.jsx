@@ -6,7 +6,9 @@ import { useApi } from '../../hooks/useApi';
 import { useBackButton } from '../../hooks/useBackButton';
 import { useTranslation } from '../../i18n/useTranslation';
 import { useStore } from '../../store/useStore';
+import { useScrollLock } from '../../hooks/useScrollLock';
 import FollowCard from '../Follows/FollowCard';
+import LoadingSpinner from '../common/LoadingSpinner';
 
 // Main Modal Component
 export default function FollowsModal({ isOpen, onClose }) {
@@ -35,6 +37,9 @@ export default function FollowsModal({ isOpen, onClose }) {
   }, [onClose]);
 
   useBackButton(isOpen ? handleClose : null);
+
+  // BUG-WEBAPP-007: Properly manage scroll lock
+  useScrollLock(isOpen);
 
   const loadData = useCallback(
     async (signal) => {
@@ -416,7 +421,7 @@ export default function FollowsModal({ isOpen, onClose }) {
               {/* Follows list */}
               {loading ? (
                 <div className="text-center py-12">
-                  <div className="inline-block w-8 h-8 border-4 border-orange-primary border-t-transparent rounded-full animate-spin"></div>
+                  <LoadingSpinner size="md" />
                 </div>
               ) : follows.length > 0 ? (
                 <div className="space-y-3">

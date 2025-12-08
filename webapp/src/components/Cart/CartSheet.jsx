@@ -13,6 +13,7 @@ import {
 } from '../../utils/platform';
 import CartItem from './CartItem';
 import { useBackButton } from '../../hooks/useBackButton';
+import { useScrollLock } from '../../hooks/useScrollLock';
 
 // Lazy load domMax
 const loadDomMax = () => import('framer-motion').then((mod) => mod.domMax);
@@ -43,7 +44,7 @@ const getEmptyEmojiVariants = (android, shouldReduceMotion) => ({
 
 export default function CartSheet() {
   // State Selection
-  const { cart, isCartOpen, setCartOpen, clearCart, startCheckout, myShops } = useStore(
+  const { cart, isCartOpen, setCartOpen, clearCart, startCheckout, myShops, validateCart } = useStore(
     useShallow((state) => ({
       cart: state.cart,
       isCartOpen: state.isCartOpen,
@@ -51,6 +52,7 @@ export default function CartSheet() {
       clearCart: state.clearCart,
       startCheckout: state.startCheckout,
       myShops: state.myShops,
+      validateCart: state.validateCart,
     }))
   );
 
@@ -73,6 +75,12 @@ export default function CartSheet() {
     if (!cartShopId) return false;
     return myShops.some((shop) => shop.id === cartShopId);
   }, [cart, myShops]);
+
+  // BUG-WEBAPP-004: Validate cart and show issues
+  const cartValidation = useMemo(() => {
+    if (cart.length === 0) return { valid: true, errors: [], invalidItems: [] };
+    return validateCart();
+  }, [cart, validateCart]);
 
   // Styles
   const overlayStyle = useMemo(() => getSurfaceStyle('overlay', platform), [platform]);
@@ -115,6 +123,9 @@ export default function CartSheet() {
   };
 
   useBackButton(isCartOpen ? handleClose : null);
+
+  // BUG-WEBAPP-007: Properly manage scroll lock
+  useScrollLock(isCartOpen);
 
   return (
     <AnimatePresence>
@@ -235,6 +246,34 @@ export default function CartSheet() {
                     </span>
                   </div>
 
+                  {/* BUG-WEBAPP-004: Show validation errors */}
+                  {!cartValidation.valid && cartValidation.invalidItems.length > 0 && !isOwnShopCart && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="p-3 rounded-xl bg-red-500/10 border border-red-500/20"
+                    >
+                      <div className="flex items-start gap-2">
+                        <svg className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                        <div className="flex-1">
+                          <p className="text-red-400 text-sm font-semibold mb-1">
+                            {t('cart.validationError') || 'Some items need attention'}
+                          </p>
+                          <ul className="text-red-400/80 text-xs space-y-0.5">
+                            {cartValidation.errors.slice(0, 3).map((error, i) => (
+                              <li key={i}>• {error}</li>
+                            ))}
+                            {cartValidation.errors.length > 3 && (
+                              <li>• +{cartValidation.errors.length - 3} more issues</li>
+                            )}
+                          </ul>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+
                   {isOwnShopCart ? (
                     /* Warning: Cannot order own products */
                     <div className="flex items-center gap-3 p-3 rounded-xl bg-yellow-500/10 border border-yellow-500/20">
@@ -248,19 +287,22 @@ export default function CartSheet() {
                   ) : (
                     <motion.button
                       onClick={handleCheckout}
-                      className="w-full h-12 text-white font-bold rounded-xl overflow-hidden"
+                      disabled={!cartValidation.valid}
+                      className="w-full h-12 text-white font-bold rounded-xl overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed"
                       style={{
-                        background: 'linear-gradient(135deg, #FF6B00 0%, #FF8F3D 100%)',
-                        boxShadow: checkoutShadow,
+                        background: cartValidation.valid
+                          ? 'linear-gradient(135deg, #FF6B00 0%, #FF8F3D 100%)'
+                          : 'rgba(255, 107, 0, 0.3)',
+                        boxShadow: cartValidation.valid ? checkoutShadow : 'none',
                       }}
-                      whileHover={{
+                      whileHover={cartValidation.valid ? {
                         scale: android ? 1.01 : 1.02,
                         boxShadow: checkoutHoverShadow,
-                      }}
-                      whileTap={{
+                      } : {}}
+                      whileTap={cartValidation.valid ? {
                         scale: android ? 0.985 : 0.98,
                         boxShadow: 'inset 0 2px 8px rgba(0, 0, 0, 0.3)',
-                      }}
+                      } : {}}
                       transition={{ ...controlSpring, boxShadow: { duration: 0.18 } }}
                     >
                       {t('cart.checkout')}

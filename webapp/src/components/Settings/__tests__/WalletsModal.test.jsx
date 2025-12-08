@@ -73,6 +73,11 @@ vi.mock('../../../hooks/useBackButton', () => ({
   },
 }));
 
+// Mock useScrollLock hook
+vi.mock('../../../hooks/useScrollLock', () => ({
+  useScrollLock: vi.fn(),
+}));
+
 // Mock framer-motion to avoid animation issues in tests
 vi.mock('framer-motion', async () => {
   const actual = await vi.importActual('framer-motion');

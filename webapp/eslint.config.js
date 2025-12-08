@@ -27,7 +27,7 @@ export default [
       // and imports used as JSX tags (Header, ProductCard, etc.)
       'no-unused-vars': ['warn', {
         argsIgnorePattern: '^(_.*|.*Icon$|props|data)$',
-        varsIgnorePattern: '^(_.*|motion|AnimatePresence|LazyMotion|domAnimation|React|Suspense|App|TelegramProvider|ProductGrid|.*Lazy|.*Page|.*Modal|.*Card|.*List|.*Button|.*Icon|.*Sheet|.*Container|.*Item|.*Form|.*Input|.*Badge|.*Timer|.*Banner|.*Manager|.*Boundary|.*Portal|.*Control|.*Skeleton|.*Dialog|.*Slider|.*Tabs|Header|PageLoader|PageHeader|InteractiveListItem|SegmentedControl|QRCodeSVG|TabIcon|WrapperComponent|Migration.*|Loading.*|Error.*|RateLimitWarning|Channel.*|Subscriber.*|Success.*|Countdown|fireEvent|within|container|user|initial|animate|exit|transition|whileTap|layout)$'
+        varsIgnorePattern: '^(_.*|motion|AnimatePresence|LazyMotion|domAnimation|React|Suspense|App|TelegramProvider|ProductGrid|.*Lazy|.*Page|.*Modal|.*Card|.*List|.*Button|.*Icon|.*Sheet|.*Container|.*Item|.*Form|.*Input|.*Badge|.*Timer|.*Banner|.*Manager|.*Boundary|.*Portal|.*Control|.*Skeleton|.*Dialog|.*Slider|.*Tabs|Header|PageLoader|PageHeader|InteractiveListItem|SegmentedControl|QRCodeSVG|TabIcon|WrapperComponent|Migration.*|Loading.*|Error.*|RateLimitWarning|Channel.*|Subscriber.*|Success.*|Countdown|fireEvent|within|container|user|initial|animate|exit|transition|whileTap|layout|List.*State|.*Spinner|InlineLoader)$'
       }],
       'no-console': ['warn', { allow: ['error'] }],
     },

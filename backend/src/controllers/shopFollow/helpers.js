@@ -7,15 +7,18 @@ import { TIER_LIMITS } from '../../config/subscriptionPricing.js';
 
 /**
  * Get follow limit for tier
- * @param {string} tier - 'pro' or 'max'
+ * @param {string} tier - 'free', 'pro' or 'max'
  * @returns {number} Follow limit (Infinity for max)
  */
 export const getFollowLimit = (tier) => {
   const limits = TIER_LIMITS[tier];
-  return limits ? limits.follows : TIER_LIMITS.pro.follows;
+  // BUG-FOLLOW-005 FIX: Default to FREE tier limits instead of PRO
+  // This ensures unknown/free tiers get restricted access
+  return limits ? limits.follows : TIER_LIMITS.free.follows;
 };
 
-// PRO tier follow limit constant
+// Tier follow limit constants
+export const FREE_TIER_FOLLOW_LIMIT = TIER_LIMITS.free.follows;
 export const PRO_TIER_FOLLOW_LIMIT = TIER_LIMITS.pro.follows;
 
 /**

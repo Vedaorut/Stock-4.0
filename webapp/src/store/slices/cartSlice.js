@@ -112,4 +112,88 @@ export const createCartSlice = (set, get) => ({
   getCartCount: () => {
     return get().cart.reduce((total, item) => total + item.quantity, 0);
   },
+
+  // BUG-WEBAPP-004: Validate cart before checkout
+  // Returns { valid: boolean, errors: string[], invalidItems: array }
+  validateCart: () => {
+    const { cart, myShops } = get();
+    const errors = [];
+    const invalidItems = [];
+
+    if (cart.length === 0) {
+      return { valid: false, errors: ['Cart is empty'], invalidItems: [] };
+    }
+
+    // Check each item
+    cart.forEach((item) => {
+      const itemErrors = [];
+
+      // Check price validity
+      if (!item.price || item.price <= 0) {
+        itemErrors.push('Invalid price');
+      }
+
+      // Check quantity validity
+      if (!item.quantity || item.quantity <= 0) {
+        itemErrors.push('Invalid quantity');
+      }
+
+      // Check stock (for non-preorder items)
+      const isPreorder = item.isPreorder || item.availability === 'preorder';
+      const stock = item.stock_quantity || item.stock || 0;
+
+      if (!isPreorder && item.quantity > stock) {
+        itemErrors.push(`Only ${stock} available`);
+      }
+
+      // Check if item has required data
+      if (!item.id) {
+        itemErrors.push('Missing product ID');
+      }
+
+      if (!item.shopId) {
+        itemErrors.push('Missing shop information');
+      }
+
+      if (itemErrors.length > 0) {
+        invalidItems.push({
+          id: item.id,
+          name: item.name,
+          errors: itemErrors,
+        });
+      }
+    });
+
+    // Check if cart contains items from user's own shop
+    if (myShops?.length > 0) {
+      const cartShopId = cart[0]?.shopId;
+      const isOwnShop = myShops.some((shop) => shop.id === cartShopId);
+
+      if (isOwnShop) {
+        errors.push('Cannot order from your own shop');
+      }
+    }
+
+    // Check all items from same shop
+    const shopIds = [...new Set(cart.map((item) => item.shopId).filter(Boolean))];
+    if (shopIds.length > 1) {
+      errors.push('Cart contains items from multiple shops');
+    }
+
+    // Calculate total
+    const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    if (total <= 0) {
+      errors.push('Cart total must be greater than zero');
+    }
+
+    const hasInvalidItems = invalidItems.length > 0;
+    const hasErrors = errors.length > 0;
+
+    return {
+      valid: !hasInvalidItems && !hasErrors,
+      errors: [...errors, ...invalidItems.flatMap((item) => item.errors.map((e) => `${item.name}: ${e}`))],
+      invalidItems,
+      total,
+    };
+  },
 });

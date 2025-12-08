@@ -7,6 +7,7 @@ import { validateTxHash, extractHashFromInput } from '../../utils/paymentUtils';
 import { usePlatform } from '../../hooks/usePlatform';
 import { isAndroid } from '../../utils/platform';
 import { useBackButton } from '../../hooks/useBackButton';
+import { useScrollLock } from '../../hooks/useScrollLock';
 
 /**
  * PaymentHashModal - Transaction Confirmation
@@ -36,6 +37,9 @@ export default function PaymentHashModal() {
   }, [triggerHaptic, setPaymentStep]);
 
   useBackButton(isOpen ? handleClose : null);
+
+  // BUG-WEBAPP-007: Properly manage scroll lock
+  useScrollLock(isOpen);
 
   const handleSubmit = async () => {
     setError('');

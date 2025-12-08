@@ -474,6 +474,7 @@ export const authController = {
 
   /**
    * Refresh access token using refresh token
+   * Implements token rotation: old token is revoked, new one is issued
    * @route POST /api/auth/refresh
    */
   refreshToken: asyncHandler(async (req, res) => {
@@ -504,6 +505,10 @@ export const authController = {
         throw new UnauthenticatedError('User not found');
       }
 
+      // BUG-AUTH-001 FIX: Token rotation - revoke old token BEFORE issuing new one
+      // This prevents stolen tokens from being used after legitimate refresh
+      await refreshTokenQueries.revoke(tokenHash);
+
       // Generate new access token
       const newAccessToken = jwt.sign(
         {
@@ -516,12 +521,18 @@ export const authController = {
         { expiresIn: config.jwt.expiresIn, algorithm: 'HS256' }
       );
 
-      logger.info(`Token refreshed for user: ${user.telegram_id}`);
+      // BUG-AUTH-001 FIX: Issue new refresh token (rotation)
+      const newRefreshToken = generateRefreshToken();
+      const newRefreshTokenHash = hashRefreshToken(newRefreshToken);
+      await refreshTokenQueries.create(user.id, newRefreshTokenHash);
+
+      logger.info(`Token refreshed with rotation for user: ${user.telegram_id}`);
 
       return res.status(200).json({
         success: true,
         data: {
           token: newAccessToken,
+          refreshToken: newRefreshToken,
         },
       });
     } catch (error) {

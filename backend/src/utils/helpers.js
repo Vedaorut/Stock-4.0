@@ -140,6 +140,21 @@ export const calculatePercentage = (value, total) => {
 };
 
 /**
+ * BUG-PROD-007 FIX: Normalize price to 2 decimal places
+ * Uses Math.round to avoid floating point precision issues
+ * @param {number|string} price - Price to normalize
+ * @returns {number} Normalized price with max 2 decimal places
+ */
+export const normalizePrice = (price) => {
+  const num = parseFloat(price);
+  if (isNaN(num) || num < 0) {
+    return 0;
+  }
+  // Round to 2 decimal places using integer math to avoid floating point errors
+  return Math.round(num * 100) / 100;
+};
+
+/**
  * Validate email format
  */
 export const isValidEmail = (email) => {
@@ -199,6 +214,7 @@ export default {
   sleep,
   safeJSONParse,
   calculatePercentage,
+  normalizePrice,
   isValidEmail,
   maskString,
   getRelativeTime,

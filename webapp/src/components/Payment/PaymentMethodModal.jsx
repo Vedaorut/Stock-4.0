@@ -14,6 +14,7 @@ import {
   isAndroid,
 } from '../../utils/platform';
 import { useBackButton } from '../../hooks/useBackButton';
+import { useScrollLock } from '../../hooks/useScrollLock';
 
 export default function PaymentMethodModal() {
   const {
@@ -103,6 +104,9 @@ export default function PaymentMethodModal() {
   };
 
   useBackButton(isOpen ? handleClose : null);
+
+  // BUG-WEBAPP-007: Properly manage scroll lock
+  useScrollLock(isOpen);
 
   // Fallback: if modal is open but shop is missing
   useEffect(() => {
