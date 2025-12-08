@@ -72,7 +72,13 @@ export const shopQueries = {
 
   // Search active shops by name with optional subscription context
   searchByName: async (name, limit = 10, userId = null) => {
-    const params = [`%${name}%`, limit];
+    // Escape special ILIKE characters to prevent SQL injection
+    const escapedName = name
+      .replace(/\\/g, '\\\\')  // Escape backslashes first
+      .replace(/%/g, '\\%')    // Escape percent signs
+      .replace(/_/g, '\\_');   // Escape underscores
+
+    const params = [`%${escapedName}%`, limit];
     const paramIndex = params.length + 1;
 
     // FIX: Use shop_subscribers table instead of subscriptions

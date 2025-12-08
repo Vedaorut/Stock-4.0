@@ -55,6 +55,13 @@ export const SUBSCRIPTION_TIERS = ['pro', 'max'];
  * Tier limits configuration
  */
 export const TIER_LIMITS = {
+  free: {
+    products: 10,
+    follows: 1,
+    workers: 0,
+    analyticsDays: 7,
+    canMigrate: false,
+  },
   pro: {
     products: 50,
     follows: 2,

@@ -20,11 +20,13 @@ export const createPaymentSlice = (set, get) => ({
   isGeneratingInvoice: false,
 
   // Payment Actions
+  // FIX BUG-WEBAPP-004: Returns validation result for UI feedback
   startCheckout: () => {
     const { cart } = get();
+    const toast = useToastStore.getState().addToast;
 
     if (cart.length === 0) {
-      return;
+      return { success: false, error: 'empty_cart' };
     }
 
     // FIX: Validate cart items
@@ -33,8 +35,8 @@ export const createPaymentSlice = (set, get) => ({
       if (import.meta.env.DEV) {
         console.error('[startCheckout] Invalid cart items:', invalidItems);
       }
-
-      return;
+      toast('Some items in cart are invalid', 'error');
+      return { success: false, error: 'invalid_items' };
     }
 
     // FIX: Validate cart total
@@ -43,8 +45,8 @@ export const createPaymentSlice = (set, get) => ({
       if (import.meta.env.DEV) {
         console.error('[startCheckout] Invalid cart total:', total);
       }
-
-      return;
+      toast('Cart total must be greater than zero', 'error');
+      return { success: false, error: 'invalid_total' };
     }
 
     // FIX: Validate all products from same shop (multi-shop orders not allowed)
@@ -58,8 +60,8 @@ export const createPaymentSlice = (set, get) => ({
           items: cart.map((i) => ({ id: i.id, name: i.name, shopId: i.shopId })),
         });
       }
-
-      return;
+      toast('Cannot checkout items from multiple shops', 'error');
+      return { success: false, error: 'multi_shop' };
     }
 
     // Get shopId from first cart item
@@ -73,7 +75,8 @@ export const createPaymentSlice = (set, get) => ({
 
       // Reopen cart so user can take action
       set({ isCartOpen: true });
-      return;
+      toast('Shop information missing. Please re-add items to cart.', 'error');
+      return { success: false, error: 'no_shop' };
     }
 
     // FIX: Get FULL shop data (including availableCryptos) from currentShop or myShops
@@ -111,6 +114,8 @@ export const createPaymentSlice = (set, get) => ({
       verifyError: null,
       paymentStep: 'method',
     });
+
+    return { success: true };
   },
 
   // Use closure for synchronous lock to prevent race condition on fast double-clicks
@@ -396,103 +401,119 @@ export const createPaymentSlice = (set, get) => ({
     };
   })(), // End of closure IIFE
 
-  submitPaymentHash: async (hash) => {
-    const { currentOrder, selectedCrypto } = get();
+  // Use closure for synchronous lock to prevent race condition on fast double-clicks
+  // FIX BUG-WEBAPP-005: Add processing lock to prevent duplicate payment submissions
+  submitPaymentHash: (() => {
+    let submitInProgress = false; // Synchronous lock
 
-    if (!currentOrder) {
-      return;
-    }
+    return async (hash) => {
+      const { currentOrder, selectedCrypto, isVerifying } = get();
+      const toast = useToastStore.getState().addToast;
 
-    set({ isVerifying: true, verifyError: null });
+      if (!currentOrder) {
+        return;
+      }
 
-    let timeoutId; // Declare before try for finally access
-    const controller = new AbortController();
+      // Check BOTH store state AND closure variable for race prevention
+      if (isVerifying || submitInProgress) {
+        toast('Payment already being submitted', 'warning');
+        return;
+      }
 
-    try {
-      timeoutId = setTimeout(() => controller.abort(), 10000);
+      // Set BOTH locks IMMEDIATELY (synchronous)
+      submitInProgress = true;
+      set({ isVerifying: true, verifyError: null });
 
-      // Use direct crypto payment endpoint (not invoice-based)
-      const { token } = get();
-      const response = await axios.post(
-        `${API_URL}/orders/${currentOrder.id}/submit-payment`,
-        {
-          tx_hash: hash,
-          currency: selectedCrypto,
-        },
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            ...(token && { Authorization: `Bearer ${token}` }),
+      let timeoutId; // Declare before try for finally access
+      const controller = new AbortController();
+
+      try {
+        timeoutId = setTimeout(() => controller.abort(), 10000);
+
+        // Use direct crypto payment endpoint (not invoice-based)
+        const { token } = get();
+        const response = await axios.post(
+          `${API_URL}/orders/${currentOrder.id}/submit-payment`,
+          {
+            tx_hash: hash,
+            currency: selectedCrypto,
           },
-          signal: controller.signal,
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              ...(token && { Authorization: `Bearer ${token}` }),
+            },
+            signal: controller.signal,
+          }
+        );
+
+        if (response.data.success) {
+          // Payment submitted - status is 'pending' until blockchain confirms
+          // Show success UI, verification happens in background
+          const submittedOrder = normalizeOrder({
+            ...currentOrder,
+            crypto: selectedCrypto,
+            txHash: hash,
+            paymentId: response.data.data?.paymentId,
+            status: 'pending', // Will become 'confirmed' after blockchain verification
+            submittedAt: new Date().toISOString(),
+          });
+
+          set({
+            pendingOrders: [...get().pendingOrders, submittedOrder],
+            paymentStep: 'success', // Show success - payment is being verified
+          });
+
+          // Clear cart
+          get().clearCart();
         }
-      );
+      } catch (error) {
+        if (import.meta.env.DEV) {
+          console.error('Verify payment error:', error);
+        }
 
-      if (response.data.success) {
-        // Payment submitted - status is 'pending' until blockchain confirms
-        // Show success UI, verification happens in background
-        const submittedOrder = normalizeOrder({
-          ...currentOrder,
-          crypto: selectedCrypto,
-          txHash: hash,
-          paymentId: response.data.data?.paymentId,
-          status: 'pending', // Will become 'confirmed' after blockchain verification
-          submittedAt: new Date().toISOString(),
-        });
+        // Handle timeout/abort
+        if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
+          set({
+            verifyError: 'Timeout verifying payment',
+          });
+          return; // Don't throw, just return
+        }
+
+        // Detailed error messages for different error types
+        const errorMsg = error.response?.data?.error || error.message;
+        const statusCode = error.response?.status;
+        let userFriendlyError = 'Payment verification error';
+
+        if (statusCode === 404) {
+          userFriendlyError = 'Order not found. Please try again.';
+        } else if (errorMsg?.includes('confirmation')) {
+          userFriendlyError = 'Transaction not yet confirmed. Please wait and try again.';
+        } else if (errorMsg?.includes('amount')) {
+          userFriendlyError = 'Payment amount mismatch. Check the exact amount sent.';
+        } else if (errorMsg?.includes('address') || errorMsg?.includes('wallet')) {
+          userFriendlyError = 'Invalid wallet address. Check recipient address.';
+        } else if (errorMsg?.includes('expired')) {
+          userFriendlyError = 'Payment window expired. Please create a new order.';
+        } else if (errorMsg?.includes('timeout') || errorMsg?.includes('network')) {
+          userFriendlyError = 'Network error. Check your connection and try again.';
+        } else if (errorMsg?.includes('invalid') || errorMsg?.includes('hash')) {
+          userFriendlyError = 'Invalid transaction hash. Check and re-enter.';
+        } else if (errorMsg) {
+          userFriendlyError = errorMsg;
+        }
 
         set({
-          pendingOrders: [...get().pendingOrders, submittedOrder],
-          paymentStep: 'success', // Show success - payment is being verified
+          verifyError: userFriendlyError,
         });
-
-        // Clear cart
-        get().clearCart();
+      } finally {
+        // CRITICAL: Always reset loading state and synchronous lock
+        submitInProgress = false; // Reset synchronous lock
+        set({ isVerifying: false });
+        if (timeoutId) clearTimeout(timeoutId); // Cleanup timeout
       }
-    } catch (error) {
-      if (import.meta.env.DEV) {
-        console.error('Verify payment error:', error);
-      }
-
-      // Handle timeout/abort
-      if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
-        set({
-          verifyError: 'Timeout verifying payment',
-        });
-        return; // Don't throw, just return
-      }
-
-      // Detailed error messages for different error types
-      const errorMsg = error.response?.data?.error || error.message;
-      const statusCode = error.response?.status;
-      let userFriendlyError = 'Payment verification error';
-
-      if (statusCode === 404) {
-        userFriendlyError = 'Order not found. Please try again.';
-      } else if (errorMsg?.includes('confirmation')) {
-        userFriendlyError = 'Transaction not yet confirmed. Please wait and try again.';
-      } else if (errorMsg?.includes('amount')) {
-        userFriendlyError = 'Payment amount mismatch. Check the exact amount sent.';
-      } else if (errorMsg?.includes('address') || errorMsg?.includes('wallet')) {
-        userFriendlyError = 'Invalid wallet address. Check recipient address.';
-      } else if (errorMsg?.includes('expired')) {
-        userFriendlyError = 'Payment window expired. Please create a new order.';
-      } else if (errorMsg?.includes('timeout') || errorMsg?.includes('network')) {
-        userFriendlyError = 'Network error. Check your connection and try again.';
-      } else if (errorMsg?.includes('invalid') || errorMsg?.includes('hash')) {
-        userFriendlyError = 'Invalid transaction hash. Check and re-enter.';
-      } else if (errorMsg) {
-        userFriendlyError = errorMsg;
-      }
-
-      set({
-        verifyError: userFriendlyError,
-      });
-    } finally {
-      // CRITICAL: Always reset loading state
-      set({ isVerifying: false });
-      if (timeoutId) clearTimeout(timeoutId); // Cleanup timeout
-    }
-  },
+    };
+  })(), // End of closure IIFE
 
   // Universal payment flow reset with options
   resetPaymentFlow: (options = {}) => {

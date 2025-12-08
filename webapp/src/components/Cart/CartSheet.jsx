@@ -1,5 +1,5 @@
 import { m as motion, AnimatePresence, LazyMotion, useReducedMotion } from 'framer-motion';
-import { useMemo, useEffect, useRef } from 'react';
+import { useMemo } from 'react';
 import { useStore } from '../../store/useStore';
 import { useShallow } from 'zustand/react/shallow';
 import { useTelegram } from '../../hooks/useTelegram';
@@ -59,7 +59,6 @@ export default function CartSheet() {
   const platform = usePlatform();
   const android = isAndroid(platform);
   const shouldReduceMotion = useReducedMotion();
-  const checkoutTimeoutRef = useRef(null);
 
   // Derived Values
   const total = useMemo(
@@ -92,13 +91,6 @@ export default function CartSheet() {
     [android, shouldReduceMotion]
   );
 
-  // Lifecycle
-  useEffect(() => {
-    return () => {
-      if (checkoutTimeoutRef.current) clearTimeout(checkoutTimeoutRef.current);
-    };
-  }, []);
-
   // Handlers
   const handleClose = () => {
     triggerHaptic('light');
@@ -106,10 +98,15 @@ export default function CartSheet() {
   };
 
   const handleCheckout = () => {
+    // FIX BUG-WEBAPP-004: Validate cart before checkout
+    const result = startCheckout();
+    if (!result?.success) {
+      // Validation failed - toast already shown by startCheckout
+      triggerHaptic('error');
+      return;
+    }
     triggerHaptic('success');
     setCartOpen(false);
-    if (checkoutTimeoutRef.current) clearTimeout(checkoutTimeoutRef.current);
-    checkoutTimeoutRef.current = setTimeout(() => startCheckout(), 200);
   };
 
   const handleClearCart = () => {

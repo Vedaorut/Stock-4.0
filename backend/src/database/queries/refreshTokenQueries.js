@@ -17,9 +17,9 @@ const refreshTokenQueries = {
   async create(userId, tokenHash) {
     const result = await query(
       `INSERT INTO refresh_tokens (user_id, token_hash, expires_at)
-       VALUES ($1, $2, NOW() + INTERVAL '${REFRESH_TOKEN_EXPIRY_DAYS} days')
+       VALUES ($1, $2, NOW() + INTERVAL '1 day' * $3)
        RETURNING id, user_id, expires_at, created_at`,
-      [userId, tokenHash]
+      [userId, tokenHash, REFRESH_TOKEN_EXPIRY_DAYS]
     );
     return result.rows[0];
   },

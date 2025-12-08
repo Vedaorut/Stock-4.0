@@ -448,6 +448,12 @@ export const productQueries = {
       return [];
     }
 
+    // Escape special ILIKE characters to prevent SQL injection
+    const escapedSearch = searchQuery
+      .replace(/\\/g, '\\\\')  // Escape backslashes first
+      .replace(/%/g, '\\%')    // Escape percent signs
+      .replace(/_/g, '\\_');   // Escape underscores
+
     const result = await query(
       `SELECT p.*,
               s.name as shop_name,
@@ -461,7 +467,7 @@ export const productQueries = {
          AND p.name ILIKE $2
        ORDER BY p.created_at DESC
        LIMIT $3`,
-      [shopIds, `%${searchQuery}%`, limit]
+      [shopIds, `%${escapedSearch}%`, limit]
     );
     return result.rows;
   },

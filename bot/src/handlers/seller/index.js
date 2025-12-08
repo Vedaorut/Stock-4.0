@@ -871,29 +871,29 @@ const handleWorkersList = async (ctx) => {
  * SECURITY FIX: Only shop owner can remove workers
  */
 const handleWorkerRemove = async (ctx) => {
-  try {
-    await ctx.answerCbQuery();
+  // BUG-BOT-001 FIX: Track if answerCbQuery was called to prevent double calls
+  let cbQueryAnswered = false;
 
+  try {
     if (!ctx.session.shopId) {
-      await ctx.reply(ctx.t('general.shopRequired'), sellerMenuNoShop);
+      await ctx.answerCbQuery(ctx.t('general.shopRequired'), { show_alert: true });
       return;
     }
 
     if (!ctx.session.token) {
-      const menu = await getSellerMenuKeyboard(ctx);
-      await ctx.reply(ctx.t('general.authorizationRequired'), menu);
+      await ctx.answerCbQuery(ctx.t('general.authorizationRequired'), { show_alert: true });
       return;
     }
 
     // SECURITY FIX: Only shop owner can remove workers
     if (!ctx.session.isShopOwner) {
-      await ctx.reply(ctx.t('seller.workersOwnerOnly'), manageWorkersMenu(getLangSafe(ctx)));
+      await ctx.answerCbQuery(ctx.t('seller.workersOwnerOnly'), { show_alert: true });
       return;
     }
 
     const workerId = Number.parseInt(ctx.match[1], 10);
     if (!Number.isInteger(workerId) || workerId <= 0) {
-      await ctx.answerCbQuery(ctx.t('seller.workerSelectionInvalid'));
+      await ctx.answerCbQuery(ctx.t('seller.workerSelectionInvalid'), { show_alert: true });
       return;
     }
 
@@ -907,10 +907,14 @@ const handleWorkerRemove = async (ctx) => {
     }
 
     if (!worker) {
-      await ctx.answerCbQuery(ctx.t('seller.workerNotFound'));
+      await ctx.answerCbQuery(ctx.t('seller.workerNotFound'), { show_alert: true });
       await showWorkersList(ctx);
       return;
     }
+
+    // Answer callback query only after all validations pass
+    await ctx.answerCbQuery();
+    cbQueryAnswered = true;
 
     const name = getWorkerDisplayName(worker);
     await ctx.reply(
@@ -919,7 +923,9 @@ const handleWorkerRemove = async (ctx) => {
     );
   } catch (error) {
     logger.error('Error in worker remove handler:', error);
-    await ctx.answerCbQuery(ctx.t('general.actionFailed'));
+    if (!cbQueryAnswered) {
+      await ctx.answerCbQuery(ctx.t('general.actionFailed'), { show_alert: true });
+    }
   }
 };
 
@@ -928,31 +934,32 @@ const handleWorkerRemove = async (ctx) => {
  * SECURITY FIX: Only shop owner can remove workers
  */
 const handleWorkerRemoveConfirm = async (ctx) => {
+  // BUG-BOT-001 FIX: Validate first, then answer callback query once
   try {
-    await ctx.answerCbQuery();
-
     if (!ctx.session.shopId) {
-      await ctx.reply(ctx.t('general.shopRequired'), sellerMenuNoShop);
+      await ctx.answerCbQuery(ctx.t('general.shopRequired'), { show_alert: true });
       return;
     }
 
     if (!ctx.session.token) {
-      const menu = await getSellerMenuKeyboard(ctx);
-      await ctx.reply(ctx.t('general.authorizationRequired'), menu);
+      await ctx.answerCbQuery(ctx.t('general.authorizationRequired'), { show_alert: true });
       return;
     }
 
     // SECURITY FIX: Only shop owner can remove workers
     if (!ctx.session.isShopOwner) {
-      await ctx.reply(ctx.t('seller.workersOwnerOnly'), manageWorkersMenu(getLangSafe(ctx)));
+      await ctx.answerCbQuery(ctx.t('seller.workersOwnerOnly'), { show_alert: true });
       return;
     }
 
     const workerId = Number.parseInt(ctx.match[1], 10);
     if (!Number.isInteger(workerId) || workerId <= 0) {
-      await ctx.answerCbQuery(ctx.t('seller.workerSelectionInvalid'));
+      await ctx.answerCbQuery(ctx.t('seller.workerSelectionInvalid'), { show_alert: true });
       return;
     }
+
+    // Answer callback query only after all validations pass
+    await ctx.answerCbQuery();
 
     await workerApi.removeWorker(ctx.session.shopId, workerId, ctx.session.token);
 

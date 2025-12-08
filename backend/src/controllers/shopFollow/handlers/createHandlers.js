@@ -42,6 +42,10 @@ export const createFollow = asyncHandler(async (req, res) => {
       throw new ValidationError('Cannot follow your own shop');
     }
 
+    // BUG-FOLLOW-001: Check if user owns the target shop (self-follow via owner_id)
+    // Must verify after loading shops to properly check owner_id
+    // Note: This is a preliminary check; full check after loading shops below
+
     if (normalizedMode === 'resell') {
       if (markupTypeValue === 'percentage') {
         if (!Number.isFinite(markupPercentageValue)) {
@@ -74,7 +78,12 @@ export const createFollow = asyncHandler(async (req, res) => {
       throw new NotFoundError('Source shop');
     }
 
-    const access = await workerQueries.checkAccess(followerId, req.user.id);
+    // BUG-FOLLOW-001: Prevent self-follow by checking owner_id
+    if (sourceShop.owner_id === req.user.id) {
+      throw new ValidationError('Cannot follow your own shop');
+    }
+
+    const access = await workerQueries.checkAccess(followerId, req.user.id)
     if (!access.hasAccess) {
       throw new UnauthorizedError('You do not have access to this shop');
     }

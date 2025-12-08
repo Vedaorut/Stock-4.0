@@ -163,7 +163,11 @@ export const useWebSocket = () => {
 
         case 'order_status':
           if (data.orderId && data.status) {
-            updateOrderStatus(data.orderId, data.status);
+            // FIX BUG-WEBAPP-003: Ensure orderId is number (WebSocket JSON may send string)
+            const numericOrderId = typeof data.orderId === 'string'
+              ? parseInt(data.orderId, 10)
+              : data.orderId;
+            updateOrderStatus(numericOrderId, data.status);
           }
           break;
 

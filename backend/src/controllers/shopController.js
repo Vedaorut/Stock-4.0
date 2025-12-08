@@ -392,6 +392,11 @@ export const shopController = {
         throw new NotFoundError('Shop');
       }
 
+      // BUG-SHOP-001: Block access to inactive shops via invite code
+      if (!shop.is_active) {
+        throw new NotFoundError('Shop');
+      }
+
       // SECURITY: Filter sensitive data if not owner
       const isOwner = req.user && req.user.id === shop.owner_id;
 

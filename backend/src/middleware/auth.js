@@ -241,6 +241,22 @@ export const requireShopAccess = async (req, res, next) => {
     const isWorker = !!worker;
 
     if (isWorker) {
+      // BUG-WORKER-002: Workers only allowed for MAX tier shops
+      // After downgrade from MAX, workers should lose access
+      if (shop.tier !== 'max') {
+        logger.warn('[requireShopAccess] Worker access denied - shop not on MAX tier', {
+          userId: req.user.id,
+          shopId,
+          workerId: worker.id,
+          shopTier: shop.tier,
+        });
+        return res.status(403).json({
+          success: false,
+          error: 'Worker access requires MAX subscription tier',
+          code: 'WORKER_TIER_REQUIRED',
+        });
+      }
+
       // PROD GUARDRAIL: Log worker mode access for monitoring
       logger.info('[GUARDRAIL] Worker mode access', {
         userId: req.user.id,
@@ -375,17 +391,32 @@ export const requireActiveShop = async (req, res, next) => {
         shopId: shop.id,
         shopName: shop.name,
         userId: req.user?.id,
+        isOwner: shop.owner_id === req.user?.id,
         path: req.path,
         method: req.method,
       });
 
-      return res.status(402).json({
-        success: false,
-        error: 'SUBSCRIPTION_INACTIVE',
-        message: 'Your subscription has expired. Please renew to continue managing your shop.',
-        code: 'SHOP_INACTIVE',
-        renewUrl: '/api/payments/subscription/crystalpay',
-      });
+      // BUG-SHOP-004: Different error messages for owner vs other users
+      const isOwner = shop.owner_id === req.user?.id;
+
+      if (isOwner) {
+        // Owner-specific message with renewal link
+        return res.status(402).json({
+          success: false,
+          error: 'SUBSCRIPTION_INACTIVE',
+          message: 'Your subscription has expired. Please renew to continue managing your shop.',
+          code: 'SHOP_INACTIVE',
+          renewUrl: '/api/payments/subscription/crystalpay',
+        });
+      } else {
+        // Non-owner message (buyers, workers)
+        return res.status(403).json({
+          success: false,
+          error: 'SHOP_UNAVAILABLE',
+          message: 'This shop is temporarily unavailable.',
+          code: 'SHOP_INACTIVE',
+        });
+      }
     }
 
     // Attach shop to request if not already

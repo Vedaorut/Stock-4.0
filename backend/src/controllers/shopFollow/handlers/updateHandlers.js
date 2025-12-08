@@ -119,6 +119,17 @@ export const switchFollowMode = asyncHandler(async (req, res) => {
     const needsSync = normalizedMode === 'resell' &&
       (existingFollow.mode !== 'resell' || existingFollow.synced_products_count === 0);
 
+    // BUG-FOLLOW-003: Delete synced products BEFORE updating mode to prevent orphaned records
+    if (normalizedMode === 'monitor' && existingFollow.mode === 'resell') {
+      const synced = await syncedProductQueries.findByFollowId(followId);
+      if (synced.length > 0) {
+        const syncedProductIds = synced.map((row) => row.synced_product_id);
+        await productQueries.bulkDeleteByIds(syncedProductIds, existingFollow.follower_shop_id);
+        await syncedProductQueries.deleteByFollowId(followId);
+      }
+      await shopFollowQueries.updateMarkup(followId, 0, 'percentage', 0);
+    }
+
     await shopFollowQueries.updateMode(followId, normalizedMode);
 
     if (normalizedMode === 'resell') {
@@ -130,15 +141,6 @@ export const switchFollowMode = asyncHandler(async (req, res) => {
       // Only sync if switching to resell OR if products are missing
       if (needsSync) {
         await syncAllProductsForFollow(followId);
-      }
-    } else {
-      await shopFollowQueries.updateMarkup(followId, 0, 'percentage', 0);
-
-      const synced = await syncedProductQueries.findByFollowId(followId);
-      if (synced.length > 0) {
-        const syncedProductIds = synced.map((row) => row.synced_product_id);
-        await productQueries.bulkDeleteByIds(syncedProductIds, existingFollow.follower_shop_id);
-        await syncedProductQueries.deleteByFollowId(followId);
       }
     }
 

@@ -115,11 +115,11 @@ export async function finalizeSubscriptionPayment(client, { subscription, invoic
       };
     }
 
-    // Update shop to pro tier
+    // Update shop to MAX tier (upgrade is always to MAX)
     // Also clear trial flags in case upgrading from trial
     await client.query(
       `UPDATE shops
-          SET tier = 'pro',
+          SET tier = 'max',
               subscription_status = 'active',
               next_payment_due = $1,
               grace_period_until = NULL,
@@ -132,11 +132,11 @@ export async function finalizeSubscriptionPayment(client, { subscription, invoic
       [periodEnd, subscription.shop_id]
     );
 
-    // Update subscription record
+    // Update subscription record to MAX tier
     await client.query(
       `UPDATE shop_subscriptions
           SET status = 'active',
-              tier = 'pro',
+              tier = 'max',
               verified_at = NOW(),
               period_start = $1,
               period_end = $2,
