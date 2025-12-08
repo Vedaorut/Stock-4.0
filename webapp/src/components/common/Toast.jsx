@@ -109,7 +109,7 @@ const Toast = memo(function Toast({ type = 'info', message, onClose, duration = 
 // Toast Container
 export function ToastContainer({ toasts, removeToast }) {
   return (
-    <div className="fixed top-4 right-4 z-[100] flex flex-col gap-2">
+    <div className="fixed top-[env(safe-area-inset-top)] right-4 z-[100] flex flex-col gap-2 pt-4">
       <AnimatePresence mode="popLayout">
         {toasts.map((toast) => (
           <Toast

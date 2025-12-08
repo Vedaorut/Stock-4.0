@@ -502,6 +502,7 @@ export default function PaymentDetailsModal() {
                   </div>
                   <motion.button
                     onClick={handleCopyWallet}
+                    aria-label="Copy address"
                     className="flex-shrink-0 w-8 h-8 rounded-md flex items-center justify-center"
                     style={{
                       background: copied ? 'rgba(34, 197, 94, 0.24)' : 'rgba(255, 107, 0, 0.22)',

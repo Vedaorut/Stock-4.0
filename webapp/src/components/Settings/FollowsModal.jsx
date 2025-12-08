@@ -313,7 +313,7 @@ export default function FollowsModal({ isOpen, onClose }) {
                       type="text"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      onKeyPress={(e) => e.key === 'Enter' && handleSearchShop()}
+                      onKeyDown={(e) => e.key === 'Enter' && handleSearchShop()}
                       placeholder={t('follows.searchPlaceholder')}
                       className="flex-1 px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:border-orange-primary transition-colors"
                     />

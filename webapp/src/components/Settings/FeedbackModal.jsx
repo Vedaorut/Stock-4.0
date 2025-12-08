@@ -149,10 +149,12 @@ export default function FeedbackModal({ isOpen, onClose }) {
               transition={{ delay: 0.15 }}
             >
               <p className="text-xs text-gray-500 mb-3 uppercase tracking-wide">{t('feedback.categoryLabel')}</p>
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-4 gap-2" role="radiogroup" aria-label={t('feedback.categoryLabel')}>
                 {CATEGORIES.map((cat) => (
                   <motion.button
                     key={cat.id}
+                    role="radio"
+                    aria-checked={category === cat.id}
                     onClick={() => handleCategorySelect(cat.id)}
                     className="p-3 rounded-xl flex flex-col items-center gap-2"
                     style={{

@@ -14,8 +14,9 @@ function ProductForm({ formData, setFormData, onSubmit, saving, editingProduct }
       exit={{ opacity: 0, height: 0 }}
     >
       <div>
-        <label className="text-sm text-gray-400 mb-2 block">{t('products.nameLabel')}</label>
+        <label htmlFor="product-name" className="text-sm text-gray-400 mb-2 block">{t('products.nameLabel')}</label>
         <input
+          id="product-name"
           type="text"
           value={formData.name}
           onChange={(e) => setFormData({ ...formData, name: e.target.value })}
@@ -26,8 +27,9 @@ function ProductForm({ formData, setFormData, onSubmit, saving, editingProduct }
 
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="text-sm text-gray-400 mb-2 block">{t('products.priceLabel')}</label>
+          <label htmlFor="product-price" className="text-sm text-gray-400 mb-2 block">{t('products.priceLabel')}</label>
           <input
+            id="product-price"
             type="number"
             value={formData.price}
             onChange={(e) => setFormData({ ...formData, price: e.target.value })}
@@ -37,8 +39,9 @@ function ProductForm({ formData, setFormData, onSubmit, saving, editingProduct }
           />
         </div>
         <div>
-          <label className="text-sm text-gray-400 mb-2 block">{t('products.stockLabel')}</label>
+          <label htmlFor="product-stock" className="text-sm text-gray-400 mb-2 block">{t('products.stockLabel')}</label>
           <input
+            id="product-stock"
             type="number"
             value={formData.stock}
             onChange={(e) => setFormData({ ...formData, stock: e.target.value })}

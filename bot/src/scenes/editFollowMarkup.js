@@ -6,6 +6,7 @@ import { cancelButton } from '../keyboards/common.js';
 import { reply as cleanReply } from '../utils/cleanReply.js';
 import logger from '../utils/logger.js';
 import { getMessages } from '../texts/messages.js';
+import { t } from '../i18n/index.js';
 
 // Markup type selection keyboard is created dynamically in showMarkupTypeSelection to use ctx.t()
 
@@ -34,11 +35,7 @@ const showMarkupTypeSelection = async (ctx) => {
     if (!followId) {
       logger.error('No followId provided to editFollowMarkup scene');
       // P0-FIX: Show user-friendly error instead of silent leave
-      await ctx.reply(
-        lang === 'ru'
-          ? 'Сессия устарела. Вернитесь в меню подписок.'
-          : 'Session expired. Return to follows menu.'
-      );
+      await ctx.reply(t('general.sessionExpired', {}, lang));
       await ctx.scene.leave();
       // Redirect to follows menu
       const { handleViewFollows } = await import('../handlers/seller/follows.js');

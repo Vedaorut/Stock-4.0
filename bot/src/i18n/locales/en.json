@@ -81,7 +81,9 @@
     "language": "Language",
     "renewSubscription": "Renew subscription",
     "exitTrial": "Exit Trial",
-    "feedback": "Feedback"
+    "feedback": "Feedback",
+    "sendFeedback": "Send Feedback",
+    "cancelFeedback": "Cancel"
   },
   "start": {
     "welcome": "Status Stock. Choose a role to continue."
@@ -108,7 +110,8 @@
     "mainMenu": "Main menu",
     "pleaseWait": "Please wait...",
     "errorRetry": "Error. Try again.",
-    "errorWithReason": "❌ Error: {reason}"
+    "errorWithReason": "❌ Error: {reason}",
+    "sessionExpired": "⚠️ Session expired. Please try /start again."
   },
   "buyer": {
     "searchContext": "Shop Search\n\nEnter the shop ID or name.\n\nExamples:\n12345 (Shop ID)\nShopName (name)\n\nAfter searching, you can open the catalog and add items to cart.",

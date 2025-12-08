@@ -26,7 +26,8 @@
     "copy": "Copy",
     "products": "products",
     "more": "more",
-    "locale": "en-US"
+    "locale": "en-US",
+    "createShop": "Create Shop"
   },
   "product": {
     "syncedFrom": "from {shop}",

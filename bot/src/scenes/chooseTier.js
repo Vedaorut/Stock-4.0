@@ -66,9 +66,7 @@ const chooseTierScene = new Scenes.WizardScene(
     // P1 FIX: Validate token before any API calls in this step
     const token = ctx.session?.token;
     if (!token) {
-      await cleanReply(ctx, lang === 'ru'
-        ? '⚠️ Сессия устарела. Начните заново с /start'
-        : '⚠️ Session expired. Please start again with /start');
+      await cleanReply(ctx, t('general.sessionExpired', {}, lang));
       return ctx.scene.leave();
     }
 

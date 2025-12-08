@@ -165,6 +165,7 @@ export default function PaymentMethodModal() {
                 </div>
                 <motion.button
                   onClick={handleClose}
+                  aria-label="Close"
                   className="w-10 h-10 rounded-xl flex items-center justify-center text-gray-400"
                   style={{
                     background: android ? 'rgba(255, 255, 255, 0.08)' : 'rgba(255, 255, 255, 0.05)',

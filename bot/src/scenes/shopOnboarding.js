@@ -198,11 +198,7 @@ shopOnboardingScene.enter(async (ctx) => {
       });
       // P0-FIX: Show user-friendly error instead of silent leave
       const lang = ctx.lang || ctx.session?.language || 'ru';
-      await ctx.reply(
-        lang === 'ru'
-          ? 'Сессия устарела. Попробуйте /start для начала.'
-          : 'Session expired. Try /start to begin.'
-      );
+      await ctx.reply(t('general.sessionExpired', {}, lang));
       await ctx.scene.leave();
       // Redirect to start handler
       const { handleStart } = await import('../handlers/start.js');
