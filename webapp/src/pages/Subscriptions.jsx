@@ -35,7 +35,7 @@ function SearchResultItem({ product, onClick }) {
         <p className="text-xs text-gray-400 truncate">{product.shop_name || 'Shop'}</p>
       </div>
       <div className="flex-shrink-0 text-right">
-        <p className="text-orange-primary font-semibold">${Math.floor(price)}</p>
+        <p className="text-orange-primary font-semibold">${price % 1 === 0 ? Math.floor(price) : price.toFixed(2)}</p>
       </div>
       <svg className="w-5 h-5 text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />

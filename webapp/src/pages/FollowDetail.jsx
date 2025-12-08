@@ -467,11 +467,11 @@ export default function FollowDetail() {
                             </div>
                             <div className="flex items-center gap-2 mt-1">
                               <span className="text-white/40 text-xs line-through">
-                                ${Math.floor(parseFloat(product.source_product?.price || product.original_price || product.price || 0))}
+                                ${(() => { const p = parseFloat(product.source_product?.price || product.original_price || product.price || 0); return p % 1 === 0 ? Math.floor(p) : p.toFixed(2); })()}
                               </span>
                               <span className="text-[#FF6B00] text-xs">→</span>
                               <span className="text-[#2ECC71] font-bold text-sm">
-                                ${Math.floor(parseFloat(product.synced_product?.price || product.price || 0))}
+                                ${(() => { const p = parseFloat(product.synced_product?.price || product.price || 0); return p % 1 === 0 ? Math.floor(p) : p.toFixed(2); })()}
                               </span>
                             </div>
                           </div>

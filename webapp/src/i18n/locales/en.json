@@ -505,7 +505,17 @@
     "reloadApp": "Reload app",
     "goToMain": "Go to main page",
     "persistentError": "If the problem persists, contact support",
-    "sessionExpired": "Session expired. Restart the app from Telegram."
+    "sessionExpired": "Session expired. Restart the app from Telegram.",
+    "networkError": "Connection issue. Check your internet and try again.",
+    "timeoutError": "Request timed out. Please try again.",
+    "serverError": "Server temporarily unavailable. Please try again later.",
+    "validationFailed": "Please check your input and try again.",
+    "cartEmpty": "Your cart is empty. Add products first.",
+    "cartInvalid": "Some items in cart are invalid. Please clear cart and try again.",
+    "orderNotFound": "Order not found. Please try again.",
+    "paymentFailed": "Payment verification failed. Check your transaction.",
+    "insufficientFunds": "Insufficient funds. Check the amount sent.",
+    "retryLater": "Please try again in a few moments."
   },
   "offline": {
     "title": "No internet connection",
