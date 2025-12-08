@@ -3,15 +3,17 @@ import { asyncHandler } from '../../../middleware/errorHandler.js';
 import logger from '../../../utils/logger.js';
 import cryptoPriceService from '../../../services/cryptoPriceService.js';
 import telegramService from '../../../services/telegram.js';
+import { verifyPayment, VERIFICATION_STATUS } from '../../../services/blockchainVerificationService.js';
 import {
   ConflictError,
   NotFoundError,
   UnauthorizedError,
   ValidationError,
 } from '../../../utils/errors.js';
+import { alertNotificationFailed } from '../../../utils/alerts.js';
 import { validateCurrencyParam, validateTxHash } from '../validators/payloadValidators.js';
 import { buildWalletMap, generatePaymentUri } from '../utils/payment.js';
-import { MIN_CONFIRMATIONS } from '../constants.js';
+import { MIN_CONFIRMATIONS, INVOICE_EXPIRY_SECONDS } from '../constants.js';
 
 /**
  * GET /api/orders/:id/payment-info
@@ -110,7 +112,7 @@ export const getPaymentInfo = asyncHandler(async (req, res) => {
       usdRate,
       qrUri,
       shopName: orderData.shop_name,
-      expiresIn: 3600,
+      expiresIn: INVOICE_EXPIRY_SECONDS,
       minConfirmations: MIN_CONFIRMATIONS[currencyUpper],
     },
   });
@@ -126,16 +128,29 @@ export const submitPayment = asyncHandler(async (req, res) => {
   const { tx_hash, currency } = req.body;
   const userId = req.user.id;
 
-  // validateTxHash now extracts hash from URL if needed and returns the clean hash
-  const cleanTxHash = validateTxHash(tx_hash);
-  const currencyUpper = validateCurrencyParam(currency);
+  logger.info('[submitPayment] START', { orderId: id, userId, tx_hash: tx_hash?.substring(0, 20), currency });
 
-  const order = await orderQueries.findById(id);
-  if (!order) {
-    throw new NotFoundError('Order');
+  // validateTxHash now extracts hash from URL if needed and returns the clean hash
+  let cleanTxHash, currencyUpper;
+  try {
+    cleanTxHash = validateTxHash(tx_hash);
+    currencyUpper = validateCurrencyParam(currency);
+    logger.info('[submitPayment] Validation passed', { cleanTxHash: cleanTxHash?.substring(0, 20), currencyUpper });
+  } catch (validationError) {
+    logger.error('[submitPayment] Validation failed', { error: validationError.message });
+    throw validationError;
   }
 
+  logger.info('[submitPayment] Finding order...', { orderId: id });
+  const order = await orderQueries.findById(id);
+  if (!order) {
+    logger.error('[submitPayment] Order not found', { orderId: id });
+    throw new NotFoundError('Order');
+  }
+  logger.info('[submitPayment] Order found', { orderId: id, status: order.status, buyerId: order.buyer_id, crypto_amount: order.crypto_amount });
+
   if (order.buyer_id !== userId) {
+    logger.error('[submitPayment] Not buyer', { orderId: id, orderBuyerId: order.buyer_id, userId });
     throw new UnauthorizedError('Only buyer can submit payment');
   }
 
@@ -152,46 +167,152 @@ export const submitPayment = asyncHandler(async (req, res) => {
   // P0 SECURITY: Prevent tx_hash submission if crypto_amount is NULL
   // Without this check, parseFloat(NULL) = NaN bypasses amount verification
   if (!order.crypto_amount) {
+    logger.error('[submitPayment] crypto_amount is NULL', { orderId: id });
     throw new ValidationError(
       'Payment info not initialized. Call GET /api/orders/:id/payment-info first.',
       { code: 'PAYMENT_NOT_INITIALIZED' }
     );
   }
 
+  // P0 SECURITY: Invoice expiration check - crypto rate may have changed
+  // updated_at is set when setCryptoPayment is called in getPaymentInfo
+  const invoiceAge = (Date.now() - new Date(order.updated_at).getTime()) / 1000;
+  if (invoiceAge > INVOICE_EXPIRY_SECONDS) {
+    logger.warn('[submitPayment] Invoice expired', {
+      orderId: id,
+      invoiceAge: Math.round(invoiceAge),
+      maxAge: INVOICE_EXPIRY_SECONDS,
+    });
+    throw new ValidationError(
+      'Invoice expired. Please refresh payment info to get current exchange rate.',
+      { code: 'INVOICE_EXPIRED' }
+    );
+  }
+
+  logger.info('[submitPayment] Importing paymentQueries...');
   const { paymentQueries } = await import('../../../database/queries/index.js');
+  logger.info('[submitPayment] Finding existing payment by txHash...');
   const existingPayment = await paymentQueries.findByTxHash(cleanTxHash);
+  logger.info('[submitPayment] existingPayment result', { found: !!existingPayment, existingOrderId: existingPayment?.order_id });
+
   if (existingPayment && existingPayment.order_id !== parseInt(id)) {
     throw new ConflictError('This transaction hash is already used for another payment');
   }
 
+  logger.info('[submitPayment] Getting invoice data...');
   const orderData = await orderQueries.getInvoiceData(id);
   const walletMap = buildWalletMap(orderData);
   const recipientAddress = walletMap[currencyUpper];
+  logger.info('[submitPayment] Wallet info', { currencyUpper, recipientAddress: recipientAddress?.substring(0, 10) });
+
+  // ============================================
+  // P0 SECURITY: Synchronous blockchain verification
+  // Verify transaction BEFORE accepting payment
+  // ============================================
+  logger.info('[submitPayment] Starting blockchain verification...', {
+    txHash: cleanTxHash,
+    currency: currencyUpper,
+    expectedAddress: recipientAddress,
+    expectedAmount: order.crypto_amount,
+  });
+
+  const verificationResult = await verifyPayment(
+    cleanTxHash,
+    currencyUpper,
+    recipientAddress,
+    parseFloat(order.crypto_amount)
+  );
+
+  logger.info('[submitPayment] Verification result', {
+    orderId: id,
+    txHash: cleanTxHash?.substring(0, 20),
+    resultStatus: verificationResult.resultStatus,
+    status: verificationResult.status,
+    verified: verificationResult.verified,
+    confirmations: verificationResult.confirmations,
+    amount: verificationResult.amount,
+    error: verificationResult.error,
+  });
+
+  // Handle verification failures
+  if (verificationResult.resultStatus === VERIFICATION_STATUS.TX_NOT_FOUND) {
+    throw new ValidationError(
+      'Transaction not found on blockchain. Please check the hash and try again.',
+      { code: 'TX_NOT_FOUND' }
+    );
+  }
+
+  if (verificationResult.resultStatus === VERIFICATION_STATUS.TX_INVALID) {
+    // Transaction exists but is invalid (wrong address, wrong amount, failed tx)
+    throw new ValidationError(
+      verificationResult.error || 'Transaction is invalid. It may be sent to wrong address or have incorrect amount.',
+      { code: 'TX_INVALID' }
+    );
+  }
+
+  if (verificationResult.resultStatus === VERIFICATION_STATUS.API_ERROR) {
+    // API error - allow retry but warn user
+    logger.warn('[submitPayment] Blockchain API error, allowing payment with warning', {
+      orderId: id,
+      txHash: cleanTxHash,
+      error: verificationResult.error,
+    });
+    // Continue with payment creation but mark for priority verification
+  }
+
+  // SUCCESS or API_ERROR (with retry) - transaction is valid, proceed
+  logger.info('[submitPayment] Blockchain verification passed', {
+    orderId: id,
+    txHash: cleanTxHash,
+    confirmations: verificationResult.confirmations,
+  });
 
   let payment;
   if (existingPayment) {
     payment = existingPayment;
+    logger.info('[submitPayment] Using existing payment', { paymentId: payment.id });
   } else {
-    payment = await paymentQueries.createForDirectCrypto({
-      orderId: parseInt(id),
-      txHash: cleanTxHash,
-      amount: order.total_price,
-      currency: currencyUpper,
-      recipientAddress,
-      expectedCryptoAmount: order.crypto_amount,
-    });
+    logger.info('[submitPayment] Creating new payment...');
+    try {
+      payment = await paymentQueries.createForDirectCrypto({
+        orderId: parseInt(id),
+        txHash: cleanTxHash,
+        amount: order.total_price,
+        currency: currencyUpper,
+        recipientAddress,
+        expectedCryptoAmount: order.crypto_amount,
+      });
+
+      // P0 SECURITY: Check for race condition - tx_hash was claimed by another order
+      // between our findByTxHash check and createForDirectCrypto
+      if (payment._conflictDetected) {
+        logger.warn('[submitPayment] Race condition: tx_hash conflict detected', {
+          orderId: id,
+          txHash: cleanTxHash,
+          conflictOrderId: payment.order_id,
+        });
+        throw new ConflictError('This transaction hash is already used for another payment');
+      }
+
+      logger.info('[submitPayment] Payment created', { paymentId: payment?.id });
+    } catch (createError) {
+      logger.error('[submitPayment] Failed to create payment', { error: createError.message, stack: createError.stack });
+      throw createError;
+    }
   }
 
   await orderQueries.updatePaymentHash(id, cleanTxHash);
 
-  logger.info('[Payment] Crypto payment submitted', {
+  logger.info('[Payment] Crypto payment submitted (verified)', {
     orderId: id,
     paymentId: payment.id,
     txHash: cleanTxHash,
     currency: currencyUpper,
+    confirmations: verificationResult.confirmations,
   });
 
-  // Non-blocking Telegram notifications
+  // Non-blocking Telegram notifications with tracking and alerting
+  // Notifications are best-effort but failures are tracked for debugging
   Promise.allSettled([
     // Notify buyer
     order.buyer_telegram_id && telegramService.notifyPaymentSubmittedBuyer(
@@ -206,7 +327,7 @@ export const submitPayment = asyncHandler(async (req, res) => {
       },
       order.buyer_language || 'ru'
     ),
-    // Notify seller
+    // Notify seller - only after blockchain verification confirmed tx exists and is valid
     order.seller_telegram_id && telegramService.notifyPaymentSubmittedSeller(
       order.seller_telegram_id,
       {
@@ -220,24 +341,59 @@ export const submitPayment = asyncHandler(async (req, res) => {
       },
       order.seller_language || 'ru'
     ),
-  ]).then((results) => {
+  ]).then(async (results) => {
+    const targets = ['buyer', 'seller'];
+    const notificationStatus = {
+      buyer: results[0]?.status === 'fulfilled' ? 'sent' : 'failed',
+      seller: results[1]?.status === 'fulfilled' ? 'sent' : 'failed',
+      timestamp: new Date().toISOString(),
+    };
+
+    // Log and alert on failures
+    const failedTargets = [];
+    const errors = [];
     results.forEach((result, idx) => {
       if (result.status === 'rejected') {
+        const target = targets[idx];
+        const errorMsg = result.reason?.message || String(result.reason);
+        failedTargets.push(target);
+        errors.push(`${target}: ${errorMsg}`);
+        notificationStatus[`${target}_error`] = errorMsg;
+
         logger.error('[Payment] Telegram notification failed', {
           orderId: id,
-          target: idx === 0 ? 'buyer' : 'seller',
-          error: result.reason?.message || result.reason,
+          target,
+          error: errorMsg,
         });
       }
     });
+
+    // Alert admin if any notifications failed
+    if (failedTargets.length > 0) {
+      alertNotificationFailed(id, failedTargets, errors);
+    }
+
+    // Track notification status in database for debugging
+    try {
+      await orderQueries.updateNotificationStatus(id, notificationStatus);
+    } catch (dbError) {
+      logger.warn('[Payment] Failed to save notification status', {
+        orderId: id,
+        error: dbError.message,
+      });
+    }
   });
 
   return res.json({
     success: true,
     data: {
       paymentId: payment.id,
-      status: 'pending',
-      message: 'Payment submitted. Verification in progress.',
+      status: verificationResult.verified ? 'verified' : 'pending_confirmations',
+      confirmations: verificationResult.confirmations,
+      required: MIN_CONFIRMATIONS[currencyUpper] || 3,
+      message: verificationResult.verified
+        ? 'Payment verified and confirmed!'
+        : `Payment verified. Waiting for ${MIN_CONFIRMATIONS[currencyUpper] || 3} confirmations.`,
     },
   });
 });

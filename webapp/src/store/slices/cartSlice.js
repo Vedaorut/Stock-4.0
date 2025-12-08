@@ -42,6 +42,10 @@ export const createCartSlice = (set, get) => ({
       const shopId = currentShop?.id || product.shop_id || product.shopId || productsShopId;
 
       if (!shopId) {
+        // P1 FIX: Show user-visible error instead of silent failure
+        const toast = useToastStore.getState().addToast;
+        toast({ type: 'error', message: 'Cannot add to cart - shop not found', duration: 3000 });
+
         if (import.meta.env.DEV) {
           console.error('[addToCart] CRITICAL: Cannot add to cart - shopId missing!', product);
         }

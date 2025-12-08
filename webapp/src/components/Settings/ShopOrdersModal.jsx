@@ -353,6 +353,7 @@ export default function ShopOrdersModal({ isOpen, onClose }) {
   // Retry handler
   const handleRetry = useCallback(() => {
     triggerHaptic('light');
+    setError(null); // Clear error first to show loading state
     setRetryTrigger((prev) => prev + 1);
   }, [triggerHaptic]);
 
@@ -360,7 +361,7 @@ export default function ShopOrdersModal({ isOpen, onClose }) {
     setUpdatingOrderId(orderId);
 
     try {
-      const { error: apiError } = await put(`/orders/${orderId}/status`, { status: newStatus });
+      const { error: apiError } = await api.put(`/orders/${orderId}/status`, { status: newStatus });
 
       if (apiError) {
         await alert(`${t('common.error')}: ${apiError}`);

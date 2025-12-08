@@ -1,10 +1,12 @@
 import { query } from '../../config/database.js';
+import logger from '../../utils/logger.js';
 
 /**
  * Payment database queries
  */
 export const paymentQueries = {
   // Create payment record
+  // Atomic upsert - prevents race condition with ON CONFLICT
   create: async (paymentData, client = null) => {
     const {
       orderId = null,
@@ -15,20 +17,37 @@ export const paymentQueries = {
       status,
     } = paymentData;
     const queryFn = client ? client.query.bind(client) : query;
+
+    // Atomic INSERT with ON CONFLICT for race-safe upsert
+    // xmax = 0 means row was inserted, xmax != 0 means row was updated (conflict)
     const result = await queryFn(
       `INSERT INTO payments (order_id, subscription_id, tx_hash, amount, currency, status)
        VALUES ($1, $2, $3, $4, $5, $6)
-       ON CONFLICT (tx_hash) DO UPDATE
-       SET status = CASE
-         WHEN payments.status = 'pending' AND EXCLUDED.status = 'confirmed' THEN 'confirmed'
-         WHEN payments.status = 'failed' AND EXCLUDED.status IN ('pending', 'confirmed') THEN EXCLUDED.status
-         ELSE payments.status
-       END,
-       updated_at = NOW()
-       RETURNING *`,
+       ON CONFLICT (tx_hash) WHERE tx_hash IS NOT NULL DO UPDATE SET
+         status = CASE
+           WHEN payments.status = 'pending' AND EXCLUDED.status = 'confirmed' THEN 'confirmed'
+           WHEN payments.status = 'failed' AND EXCLUDED.status IN ('pending', 'confirmed') THEN EXCLUDED.status
+           ELSE payments.status
+         END,
+         updated_at = NOW()
+       RETURNING *, (xmax = 0) as is_new`,
       [orderId, subscriptionId, txHash, amount, currency, status]
     );
-    return result.rows[0];
+
+    const payment = result.rows[0];
+
+    // PROD GUARDRAIL: Flag and log if conflict occurred with different order_id
+    if (!payment.is_new && payment.order_id !== orderId) {
+      payment._conflictDetected = true;
+      logger.warn('[GUARDRAIL] tx_hash conflict detected in create()', {
+        txHash: txHash?.substring(0, 20),
+        attemptedOrderId: orderId,
+        existingOrderId: payment.order_id,
+        paymentId: payment.id,
+      });
+    }
+
+    return payment;
   },
 
   // Find payment by transaction hash
@@ -80,18 +99,34 @@ export const paymentQueries = {
   },
 
   // Create payment for direct crypto
-  // P0 FIX: Added ON CONFLICT to prevent race condition with duplicate tx_hash
+  // Atomic upsert - prevents race condition with ON CONFLICT
   createForDirectCrypto: async ({ orderId, txHash, amount, currency, recipientAddress, expectedCryptoAmount }) => {
+    // Atomic INSERT with ON CONFLICT for race-safe upsert
+    // xmax = 0 means row was inserted, xmax != 0 means row was updated (conflict)
     const result = await query(
       `INSERT INTO payments (order_id, tx_hash, amount, currency, status, verification_status, recipient_address, expected_crypto_amount)
        VALUES ($1, $2, $3, $4, 'pending', 'pending', $5, $6)
-       ON CONFLICT (tx_hash) DO UPDATE
-       SET updated_at = NOW()
-       WHERE payments.order_id = EXCLUDED.order_id
-       RETURNING *`,
+       ON CONFLICT (tx_hash) WHERE tx_hash IS NOT NULL DO UPDATE SET
+         updated_at = NOW()
+       RETURNING *, (xmax = 0) as is_new`,
       [orderId, txHash, amount, currency, recipientAddress, expectedCryptoAmount]
     );
-    return result.rows[0];
+
+    const payment = result.rows[0];
+
+    // PROD GUARDRAIL: Flag and log if conflict occurred (potential fraud or duplicate tx_hash)
+    if (!payment.is_new && payment.order_id !== orderId) {
+      payment._conflictDetected = true;
+      logger.warn('[GUARDRAIL] tx_hash conflict detected in createForDirectCrypto()', {
+        txHash: txHash?.substring(0, 20),
+        attemptedOrderId: orderId,
+        existingOrderId: payment.order_id,
+        paymentId: payment.id,
+        currency,
+      });
+    }
+
+    return payment;
   },
 };
 

@@ -9,6 +9,31 @@ import { mockApi } from '../mock/api'; // Import mock adapter
 const API_BASE_URL = getApiBaseUrl();
 
 // ============================================
+// P1 FIX: Token Refresh Singleton
+// Prevents race condition when multiple 401s trigger parallel refresh attempts
+// ============================================
+let isRefreshing = false;
+let refreshSubscribers = [];
+
+/**
+ * Subscribe to token refresh completion
+ * @param {Function} callback - Called with new token when refresh completes
+ */
+function subscribeTokenRefresh(callback) {
+  refreshSubscribers.push(callback);
+}
+
+/**
+ * Notify all subscribers that token has been refreshed
+ * @param {string|null} token - New token or null if refresh failed
+ * @param {Error|null} error - Error if refresh failed
+ */
+function onTokenRefreshed(token, error = null) {
+  refreshSubscribers.forEach((callback) => callback(token, error));
+  refreshSubscribers = [];
+}
+
+// ============================================
 // API Response Cache
 // ============================================
 const apiCache = new Map();
@@ -189,6 +214,7 @@ export function useApi() {
             }
 
             // Handle 401 Unauthorized - attempt token refresh and retry ONCE
+            // P1 FIX: Use singleton to prevent parallel refresh attempts
             if (err.response?.status === 401 && !isRetry && isTokenRefreshInitialized()) {
               const errorCode = err.response?.data?.code;
 
@@ -201,9 +227,48 @@ export function useApi() {
                 useStore.getState().setToken(null);
               }
 
+              // P1 FIX: If already refreshing, wait for completion instead of starting new refresh
+              if (isRefreshing) {
+                if (import.meta.env.DEV) {
+                  // eslint-disable-next-line no-console
+                  console.log('[useApi] ⏳ Token refresh in progress, waiting...', endpoint);
+                }
+
+                // Wait for ongoing refresh to complete
+                return new Promise((resolve) => {
+                  subscribeTokenRefresh((newToken, refreshError) => {
+                    if (refreshError || !newToken) {
+                      resolve({ data: null, error: 'Session expired. Please restart the app from Telegram.' });
+                      return;
+                    }
+
+                    // Retry with new token
+                    makeRequest(newToken)
+                      .then((retryResponse) => {
+                        if (shouldCache(method)) {
+                          setCacheWithLimit(cacheKey, {
+                            data: retryResponse.data,
+                            timestamp: Date.now(),
+                            expiry: Date.now() + getCacheTTL(endpoint)
+                          });
+                        }
+                        resolve({ data: retryResponse.data, error: null });
+                      })
+                      .catch((retryErr) => {
+                        const apiError = retryErr.response?.data;
+                        const errorMessage = apiError?.error || apiError?.message || retryErr.message || 'An error occurred';
+                        resolve({ data: null, error: errorMessage });
+                      });
+                  });
+                });
+              }
+
+              // Start refresh process
+              isRefreshing = true;
+
               if (import.meta.env.DEV) {
                 // eslint-disable-next-line no-console
-                console.log('[useApi] 🔄 Got 401, attempting token refresh for:', endpoint);
+                console.log('[useApi] 🔄 Got 401, starting token refresh for:', endpoint);
               }
 
               try {
@@ -214,8 +279,12 @@ export function useApi() {
 
                 if (import.meta.env.DEV) {
                   // eslint-disable-next-line no-console
-                  console.log('[useApi] ✅ Token refreshed, retrying request');
+                  console.log('[useApi] ✅ Token refreshed, notifying subscribers');
                 }
+
+                // Notify waiting requests
+                onTokenRefreshed(newToken, null);
+                isRefreshing = false;
 
                 // Retry the request with new token (mark as retry to prevent infinite loop)
                 const retryResponse = await makeRequest(newToken);
@@ -238,6 +307,11 @@ export function useApi() {
                     hint: 'initData may have expired. Restart the app from Telegram.',
                   });
                 }
+
+                // Notify waiting requests about failure
+                onTokenRefreshed(null, refreshError);
+                isRefreshing = false;
+
                 // Token refresh failed - return user-friendly error
                 return { data: null, error: 'Session expired. Please restart the app from Telegram.' };
               }

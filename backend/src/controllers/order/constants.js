@@ -20,3 +20,6 @@ export const MIN_CONFIRMATIONS = {
   ETH: 12,
   USDT_TRC20: 19,
 };
+
+// Re-export from central config for backwards compatibility
+export { INVOICE_EXPIRY_SECONDS } from '../../config/payments.js';

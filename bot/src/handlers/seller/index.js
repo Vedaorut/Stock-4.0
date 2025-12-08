@@ -511,7 +511,7 @@ export const setupSellerHandlers = (bot) => {
   bot.action('seller:order_history', (ctx) => handleOrderHistory(ctx, 1));
 
   // Order history pagination
-  bot.action(/seller:order_history:(\d+)/, handleOrderHistoryPage);
+  bot.action(/^seller:order_history:(\d+)$/, handleOrderHistoryPage);
 
   // Order history features (placeholders)
   bot.action('seller:order_history:jump', handleOrderHistoryJump);

@@ -101,6 +101,30 @@ const stage = new Scenes.Stage([
 // Configure session middleware with Redis store
 bot.use(createRedisSession(redis));
 
+// P1 FIX: Wrap answerCbQuery to prevent unhandled rejection on timeout
+// Telegram callback queries expire after ~30s, but users may click buttons later
+// This middleware silently catches timeout errors instead of crashing
+bot.use((ctx, next) => {
+  if (ctx.callbackQuery) {
+    const originalAnswerCbQuery = ctx.answerCbQuery.bind(ctx);
+    ctx.answerCbQuery = async (...args) => {
+      try {
+        return await originalAnswerCbQuery(...args);
+      } catch (err) {
+        // Silently ignore timeout/expired callback errors
+        if (err.description?.includes('query is too old') ||
+            err.description?.includes('QUERY_ID_INVALID')) {
+          logger.debug(`[answerCbQuery] Silenced expired callback: ${err.message}`);
+          return;
+        }
+        // Re-throw other errors
+        throw err;
+      }
+    };
+  }
+  return next();
+});
+
 // CRITICAL: /start must ALWAYS reset scene state - even when stuck in a scene
 // This middleware runs BEFORE stage.middleware() so it can clear __scenes first
 bot.use((ctx, next) => {
@@ -214,14 +238,10 @@ bot.catch((err, ctx) => {
     }
   }
 
-  // Force clear __scenes from Redis session on any error
-  // ctx.scene.leave() may not remove __scenes on scene crash
-  if (ctx.session && ctx.session.__scenes) {
-    delete ctx.session.__scenes;
-    logger.info('Cleared __scenes from session after error', {
-      userId: ctx.from?.id,
-    });
-  }
+  // P0 FIX: DO NOT delete ctx.session.__scenes - it breaks scene transitions
+  // ctx.scene.leave() already handles __scenes cleanup properly
+  // Deleting it manually causes race condition when leave() is followed by enter()
+  // If scene is stuck, ctx.scene.leave() above already handled it
 
   // DON'T clear session - preserve shopId, token, role, etc.
   // Only wizard state (ctx.wizard.state) should be cleared, which happens in scene.leave()

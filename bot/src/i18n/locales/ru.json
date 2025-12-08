@@ -627,7 +627,8 @@
     "statusCheckError": "Не удалось проверить статус. Попробуйте позже.",
     "invoiceRetryError": "Не удалось создать новый счёт.",
     "successNoDate": "✅ Апгрейд на MAX подтверждён.",
-    "defaultExpiry": "30 минут"
+    "defaultExpiry": "30 минут",
+    "invalidTxHashFormat": "Неверный формат TX hash для {currency}.\n\nПроверьте и отправьте корректный хеш транзакции."
   },
   "createShop": {
     "enterName": "Введите название магазина",

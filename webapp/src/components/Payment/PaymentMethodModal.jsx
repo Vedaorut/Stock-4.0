@@ -39,7 +39,18 @@ export default function PaymentMethodModal() {
   const platform = usePlatform();
   const android = isAndroid(platform);
 
-  const [generatingStartTime, setGeneratingStartTime] = useState(null);
+  // P0-1: Removed generatingStartTime - now using useEffect-based timer
+  const [showCancelButton, setShowCancelButton] = useState(false);
+
+  // P0-1 FIX: Timer to show Cancel button after 15 seconds
+  useEffect(() => {
+    if (!isGeneratingInvoice) {
+      setShowCancelButton(false);
+      return;
+    }
+    const timeout = setTimeout(() => setShowCancelButton(true), 15000);
+    return () => clearTimeout(timeout);
+  }, [isGeneratingInvoice]);
 
   const overlayStyle = useMemo(() => getSurfaceStyle('overlay', platform), [platform]);
 
@@ -64,7 +75,6 @@ export default function PaymentMethodModal() {
     if (isGeneratingInvoice) return;
 
     triggerHaptic('medium');
-    setGeneratingStartTime(Date.now());
 
     try {
       // Call selectCrypto from store - creates order + invoice + transition to details
@@ -88,7 +98,7 @@ export default function PaymentMethodModal() {
         toast.error(t('payment.selectError'));
       }
     } finally {
-      setGeneratingStartTime(null);
+      // isGeneratingInvoice is reset by paymentSlice.selectCrypto finally block
     }
   };
 
@@ -299,11 +309,14 @@ export default function PaymentMethodModal() {
                 <p className="text-white font-semibold text-lg">{t('payment.generatingInvoice')}</p>
                 <p className="text-gray-400 text-sm mt-2">{t('payment.pleaseWait')}</p>
 
-                {generatingStartTime && Date.now() - generatingStartTime > 15000 && (
+                {/* P0-1 FIX: Use state-driven condition instead of Date.now() */}
+                {showCancelButton && (
                   <motion.button
                     onClick={() => {
+                      // P0-2 FIX: Reset isGeneratingInvoice via store action
+                      useStore.getState().resetPaymentFlow({ keepOrder: true });
                       setPaymentStep('method');
-                      setGeneratingStartTime(null);
+                      setShowCancelButton(false);
                       toast.error(t('payment.timeoutError'));
                     }}
                     className="mt-4 px-6 py-3 rounded-xl bg-red-500 text-white font-semibold"

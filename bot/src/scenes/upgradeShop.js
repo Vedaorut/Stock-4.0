@@ -26,11 +26,12 @@ import {
 } from '../utils/paymentUi.js';
 import { t } from '../i18n/index.js';
 
-// Cancel button for TX Hash input - function to get localized button
-const getCancelButtonHashInput = (lang = 'ru') => {
-  return Markup.inlineKeyboard([
-    [Markup.button.callback(t('buttons.cancel', {}, lang), 'seller:menu')],
-  ]);
+// TX Hash validation patterns per network
+const TX_HASH_PATTERNS = {
+  BTC: /^[a-fA-F0-9]{64}$/,
+  LTC: /^[a-fA-F0-9]{64}$/,
+  ETH: /^0x[a-fA-F0-9]{64}$/,
+  USDT: /^[a-fA-F0-9]{64}$/, // TRC20
 };
 
 const CHAIN_MAPPINGS = {
@@ -360,7 +361,19 @@ ${t('upgradeShop.benefitAnalytics', {}, lang)}`;
         if (data === 'upgrade:paid') {
           await ctx.answerCbQuery();
           ctx.wizard.state.awaitingTxHash = true;
-          await smartMessage.send(ctx, { text: sellerMessages.upgrade.sendHashPrompt(lang), keyboard: getCancelButtonHashInput(lang) });
+
+          // Remove keyboard from QR message to avoid confusion
+          if (ctx.wizard.state.qrMessageId) {
+            await ctx.telegram.editMessageReplyMarkup(
+              ctx.chat.id,
+              ctx.wizard.state.qrMessageId,
+              undefined,
+              { inline_keyboard: [] }
+            ).catch(() => {});
+          }
+
+          // Send clean text prompt WITHOUT inline keyboard
+          await ctx.reply(sellerMessages.upgrade.sendHashPrompt(lang));
           return;
         }
 
@@ -370,10 +383,8 @@ ${t('upgradeShop.benefitAnalytics', {}, lang)}`;
 
       if (!ctx.message?.text) {
         if (ctx.wizard.state.awaitingTxHash) {
-          await smartMessage.send(ctx, {
-            text: ctx.t('seller.enterTxHash') + '\n\n' + sellerMessages.upgrade.sendHashPrompt(lang),
-            keyboard: getCancelButtonHashInput(lang),
-          });
+          // Send clean text prompt WITHOUT inline keyboard
+          await ctx.reply(ctx.t('seller.enterTxHash') + '\n\n' + sellerMessages.upgrade.sendHashPrompt(lang));
         }
         return;
       }
@@ -381,6 +392,14 @@ ${t('upgradeShop.benefitAnalytics', {}, lang)}`;
       const txHash = ctx.message.text.trim();
       if (txHash.length < 10) {
         await smartMessage.send(ctx, { text: sellerMessages.upgrade.hashInvalid(lang) });
+        return;
+      }
+
+      // Validate tx_hash format based on network
+      const currentCurrency = ctx.wizard.state.currency;
+      const pattern = TX_HASH_PATTERNS[currentCurrency];
+      if (pattern && !pattern.test(txHash)) {
+        await ctx.reply(t('upgradeShop.invalidTxHashFormat', { currency: currentCurrency }, lang));
         return;
       }
 
@@ -491,12 +510,15 @@ ${t('upgradeShop.benefitAnalytics', {}, lang)}`;
 
 // Leave handler
 upgradeShopScene.leave(async (ctx) => {
-  ctx.wizard.state = {};
-
-  // Clear __scenes from Redis session to prevent stuck state
-  if (ctx.session && ctx.session.__scenes) {
-    delete ctx.session.__scenes;
+  // P0 FIX: Use assignment instead of delete to prevent TypeError
+  if (ctx.wizard) {
+    ctx.wizard.state = {};
   }
+  ctx.scene.state = {};
+
+  // P0 FIX: REMOVED delete ctx.session.__scenes
+  // Telegraf manages __scenes automatically. Deleting it here can cause
+  // race condition when scene.leave() is followed by scene.enter()
 
   logger.info('[UpgradeShop] Scene left');
 });
@@ -588,18 +610,20 @@ ${t('upgradeShop.invoiceExpires', { expires: expiresLabel }, lang)}
 
 ${t('upgradeShop.afterPaymentHint', {}, lang)}`;
 
-  await ctx.replyWithPhoto(
+  const qrMessage = await ctx.replyWithPhoto(
     { source: qrCodeBuffer },
     {
       caption: message,
       parse_mode: 'HTML',
       ...Markup.inlineKeyboard([
         [Markup.button.callback(t('upgradeShop.enterTxHash', {}, lang), 'upgrade:paid')],
-        [Markup.button.callback(t('upgradeShop.checkStatus', {}, lang), 'upgrade:status')],
         [Markup.button.callback(t('buttons.cancel', {}, lang), 'seller:menu')],
       ]),
     }
   );
+
+  // Save QR message ID to remove keyboard later
+  ctx.wizard.state.qrMessageId = qrMessage.message_id;
 }
 
 export default upgradeShopScene;

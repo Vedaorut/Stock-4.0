@@ -231,12 +231,9 @@ export const handleStart = async (ctx) => {
       await ctx.scene.leave();
     }
 
-    // Force clear __scenes from Redis session
-    // ctx.scene.leave() doesn't always remove __scenes on errors
-    if (ctx.session && ctx.session.__scenes) {
-      delete ctx.session.__scenes;
-      logger.info(`Cleared __scenes from session for user ${ctx.from.id}`);
-    }
+    // P0 FIX: DO NOT delete ctx.session.__scenes - it breaks scene transitions
+    // ctx.scene.leave() above already handles cleanup properly
+    // Deleting it manually causes race condition when leave() is followed by enter()
 
     // Clear conversation history on /start
     delete ctx.session.aiConversation;

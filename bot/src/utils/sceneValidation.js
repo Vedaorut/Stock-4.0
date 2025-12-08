@@ -1,6 +1,7 @@
 import { sellerMenuNoShop } from '../keyboards/seller.js';
 import { shopApi } from './api.js';
 import logger from './logger.js';
+import { Markup } from 'telegraf';
 
 /**
  * Validate shop before entering scene
@@ -110,4 +111,64 @@ export const validateShopBeforeScene = async (ctx, sceneName) => {
     logger.error(`[validateShop] Error validating shop for scene ${sceneName}:`, error);
     throw error;
   }
+};
+
+/**
+ * Validate required session/scene state before scene operations
+ * Returns true if valid, handles error and returns false if not
+ *
+ * Usage inside scenes:
+ * ```javascript
+ * const isValid = await validateSceneState(ctx, {
+ *   shopId: true,
+ *   token: true,
+ *   followId: true
+ * });
+ * if (!isValid) return ctx.scene.leave();
+ * ```
+ *
+ * @param {Context} ctx - Telegraf context
+ * @param {Object} requirements - Required fields to validate
+ * @param {boolean} [requirements.shopId] - Require ctx.session.shopId
+ * @param {boolean} [requirements.token] - Require ctx.session.token
+ * @param {boolean} [requirements.followId] - Require ctx.scene.state.followId
+ * @returns {Promise<boolean>} - true if valid, false if invalid (message already sent)
+ */
+export const validateSceneState = async (ctx, requirements = {}) => {
+  const lang = ctx.lang || ctx.session?.language || 'ru';
+  const missing = [];
+
+  if (requirements.shopId && !ctx.session?.shopId) {
+    missing.push('shopId');
+  }
+  if (requirements.token && !ctx.session?.token) {
+    missing.push('token');
+  }
+  if (requirements.followId && !ctx.scene?.state?.followId) {
+    missing.push('followId');
+  }
+
+  if (missing.length > 0) {
+    logger.warn('[validateSceneState] Missing required state', {
+      userId: ctx.from?.id,
+      missing,
+    });
+
+    const message = lang === 'ru'
+      ? 'Сессия устарела. Вернитесь в главное меню.'
+      : 'Session expired. Return to main menu.';
+
+    await ctx.reply(message, {
+      ...Markup.inlineKeyboard([[
+        Markup.button.callback(
+          lang === 'ru' ? 'Главное меню' : 'Main Menu',
+          'main_menu'
+        )
+      ]])
+    });
+
+    return false;
+  }
+
+  return true;
 };

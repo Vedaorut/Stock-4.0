@@ -241,6 +241,19 @@ export const orderQueries = {
     return result.rows[0];
   },
 
+  // Update notification status after sending payment notifications
+  updateNotificationStatus: async (orderId, notificationStatus) => {
+    const result = await query(
+      `UPDATE orders
+       SET notification_status = $2,
+           updated_at = NOW()
+       WHERE id = $1
+       RETURNING id`,
+      [orderId, JSON.stringify(notificationStatus)]
+    );
+    return result.rows[0];
+  },
+
   // Count orders by shop ID with optional status filter
   countByShopId: async (shopId, statuses = null) => {
     const params = [shopId];

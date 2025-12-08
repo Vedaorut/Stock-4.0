@@ -19,11 +19,15 @@ export const createWorkerSlice = (set, get) => ({
       return;
     }
 
-    // Enter worker mode for this shop
+    // P0 FIX: Clear stale products when switching workspace shop
+    // Without this, worker sees previous shop's products until API refetch
     set({
       workspaceShopId: shop.id,
       workspaceShop: shop,
       isWorkerMode: true,
+      // Clear stale products to force refetch
+      products: [],
+      productsShopId: null,
     });
   },
 

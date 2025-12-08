@@ -219,10 +219,10 @@ addProductScene.leave(async (ctx) => {
   }
   ctx.scene.state = {};
 
-  // Clear __scenes from Redis session to prevent stuck state
-  if (ctx.session && ctx.session.__scenes) {
-    delete ctx.session.__scenes;
-  }
+  // P0 FIX: REMOVED delete ctx.session.__scenes
+  // Telegraf manages __scenes automatically. Deleting it here can cause
+  // race condition when scene.leave() is followed by scene.enter()
+  // The old pattern: delete ctx.session.__scenes - broke scene transitions
 
   logger.info(`User ${ctx.from?.id} left addProduct scene`);
 });

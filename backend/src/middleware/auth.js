@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken';
 import { config } from '../config/env.js';
 import { shopQueries, workerQueries, userQueries } from '../database/queries/index.js';
+import { query } from '../config/database.js';
 import logger from '../utils/logger.js';
 
 /**
@@ -52,19 +53,39 @@ export const verifyToken = async (req, res, next) => {
       });
     }
 
-    // Attach user data to request
+    // PROD GUARDRAIL: Detect language desync between client and server
+    const clientLang = req.headers['accept-language']?.split(',')[0]?.substring(0, 2);
+    const serverLang = userExists.language || 'ru';
+    if (clientLang && clientLang !== serverLang && ['ru', 'en'].includes(clientLang)) {
+      logger.info('[GUARDRAIL] Language desync detected', {
+        userId: decoded.id,
+        clientLang,
+        serverLang,
+        path: req.path,
+      });
+      // Attach preferred language to request for downstream handlers
+      req.preferredLanguage = clientLang;
+    }
+
+    // Attach user data to request (including language for localized errors)
     req.user = {
       id: decoded.id,
       telegram_id: decoded.telegram_id,
       username: decoded.username,
+      language: serverLang,
     };
 
     next();
   } catch (error) {
+    // DEBUG: Always log JWT errors to help debug authentication issues
+    logger.warn('[verifyToken] JWT verification failed', {
+      errorName: error.name,
+      errorMessage: error.message,
+      tokenLength: req.headers.authorization?.split(' ')[1]?.length,
+      secretLength: config.jwt.secret?.length,
+    });
+
     if (error.name === 'JsonWebTokenError') {
-      if (process.env.NODE_ENV === 'test') {
-        logger.warn('[verifyToken] Invalid JWT', { error: error.message });
-      }
       return res.status(401).json({
         success: false,
         error: 'Invalid token',
@@ -72,9 +93,6 @@ export const verifyToken = async (req, res, next) => {
     }
 
     if (error.name === 'TokenExpiredError') {
-      if (process.env.NODE_ENV === 'test') {
-        logger.warn('[verifyToken] Expired JWT', { error: error.message });
-      }
       return res.status(401).json({
         success: false,
         error: 'Token expired',
@@ -223,11 +241,20 @@ export const requireShopAccess = async (req, res, next) => {
     const isWorker = !!worker;
 
     if (isWorker) {
+      // PROD GUARDRAIL: Log worker mode access for monitoring
+      logger.info('[GUARDRAIL] Worker mode access', {
+        userId: req.user.id,
+        shopId,
+        workerId: worker.id,
+        shopOwnerId: shop.owner_id,
+      });
+
       req.shopAccess = {
         shopId,
         accessType: 'worker',
         isOwner: false,
         isWorker: true,
+        workerId: worker.id,
       };
       return next();
     }
@@ -246,9 +273,71 @@ export const requireShopAccess = async (req, res, next) => {
   }
 };
 
+/**
+ * Authenticate middleware (alias for verifyToken)
+ * Use this in routes that require authentication
+ */
+export const authenticate = verifyToken;
+
+/**
+ * Require admin privileges
+ * Must be used AFTER authenticate middleware
+ * Checks is_admin flag in database
+ */
+export const requireAdmin = async (req, res, next) => {
+  try {
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({
+        success: false,
+        error: 'Authentication required',
+      });
+    }
+
+    // Check is_admin flag in database
+    const result = await query(
+      'SELECT is_admin FROM users WHERE id = $1',
+      [req.user.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(401).json({
+        success: false,
+        error: 'User not found',
+      });
+    }
+
+    if (!result.rows[0].is_admin) {
+      logger.warn('[requireAdmin] Non-admin user attempted admin access', {
+        userId: req.user.id,
+        username: req.user.username,
+        path: req.path,
+      });
+      return res.status(403).json({
+        success: false,
+        error: 'Admin privileges required',
+      });
+    }
+
+    // Attach admin flag to request
+    req.user.is_admin = true;
+    next();
+  } catch (error) {
+    logger.error('[requireAdmin] Error checking admin status', {
+      error: error.message,
+      userId: req.user?.id,
+    });
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to verify admin privileges',
+    });
+  }
+};
+
 export default {
   verifyToken,
+  authenticate,
   optionalAuth,
   requireShopOwner,
   requireShopAccess,
+  requireAdmin,
 };

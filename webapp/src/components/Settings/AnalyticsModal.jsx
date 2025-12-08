@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { AnimatePresence,m as motion } from 'framer-motion';
 import PageHeader from '../common/PageHeader';
 import { useApi } from '../../hooks/useApi';
@@ -16,6 +16,7 @@ export default function AnalyticsModal({ isOpen, onClose }) {
   const [analytics, setAnalytics] = useState(null);
   const [customRange, setCustomRange] = useState({ from: '', to: '' });
   const [showCustomPicker, setShowCustomPicker] = useState(false);
+  const abortControllerRef = useRef(null);
 
   const formatUSD = useCallback((amount = 0, fractionDigits = 2) => {
     const value = Number(amount) || 0;
@@ -153,15 +154,32 @@ export default function AnalyticsModal({ isOpen, onClose }) {
     }
   };
 
-  const handleCustomRangeApply = () => {
+  const handleCustomRangeApply = useCallback(() => {
     if (!customRange.from || !customRange.to) {
       return;
     }
 
     triggerHaptic('medium');
     setShowCustomPicker(false);
-    fetchAnalytics();
-  };
+    setLoading(true);
+    setError(null);
+
+    // Abort any in-flight request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
+
+    fetchAnalytics(abortControllerRef.current.signal)
+      .then((result) => {
+        if (result?.status === 'error') {
+          setError(result.error);
+        }
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, [customRange.from, customRange.to, triggerHaptic, fetchAnalytics]);
 
   // Loading skeleton
   if (loading) {
@@ -229,7 +247,21 @@ export default function AnalyticsModal({ isOpen, onClose }) {
             >
               <p className="text-red-500 mb-4">{error}</p>
               <button
-                onClick={fetchAnalytics}
+                onClick={() => {
+                  setLoading(true);
+                  setError(null);
+                  if (abortControllerRef.current) {
+                    abortControllerRef.current.abort();
+                  }
+                  abortControllerRef.current = new AbortController();
+                  fetchAnalytics(abortControllerRef.current.signal)
+                    .then((result) => {
+                      if (result?.status === 'error') {
+                        setError(result.error);
+                      }
+                    })
+                    .finally(() => setLoading(false));
+                }}
                 className="bg-orange-primary text-white px-6 py-3 rounded-xl"
               >
                 {t('common.retry')}

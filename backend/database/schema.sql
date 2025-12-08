@@ -306,18 +306,22 @@ CREATE TABLE payments (
     tx_hash VARCHAR(255),
     amount DECIMAL(18, 8) NOT NULL,
     currency VARCHAR(10) NOT NULL CHECK (currency IN ('BTC', 'ETH', 'USDT', 'LTC', 'USDT_TRC20')),
-    status VARCHAR(50) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'confirmed', 'failed')),
+    status VARCHAR(50) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'confirmed', 'failed', 'needs_review')),
     confirmations INTEGER NOT NULL DEFAULT 0,
     verified_at TIMESTAMP,
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
     -- Direct crypto verification fields (migration 043)
-    verification_status VARCHAR(20) DEFAULT 'pending' CHECK (verification_status IN ('pending', 'verifying', 'confirmed', 'failed', 'expired')),
+    verification_status VARCHAR(20) DEFAULT 'pending' CHECK (verification_status IN ('pending', 'verifying', 'confirmed', 'failed', 'expired', 'late_confirmed')),
     last_checked_at TIMESTAMP,
     blockchain_confirmations INTEGER DEFAULT 0,
     verification_error VARCHAR(255),
     recipient_address VARCHAR(255),
     expected_crypto_amount DECIMAL(20, 8),
+    -- Admin review fields (migration 062)
+    reviewed_at TIMESTAMP,
+    reviewed_by INTEGER REFERENCES users(id),
+    review_notes TEXT,
     CONSTRAINT check_payment_reference CHECK (
         (order_id IS NOT NULL AND subscription_id IS NULL) OR
         (order_id IS NULL AND subscription_id IS NOT NULL)
@@ -333,12 +337,18 @@ COMMENT ON COLUMN payments.verification_status IS 'Blockchain verification statu
 COMMENT ON COLUMN payments.blockchain_confirmations IS 'Number of blockchain confirmations';
 COMMENT ON COLUMN payments.recipient_address IS 'Payment address used for the invoice';
 COMMENT ON COLUMN payments.expected_crypto_amount IS 'Expected crypto amount for verification';
+COMMENT ON COLUMN payments.reviewed_at IS 'When admin reviewed the late payment';
+COMMENT ON COLUMN payments.reviewed_by IS 'Admin user who reviewed the payment';
+COMMENT ON COLUMN payments.review_notes IS 'Admin notes about the review decision';
 
 CREATE INDEX idx_payments_pending_verification
 ON payments(status, created_at) WHERE status = 'pending' AND subscription_id IS NULL;
 
-CREATE UNIQUE INDEX idx_payments_tx_hash_unique 
+CREATE UNIQUE INDEX idx_payments_tx_hash_unique
 ON payments(tx_hash) WHERE tx_hash IS NOT NULL;
+
+CREATE INDEX idx_payments_needs_review
+ON payments(status) WHERE status = 'needs_review';
 
 
 -- ============================================

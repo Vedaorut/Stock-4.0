@@ -63,6 +63,15 @@ const chooseTierScene = new Scenes.WizardScene(
     const lang = ctx.lang || ctx.session?.language || 'ru';
     const { subscription: subMessages } = getMessages(lang);
 
+    // P1 FIX: Validate token before any API calls in this step
+    const token = ctx.session?.token;
+    if (!token) {
+      await cleanReply(ctx, lang === 'ru'
+        ? '⚠️ Сессия устарела. Начните заново с /start'
+        : '⚠️ Session expired. Please start again with /start');
+      return ctx.scene.leave();
+    }
+
     // Handle callback queries
     if (ctx.callbackQuery) {
       const action = ctx.callbackQuery.data;

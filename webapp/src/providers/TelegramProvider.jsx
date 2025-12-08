@@ -28,6 +28,9 @@ import { setSentryUser } from '../lib/sentry';
 
 const TelegramContext = createContext(null);
 
+// Maximum time to wait for SDK initialization before showing error
+const SDK_INIT_TIMEOUT_MS = 15000;
+
 /**
  * TelegramProvider - unified context for Telegram WebApp
  * Initializes ONCE for the entire app, instead of creating a hook in each component
@@ -37,6 +40,7 @@ export function TelegramProvider({ children }) {
   const [isReady, setIsReady] = useState(false);
   const [isValidating, setIsValidating] = useState(true);
   const [error, setError] = useState(null);
+  const [initError, setInitError] = useState(null); // SDK load failure error
   const [backendUser, setBackendUser] = useState(null); // User from backend (includes selected_role)
   const initializationRef = useRef(false);
   const apiLoggedRef = useRef(false);
@@ -171,6 +175,19 @@ export function TelegramProvider({ children }) {
     initialize();
   }, [validateTelegramAuth, waitForTelegramSDK]); // Runs ONCE per app
 
+  // Safety timeout: escape infinite loading if SDK never loads
+  useEffect(() => {
+    if (!isValidating) return;
+
+    const timeout = setTimeout(() => {
+      console.error('[TelegramProvider] SDK initialization timeout after', SDK_INIT_TIMEOUT_MS, 'ms');
+      setIsValidating(false);
+      setInitError('Telegram SDK failed to load. Please refresh the page.');
+    }, SDK_INIT_TIMEOUT_MS);
+
+    return () => clearTimeout(timeout);
+  }, [isValidating]);
+
   // Main Button
   const setMainButton = useCallback((text, onClick) => {
     showMainButton(text, onClick);
@@ -246,6 +263,7 @@ export function TelegramProvider({ children }) {
       isReady,
       isValidating,
       error,
+      initError,
 
       // Methods (all stable via useCallback)
       setMainButton,
@@ -264,6 +282,7 @@ export function TelegramProvider({ children }) {
       isReady,
       isValidating,
       error,
+      initError,
       setMainButton,
       removeMainButton,
       setBackButton,
@@ -275,6 +294,38 @@ export function TelegramProvider({ children }) {
       close,
     ]
   );
+
+  // Show error UI if SDK failed to load (timeout or fatal error)
+  if (initError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-900 p-4">
+        <div className="text-center max-w-sm">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-500/20 flex items-center justify-center">
+            <svg
+              className="w-8 h-8 text-red-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+              />
+            </svg>
+          </div>
+          <p className="text-red-400 mb-4 text-sm">{initError}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-xl transition-colors"
+          >
+            Reload
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return <TelegramContext.Provider value={value}>{children}</TelegramContext.Provider>;
 }

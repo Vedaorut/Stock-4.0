@@ -7,6 +7,7 @@ import {
 import { getClient } from '../config/database.js';
 import logger from '../utils/logger.js';
 import invoicePaymentService from '../services/invoicePaymentService.js';
+import metricsCollector from '../services/metricsCollector.js';
 
 const router = express.Router();
 
@@ -178,6 +179,8 @@ router.post('/crystalpay', async (req, res) => {
     await client.query('ROLLBACK').catch((rollbackErr) => {
       logger.error('[Webhook] ROLLBACK failed:', rollbackErr);
     });
+    // Record webhook failure metric
+    metricsCollector.recordWebhookFailure('crystalpay', error);
     logger.error('[Webhook] CrystalPay error', { error: error.message });
     return res.status(500).json({ error: 'Internal error' });
   } finally {

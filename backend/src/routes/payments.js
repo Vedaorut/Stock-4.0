@@ -4,6 +4,7 @@ import { paymentValidation } from '../middleware/validation.js';
 import { verifyToken } from '../middleware/auth.js';
 import { optionalTelegramAuth } from '../middleware/telegramAuth.js';
 import { strictPaymentLimiter } from '../middleware/rateLimiter.js';
+import { requirePaymentsEnabled, requireSubscriptionsEnabled } from '../middleware/featureFlags.js';
 import { createCrystalPayInvoice } from '../services/subscriptionInvoiceService.js';
 import { invoiceQueries, subscriptionQueries } from '../database/queries/index.js';
 import { getPrice } from '../config/subscriptionPricing.js';
@@ -23,6 +24,7 @@ const router = express.Router();
 router.post(
   '/verify',
   verifyToken,
+  requirePaymentsEnabled,
   optionalTelegramAuth,
   strictPaymentLimiter, // P1-SEC-004: Changed from paymentLimiter to strictPaymentLimiter
   paymentValidation.verify,
@@ -55,14 +57,14 @@ router.get('/status', verifyToken, optionalTelegramAuth, paymentController.check
  * @access  Private (Bot server-side)
  * @note    No optionalTelegramAuth - Bot cannot provide x-telegram-init-data header
  */
-router.post('/qr', verifyToken, paymentController.generateQR);
+router.post('/qr', verifyToken, requirePaymentsEnabled, paymentController.generateQR);
 
 /**
  * @route   POST /api/payments/subscriptions/:id/invoice/crystalpay
  * @desc    Create CrystalPay invoice for subscription payment
  * @access  Private (Bot)
  */
-router.post('/subscriptions/:id/invoice/crystalpay', verifyToken, async (req, res) => {
+router.post('/subscriptions/:id/invoice/crystalpay', verifyToken, requireSubscriptionsEnabled, async (req, res) => {
   try {
     const subscriptionId = parseInt(req.params.id);
     const { method, purpose } = req.body;

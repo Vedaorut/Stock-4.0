@@ -8,6 +8,7 @@ import express from 'express';
 import * as subscriptionController from '../controllers/subscriptionController.js';
 import { verifyToken, requireShopOwner } from '../middleware/auth.js';
 import { subscriptionCreationLimiter, strictPaymentLimiter } from '../middleware/rateLimiter.js';
+import { requireSubscriptionsEnabled } from '../middleware/featureFlags.js';
 
 const router = express.Router();
 
@@ -35,6 +36,7 @@ router.use(verifyToken);
  */
 router.post(
   '/pending',
+  requireSubscriptionsEnabled,
   subscriptionCreationLimiter,
   subscriptionController.createPendingSubscription
 );
@@ -106,7 +108,7 @@ router.get('/history/:shopId', requireShopOwner, subscriptionController.getHisto
  * }
  */
 // SECURITY FIX: Add rate limiter to prevent invoice generation abuse
-router.post('/:id/payment/generate', strictPaymentLimiter, subscriptionController.generatePaymentInvoice);
+router.post('/:id/payment/generate', requireSubscriptionsEnabled, strictPaymentLimiter, subscriptionController.generatePaymentInvoice);
 
 /**
  * POST /api/subscriptions/:id/upgrade/payment/generate
@@ -115,6 +117,7 @@ router.post('/:id/payment/generate', strictPaymentLimiter, subscriptionControlle
 // SECURITY FIX: Add rate limiter to prevent invoice generation abuse
 router.post(
   '/:id/upgrade/payment/generate',
+  requireSubscriptionsEnabled,
   strictPaymentLimiter,
   subscriptionController.generateUpgradePaymentInvoice
 );
@@ -136,13 +139,13 @@ router.get('/:id/upgrade/payment/status', subscriptionController.getUpgradePayme
  * Manually confirm payment by tx hash (on-chain verification)
  */
 // SECURITY FIX: Add rate limiter to prevent payment confirmation abuse
-router.post('/:id/payment/confirm', strictPaymentLimiter, subscriptionController.confirmPaymentWithTxHash);
+router.post('/:id/payment/confirm', requireSubscriptionsEnabled, strictPaymentLimiter, subscriptionController.confirmPaymentWithTxHash);
 
 /**
  * POST /api/subscriptions/:id/upgrade/payment/confirm
  * Manually confirm upgrade payment by tx hash
  */
 // SECURITY FIX: Add rate limiter to prevent upgrade payment confirmation abuse
-router.post('/:id/upgrade/payment/confirm', strictPaymentLimiter, subscriptionController.confirmUpgradePaymentWithTxHash);
+router.post('/:id/upgrade/payment/confirm', requireSubscriptionsEnabled, strictPaymentLimiter, subscriptionController.confirmUpgradePaymentWithTxHash);
 
 export default router;

@@ -1,4 +1,5 @@
 import { query } from '../../config/database.js';
+import { INVOICE_EXPIRY_SECONDS } from '../../config/payments.js';
 
 /**
  * Invoice database queries for CrystalPay payment gateway
@@ -17,9 +18,9 @@ export const invoiceQueries = {
     const result = await query(
       `INSERT INTO invoices (subscription_id, chain, address, address_index,
        expected_amount, currency, expires_at, status, purpose)
-       VALUES ($1, 'CRYSTALPAY', NULL, NULL, $2, $3, NOW() + INTERVAL '1 hour', 'pending', $4)
+       VALUES ($1, 'CRYSTALPAY', NULL, NULL, $2, $3, NOW() + make_interval(secs => $5), 'pending', $4)
        RETURNING *`,
-      [subscriptionId, amount, currency, purpose]
+      [subscriptionId, amount, currency, purpose, INVOICE_EXPIRY_SECONDS]
     );
     return result.rows[0];
   },

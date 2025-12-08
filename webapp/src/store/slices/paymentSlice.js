@@ -113,29 +113,31 @@ export const createPaymentSlice = (set, get) => ({
     });
   },
 
-  createOrder: async () => {
-    const { cart, isCreatingOrder } = get();
+  // Use closure for synchronous lock to prevent race condition on fast double-clicks
+  createOrder: (() => {
+    let orderInProgress = false; // Synchronous lock (same pattern as selectCrypto)
 
-    // FIX: Atomic check-and-set to prevent race condition
-    if (isCreatingOrder) {
-      return null;
-    }
+    return async () => {
+      const { cart, isCreatingOrder } = get();
+      const toast = useToastStore.getState().addToast;
 
-    if (cart.length === 0) return null;
-
-    // Set flag IMMEDIATELY before any async operations
-    set({ isCreatingOrder: true });
-
-    // Defensive re-check after set (paranoid mode)
-    if (get().isCreatingOrder !== true) {
-      if (import.meta.env.DEV) {
-        console.error('[createOrder] Race condition detected, aborting');
+      // Check BOTH store state AND closure variable for race prevention
+      if (isCreatingOrder || orderInProgress) {
+        toast('Order already being created', 'warning');
+        return null;
       }
-      return null;
-    }
 
-    let timeoutId; // Moved BEFORE try block for finally access
-    try {
+      if (cart.length === 0) {
+        toast('Cart is empty', 'warning');
+        return null;
+      }
+
+      // Set BOTH locks IMMEDIATELY (synchronous)
+      orderInProgress = true;
+      set({ isCreatingOrder: true });
+
+      let timeoutId; // Moved BEFORE try block for finally access
+      try {
       const initData = window.Telegram?.WebApp?.initData || '';
 
       const controller = new AbortController();
@@ -164,7 +166,7 @@ export const createPaymentSlice = (set, get) => ({
           console.error('[createOrder] Invalid items in cart!', invalidItems);
           console.error('Full cart state:', cart);
         }
-
+        toast('Invalid items in cart', 'error');
         return null;
       }
 
@@ -226,12 +228,14 @@ export const createPaymentSlice = (set, get) => ({
       }
 
       throw error;
-    } finally {
-      // CRITICAL: Always cleanup timeout and reset loading state
-      if (timeoutId) clearTimeout(timeoutId);
-      set({ isCreatingOrder: false });
-    }
-  },
+      } finally {
+        // CRITICAL: Always cleanup timeout and reset loading state
+        orderInProgress = false; // Reset synchronous lock
+        set({ isCreatingOrder: false });
+        if (timeoutId) clearTimeout(timeoutId);
+      }
+    };
+  })(), // End of createOrder closure IIFE
 
   // Use closure for synchronous lock to prevent race condition on fast double-clicks
   selectCrypto: (() => {
@@ -553,6 +557,10 @@ export const createPaymentSlice = (set, get) => ({
         state.currentOrder?.id === orderId
           ? { ...state.currentOrder, status }
           : state.currentOrder,
+      // P1-3 FIX: Also update pendingOrders for real-time status sync
+      pendingOrders: state.pendingOrders?.map((order) =>
+        order.id === orderId ? { ...order, status } : order
+      ),
     }));
   },
 });

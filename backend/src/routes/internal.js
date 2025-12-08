@@ -4,6 +4,10 @@ import crypto from 'crypto';
 import logger from '../utils/logger.js';
 import { config } from '../config/env.js';
 import { userQueries } from '../database/queries/index.js';
+import { getFeatureStatus } from '../middleware/featureFlags.js';
+import metricsCollector from '../services/metricsCollector.js';
+import alertService from '../services/alertService.js';
+import { pool } from '../config/database.js';
 
 const router = express.Router();
 
@@ -225,6 +229,111 @@ router.get('/health', verifyInternalSecret, (req, res) => {
       timestamp: new Date().toISOString(),
     },
   });
+});
+
+/**
+ * GET /api/internal/status/features
+ * Public endpoint to check feature flags status (for WebApp/Bot polling)
+ * No authentication required - just returns feature availability
+ */
+router.get('/status/features', getFeatureStatus);
+
+/**
+ * GET /api/internal/status/metrics
+ * P0 Metrics endpoint for production monitoring
+ * Returns rolling window metrics for errors, workers, webhooks
+ */
+router.get('/status/metrics', verifyInternalSecret, (req, res) => {
+  try {
+    const metrics = metricsCollector.getMetrics();
+
+    // Check thresholds and log alerts
+    const alerts = metricsCollector.checkThresholds();
+    if (alerts.length > 0) {
+      // Fire alerts asynchronously (non-blocking)
+      alertService.checkAndAlert(metricsCollector).catch((err) => {
+        logger.error('[Metrics] Alert check failed:', err);
+      });
+    }
+
+    res.json({
+      success: true,
+      data: metrics,
+      alerts: alerts.length > 0 ? alerts : undefined,
+    });
+  } catch (error) {
+    logger.error('[Metrics] Error fetching metrics:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to collect metrics',
+    });
+  }
+});
+
+/**
+ * GET /api/internal/status/golden
+ * Golden Signals endpoint (SRE standard)
+ * Returns: latency, traffic, errors, saturation
+ */
+router.get('/status/golden', verifyInternalSecret, async (req, res) => {
+  try {
+    const golden = metricsCollector.getGoldenSignals();
+
+    // Enrich saturation with database pool metrics
+    try {
+      const totalCount = pool.totalCount || 0;
+      const idleCount = pool.idleCount || 0;
+      const maxConnections = pool.options?.max || 20;
+
+      golden.saturation.dbPoolUsage = totalCount > 0 ? parseFloat(((totalCount - idleCount) / maxConnections).toFixed(2)) : 0;
+
+      golden.saturation.dbPool = {
+        total: totalCount,
+        idle: idleCount,
+        active: totalCount - idleCount,
+        max: maxConnections,
+      };
+    } catch (dbErr) {
+      logger.warn('[Golden] Failed to get DB pool metrics:', dbErr.message);
+    }
+
+    res.json({
+      success: true,
+      data: golden,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    logger.error('[Golden] Error fetching golden signals:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to collect golden signals',
+    });
+  }
+});
+
+/**
+ * GET /api/internal/status/alerts
+ * Check current alert status and rate limits
+ */
+router.get('/status/alerts', verifyInternalSecret, (req, res) => {
+  try {
+    const thresholds = metricsCollector.checkThresholds();
+    const rateLimitStatus = alertService.getRateLimitStatus();
+
+    res.json({
+      success: true,
+      data: {
+        activeAlerts: thresholds,
+        rateLimits: rateLimitStatus,
+      },
+    });
+  } catch (error) {
+    logger.error('[Alerts] Error fetching alert status:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to check alerts',
+    });
+  }
 });
 
 /**

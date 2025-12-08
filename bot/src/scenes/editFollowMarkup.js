@@ -33,7 +33,16 @@ const showMarkupTypeSelection = async (ctx) => {
     const followId = ctx.scene.state.followId;
     if (!followId) {
       logger.error('No followId provided to editFollowMarkup scene');
-      return ctx.scene.leave();
+      // P0-FIX: Show user-friendly error instead of silent leave
+      await ctx.reply(
+        lang === 'ru'
+          ? 'Сессия устарела. Вернитесь в меню подписок.'
+          : 'Session expired. Return to follows menu.'
+      );
+      await ctx.scene.leave();
+      // Redirect to follows menu
+      const { handleViewFollows } = await import('../handlers/seller/follows.js');
+      return handleViewFollows(ctx);
     }
 
     const now = Date.now();
@@ -275,16 +284,15 @@ editFollowMarkupScene.leave(async (ctx) => {
   delete ctx.session.editingFollowTimestamp;
   delete ctx.session.pendingModeSwitch;
 
-  // Clear wizard state (P1-2 fix)
+  // P0 FIX: Use assignment instead of delete to prevent TypeError
   if (ctx.wizard) {
-    delete ctx.wizard.state;
+    ctx.wizard.state = {};
   }
   ctx.scene.state = {};
 
-  // Clear __scenes from Redis session to prevent getting stuck
-  if (ctx.session && ctx.session.__scenes) {
-    delete ctx.session.__scenes;
-  }
+  // P0 FIX: REMOVED delete ctx.session.__scenes
+  // Telegraf manages __scenes automatically. Deleting it here can cause
+  // race condition when scene.leave() is followed by scene.enter()
 
   logger.info(`User ${ctx.from?.id} left editFollowMarkup scene`);
 });

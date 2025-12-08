@@ -133,24 +133,33 @@ export const useWebSocket = () => {
           // Heartbeat response
           break;
 
-        case 'product_added':
-          if (data.shopId) {
+        case 'product_added': {
+          // P1 FIX: Only refetch if this is the shop user is currently viewing
+          const currentShopId = useStore.getState().currentShop?.id;
+          if (data.shopId && data.shopId === currentShopId) {
             refetchProducts(data.shopId);
           }
           break;
+        }
 
-        case 'product:updated':
-          if (data.shopId || data.data?.shopId) {
-            const shopId = data.shopId || data.data?.shopId;
+        case 'product:updated': {
+          // P1 FIX: Only refetch if this is the shop user is currently viewing
+          const shopId = data.shopId || data.data?.shopId;
+          const currentShopId = useStore.getState().currentShop?.id;
+          if (shopId && shopId === currentShopId) {
             refetchProducts(shopId);
           }
           break;
+        }
 
-        case 'product_deleted':
-          if (data.shopId) {
+        case 'product_deleted': {
+          // P1 FIX: Only refetch if this is the shop user is currently viewing
+          const currentShopId = useStore.getState().currentShop?.id;
+          if (data.shopId && data.shopId === currentShopId) {
             refetchProducts(data.shopId);
           }
           break;
+        }
 
         case 'order_status':
           if (data.orderId && data.status) {

@@ -32,9 +32,22 @@ export default function OrderStatusModal() {
     clearCheckout();
   };
 
-  useBackButton(isOpen ? handleClose : null);
+  // Hooks must be called unconditionally (Rules of Hooks)
+  useBackButton(isOpen && currentOrder && cryptoInfo ? handleClose : null);
 
-  if (!currentOrder || !cryptoInfo) return null;
+  // Show loading state if modal is open but data not ready yet
+  if (!currentOrder || !cryptoInfo) {
+    if (!isOpen) return null;
+
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
+          <span className="text-white/70 text-sm">{t('common.loading')}</span>
+        </div>
+      </div>
+    );
+  }
 
   // Get the completed order from pending orders (using hook for reactivity)
   const completedOrder = pendingOrders?.[pendingOrders.length - 1];

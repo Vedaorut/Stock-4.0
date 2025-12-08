@@ -244,16 +244,13 @@ const manageWorkersScene = new Scenes.WizardScene('manageWorkers', enterTelegram
 
 // Handle scene leave
 manageWorkersScene.leave(async (ctx) => {
-  // P1-2 FIX: Clear wizard state to prevent memory leak
+  // P0 FIX: Use assignment instead of delete to prevent TypeError
   if (ctx.wizard) {
-    delete ctx.wizard.state;
+    ctx.wizard.state = {};
   }
   ctx.scene.state = {};
 
-  // Clear __scenes from Redis session to prevent stuck state
-  if (ctx.session && ctx.session.__scenes) {
-    delete ctx.session.__scenes;
-  }
+  // P0 FIX: REMOVED delete ctx.session.__scenes - Telegraf manages this
 
   logger.info(`User ${ctx.from?.id} left manageWorkers scene`);
 });

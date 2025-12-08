@@ -3,6 +3,7 @@ import { orderController } from '../controllers/orderController.js';
 import { orderValidation, validateBulkOperation } from '../middleware/validation.js';
 import { verifyToken } from '../middleware/auth.js';
 import { orderPaymentLimiter } from '../middleware/rateLimiter.js';
+import { requirePaymentsEnabled } from '../middleware/featureFlags.js';
 
 const router = express.Router();
 
@@ -64,21 +65,21 @@ router.get('/', verifyToken, (req, res, next) => {
  * @desc    Get payment info for direct crypto payment
  * @access  Private (WebApp)
  */
-router.get('/:id/payment-info', verifyToken, orderPaymentLimiter, orderController.getPaymentInfo);
+router.get('/:id/payment-info', verifyToken, requirePaymentsEnabled, orderPaymentLimiter, orderController.getPaymentInfo);
 
 /**
  * @route   POST /api/orders/:id/submit-payment
  * @desc    Submit payment transaction hash
  * @access  Private (WebApp)
  */
-router.post('/:id/submit-payment', verifyToken, orderPaymentLimiter, orderController.submitPayment);
+router.post('/:id/submit-payment', verifyToken, requirePaymentsEnabled, orderPaymentLimiter, orderController.submitPayment);
 
 /**
  * @route   GET /api/orders/:id/payment-status
  * @desc    Get payment verification status
  * @access  Private (WebApp)
  */
-router.get('/:id/payment-status', verifyToken, orderPaymentLimiter, orderController.getPaymentStatus);
+router.get('/:id/payment-status', verifyToken, requirePaymentsEnabled, orderPaymentLimiter, orderController.getPaymentStatus);
 
 /**
  * @route   GET /api/orders/:id

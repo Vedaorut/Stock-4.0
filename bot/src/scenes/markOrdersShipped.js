@@ -317,16 +317,15 @@ markOrdersShippedScene.leave(async (ctx) => {
     }
   }
 
-  // P1-2 FIX: Clear wizard state to prevent memory leak
+  // P0 FIX: Use assignment instead of delete to prevent TypeError
   if (ctx.wizard) {
-    delete ctx.wizard.state;
+    ctx.wizard.state = {};
   }
   ctx.scene.state = {};
 
-  // Clear __scenes from Redis session to prevent scene sticking
-  if (ctx.session && ctx.session.__scenes) {
-    delete ctx.session.__scenes;
-  }
+  // P0 FIX: REMOVED delete ctx.session.__scenes
+  // Telegraf manages __scenes automatically. Deleting it here can cause
+  // race condition when scene.leave() is followed by scene.enter()
 
   logger.info(`User ${ctx.from?.id} left markOrdersShipped scene`);
 });

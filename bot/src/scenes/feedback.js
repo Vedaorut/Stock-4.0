@@ -114,14 +114,15 @@ const feedbackScene = new Scenes.WizardScene('feedback', showPrompt, receiveFeed
 
 // Handle scene leave
 feedbackScene.leave(async (ctx) => {
+  // P0 FIX: Use assignment instead of delete to prevent TypeError
   if (ctx.wizard) {
     ctx.wizard.state = {};
   }
   ctx.scene.state = {};
 
-  if (ctx.session && ctx.session.__scenes) {
-    delete ctx.session.__scenes;
-  }
+  // P0 FIX: REMOVED delete ctx.session.__scenes
+  // Telegraf manages __scenes automatically. Deleting it here can cause
+  // race condition when scene.leave() is followed by scene.enter()
 
   logger.info(`User ${ctx.from?.id} left feedback scene`);
 });

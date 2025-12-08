@@ -564,18 +564,19 @@ const manageWalletsScene = new Scenes.WizardScene('manageWallets', showWallets, 
 // Handle scene leave
 manageWalletsScene.leave(async (ctx) => {
   // P0-BOT-3 FIX: Clear timeout from wizard state
-  if (ctx.wizard.state.refreshTimer) {
+  if (ctx.wizard?.state?.refreshTimer) {
     clearTimeout(ctx.wizard.state.refreshTimer);
-    delete ctx.wizard.state.refreshTimer;
   }
 
-  // Clean up wizard state
-  ctx.wizard.state = {};
-
-  // Clear __scenes from Redis session to prevent stuck state
-  if (ctx.session && ctx.session.__scenes) {
-    delete ctx.session.__scenes;
+  // P0 FIX: Use assignment instead of delete to prevent TypeError
+  if (ctx.wizard) {
+    ctx.wizard.state = {};
   }
+  ctx.scene.state = {};
+
+  // P0 FIX: REMOVED delete ctx.session.__scenes
+  // Telegraf manages __scenes automatically. Deleting it here can cause
+  // race condition when scene.leave() is followed by scene.enter()
 
   logger.info(`User ${ctx.from?.id} left manageWallets scene`);
 });

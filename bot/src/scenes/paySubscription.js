@@ -325,6 +325,8 @@ const paySubscriptionScene = new Scenes.WizardScene(
         parse_mode: 'HTML',
         ...Markup.inlineKeyboard([
           [Markup.button.url(t('paySubscription.payButton', {}, lang), invoiceResponse.paymentUrl)],
+          // P0-4 FIX: Add check payment button
+          [Markup.button.callback(t('buttons.checkPayment', {}, lang) || '🔄 Check Payment', 'subscription:check_payment')],
           [Markup.button.callback(t('buttons.cancel', {}, lang), 'seller:menu')],
         ]),
       });
@@ -486,6 +488,8 @@ const paySubscriptionScene = new Scenes.WizardScene(
             parse_mode: 'HTML',
             ...Markup.inlineKeyboard([
               [Markup.button.url(t('paySubscription.payButton', {}, lang), crystalPayUrl)],
+              // P0-4 FIX: Add check payment button in pending flow
+              [Markup.button.callback(t('buttons.checkPayment', {}, lang) || '🔄 Check Payment', 'subscription:check_payment')],
               [Markup.button.callback(t('buttons.cancel', {}, lang), 'seller:menu')],
             ]),
           }

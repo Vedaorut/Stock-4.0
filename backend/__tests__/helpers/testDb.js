@@ -60,7 +60,6 @@ export const cleanupTestData = async () => {
     await client.query('DELETE FROM order_items WHERE order_id IS NULL OR product_id IS NULL');
     await client.query('DELETE FROM payments WHERE order_id IS NULL');
     await client.query('DELETE FROM subscriptions WHERE user_id IS NULL OR shop_id IS NULL');
-    await client.query('DELETE FROM shop_payments WHERE user_id IS NULL OR shop_id IS NULL');
 
     await client.query('COMMIT');
   } catch (error) {

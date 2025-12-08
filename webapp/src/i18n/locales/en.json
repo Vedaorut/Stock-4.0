@@ -259,7 +259,10 @@
     "pleaseWait": "Please wait a few seconds",
     "timeoutError": "Timeout exceeded. Please try again.",
     "noWallets": "No payment methods",
-    "noWalletsDesc": "This shop hasn't configured payment wallets yet"
+    "noWalletsDesc": "This shop hasn't configured payment wallets yet",
+    "orderDataLost": "Order data lost",
+    "orderDataLostDesc": "Please restart checkout",
+    "backToCart": "Back to cart"
   },
   "subscription": {
     "title": "Subscription",

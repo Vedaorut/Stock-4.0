@@ -11,6 +11,7 @@ import { invoiceQueries } from '../database/queries/index.js';
 import { query } from '../config/database.js';
 import { SUBSCRIPTION_PRICES } from '../config/subscriptionPricing.js';
 import { INVOICE_PURPOSES } from '../constants/invoice.js';
+import { INVOICE_EXPIRY_SECONDS } from '../config/payments.js';
 
 
 /**
@@ -123,12 +124,14 @@ export async function findActiveInvoiceForSubscription(subscriptionId, purpose =
 
     return invoice;
   } catch (error) {
+    // P0-5 FIX: Throw error instead of silent null return
     logger.error('[SubscriptionInvoice] Error finding active invoice:', {
       error: error.message,
       stack: error.stack,
       subscriptionId,
     });
-    return null;
+    // Re-throw so caller knows there was a DB error (not "no invoice")
+    throw error;
   }
 }
 
@@ -164,7 +167,7 @@ export async function createCrystalPayInvoice({ subscriptionId, purpose, amountU
       method,
       description: `Subscription #${subscriptionId} - ${purpose}`,
       extra: String(invoice.id), // Link back to our invoice
-      lifetime: 3600 // 1 hour in seconds
+      lifetime: INVOICE_EXPIRY_SECONDS
     });
 
     // 3. Update our invoice with CrystalPay ID
@@ -186,7 +189,17 @@ export async function createCrystalPayInvoice({ subscriptionId, purpose, amountU
     };
 
   } catch (error) {
-    // If CrystalPay fails, mark our invoice as failed
+    // P0-3 FIX: Actually mark invoice as failed (not just log)
+    try {
+      await invoiceQueries.updateStatus(invoice.id, 'failed');
+      logger.info('[SubscriptionInvoice] Marked invoice as failed', { invoiceId: invoice.id });
+    } catch (updateError) {
+      logger.error('[SubscriptionInvoice] Failed to mark invoice as failed', {
+        invoiceId: invoice.id,
+        error: updateError.message
+      });
+    }
+
     logger.error('[SubscriptionInvoice] CrystalPay invoice creation failed', {
       invoiceId: invoice.id,
       error: error.message

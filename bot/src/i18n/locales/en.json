@@ -627,7 +627,8 @@
     "statusCheckError": "Failed to check status. Try again later.",
     "invoiceRetryError": "Failed to create a new invoice.",
     "successNoDate": "✅ Upgrade to MAX confirmed.",
-    "defaultExpiry": "30 minutes"
+    "defaultExpiry": "30 minutes",
+    "invalidTxHashFormat": "Invalid TX hash format for {currency}.\n\nPlease check and send a valid transaction hash."
   },
   "createShop": {
     "enterName": "Enter your store name",

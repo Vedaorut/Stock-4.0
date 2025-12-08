@@ -34,7 +34,15 @@ const ALERT_LEVELS = {
 export async function sendAlert(level, title, details = {}, throttleKey = null) {
   // Skip if not configured
   if (!BOT_TOKEN || !ADMIN_CHAT_ID) {
-    logger.warn('[Alerts] Telegram alerting not configured (ADMIN_TELEGRAM_ID missing)');
+    const isProduction = process.env.NODE_ENV === 'production';
+    if (isProduction) {
+      logger.error('[Alerts] CRITICAL: Telegram alerting not configured (ADMIN_TELEGRAM_ID missing) - alerts are silently dropped!', {
+        level,
+        title,
+      });
+    } else {
+      logger.warn('[Alerts] Telegram alerting not configured (ADMIN_TELEGRAM_ID missing)');
+    }
     return false;
   }
 
@@ -156,6 +164,65 @@ export function alertStockDeductionFailed(orderId, productId, error) {
   }, `stock_fail_${orderId}`);
 }
 
+// Late payment received (invoice expired but payment came)
+export function alertLatePaymentReceived(orderId, paymentId, invoiceAgeSeconds) {
+  return alertWarning('Late Payment Received', {
+    'Order ID': orderId,
+    'Payment ID': paymentId,
+    'Invoice Age': `${Math.round(invoiceAgeSeconds / 60)} minutes`,
+    'Action': 'Review and decide: confirm with current rate or refund',
+  }, `late_payment_${orderId}`);
+}
+
+/**
+ * Alert when payment confirmed on-chain but order not transitioned
+ */
+export function alertConfirmedButNotPaid(orderId, paymentId, orderStatus) {
+  return alertError('Confirmed On-Chain But Order Not Paid', {
+    'Order ID': orderId,
+    'Payment ID': paymentId,
+    'Order Status': orderStatus,
+    'Action': 'Check order state and fix manually',
+  }, `confirmed_not_paid_${orderId}`);
+}
+
+/**
+ * Helper to mask wallet addresses for safe logging
+ */
+function maskAddress(address) {
+  if (!address || address.length < 10) {return '***';}
+  return address.substring(0, 6) + '...' + address.substring(address.length - 4);
+}
+
+/**
+ * Alert when webhook processing fails
+ */
+export function alertWebhookProcessingFailed(webhookType, error, payload) {
+  // Mask sensitive data
+  const safePayload = { ...payload };
+  if (safePayload.address) {
+    safePayload.address = maskAddress(safePayload.address);
+  }
+
+  return alertError('Webhook Processing Failed', {
+    'Webhook Type': webhookType,
+    'Error': error,
+    'Payload': JSON.stringify(safePayload).substring(0, 200),
+  }, `webhook_fail_${webhookType}`);
+}
+
+/**
+ * Alert when Telegram notification fails after payment
+ */
+export function alertNotificationFailed(orderId, failedTargets, errors) {
+  return alertError('Payment Notification Failed', {
+    'Order ID': orderId,
+    'Failed Targets': failedTargets.join(', '),
+    'Errors': errors.join('; ').substring(0, 200),
+    'Action': 'Buyer/seller may not have received payment confirmation',
+  }, `notify_fail_${orderId}`);
+}
+
 export default {
   sendAlert,
   alertCritical,
@@ -167,4 +234,8 @@ export default {
   alertDatabasePoolHigh,
   alertSubscriptionActivationFailed,
   alertStockDeductionFailed,
+  alertLatePaymentReceived,
+  alertConfirmedButNotPaid,
+  alertWebhookProcessingFailed,
+  alertNotificationFailed,
 };

@@ -9,7 +9,10 @@ import { getClient, query } from '../config/database.js';
 import * as blockchainVerificationService from '../services/blockchainVerificationService.js';
 import telegramService from '../services/telegram.js';
 import logger from '../utils/logger.js';
-import { alertPaymentVerificationFailed, alertStockDeductionFailed } from '../utils/alerts.js';
+import { alertPaymentVerificationFailed, alertStockDeductionFailed, alertLatePaymentReceived } from '../utils/alerts.js';
+import { logPaymentStatusChange, logOrderStatusChange } from '../utils/statusLogger.js';
+import { INVOICE_EXPIRY_SECONDS } from '../config/payments.js';
+import metricsCollector from '../services/metricsCollector.js';
 
 const POLL_INTERVAL = 30 * 1000; // 30 seconds (in milliseconds)
 // 72 hours to accommodate slow BTC/LTC confirmations during network congestion
@@ -178,6 +181,8 @@ async function processPendingPayments() {
           `UPDATE payments SET status = 'pending', updated_at = NOW() WHERE id = $1`,
           [payment.id]
         );
+        // Record worker error metric
+        metricsCollector.recordWorkerError('payment_verification', error);
         logger.error(`[PaymentWorker] Error processing payment ${payment.id}:`, {
           error: error.message
         });
@@ -237,8 +242,63 @@ async function verifyAndProcessPaymentSafe(payment) {
     [result.confirmations || 0, paymentId]
   );
 
-  // If verified - confirm order
+  // If verified - check invoice expiry before confirming
   if (result.verified) {
+    // Check if invoice has expired (late payment protection)
+    const orderInfo = await query(
+      `SELECT created_at FROM orders WHERE id = $1`,
+      [orderId]
+    );
+
+    if (orderInfo.rows.length > 0) {
+      const invoiceAge = (Date.now() - new Date(orderInfo.rows[0].created_at).getTime()) / 1000;
+
+      if (invoiceAge > INVOICE_EXPIRY_SECONDS) {
+        const requestId = `worker-${orderId}-${Date.now()}`;
+
+        // Late payment - mark for manual review, DO NOT auto-confirm
+        await query(
+          `UPDATE payments
+           SET status = 'needs_review',
+               verification_status = 'late_confirmed',
+               verification_error = $2,
+               updated_at = NOW()
+           WHERE id = $1`,
+          [paymentId, `Late payment: ${Math.round(invoiceAge / 60)} minutes after invoice`]
+        );
+
+        logPaymentStatusChange({
+          paymentId,
+          orderId,
+          statusFrom: 'processing',
+          statusTo: 'needs_review',
+          reason: 'late_payment',
+          requestId,
+          extra: { invoiceAgeMinutes: Math.round(invoiceAge / 60) },
+        });
+
+        // Record needs_review metric
+        metricsCollector.recordNeedsReviewOrder(orderId);
+
+        alertLatePaymentReceived(orderId, paymentId, invoiceAge);
+
+        // Notify buyer and seller about late payment
+        notifyLatePaymentReceived(orderId, paymentId, invoiceAge).catch(err => {
+          logger.error('[PaymentWorker] Late payment notification error:', err);
+        });
+
+        logger.warn(`[PaymentWorker] Late payment detected`, {
+          orderId,
+          paymentId,
+          invoiceAgeMinutes: Math.round(invoiceAge / 60),
+          thresholdMinutes: INVOICE_EXPIRY_SECONDS / 60
+        });
+
+        return; // DO NOT auto-confirm late payments
+      }
+    }
+
+    // Invoice still valid - proceed with confirmation
     await confirmOrderPayment(orderId, paymentId, result);
     return;
   }
@@ -273,6 +333,8 @@ async function verifyAndProcessPaymentSafe(payment) {
   }
 
   if (result.resultStatus === blockchainVerificationService.VERIFICATION_STATUS.TX_INVALID) {
+    const requestId = `worker-${orderId}-${Date.now()}`;
+
     // Permanent failure - don't retry
     await query(
       `UPDATE payments
@@ -280,6 +342,17 @@ async function verifyAndProcessPaymentSafe(payment) {
        WHERE id = $1`,
       [paymentId, result.error]
     );
+
+    logPaymentStatusChange({
+      paymentId,
+      orderId,
+      statusFrom: 'processing',
+      statusTo: 'failed',
+      reason: 'tx_invalid',
+      requestId,
+      extra: { error: result.error },
+    });
+
     logger.warn(`[PaymentWorker] Payment ${paymentId} failed permanently: ${result.error}`);
 
     // Alert admin about permanent payment failure
@@ -435,6 +508,27 @@ async function confirmOrderPayment(orderId, paymentId, verificationResult) {
 
     await client.query('COMMIT');
 
+    const requestId = `worker-${orderId}-${Date.now()}`;
+
+    logOrderStatusChange({
+      orderId,
+      statusFrom: 'pending',
+      statusTo: 'confirmed',
+      reason: 'payment_verified',
+      requestId,
+      extra: { paymentId, confirmations: verificationResult.confirmations },
+    });
+
+    logPaymentStatusChange({
+      paymentId,
+      orderId,
+      statusFrom: 'processing',
+      statusTo: 'confirmed',
+      reason: 'blockchain_verified',
+      requestId,
+      extra: { confirmations: verificationResult.confirmations },
+    });
+
     logger.info(`[PaymentWorker] Order ${orderId} confirmed`, {
       paymentId,
       txHash: verificationResult.txHash,
@@ -586,6 +680,97 @@ async function notifySellerPaymentReceived(orderId) {
 
   } catch (error) {
     logger.error('[PaymentWorker] notifySellerPaymentReceived error:', error);
+  }
+}
+
+/**
+ * Notify buyer and seller about late payment requiring review
+ */
+async function notifyLatePaymentReceived(orderId, paymentId, invoiceAgeSeconds) {
+  try {
+    const result = await query(
+      `SELECT
+         o.id as order_id,
+         o.total_price,
+         o.currency,
+         p.name as product_name,
+         pay.currency as crypto_currency,
+         pay.expected_crypto_amount,
+         buyer.telegram_id as buyer_telegram_id,
+         buyer.username as buyer_username,
+         seller.telegram_id as seller_telegram_id,
+         seller.username as seller_username,
+         s.name as shop_name
+       FROM orders o
+       JOIN products p ON o.product_id = p.id
+       JOIN shops s ON p.shop_id = s.id
+       JOIN users seller ON s.owner_id = seller.id
+       LEFT JOIN users buyer ON o.buyer_id = buyer.id
+       LEFT JOIN payments pay ON pay.order_id = o.id AND pay.id = $2
+       WHERE o.id = $1
+       LIMIT 1`,
+      [orderId, paymentId]
+    );
+
+    if (result.rows.length === 0) {return;}
+    const order = result.rows[0];
+
+    const delayMinutes = Math.round(invoiceAgeSeconds / 60);
+    const dateStr = new Date().toLocaleDateString('ru-RU', {
+      day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'
+    });
+
+    // Notify buyer
+    if (order.buyer_telegram_id) {
+      const buyerMessage = [
+        '⚠️ <b>Платёж получен с задержкой</b>',
+        '',
+        `🧾 Заказ #${order.order_id}`,
+        `📦 ${escapeHtml(order.product_name)}`,
+        `💵 ${order.total_price} ${order.currency}`,
+        '',
+        `⏱ Задержка: ${delayMinutes} минут`,
+        '',
+        '📋 <i>Ваш платёж подтверждён на блокчейне, но поступил после истечения срока оплаты.</i>',
+        '<i>Заказ передан на ручную проверку администратору.</i>',
+        '<i>Мы свяжемся с вами в ближайшее время.</i>',
+      ].join('\n');
+
+      await telegramService.sendMessage(order.buyer_telegram_id, buyerMessage, {
+        parse_mode: 'HTML'
+      });
+    }
+
+    // Notify seller
+    if (order.seller_telegram_id) {
+      const sellerMessage = [
+        '⚠️ <b>Поздний платёж требует проверки</b>',
+        '',
+        `🧾 Заказ #${order.order_id}`,
+        `📅 ${dateStr}`,
+        '',
+        `📦 ${escapeHtml(order.product_name)}`,
+        `💵 ${order.total_price} ${order.currency}`,
+        '',
+        `⏱ Платёж поступил через ${delayMinutes} минут после создания заказа`,
+        '',
+        '📋 <i>Платёж подтверждён на блокчейне, но курс мог измениться.</i>',
+        '<i>Администратор рассмотрит заказ и примет решение.</i>',
+      ].join('\n');
+
+      await telegramService.sendMessage(order.seller_telegram_id, sellerMessage, {
+        parse_mode: 'HTML'
+      });
+    }
+
+    logger.info('[PaymentWorker] Late payment notifications sent', {
+      orderId,
+      paymentId,
+      delayMinutes,
+    });
+
+  } catch (error) {
+    logger.error('[PaymentWorker] notifyLatePaymentReceived error:', error);
   }
 }
 
