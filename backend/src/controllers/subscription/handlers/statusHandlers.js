@@ -56,7 +56,9 @@ export const getHistory = asyncHandler(async (req, res) => {
 /**
  * Get subscription pricing info
  * GET /api/subscriptions/pricing
- * Note: Only monthly subscription available
+ *
+ * BUG-SUB-004 FIX: Features now match actual tier limits from subscriptionPricing.js
+ * BUG-SUB-006 FIX: Yearly pricing now exposed in API response
  */
 export const getPricing = asyncHandler(async (req, res) => {
   try {
@@ -67,14 +69,21 @@ export const getPricing = asyncHandler(async (req, res) => {
         period: 'month',
         pricing: {
           month: subscriptionService.SUBSCRIPTION_PRICES.pro,
+          year: subscriptionService.SUBSCRIPTION_PRICES_YEARLY.pro,
+        },
+        limits: {
+          products: 50,
+          follows: 2,
+          workers: 0,
+          analyticsDays: 30,
+          canMigrate: false,
         },
         features: [
           'Create and manage shop',
-          'Unlimited products',
-          'Unlimited Follow Shop (dropshipping)',
-          'Channel Migration (2 times/month)',
+          'Up to 50 products',
+          'Follow up to 2 shops (dropshipping)',
+          '30 days analytics history',
           'Priority support',
-          'Advanced analytics',
         ],
       },
       max: {
@@ -83,12 +92,22 @@ export const getPricing = asyncHandler(async (req, res) => {
         period: 'month',
         pricing: {
           month: subscriptionService.SUBSCRIPTION_PRICES.max,
+          year: subscriptionService.SUBSCRIPTION_PRICES_YEARLY.max,
+        },
+        limits: {
+          products: -1, // Unlimited (Infinity not JSON-serializable)
+          follows: -1,  // Unlimited
+          workers: 5,
+          analyticsDays: 365,
+          canMigrate: true,
         },
         features: [
           'Everything in PRO',
-          'Unlimited channel migrations',
-          'Up to 5 workers and automations',
-          '365 days of analytics history',
+          'Unlimited products',
+          'Unlimited shop follows',
+          'Channel migration support',
+          'Up to 5 workers',
+          '365 days analytics history',
           'Priority support (fast lane)',
         ],
       },
@@ -96,6 +115,7 @@ export const getPricing = asyncHandler(async (req, res) => {
         days: subscriptionService.GRACE_PERIOD_DAYS,
         description: 'Grace period after subscription expires before shop deactivation',
       },
+      yearlyDiscount: '~17% off compared to monthly billing',
     });
   } catch (error) {
     logger.error('[SubscriptionController] Error getting pricing:', error);

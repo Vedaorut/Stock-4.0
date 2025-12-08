@@ -563,25 +563,39 @@ export const createPaymentSlice = (set, get) => ({
 
   setPaymentStep: (step) => set({ paymentStep: step }),
 
+  // FIX BUG-WEBAPP-003: Normalize orderId to ensure consistent comparison
   removePendingOrder: (orderId) => {
+    const normalizedId = typeof orderId === 'string' ? parseInt(orderId, 10) : orderId;
     set({
-      pendingOrders: get().pendingOrders.filter((order) => order.id !== orderId),
+      pendingOrders: get().pendingOrders.filter((order) => {
+        const orderIdNum = typeof order.id === 'string' ? parseInt(order.id, 10) : order.id;
+        return orderIdNum !== normalizedId;
+      }),
     });
   },
 
+  // FIX BUG-WEBAPP-003: Normalize orderId to ensure consistent comparison
   updateOrderStatus: (orderId, status) => {
+    const normalizedId = typeof orderId === 'string' ? parseInt(orderId, 10) : orderId;
     set((state) => ({
-      orders: state.orders?.map((order) =>
-        order.id === orderId ? { ...order, status } : order
-      ),
-      currentOrder:
-        state.currentOrder?.id === orderId
+      orders: state.orders?.map((order) => {
+        const orderIdNum = typeof order.id === 'string' ? parseInt(order.id, 10) : order.id;
+        return orderIdNum === normalizedId ? { ...order, status } : order;
+      }),
+      currentOrder: (() => {
+        if (!state.currentOrder) return null;
+        const currentIdNum = typeof state.currentOrder.id === 'string'
+          ? parseInt(state.currentOrder.id, 10)
+          : state.currentOrder.id;
+        return currentIdNum === normalizedId
           ? { ...state.currentOrder, status }
-          : state.currentOrder,
+          : state.currentOrder;
+      })(),
       // P1-3 FIX: Also update pendingOrders for real-time status sync
-      pendingOrders: state.pendingOrders?.map((order) =>
-        order.id === orderId ? { ...order, status } : order
-      ),
+      pendingOrders: state.pendingOrders?.map((order) => {
+        const orderIdNum = typeof order.id === 'string' ? parseInt(order.id, 10) : order.id;
+        return orderIdNum === normalizedId ? { ...order, status } : order;
+      }),
     }));
   },
 });

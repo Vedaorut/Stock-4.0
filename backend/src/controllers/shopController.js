@@ -59,6 +59,16 @@ export const shopController = {
         throw new ValidationError('Shop name can only contain letters, numbers, spaces, underscores, and hyphens');
       }
 
+      // Validate name max length (database column limit)
+      if (name.trim().length > 100) {
+        throw new ValidationError('Shop name must be at most 100 characters');
+      }
+
+      // BUG-SHOP-007 FIX: Validate description max length
+      if (description && description.length > 1000) {
+        throw new ValidationError('Shop description must be at most 1000 characters');
+      }
+
       // Check if shop name is already taken
       const nameTaken = await shopQueries.isNameTaken(name);
       if (nameTaken) {
@@ -548,6 +558,16 @@ export const shopController = {
         if (nameTaken) {
           throw new ConflictError('Shop name already taken. Try another one');
         }
+      }
+
+      // BUG-SHOP-007 FIX: Validate name max length on update
+      if (name && name.trim().length > 100) {
+        throw new ValidationError('Shop name must be at most 100 characters');
+      }
+
+      // BUG-SHOP-007 FIX: Validate description max length on update
+      if (description && description.length > 1000) {
+        throw new ValidationError('Shop description must be at most 1000 characters');
       }
 
       const shop = await shopQueries.update(id, {

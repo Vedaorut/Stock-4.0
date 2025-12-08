@@ -107,6 +107,58 @@ export function invalidateCache(pattern = null) {
 // Demo mode flag
 const IS_DEMO_MODE = import.meta.env.VITE_DEMO_MODE === 'true';
 
+// ============================================
+// FIX BUG-WEBAPP-006: Retry Configuration
+// ============================================
+const RETRY_CONFIG = {
+  maxRetries: 3,
+  baseDelay: 1000, // 1 second
+  maxDelay: 10000, // 10 seconds
+  retryableCodes: ['ECONNABORTED', 'ERR_NETWORK', 'ETIMEDOUT'],
+  retryableStatuses: [502, 503, 504, 408], // Bad Gateway, Service Unavailable, Gateway Timeout, Request Timeout
+};
+
+/**
+ * Calculate exponential backoff delay with jitter
+ * @param {number} attempt - Current attempt number (0-indexed)
+ * @returns {number} Delay in milliseconds
+ */
+function getRetryDelay(attempt) {
+  const exponentialDelay = RETRY_CONFIG.baseDelay * Math.pow(2, attempt);
+  const jitter = Math.random() * 200; // Add 0-200ms jitter
+  return Math.min(exponentialDelay + jitter, RETRY_CONFIG.maxDelay);
+}
+
+/**
+ * Check if error is retryable
+ * @param {Error} error - Axios error
+ * @returns {boolean}
+ */
+function isRetryableError(error) {
+  // Network errors
+  if (RETRY_CONFIG.retryableCodes.includes(error.code)) {
+    return true;
+  }
+  // Server errors (5xx)
+  if (error.response && RETRY_CONFIG.retryableStatuses.includes(error.response.status)) {
+    return true;
+  }
+  // Offline detection
+  if (!navigator.onLine) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Sleep for specified milliseconds
+ * @param {number} ms - Milliseconds to sleep
+ * @returns {Promise}
+ */
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 /**
  * Hook for API calls with stable reference
  * Uses useRef pattern to return the SAME object on every render
@@ -180,6 +232,9 @@ export function useApi() {
             return await axios(axiosConfig);
           };
 
+          // FIX BUG-WEBAPP-006: Request with retry logic
+          const retryCount = config._retryCount || 0;
+
           try {
             const currentToken = tokenGetter();
             const response = await makeRequest(currentToken);
@@ -203,14 +258,32 @@ export function useApi() {
               console.error(`API ${method} ${endpoint} error:`, err);
             }
 
-            // Handle axios native timeout
-            if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
-              return { data: null, error: 'Request timeout - please check your connection' };
-            }
-
-            // Handle external AbortSignal (from useEffect cleanup)
+            // Handle external AbortSignal (from useEffect cleanup) - don't retry
             if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') {
               return { data: null, error: 'Request cancelled' };
+            }
+
+            // FIX BUG-WEBAPP-006: Retry logic for network/server errors
+            if (isRetryableError(err) && retryCount < RETRY_CONFIG.maxRetries) {
+              const delay = getRetryDelay(retryCount);
+              if (import.meta.env.DEV) {
+                // eslint-disable-next-line no-console
+                console.log(`[useApi] Retrying ${method} ${endpoint} (attempt ${retryCount + 1}/${RETRY_CONFIG.maxRetries}) in ${delay}ms`);
+              }
+
+              // Wait before retry
+              await sleep(delay);
+
+              // Recursive call with incremented retry count
+              return createRequest(tokenGetter)(method, endpoint, data, {
+                ...config,
+                _retryCount: retryCount + 1,
+              });
+            }
+
+            // Handle axios native timeout (after retries exhausted)
+            if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
+              return { data: null, error: 'Request timeout - please check your connection and try again' };
             }
 
             // Handle 401 Unauthorized - attempt token refresh and retry ONCE
