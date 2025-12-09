@@ -55,7 +55,6 @@ function OrderRow({ order, isExpanded, onToggle, t }) {
 
   return (
     <motion.div
-      layout
       className="overflow-hidden"
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}

@@ -428,7 +428,7 @@ export default function FollowsModal({ isOpen, onClose }) {
                   <h3 className="text-sm font-semibold text-gray-400 px-2">
                     {t('follows.subscriptions', { count: follows.length })}
                   </h3>
-                  <AnimatePresence mode="popLayout">
+                  <AnimatePresence mode="wait">
                     {follows.map((follow) => (
                       <FollowCard
                         key={follow.id}

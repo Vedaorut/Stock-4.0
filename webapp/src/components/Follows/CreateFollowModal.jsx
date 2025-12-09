@@ -57,8 +57,6 @@ export default function CreateFollowModal({ isOpen, onClose, myShopId, onSuccess
     onClose();
   }, [onClose]);
 
-  useBackButton(isOpen ? handleClose : null);
-
   // Handle back button in wizard
   const handleBack = useCallback(() => {
     triggerHaptic('light');
@@ -69,6 +67,10 @@ export default function CreateFollowModal({ isOpen, onClose, myShopId, onSuccess
       setStep(STEPS.MODE);
     }
   }, [step, triggerHaptic]);
+
+  const backButtonHandler = step === STEPS.SEARCH ? handleClose : handleBack;
+
+  useBackButton(isOpen ? backButtonHandler : null);
 
   // Search shops
   const handleSearch = useCallback(async () => {

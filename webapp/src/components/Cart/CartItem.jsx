@@ -83,7 +83,7 @@ const CartItem = memo(function CartItem({ item }) {
     <motion.div
       className="relative"
       {...swipeProps}
-      style={{ ...gpuAccelStyle, touchAction: android ? 'pan-y' : 'pan-x' }}
+      style={{ ...gpuAccelStyle, touchAction: 'pan-y pinch-zoom' }}
       initial={{ opacity: 0, y: android ? 12 : 0, x: android ? 0 : -20 }}
       animate={{ opacity: 1, y: 0, x: 0 }}
       exit={{ opacity: 0, y: android ? 12 : 0, x: android ? 0 : 20 }}

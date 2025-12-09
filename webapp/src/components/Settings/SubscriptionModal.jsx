@@ -250,10 +250,12 @@ export default function SubscriptionModal({ isOpen, onClose }) {
           <PageHeader title={t('settings.items.subscription')} onBack={handleClose} variant="close" />
 
           <div
-            className="flex-1 flex flex-col px-4"
+            className="flex-1 flex flex-col px-4 overflow-y-auto"
             style={{
               paddingTop: 'calc(env(safe-area-inset-top) + 60px)',
               paddingBottom: 'calc(var(--tabbar-total, 80px) + 16px)',
+              WebkitOverflowScrolling: 'touch',
+              overscrollBehavior: 'contain',
             }}
           >
             {loading ? (

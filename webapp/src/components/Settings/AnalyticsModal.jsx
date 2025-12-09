@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { AnimatePresence,motion } from 'framer-motion';
+import { AnimatePresence, motion, LayoutGroup } from 'framer-motion';
 import PageHeader from '../common/PageHeader';
 import { useApi } from '../../hooks/useApi';
 import { useBackButton } from '../../hooks/useBackButton';
@@ -35,7 +35,7 @@ export default function AnalyticsModal({ isOpen, onClose }) {
   }, [onClose, triggerHaptic]);
 
   useBackButton(isOpen ? handleClose : null);
-  useScrollLock(isOpen);
+  useScrollLock(isOpen || showCustomPicker);
 
   // Calculate date range based on period
   const getDateRange = useCallback(() => {
@@ -150,8 +150,7 @@ export default function AnalyticsModal({ isOpen, onClose }) {
     setPeriod(newPeriod);
     if (newPeriod === 'custom') {
       setShowCustomPicker(true);
-    }
-    if (newPeriod !== 'custom') {
+    } else {
       setShowCustomPicker(false);
     }
   };
@@ -210,10 +209,7 @@ export default function AnalyticsModal({ isOpen, onClose }) {
               </div>
 
               {/* Buttons skeleton */}
-              <div className="flex gap-2 mt-4 animate-pulse">
-                <div className="h-11 bg-gray-700 rounded-xl flex-1" />
-                <div className="h-11 bg-gray-700 rounded-xl flex-1" />
-                <div className="h-11 bg-gray-700 rounded-xl flex-1" />
+              <div className="flex gap-2 mt-4 animate-pulse h-12 bg-white/5 rounded-xl">
               </div>
 
               {/* Products skeleton */}
@@ -278,6 +274,12 @@ export default function AnalyticsModal({ isOpen, onClose }) {
   const { summary, topProducts } = analytics || {};
   const maxRevenue = topProducts?.length > 0 ? topProducts[0].revenue : 1;
 
+  const periods = [
+    { id: '7d', label: t('analytics.period7d') },
+    { id: '1m', label: t('analytics.period1m') },
+    { id: 'custom', label: t('analytics.periodCustom') },
+  ];
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -293,7 +295,7 @@ export default function AnalyticsModal({ isOpen, onClose }) {
             <div
               style={{
                 paddingTop: 'calc(env(safe-area-inset-top) + 56px)',
-                paddingBottom: 'var(--tabbar-total)',
+                paddingBottom: 'calc(var(--tabbar-total, 90px) + 20px)',
               }}
               className="px-4 overflow-y-auto h-full"
             >
@@ -304,143 +306,184 @@ export default function AnalyticsModal({ isOpen, onClose }) {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 }}
               >
-                <p className="text-sm text-gray-400 mb-2">{t('analytics.totalSales')}</p>
-                <h1 className="text-4xl font-bold text-orange-primary mb-1">
+                <p className="text-sm text-gray-400 mb-2 font-medium tracking-wide uppercase text-[10px] opacity-70">
+                  {t('analytics.totalSales')}
+                </p>
+                <h1 className="text-4xl font-bold text-orange-primary mb-1 tracking-tight">
                   {formatUSD(summary?.totalRevenue)}
                 </h1>
                 <p className="text-sm text-gray-400">
-                  {summary?.completedOrders || 0} {t('analytics.ordersCount')} - {t('analytics.avgCheck')}:{' '}
-                  {formatUSD(summary?.avgOrderValue)}
+                  {summary?.completedOrders || 0} {t('analytics.ordersCount')} <span className="mx-1 opacity-30">|</span> {t('analytics.avgCheck')}:{' '}
+                  <span className="text-white font-medium">{formatUSD(summary?.avgOrderValue)}</span>
                 </p>
               </motion.div>
 
-              {/* Period Selector */}
-              <div className="flex gap-2 mt-4">
-                <button
-                  onClick={() => handlePeriodChange('7d')}
-                  className={`period-btn flex-1 ${period === '7d' ? 'active' : ''}`}
-                >
-                  {t('analytics.period7d')}
-                </button>
-                <button
-                  onClick={() => handlePeriodChange('1m')}
-                  className={`period-btn flex-1 ${period === '1m' ? 'active' : ''}`}
-                >
-                  {t('analytics.period1m')}
-                </button>
-                <button
-                  onClick={() => handlePeriodChange('custom')}
-                  className={`period-btn flex-1 ${period === 'custom' ? 'active' : ''}`}
-                >
-                  {t('analytics.periodCustom')}
-                </button>
+              {/* Period Selector - Premium Segmented Control */}
+              <div className="mt-6 mb-2">
+                <div className="bg-white/5 p-1 rounded-xl flex relative isolate">
+                  <LayoutGroup>
+                    {periods.map((p) => {
+                      const isActive = period === p.id;
+                      return (
+                        <button
+                          key={p.id}
+                          onClick={() => handlePeriodChange(p.id)}
+                          className={`flex-1 relative z-10 py-2.5 text-sm font-medium transition-colors duration-200 ${isActive ? 'text-white' : 'text-gray-400 hover:text-white/70'
+                            }`}
+                        >
+                          {isActive && (
+                            <motion.div
+                              layoutId="activePeriod"
+                              className="absolute inset-0 bg-white/10 rounded-lg shadow-sm backdrop-blur-sm border border-white/5"
+                              transition={{ type: "spring", stiffness: 350, damping: 25 }}
+                              style={{ borderRadius: '8px' }}
+                            />
+                          )}
+                          <span className="relative z-20">{p.label}</span>
+                        </button>
+                      );
+                    })}
+                  </LayoutGroup>
+                </div>
               </div>
 
               {/* Top Products */}
               <div className="mt-6 mb-4">
-                <h2 className="text-lg font-semibold text-white mb-4">{t('analytics.topProducts')}</h2>
+                <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                  <span className="w-1 h-5 bg-orange-primary rounded-full"></span>
+                  {t('analytics.topProducts')}
+                </h2>
 
                 {topProducts && topProducts.length > 0 ? (
                   <div className="space-y-3">
                     {topProducts.map((product, index) => (
                       <motion.div
                         key={product.id}
-                        className="glass-card p-4"
+                        className="glass-card p-4 active:scale-[0.99] transition-transform"
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: 0.2 + index * 0.1 }}
                       >
-                        <div className="flex justify-between items-start mb-2">
-                          <span className="text-white font-medium">{product.name}</span>
-                          <span className="text-orange-primary font-bold">
+                        <div className="flex justify-between items-start mb-3">
+                          <span className="text-white font-medium text-sm line-clamp-2 pr-4">{product.name}</span>
+                          <span className="text-orange-primary font-bold whitespace-nowrap">
                             {formatUSD(product.revenue, 2)}
                           </span>
                         </div>
 
                         {/* Bar Chart */}
-                        <div className="bar-container mb-2">
-                          <motion.div
-                            className="bar-fill"
-                            initial={{ width: 0 }}
-                            animate={{ width: `${(product.revenue / maxRevenue) * 100}%` }}
-                            transition={{ duration: 0.8, delay: 0.3 + index * 0.1 }}
-                          />
+                        <div className="flex items-center gap-3">
+                          <div className="bar-container flex-1 h-1.5 bg-white/5 rounded-full overflow-hidden">
+                            <motion.div
+                              className="h-full bg-gradient-to-r from-orange-primary to-orange-400 rounded-full"
+                              initial={{ width: 0 }}
+                              animate={{ width: `${(product.revenue / maxRevenue) * 100}%` }}
+                              transition={{ duration: 1, delay: 0.3 + index * 0.1, type: "spring" }}
+                            />
+                          </div>
+                          <span className="text-[10px] text-gray-400 tabular-nums w-12 text-right">
+                            {product.quantity} sold
+                          </span>
                         </div>
-
-                        <p className="text-xs text-gray-400">{product.quantity} {t('analytics.soldCount')}</p>
                       </motion.div>
                     ))}
                   </div>
                 ) : (
-                  <div className="glass-card p-8 text-center">
-                    <p className="text-gray-400">{t('analytics.noData')}</p>
+                  <div className="glass-card p-8 text-center border-dashed border-white/10">
+                    <div className="text-4xl mb-3 opacity-30">📊</div>
+                    <p className="text-gray-400 text-sm font-medium">{t('analytics.noData')}</p>
+                    <p className="text-gray-600 text-xs mt-1">Try selecting a different period</p>
                   </div>
                 )}
               </div>
             </div>
           </motion.div>
 
-          {/* Custom Date Range Picker */}
-          {showCustomPicker && (
-            <motion.div
-              className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-end"
-              style={{ padding: '0 12px calc(var(--tabbar-total) + 16px)', maxHeight: '80vh' }}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setShowCustomPicker(false)}
-            >
-              <motion.div
-                className="w-full max-w-xl mx-auto bg-dark-elevated rounded-3xl p-4 sm:p-6 shadow-2xl overflow-y-auto max-h-[75vh]"
-                initial={{ y: '100%' }}
-                animate={{ y: 0 }}
-                exit={{ y: '100%' }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <h3 className="text-lg font-semibold text-white mb-4">{t('analytics.selectPeriod')}</h3>
-
-                <div className="space-y-4 w-full min-w-0">
-                  <div>
-                    <label className="text-sm text-gray-400 mb-1 block">{t('analytics.from')}</label>
-                    <input
-                      type="date"
-                      value={customRange.from}
-                      onChange={(e) =>
-                        setCustomRange((prev) => ({ ...prev, from: e.target.value }))
-                      }
-                      className="w-full bg-dark-bg text-white px-4 py-3 rounded-xl border border-gray-700 focus:border-orange-primary outline-none"
-                    />
+          {/* Custom Date Range Picker - Premium Bottom Sheet */}
+          <AnimatePresence>
+            {showCustomPicker && (
+              <>
+                <motion.div
+                  className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-md"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  onClick={() => setShowCustomPicker(false)}
+                />
+                <motion.div
+                  className="fixed inset-x-0 bottom-0 z-[61] bg-[#141414] rounded-t-[32px] border-t border-white/10 overflow-hidden"
+                  initial={{ y: '100%' }}
+                  animate={{ y: 0 }}
+                  exit={{ y: '100%' }}
+                  transition={{ type: "spring", damping: 25, stiffness: 300 }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {/* Sheet Handle */}
+                  <div className="w-full flex justify-center pt-3 pb-2" onPointerDown={() => setShowCustomPicker(false)}>
+                    <div className="w-10 h-1 rounded-full bg-white/20" />
                   </div>
 
-                  <div>
-                    <label className="text-sm text-gray-400 mb-1 block">{t('analytics.to')}</label>
-                    <input
-                      type="date"
-                      value={customRange.to}
-                      onChange={(e) => setCustomRange((prev) => ({ ...prev, to: e.target.value }))}
-                      className="w-full bg-dark-bg text-white px-4 py-3 rounded-xl border border-gray-700 focus:border-orange-primary outline-none"
-                    />
-                  </div>
-                </div>
+                  <div className="px-5 pb-8 pt-2">
+                    <div className="flex items-center justify-between mb-6">
+                      <h3 className="text-xl font-bold text-white">{t('analytics.selectPeriod')}</h3>
+                      <button
+                        onClick={() => setShowCustomPicker(false)}
+                        className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-gray-400"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                      </button>
+                    </div>
 
-                <div className="flex gap-3 mt-6 sticky bottom-0 bg-dark-elevated pt-4 -mx-6 px-6 pb-2">
-                  <button
-                    onClick={() => setShowCustomPicker(false)}
-                    className="flex-1 bg-dark-bg text-white px-4 py-3 sm:py-4 rounded-xl font-medium min-h-[44px]"
-                  >
-                    {t('common.cancel')}
-                  </button>
-                  <button
-                    onClick={handleCustomRangeApply}
-                    className="flex-1 bg-orange-primary text-white px-4 py-3 sm:py-4 rounded-xl font-medium min-h-[44px]"
-                    disabled={!customRange.from || !customRange.to}
-                  >
-                    {t('common.apply')}
-                  </button>
-                </div>
-              </motion.div>
-            </motion.div>
-          )}
+                    <div className="space-y-4">
+                      <div>
+                        <label className="text-xs font-semibold text-gray-400 mb-2 block uppercase tracking-wider">{t('analytics.from')}</label>
+                        <div className="relative">
+                          <input
+                            type="date"
+                            value={customRange.from}
+                            onChange={(e) =>
+                              setCustomRange((prev) => ({ ...prev, from: e.target.value }))
+                            }
+                            className="w-full bg-white/5 text-white px-4 py-3.5 rounded-xl border border-white/10 focus:border-orange-primary outline-none transition-colors appearance-none min-h-[50px]"
+                          />
+                          <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-xs font-semibold text-gray-400 mb-2 block uppercase tracking-wider">{t('analytics.to')}</label>
+                        <div className="relative">
+                          <input
+                            type="date"
+                            value={customRange.to}
+                            onChange={(e) => setCustomRange((prev) => ({ ...prev, to: e.target.value }))}
+                            className="w-full bg-white/5 text-white px-4 py-3.5 rounded-xl border border-white/10 focus:border-orange-primary outline-none transition-colors appearance-none min-h-[50px]"
+                          />
+                          <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-8" style={{ marginBottom: 'max(env(safe-area-inset-bottom), 20px)' }}>
+                      <button
+                        onClick={handleCustomRangeApply}
+                        className="w-full bg-gradient-to-r from-orange-primary to-orange-500 text-white font-bold py-4 rounded-xl shadow-lg shadow-orange-500/20 active:scale-[0.98] transition-all disabled:opacity-50 disabled:shadow-none"
+                        disabled={!customRange.from || !customRange.to}
+                      >
+                        {t('common.apply')}
+                      </button>
+                    </div>
+                    {/* Safe area spacer */}
+                    <div className="h-[env(safe-area-inset-bottom)]" />
+                  </div>
+                </motion.div>
+              </>
+            )}
+          </AnimatePresence>
         </>
       )}
     </AnimatePresence>

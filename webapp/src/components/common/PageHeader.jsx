@@ -1,4 +1,3 @@
-import { motion } from 'framer-motion';
 import { useTelegram } from '../../hooks/useTelegram';
 
 /**
@@ -11,11 +10,16 @@ import { useTelegram } from '../../hooks/useTelegram';
  */
 export default function PageHeader({ title, onBack, action, variant: _variant = 'back' }) {
   const { triggerHaptic } = useTelegram();
+  const variant = _variant === 'close' ? 'close' : 'back';
+  const isClose = variant === 'close';
 
   const _handleBack = () => {
     triggerHaptic('light');
-    onBack();
+    onBack?.();
   };
+
+  const iconPath = isClose ? 'M6 18L18 6M6 6l12 12' : 'M15 19l-7-7 7-7';
+  const ariaLabel = isClose ? 'Close' : 'Go back';
 
   return (
     <div
@@ -25,8 +29,16 @@ export default function PageHeader({ title, onBack, action, variant: _variant = 
       }}
     >
       <div className="flex items-center justify-between px-4 h-12">
-        {/* Spacer for symmetry (Back button is now native-only) */}
-        <div style={{ width: '40px', height: '40px' }} />
+        <button
+          type="button"
+          onClick={_handleBack}
+          aria-label={ariaLabel}
+          className="w-10 h-10 rounded-xl flex items-center justify-center text-gray-300 border border-white/10 bg-white/5"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={iconPath} />
+          </svg>
+        </button>
 
         {/* Title */}
         <h1

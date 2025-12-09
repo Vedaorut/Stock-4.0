@@ -29,7 +29,6 @@ function WorkerCard({ worker, onRemove, isOwner, t }) {
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, x: -20 }}
-      layout
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3 flex-1">
@@ -109,7 +108,17 @@ export default function WorkspaceModal({ isOpen, onClose }) {
     onClose();
   }, [onClose]);
 
-  useBackButton(isOpen ? (showForm ? () => setShowForm(false) : handleClose) : null);
+  const handleBackButton = useCallback(() => {
+    if (showForm) {
+      setShowForm(false);
+      return;
+    }
+    handleClose();
+  }, [handleClose, showForm]);
+
+  useBackButton(isOpen ? handleBackButton : null);
+
+  const headerVariant = showForm ? 'back' : 'close';
 
 
   const loadData = useCallback(async (signal) => {
@@ -302,7 +311,7 @@ export default function WorkspaceModal({ isOpen, onClose }) {
             exit={{ x: '100%' }}
             transition={{ type: 'spring', damping: 30, stiffness: 300 }}
           >
-            <PageHeader title="Workspace" onBack={handleClose} variant="close" />
+            <PageHeader title="Workspace" onBack={handleBackButton} variant={headerVariant} />
             <div
               className="flex-1 overflow-y-auto"
               style={{
@@ -365,7 +374,7 @@ export default function WorkspaceModal({ isOpen, onClose }) {
             exit={{ x: '100%' }}
             transition={{ type: 'spring', damping: 30, stiffness: 300 }}
           >
-            <PageHeader title="Workspace" onBack={handleClose} />
+            <PageHeader title="Workspace" onBack={handleBackButton} variant={headerVariant} />
             <div
               className="flex-1 overflow-y-auto"
               style={{
@@ -414,7 +423,7 @@ export default function WorkspaceModal({ isOpen, onClose }) {
           exit={{ x: '100%' }}
           transition={{ type: 'spring', damping: 30, stiffness: 300 }}
         >
-          <PageHeader title="Workspace" onBack={handleClose} />
+          <PageHeader title="Workspace" onBack={handleBackButton} variant={headerVariant} />
           <div
             className="flex-1 overflow-y-auto"
             style={{
@@ -552,7 +561,7 @@ export default function WorkspaceModal({ isOpen, onClose }) {
                     <h3 className="text-sm font-semibold text-gray-400 px-2">
                       {t('workspace.workersCount', { count: workers.length })}
                     </h3>
-                    <AnimatePresence mode="popLayout">
+                    <AnimatePresence mode="wait">
                       {workers.map((worker) => (
                         <WorkerCard
                           key={worker.id}

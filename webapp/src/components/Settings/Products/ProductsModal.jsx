@@ -102,7 +102,21 @@ export default function ProductsModal({ isOpen, onClose }) {
     onClose();
   }, [onClose]);
 
-  useBackButton(isOpen ? (showAIChat ? handleCloseAIChat : handleClose) : null);
+  const handleBackButton = useCallback(() => {
+    if (showAIChat) {
+      handleCloseAIChat();
+      return;
+    }
+    if (showForm) {
+      setShowForm(false);
+      return;
+    }
+    handleClose();
+  }, [handleClose, handleCloseAIChat, showAIChat, showForm]);
+
+  useBackButton(isOpen ? handleBackButton : null);
+
+  const headerVariant = showAIChat || showForm ? 'back' : 'close';
 
 
   // Initialize AI chat history
@@ -463,7 +477,11 @@ export default function ProductsModal({ isOpen, onClose }) {
           exit={{ x: '100%' }}
           transition={{ type: 'spring', damping: 30, stiffness: 300 }}
         >
-          <PageHeader title={t('settings.items.products')} onBack={handleClose} variant="close" />
+          <PageHeader
+            title={t('settings.items.products')}
+            onBack={handleBackButton}
+            variant={headerVariant}
+          />
           <div
             className="flex-1 overflow-y-auto"
             style={{

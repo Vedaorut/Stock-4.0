@@ -480,7 +480,7 @@ const TabBar = memo(function TabBar() {
 
                 {/* Tab items container */}
                 <div className="relative flex w-full justify-around items-center px-1">
-                    <AnimatePresence mode="popLayout">
+                    <AnimatePresence mode="wait">
                         {tabs.map(({ id, label, Icon }, index) => (
                             <TabItem
                                 key={id}

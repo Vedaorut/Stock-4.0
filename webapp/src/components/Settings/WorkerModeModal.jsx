@@ -33,7 +33,6 @@ function WorkspaceShopCard({ shop, onSelect, isActive, t }) {
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, x: -20 }}
-      layout
     >
       <div className="flex items-center gap-4">
         {/* Shop Logo */}
@@ -375,7 +374,7 @@ export default function WorkerModeModal({ isOpen, onClose }) {
                   <h3 className="text-sm font-semibold text-gray-400 px-2">
                     {t('workerMode.availableShops', { count: workspaceShops.length })}
                   </h3>
-                  <AnimatePresence mode="popLayout">
+                  <AnimatePresence mode="wait">
                     {workspaceShops.map((shop) => (
                       <WorkspaceShopCard
                         key={shop.id}

@@ -85,7 +85,6 @@ function WalletCard({ wallet, onRemove, onEdit, isEditing, onStartEdit, onCancel
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, x: -20 }}
-      layout
     >
       {isEditing ? (
         <div className="space-y-3">
@@ -355,6 +354,8 @@ export default function WalletsModal({ isOpen, onClose }) {
 
   useBackButton(isOpen ? handleBackButton : null);
 
+  const headerVariant = editingWalletType ? 'back' : 'close';
+
   // BUG-WEBAPP-007: Properly manage scroll lock
   useScrollLock(isOpen);
 
@@ -536,7 +537,7 @@ export default function WalletsModal({ isOpen, onClose }) {
           exit={{ x: '100%' }}
           transition={{ type: 'spring', damping: 30, stiffness: 300 }}
         >
-          <PageHeader title={t('wallet.title')} onBack={handleClose} variant="close" />
+          <PageHeader title={t('wallet.title')} onBack={handleBackButton} variant={headerVariant} />
           <div
             className="flex-1 overflow-y-auto"
             style={{

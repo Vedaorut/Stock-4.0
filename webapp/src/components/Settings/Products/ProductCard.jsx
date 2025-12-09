@@ -26,7 +26,6 @@ function ProductCard({ product, onEdit, onDelete, t }) {
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, x: -20 }}
-      layout
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">

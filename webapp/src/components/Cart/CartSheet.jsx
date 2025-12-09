@@ -88,7 +88,7 @@ export default function CartSheet() {
   const sheetSpring = useMemo(() => getSpringPreset('sheet', platform), [platform]);
   const controlSpring = useMemo(() => getSpringPreset('press', platform), [platform]);
   const quickSpring = useMemo(() => getSpringPreset('quick', platform), [platform]);
-  
+
   const { shadow: checkoutShadow, hover: checkoutHoverShadow } = useMemo(
     () => getCheckoutShadows(android),
     [android]
@@ -144,16 +144,20 @@ export default function CartSheet() {
 
           {/* Sheet */}
           <motion.div
-            className="fixed inset-x-0 bottom-0 z-[1000] flex flex-col"
-            style={{ maxHeight: getSheetMaxHeight(platform, 24) }}
+            className="fixed inset-x-0 bottom-0 z-[1000] flex flex-col overflow-hidden"
+            style={{
+              // Fallback to 85vh if calc fails, ensuring visibility
+              maxHeight: 'calc(100dvh - var(--tabbar-total, 90px))',
+              height: 'auto',
+            }}
             initial={{ y: '100%' }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: '100%' }}
             transition={sheetSpring}
           >
-            <div className="rounded-t-[32px] flex flex-col h-full" style={sheetStyle}>
+            <div className="rounded-t-[32px] flex flex-col h-full overflow-hidden" style={sheetStyle}>
               {/* Header */}
-              <div className="flex items-center justify-between p-5 border-b border-white/10 flex-shrink-0">
+              <div className="flex items-center justify-between p-5 border-b border-white/10 flex-shrink-0 relative z-20 bg-inherit">
                 <h2 className="text-xl font-bold text-white" style={{ letterSpacing: '-0.01em' }}>
                   {t('cart.title')}
                 </h2>
@@ -190,7 +194,7 @@ export default function CartSheet() {
 
               {/* Cart Items Area */}
               <div
-                className="flex-1 overflow-y-auto p-4 space-y-3 min-h-0"
+                className="flex-1 overflow-y-auto p-4 space-y-3 min-h-0 relative z-10"
                 style={{ WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}
               >
                 {cart.length === 0 ? (
@@ -225,7 +229,7 @@ export default function CartSheet() {
                     </motion.button>
                   </motion.div>
                 ) : (
-                  <AnimatePresence initial={false}>
+                  <AnimatePresence initial={false} mode="popLayout">
                     {cart.map((item) => (
                       <CartItem key={item.id} item={item} />
                     ))}
@@ -236,8 +240,8 @@ export default function CartSheet() {
               {/* Footer */}
               {cart.length > 0 && (
                 <div
-                  className="p-5 border-t border-white/10 space-y-4 flex-shrink-0"
-                  style={{ paddingBottom: 'calc(var(--tabbar-total) + 20px)' }}
+                  className="p-5 border-t border-white/10 space-y-4 flex-shrink-0 relative z-20 bg-inherit"
+                  style={{ paddingBottom: 'calc(var(--tabbar-total, 90px) + 20px)' }}
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-gray-400 text-base font-medium">{t('cart.total')}</span>

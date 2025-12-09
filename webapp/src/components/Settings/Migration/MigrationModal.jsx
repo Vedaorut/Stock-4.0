@@ -65,6 +65,9 @@ export default function MigrationModal({ isOpen, onClose }) {
 
   useBackButton(isOpen ? handleBack : null);
 
+  const isStepNavigation = step > 1 && step < 3;
+  const headerVariant = isStepNavigation ? 'back' : 'close';
+
   // Handle continue to input step
   const handleContinue = useCallback(() => {
     triggerHaptic('light');
@@ -85,11 +88,11 @@ export default function MigrationModal({ isOpen, onClose }) {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-        >
+          >
           <PageHeader
             title={step === 3 ? 'Done' : 'Migration'}
-            onBack={step === 1 || step === 3 ? onClose : () => setStep(step - 1)}
-            variant="close"
+            onBack={handleBack}
+            variant={headerVariant}
           />
 
           <div

@@ -45,7 +45,6 @@ function OrderCard({ order }) {
       className="glass-card rounded-2xl p-4"
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      layout
     >
       <div className="space-y-3">
         {/* Header */}
