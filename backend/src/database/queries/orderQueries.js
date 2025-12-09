@@ -6,13 +6,13 @@ import { query } from '../../config/database.js';
 export const orderQueries = {
   // Create new order (with optional transaction client)
   create: async (orderData, client = null) => {
-    const { buyerId, productId, quantity, totalPrice, currency, deliveryAddress } = orderData;
+    const { buyerId, productId, quantity, totalPrice, currency, deliveryAddress, shopId } = orderData;
     const queryFn = client ? client.query.bind(client) : query;
     const result = await queryFn(
-      `INSERT INTO orders (buyer_id, product_id, quantity, total_price, currency, delivery_address, status)
-       VALUES ($1, $2, $3, $4, $5, $6, 'pending')
+      `INSERT INTO orders (buyer_id, product_id, quantity, total_price, currency, delivery_address, status, shop_id)
+       VALUES ($1, $2, $3, $4, $5, $6, 'pending', $7)
        RETURNING *`,
-      [buyerId, productId, quantity, totalPrice, currency, deliveryAddress]
+      [buyerId, productId, quantity, totalPrice, currency, deliveryAddress, shopId]
     );
     return result.rows[0];
   },
@@ -22,9 +22,10 @@ export const orderQueries = {
     const queryFn = client ? client.query.bind(client) : query;
     const result = await queryFn(
       `SELECT o.*,
-              p.name as product_name,
+              COALESCE(p.name, (SELECT oi.product_name FROM order_items oi WHERE oi.order_id = o.id LIMIT 1)) as product_name,
               s.id as shop_id,
-              s.name as shop_name, s.owner_id,
+              s.name as shop_name,
+              s.owner_id,
               u.username as buyer_username, u.telegram_id as buyer_telegram_id,
               u.language as buyer_language,
               seller.telegram_id as seller_telegram_id,
@@ -32,7 +33,7 @@ export const orderQueries = {
               seller.language as seller_language
        FROM orders o
        LEFT JOIN products p ON o.product_id = p.id
-       LEFT JOIN shops s ON p.shop_id = s.id
+       LEFT JOIN shops s ON o.shop_id = s.id
        LEFT JOIN users u ON o.buyer_id = u.id
        LEFT JOIN users seller ON s.owner_id = seller.id
        WHERE o.id = $1`,
@@ -50,13 +51,13 @@ export const orderQueries = {
 
     const result = await query(
       `SELECT o.*,
-              p.name as product_name,
+              COALESCE(p.name, (SELECT oi.product_name FROM order_items oi WHERE oi.order_id = o.id LIMIT 1)) as product_name,
               s.name as shop_name,
               pay.blockchain_confirmations,
               pay.verification_status as payment_verification_status
        FROM orders o
        LEFT JOIN products p ON o.product_id = p.id
-       LEFT JOIN shops s ON p.shop_id = s.id
+       LEFT JOIN shops s ON o.shop_id = s.id
        LEFT JOIN payments pay ON pay.order_id = o.id
        WHERE o.buyer_id = $1
        ORDER BY o.created_at DESC
@@ -71,7 +72,7 @@ export const orderQueries = {
     const { limit = 50, offset = 0, statuses = [] } = options;
 
     const params = [ownerId];
-    const conditions = ['s.owner_id = $1'];
+    const conditions = ['(s.owner_id = $1 OR ps.owner_id = $1)'];
     let paramIndex = 2;
 
     if (Array.isArray(statuses) && statuses.length > 0) {
@@ -84,14 +85,15 @@ export const orderQueries = {
 
     const result = await query(
       `SELECT o.*,
-              p.name as product_name,
+              COALESCE(p.name, (SELECT oi.product_name FROM order_items oi WHERE oi.order_id = o.id LIMIT 1)) as product_name,
               s.name as shop_name,
               u.username as buyer_username,
               u.first_name as buyer_first_name,
               u.last_name as buyer_last_name
        FROM orders o
-       JOIN products p ON o.product_id = p.id
-       JOIN shops s ON p.shop_id = s.id
+       LEFT JOIN products p ON o.product_id = p.id
+       LEFT JOIN shops s ON o.shop_id = s.id
+       LEFT JOIN shops ps ON p.shop_id = ps.id
        LEFT JOIN users u ON o.buyer_id = u.id
        WHERE ${conditions.join(' AND ')}
        ORDER BY o.created_at DESC
@@ -111,7 +113,7 @@ export const orderQueries = {
     const { limit = 50, offset = 0, statuses = [] } = options;
 
     const params = [shopIds];
-    const conditions = ['p.shop_id = ANY($1)'];
+    const conditions = ['o.shop_id = ANY($1)'];
     let paramIndex = 2;
 
     if (Array.isArray(statuses) && statuses.length > 0) {
@@ -124,14 +126,14 @@ export const orderQueries = {
 
     const result = await query(
       `SELECT o.*,
-              p.name as product_name,
+              COALESCE(p.name, (SELECT oi.product_name FROM order_items oi WHERE oi.order_id = o.id LIMIT 1)) as product_name,
               s.name as shop_name,
               u.username as buyer_username,
               u.first_name as buyer_first_name,
               u.last_name as buyer_last_name
        FROM orders o
-       JOIN products p ON o.product_id = p.id
-       JOIN shops s ON p.shop_id = s.id
+       LEFT JOIN products p ON o.product_id = p.id
+       JOIN shops s ON o.shop_id = s.id
        LEFT JOIN users u ON o.buyer_id = u.id
        WHERE ${conditions.join(' AND ')}
        ORDER BY o.created_at DESC
@@ -146,7 +148,7 @@ export const orderQueries = {
     const { limit = 50, offset = 0, statuses = [] } = options;
 
     const params = [shopId];
-    const conditions = ['p.shop_id = $1'];
+    const conditions = ['o.shop_id = $1'];
     let paramIndex = 2;
 
     if (Array.isArray(statuses) && statuses.length > 0) {
@@ -165,8 +167,8 @@ export const orderQueries = {
               u.first_name as buyer_first_name,
               u.last_name as buyer_last_name
        FROM orders o
-       JOIN products p ON o.product_id = p.id
-       JOIN shops s ON p.shop_id = s.id
+       LEFT JOIN products p ON o.product_id = p.id
+       JOIN shops s ON o.shop_id = s.id
        LEFT JOIN users u ON o.buyer_id = u.id
        WHERE ${conditions.join(' AND ')}
        ORDER BY o.created_at DESC
@@ -206,10 +208,10 @@ export const orderQueries = {
          s.wallet_usdt,
          s.wallet_ltc
        FROM orders o
+       LEFT JOIN shops s ON s.id = o.shop_id
        LEFT JOIN products p ON o.product_id = p.id
        LEFT JOIN order_items oi ON oi.order_id = o.id
        LEFT JOIN products pi ON oi.product_id = pi.id
-       JOIN shops s ON s.id = COALESCE(p.shop_id, pi.shop_id)
        WHERE o.id = $1
        LIMIT 1`,
       [orderId]
@@ -267,8 +269,7 @@ export const orderQueries = {
     const result = await query(
       `SELECT COUNT(*) as total 
        FROM orders o
-       JOIN products p ON o.product_id = p.id
-       WHERE p.shop_id = $1${statusFilter}`,
+       WHERE o.shop_id = $1${statusFilter}`,
       params
     );
 

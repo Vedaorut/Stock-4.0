@@ -35,6 +35,7 @@ export const createOrderWithItems = async (userId, validatedData, deliveryAddres
       totalPrice,
       currency,
       deliveryAddress,
+      shopId,
     },
     client
   );
@@ -162,39 +163,58 @@ export const getOrderAnalytics = async (userId, fromDate, toDate) => {
     const toDateExclusive = new Date(toDate);
     toDateExclusive.setDate(toDateExclusive.getDate() + 1);
 
-    // Get summary statistics
+    // Owner orders scoped via shop_id snapshot (fallback to product shop if needed)
     const summaryResult = await client.query(
-      `SELECT
-        COUNT(*) as total_orders,
-        SUM(CASE WHEN o.status IN ('confirmed', 'shipped', 'delivered') THEN 1 ELSE 0 END) as completed_orders,
-        SUM(CASE WHEN o.status IN ('confirmed', 'shipped', 'delivered') THEN o.total_price ELSE 0 END) as total_revenue,
-        AVG(CASE WHEN o.status IN ('confirmed', 'shipped', 'delivered') THEN o.total_price ELSE NULL END) as avg_order_value
-      FROM orders o
-      JOIN products p ON o.product_id = p.id
-      JOIN shops s ON p.shop_id = s.id
-      WHERE s.owner_id = $1
-        AND o.created_at >= $2
-        AND o.created_at < $3`,
+      `WITH owner_orders AS (
+         SELECT o.id, o.status
+         FROM orders o
+         LEFT JOIN products p ON o.product_id = p.id
+         LEFT JOIN shops s ON s.id = o.shop_id
+         LEFT JOIN shops ps ON ps.id = p.shop_id
+         WHERE (s.owner_id = $1 OR ps.owner_id = $1)
+           AND o.created_at >= $2
+           AND o.created_at < $3
+       ),
+       order_totals AS (
+         SELECT oo.id,
+                oo.status,
+                COALESCE(SUM(oi.price * oi.quantity), 0) AS item_total
+         FROM owner_orders oo
+         LEFT JOIN order_items oi ON oi.order_id = oo.id
+         GROUP BY oo.id, oo.status
+       )
+       SELECT
+         COUNT(*) as total_orders,
+         SUM(CASE WHEN status IN ('confirmed', 'shipped', 'delivered') THEN 1 ELSE 0 END) as completed_orders,
+         SUM(CASE WHEN status IN ('confirmed', 'shipped', 'delivered') THEN item_total ELSE 0 END) as total_revenue,
+         AVG(CASE WHEN status IN ('confirmed', 'shipped', 'delivered') THEN item_total ELSE NULL END) as avg_order_value
+       FROM order_totals`,
       [userId, fromDate, toDateExclusive]
     );
 
-    // Get top products
+    // Get top products aggregated via order_items
     const topProductsResult = await client.query(
-      `SELECT
-        p.id,
-        p.name,
-        COUNT(o.id) as quantity,
-        SUM(o.total_price) as revenue
-      FROM orders o
-      JOIN products p ON o.product_id = p.id
-      JOIN shops s ON p.shop_id = s.id
-      WHERE s.owner_id = $1
-        AND o.created_at >= $2
-        AND o.created_at < $3
-        AND o.status IN ('confirmed', 'shipped', 'delivered')
-      GROUP BY p.id, p.name
-      ORDER BY revenue DESC
-      LIMIT 10`,
+      `WITH owner_orders AS (
+         SELECT o.id
+         FROM orders o
+         LEFT JOIN products p ON o.product_id = p.id
+         LEFT JOIN shops s ON s.id = o.shop_id
+         LEFT JOIN shops ps ON ps.id = p.shop_id
+         WHERE (s.owner_id = $1 OR ps.owner_id = $1)
+           AND o.created_at >= $2
+           AND o.created_at < $3
+           AND o.status IN ('confirmed', 'shipped', 'delivered')
+       )
+       SELECT
+         COALESCE(p.name, oi.product_name) as name,
+         SUM(oi.quantity) as quantity,
+         SUM(oi.price * oi.quantity) as revenue
+       FROM order_items oi
+       JOIN owner_orders oo ON oo.id = oi.order_id
+       LEFT JOIN products p ON oi.product_id = p.id
+       GROUP BY COALESCE(p.name, oi.product_name)
+       ORDER BY revenue DESC
+       LIMIT 10`,
       [userId, fromDate, toDateExclusive]
     );
 

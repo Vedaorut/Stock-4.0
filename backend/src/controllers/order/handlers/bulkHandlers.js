@@ -20,12 +20,18 @@ export const bulkUpdateStatus = async (req, res) => {
     await client.query('BEGIN');
 
     const ordersResult = await client.query(
-      `SELECT o.id, o.status as current_status, o.buyer_id,
-                p.shop_id, s.owner_id, p.name as product_name,
-                u.username as buyer_username, u.telegram_id as buyer_telegram_id
+      `SELECT o.id,
+              o.status as current_status,
+              o.buyer_id,
+              o.shop_id,
+              COALESCE(o.shop_id, p.shop_id) as resolved_shop_id,
+              p.name as product_name,
+              s.owner_id,
+              u.username as buyer_username,
+              u.telegram_id as buyer_telegram_id
          FROM orders o
-         JOIN products p ON o.product_id = p.id
-         JOIN shops s ON p.shop_id = s.id
+         LEFT JOIN products p ON o.product_id = p.id
+         LEFT JOIN shops s ON s.id = COALESCE(o.shop_id, p.shop_id)
          LEFT JOIN users u ON o.buyer_id = u.id
          WHERE o.id = ANY($1::int[])`,
       [order_ids]
@@ -41,7 +47,8 @@ export const bulkUpdateStatus = async (req, res) => {
       });
     }
 
-    const unauthorized = foundOrders.find((order) => order.owner_id !== userId);
+    // Security: Reject if owner_id is null (orphan order) OR belongs to another user
+    const unauthorized = foundOrders.find((order) => !order.owner_id || order.owner_id !== userId);
     if (unauthorized) {
       await client.query('ROLLBACK');
       return res.status(403).json({
@@ -109,7 +116,7 @@ export const bulkUpdateStatus = async (req, res) => {
           broadcast('order_status', {
             orderId: order.id,
             status,
-            shopId: order.shop_id,
+            shopId: order.resolved_shop_id || order.shop_id,
           });
 
           if (order.buyer_telegram_id) {

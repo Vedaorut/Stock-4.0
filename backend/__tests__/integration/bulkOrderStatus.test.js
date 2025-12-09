@@ -23,6 +23,21 @@ describe('POST /api/orders/bulk-status', () => {
   beforeAll(async () => {
     client = await getClient();
 
+    // Ensure shop_id column exists (migration safety for local test DB)
+    await client.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'orders' AND column_name = 'shop_id'
+        ) THEN
+          ALTER TABLE orders ADD COLUMN shop_id INT REFERENCES shops(id) ON DELETE SET NULL;
+          CREATE INDEX IF NOT EXISTS idx_orders_shop_id ON orders(shop_id);
+        END IF;
+      END
+      $$;
+    `);
+
     // Generate unique identifiers for this test run (test range: 9000000000+)
     const uniqueSuffix = Date.now() % 1000000;
     testTelegramId1 = 9000888001 + uniqueSuffix;
@@ -74,24 +89,24 @@ describe('POST /api/orders/bulk-status', () => {
 
     // Create 3 test orders
     const order1 = await client.query(
-      `INSERT INTO orders (buyer_id, product_id, quantity, total_price, currency, status)
-       VALUES ($1, $2, 1, 10.00, 'USD', 'pending')
+      `INSERT INTO orders (buyer_id, product_id, quantity, total_price, currency, status, shop_id)
+       VALUES ($1, $2, 1, 10.00, 'USD', 'pending', $3)
        RETURNING id`,
-      [otherUserId, productId]
+      [otherUserId, productId, shopId]
     );
 
     const order2 = await client.query(
-      `INSERT INTO orders (buyer_id, product_id, quantity, total_price, currency, status)
-       VALUES ($1, $2, 2, 20.00, 'USD', 'pending')
+      `INSERT INTO orders (buyer_id, product_id, quantity, total_price, currency, status, shop_id)
+       VALUES ($1, $2, 2, 20.00, 'USD', 'pending', $3)
        RETURNING id`,
-      [otherUserId, productId]
+      [otherUserId, productId, shopId]
     );
 
     const order3 = await client.query(
-      `INSERT INTO orders (buyer_id, product_id, quantity, total_price, currency, status)
-       VALUES ($1, $2, 1, 10.00, 'USD', 'confirmed')
+      `INSERT INTO orders (buyer_id, product_id, quantity, total_price, currency, status, shop_id)
+       VALUES ($1, $2, 1, 10.00, 'USD', 'confirmed', $3)
        RETURNING id`,
-      [otherUserId, productId]
+      [otherUserId, productId, shopId]
     );
 
     orderIds = [order1.rows[0].id, order2.rows[0].id, order3.rows[0].id];
@@ -338,6 +353,36 @@ describe('POST /api/orders/bulk-status', () => {
       expect(response.status).toBe(200);
       expect(response.body.data.updated_count).toBe(1);
       expect(response.body.data.orders).toHaveLength(1);
+    });
+
+    test('should still update when product is soft-deleted and orders remain visible', async () => {
+      // Soft delete the product (is_active = false) to simulate deletion
+      await client.query('UPDATE products SET is_active = false WHERE id = $1', [productId]);
+
+      const response = await request(app)
+        .post('/api/orders/bulk-status')
+        .set('Authorization', `Bearer ${testUserToken}`)
+        .send({
+          order_ids: orderIds,
+          status: 'confirmed',
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.updated_count).toBe(orderIds.length);
+
+      // Seller should still see orders list
+      const sellerOrders = await request(app)
+        .get('/api/orders')
+        .set('Authorization', `Bearer ${testUserToken}`)
+        .query({ type: 'seller', limit: 5 });
+
+      expect(sellerOrders.status).toBe(200);
+      expect(Array.isArray(sellerOrders.body.data)).toBe(true);
+      expect(sellerOrders.body.data.length).toBeGreaterThan(0);
+
+      // restore product state for other tests
+      await client.query('UPDATE products SET is_active = true WHERE id = $1', [productId]);
     });
   });
 

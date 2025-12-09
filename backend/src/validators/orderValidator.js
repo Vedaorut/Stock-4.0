@@ -78,6 +78,25 @@ export const validateProductsForOrder = async (cartItems, client) => {
     throw new ValidationError(`Products not found or locked: ${missingIds.join(', ')}`);
   }
 
+  // P0-CRITICAL: Check shop is active and has valid subscription
+  const firstShopId = products[0].shop_id;
+  const { rows: [shop] } = await client.query(
+    `SELECT is_active, subscription_status FROM shops WHERE id = $1`,
+    [firstShopId]
+  );
+
+  if (!shop) {
+    throw new ValidationError('Shop not found');
+  }
+
+  if (!shop.is_active) {
+    throw new ValidationError('This shop is currently not accepting orders');
+  }
+
+  if (shop.subscription_status === 'inactive') {
+    throw new ValidationError('This shop is currently not accepting orders');
+  }
+
   // Validate products
   const validatedItems = [];
   let shopId = null;

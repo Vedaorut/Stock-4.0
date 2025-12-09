@@ -6,6 +6,7 @@
 
 import { INVOICE_STATES } from '../../../constants/invoice.js';
 import { ValidationError } from '../../../utils/errors.js';
+import { isExpiredUtc } from '../../../utils/time.js';
 
 /**
  * Ensures an invoice is active (not paid and not expired).
@@ -26,14 +27,13 @@ import { ValidationError } from '../../../utils/errors.js';
  * }
  */
 export async function ensureInvoiceActive(invoice, client) {
-  const now = new Date();
-  const expiresAt = new Date(invoice.expires_at);
+  const expired = isExpiredUtc(invoice.expires_at);
 
   if (invoice.status === INVOICE_STATES.PAID) {
     return { active: false, reason: 'already_paid' };
   }
 
-  if (expiresAt < now) {
+  if (expired) {
     await client.query(
       `UPDATE invoices SET status = $1, updated_at = NOW() WHERE id = $2`,
       [INVOICE_STATES.EXPIRED, invoice.id]

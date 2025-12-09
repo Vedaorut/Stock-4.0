@@ -162,11 +162,16 @@ export const productQueries = {
     return result.rows[0];
   },
 
-  // Delete product
+  // Delete product (soft delete to preserve order history)
   delete: async (id) => {
-    const result = await query('DELETE FROM products WHERE id = $1 RETURNING id, shop_id, name', [
-      id,
-    ]);
+    const result = await query(
+      `UPDATE products
+       SET is_active = false,
+           updated_at = NOW()
+       WHERE id = $1
+       RETURNING id, shop_id, name, is_active`,
+      [id]
+    );
     return result.rows[0];
   },
 

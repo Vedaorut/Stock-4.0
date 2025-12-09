@@ -46,7 +46,7 @@ export async function findActiveInvoiceForSubscription(subscriptionId, purpose =
        WHERE subscription_id = $1
        ${purposeFilter}
        AND (
-         (status = 'pending' AND expires_at > NOW())
+        (status = 'pending' AND expires_at > timezone('utc', NOW()))
          OR
          status IN ('paid', 'confirmed')
        )
