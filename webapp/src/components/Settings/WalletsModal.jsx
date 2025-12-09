@@ -26,7 +26,7 @@ const orderedWalletTypes = ['BTC', 'ETH', 'USDT', 'LTC'];
 
 function WalletCard({ wallet, onRemove, onEdit, isEditing, onStartEdit, onCancelEdit }) {
   const { triggerHaptic, confirm } = useTelegram();
-  const { t, i18n } = useTranslation();
+  const { t, lang } = useTranslation();
   const [editValue, setEditValue] = useState(wallet.address);
   const [saving, setSaving] = useState(false);
 
@@ -148,7 +148,7 @@ function WalletCard({ wallet, onRemove, onEdit, isEditing, onStartEdit, onCancel
             <p className="text-white font-mono text-sm break-all">{wallet.address}</p>
             <p className="text-gray-500 text-xs mt-1">
               {t('wallet.added', {
-                date: new Date(wallet.addedAt || Date.now()).toLocaleDateString(i18n.language || 'ru-RU'),
+                date: new Date(wallet.addedAt || Date.now()).toLocaleDateString(lang || 'ru'),
               })}
             </p>
           </div>
