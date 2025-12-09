@@ -7,6 +7,7 @@ import { useTelegram } from '../hooks/useTelegram';
 import { useTranslation } from '../i18n/useTranslation';
 import FollowCard from '../components/Follows/FollowCard';
 import SubscriptionCard from '../components/Follows/SubscriptionCard';
+import CreateFollowModal from '../components/Follows/CreateFollowModal';
 
 export default function Follows() {
   const { get } = useApi();
@@ -20,6 +21,7 @@ export default function Follows() {
   const [error, setError] = useState(null);
   const [follows, setFollows] = useState([]);
   const [subscriptions, setSubscriptions] = useState([]);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
   // AbortController for retry requests
   const retryControllerRef = useRef(null);
@@ -186,10 +188,22 @@ export default function Follows() {
 
   const handleAddShop = () => {
     triggerHaptic('light');
-    if (window.Telegram?.WebApp?.showAlert) {
-      window.Telegram.WebApp.showAlert('Use the /follow command in the bot to add shops');
+    // Check if user has a shop first
+    if (!myShop) {
+      if (window.Telegram?.WebApp?.showAlert) {
+        window.Telegram.WebApp.showAlert(t('follows.createShopFirst'));
+      }
+      return;
     }
+    setIsCreateModalOpen(true);
   };
+
+  // Callback when follow is successfully created
+  const handleFollowCreated = useCallback(() => {
+    // Reload follows list
+    const controller = new AbortController();
+    loadFollows(controller.signal);
+  }, [loadFollows]);
 
   return (
     <div
@@ -328,6 +342,14 @@ export default function Follows() {
           </>
         )}
       </div>
+
+      {/* Create Follow Modal */}
+      <CreateFollowModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        myShopId={myShop?.id}
+        onSuccess={handleFollowCreated}
+      />
     </div>
   );
 }
