@@ -1,6 +1,6 @@
 import express from 'express';
 import { workerController } from '../controllers/workerController.js';
-import { verifyToken } from '../middleware/auth.js';
+import { verifyToken, requireShopAccess } from '../middleware/auth.js';
 import { workerLimiter } from '../middleware/rateLimiter.js';
 
 const router = express.Router();
@@ -20,7 +20,8 @@ router.get('/accessible', verifyToken, workerController.getAccessibleShops);
 router.get('/workspace', verifyToken, workerController.getWorkerShops);
 router.get('/worker', verifyToken, workerController.getWorkerShops); // alias for bots
 
-router.get('/:shopId/stats', verifyToken, workerController.getStats);
+// AUTH-WORKER-001 FIX: requireShopAccess enforces MAX tier + active subscription for workers
+router.get('/:shopId/stats', verifyToken, requireShopAccess, workerController.getStats);
 
 /**
  * @route   POST /api/shops/:shopId/workers
@@ -28,21 +29,21 @@ router.get('/:shopId/stats', verifyToken, workerController.getStats);
  * @access  Private (Shop owner only)
  * @body    { telegram_id: number } OR { username: string }
  */
-router.post('/:shopId/workers', verifyToken, workerLimiter, workerController.add);
+router.post('/:shopId/workers', verifyToken, requireShopAccess, workerLimiter, workerController.add);
 
 /**
  * @route   GET /api/shops/:shopId/workers
  * @desc    List all workers for a shop
  * @access  Private (Shop owner only)
  */
-router.get('/:shopId/workers', verifyToken, workerController.list);
+router.get('/:shopId/workers', verifyToken, requireShopAccess, workerController.list);
 
 /**
  * @route   DELETE /api/shops/:shopId/workers/:workerId
  * @desc    Remove worker from shop
  * @access  Private (Shop owner only)
  */
-router.delete('/:shopId/workers/:workerId', verifyToken, workerLimiter, workerController.remove);
+router.delete('/:shopId/workers/:workerId', verifyToken, requireShopAccess, workerLimiter, workerController.remove);
 
 /**
  * @route   PATCH /api/workers/mute

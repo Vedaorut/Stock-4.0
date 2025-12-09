@@ -8,6 +8,7 @@ import { getClient } from '../config/database.js';
 import logger from '../utils/logger.js';
 import invoicePaymentService from '../services/invoicePaymentService.js';
 import metricsCollector from '../services/metricsCollector.js';
+import { webhookLimiter } from '../middleware/rateLimiter.js';
 
 const router = express.Router();
 
@@ -18,23 +19,27 @@ const router = express.Router();
  * Handles payment notifications from CrystalPay gateway.
  * Used for subscription payments (BTC/LTC via CrystalPay hosted page).
  */
-router.post('/crystalpay', async (req, res) => {
+// DOS-WEBHOOK-001 FIX: Apply rate limiter to prevent DoS attacks
+router.post('/crystalpay', webhookLimiter, async (req, res) => {
+  const payload = req.body;
+
+  logger.info('[Webhook] CrystalPay received', {
+    id: payload.id,
+    state: payload.state,
+    method: payload.method
+  });
+
+  // DOS-WEBHOOK-001 FIX: Validate signature BEFORE acquiring DB connection
+  // This prevents attackers from exhausting DB connections with invalid requests
+  if (!crystalPayService.verifySignature(payload)) {
+    logger.warn('[Webhook] CrystalPay: Invalid signature');
+    return res.status(401).json({ error: 'Invalid signature' });
+  }
+
+  // Only acquire DB connection after signature validation passes
   const client = await getClient();
 
   try {
-    const payload = req.body;
-
-    logger.info('[Webhook] CrystalPay received', {
-      id: payload.id,
-      state: payload.state,
-      method: payload.method
-    });
-
-    // 1. Verify signature
-    if (!crystalPayService.verifySignature(payload)) {
-      logger.warn('[Webhook] CrystalPay: Invalid signature');
-      return res.status(401).json({ error: 'Invalid signature' });
-    }
 
     // 2. Replay protection
     const webhookId = `crystalpay_${payload.id}_${payload.state}`;
