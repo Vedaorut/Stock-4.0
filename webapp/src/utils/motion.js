@@ -9,7 +9,7 @@
  * import { motion } from 'framer-motion';
  * 
  * // After (uses LazyMotion from App.jsx ~50KB)
- * import { m as motion } from '../../utils/motion';
+ * import { motion } from '../../utils/motion';
  */
 
 export { m, AnimatePresence, LazyMotion, domAnimation, useReducedMotion, useDragControls } from 'framer-motion';

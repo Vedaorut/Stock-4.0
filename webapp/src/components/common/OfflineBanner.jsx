@@ -1,4 +1,4 @@
-import { m as motion, AnimatePresence, useReducedMotion } from 'framer-motion';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 import { useTranslation } from '../../i18n/useTranslation';
 

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, memo } from 'react';
-import { m as motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useFollowsApi } from '../../hooks/useApi';
 import { useTranslation } from '../../i18n/useTranslation';
 

@@ -1,5 +1,5 @@
 import { useEffect, useState, lazy, Suspense } from 'react';
-import { AnimatePresence, LazyMotion, domAnimation } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import { useStore } from './store/useStore';
 import { useTelegram } from './hooks/useTelegram';
 import { useWebSocket } from './hooks/useWebSocket';
@@ -233,7 +233,6 @@ function App() {
   }
 
   return (
-    <LazyMotion features={domAnimation}>
       <div className="min-h-[100dvh] bg-[#181818] flex flex-col overflow-hidden">
         <div
           className="fixed inset-0 z-0 pointer-events-none"
@@ -260,7 +259,7 @@ function App() {
         >
           <Suspense fallback={<PageLoader />}>
             <AnimatePresence mode="wait">
-              <m.div
+              <motion.div
                 key={followDetailId ? `follow-${followDetailId}` : activeTab}
                 initial="initial"
                 animate="enter"
@@ -269,7 +268,7 @@ function App() {
                 transition={pageTransition}
               >
                 {renderPage()}
-              </m.div>
+              </motion.div>
             </AnimatePresence>
           </Suspense>
         </div>
@@ -286,7 +285,6 @@ function App() {
           <OfflineBanner />
         </div>
       </div>
-    </LazyMotion>
   );
 }
 

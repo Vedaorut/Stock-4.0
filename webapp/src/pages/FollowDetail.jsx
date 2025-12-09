@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, useRef } from 'react';
-import { m as motion } from 'framer-motion';
+import { motion } from 'framer-motion';
 import Header from '../components/Layout/Header';
 import ActionsList from '../components/Follows/ActionsList';
 import ConfirmDialog from '../components/Follows/ConfirmDialog';

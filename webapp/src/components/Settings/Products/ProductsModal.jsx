@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { m as motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import PageHeader from '../../common/PageHeader';
 import { useTelegram } from '../../../hooks/useTelegram';
 import { useApi } from '../../../hooks/useApi';

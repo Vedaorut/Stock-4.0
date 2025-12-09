@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { m as motion, AnimatePresence, useDragControls } from 'framer-motion';
+import { motion, AnimatePresence, useDragControls } from 'framer-motion';
 import { useBackButton } from '../../hooks/useBackButton';
 
 const ProductMarkupModal = ({

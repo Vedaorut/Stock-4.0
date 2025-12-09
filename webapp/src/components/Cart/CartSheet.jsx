@@ -1,4 +1,4 @@
-import { m as motion, AnimatePresence, LazyMotion, useReducedMotion } from 'framer-motion';
+import { motion, AnimatePresence, LazyMotion, useReducedMotion } from 'framer-motion';
 import { useMemo } from 'react';
 import { useStore } from '../../store/useStore';
 import { useShallow } from 'zustand/react/shallow';

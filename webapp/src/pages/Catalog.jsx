@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef, memo } from 'react';
-import { m as motion, AnimatePresence } from 'framer-motion'; // Used in JSX
+import { motion, AnimatePresence } from 'framer-motion'; // Used in JSX
 import { useShallow } from 'zustand/react/shallow';
 import ProductGrid from '../components/Product/ProductGrid';
 import Header from '../components/Layout/Header';

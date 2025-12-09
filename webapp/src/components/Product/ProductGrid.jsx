@@ -1,4 +1,4 @@
-import { m as motion } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { memo, useMemo, useRef } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import ProductCard from './ProductCard';

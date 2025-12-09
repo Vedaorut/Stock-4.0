@@ -1,4 +1,4 @@
-import { m as motion } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { memo, useCallback } from 'react';
 import { useTelegram } from '../../hooks/useTelegram';
 import { useTranslation } from '../../i18n/useTranslation';

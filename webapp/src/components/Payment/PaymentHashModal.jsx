@@ -1,4 +1,4 @@
-import { m as motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useMemo, useState, useCallback } from 'react';
 import { useStore } from '../../store/useStore';
 import { useTelegram } from '../../hooks/useTelegram';

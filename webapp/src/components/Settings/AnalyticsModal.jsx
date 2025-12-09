@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { AnimatePresence,m as motion } from 'framer-motion';
+import { AnimatePresence,motion } from 'framer-motion';
 import PageHeader from '../common/PageHeader';
 import { useApi } from '../../hooks/useApi';
 import { useBackButton } from '../../hooks/useBackButton';

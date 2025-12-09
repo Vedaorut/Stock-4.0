@@ -1,4 +1,5 @@
 import ReactDOM from 'react-dom/client';
+import { LazyMotion, domAnimation } from 'framer-motion';
 import App from './App.jsx';
 import ErrorBoundary from './components/ErrorBoundary';
 import { TelegramProvider } from './providers/TelegramProvider';
@@ -26,10 +27,12 @@ tg?.ready?.();
 // Start MSW before rendering the application
 enableMocking().then(() => {
   ReactDOM.createRoot(document.getElementById('root')).render(
-    <ErrorBoundary>
-      <TelegramProvider>
-        <App />
-      </TelegramProvider>
-    </ErrorBoundary>
+    <LazyMotion features={domAnimation} strict>
+      <ErrorBoundary>
+        <TelegramProvider>
+          <App />
+        </TelegramProvider>
+      </ErrorBoundary>
+    </LazyMotion>
   );
 });

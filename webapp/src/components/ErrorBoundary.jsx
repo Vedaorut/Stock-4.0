@@ -1,5 +1,5 @@
 import { Component } from 'react';
-import { m as motion } from 'framer-motion'; // Used in JSX
+import { motion } from 'framer-motion'; // Use full motion (not m) as ErrorBoundary is outside LazyMotion
 import { t } from '../i18n';
 import { captureException } from '../lib/sentry';
 

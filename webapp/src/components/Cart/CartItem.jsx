@@ -1,4 +1,4 @@
-import { m as motion, useDragControls } from 'framer-motion';
+import { motion, useDragControls } from 'framer-motion';
 import { memo, useMemo, useState, useCallback } from 'react';
 import { useStore } from '../../store/useStore';
 import { useShallow } from 'zustand/react/shallow';

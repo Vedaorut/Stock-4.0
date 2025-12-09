@@ -1,13 +1,11 @@
 import { useCallback, useEffect, useState, useRef } from 'react';
-import { m as motion } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { PlusIcon } from '@heroicons/react/24/outline';
 import { useApi } from '../hooks/useApi';
 import { useStore } from '../store/useStore';
 import { useTelegram } from '../hooks/useTelegram';
 import { useTranslation } from '../i18n/useTranslation';
 import FollowCard from '../components/Follows/FollowCard';
-// eslint-disable-next-line no-unused-vars -- Used in JSX below
-import ProductsPreview from '../components/Follows/ProductsPreview';
 import SubscriptionCard from '../components/Follows/SubscriptionCard';
 
 export default function Follows() {
@@ -322,11 +320,6 @@ export default function Follows() {
                     <FollowCard
                       follow={follow}
                       onClick={() => handleFollowClick(follow.id)}
-                    />
-                    <ProductsPreview
-                      followId={follow.id}
-                      mode={follow.mode}
-                      maxProducts={5}
                     />
                   </motion.div>
                 ))}
