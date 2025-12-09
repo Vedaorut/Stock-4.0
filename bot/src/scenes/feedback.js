@@ -38,6 +38,19 @@ const receiveFeedback = async (ctx) => {
   try {
     const lang = ctx.lang || ctx.session?.language || 'ru';
 
+    // BOT-P0-001 FIX: Validate adminTelegramId before attempting to send
+    if (!config.adminTelegramId || !/^\d+$/.test(config.adminTelegramId)) {
+      logger.error('feedback_admin_not_configured', {
+        adminTelegramId: config.adminTelegramId,
+        userId: ctx.from.id,
+      });
+      await smartMessage.send(ctx, {
+        text: t('feedback.error', {}, lang),
+        keyboard: sellerToolsMenu(ctx.session?.isOwner, lang),
+      });
+      return ctx.scene.leave();
+    }
+
     if (!ctx.message || !ctx.message.text) {
       await smartMessage.send(ctx, {
         text: t('scenes.sendTextMessage', {}, lang),

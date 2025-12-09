@@ -68,6 +68,10 @@ export default function PaymentDetailsModal() {
     };
   }, []);
 
+  // P0-002 FIX: Define isOpen and isLoading BEFORE useEffect that depends on them
+  const isOpen = paymentStep === 'details';
+  const isLoading = isOpen && isGeneratingInvoice;
+
   // Timeout protection: show cancel button after 30 seconds of loading
   useEffect(() => {
     if (!isLoading) {
@@ -89,9 +93,6 @@ export default function PaymentDetailsModal() {
   const controlSpring = useMemo(() => getSpringPreset('press', platform), [platform]);
 
   const quickSpring = useMemo(() => getSpringPreset('quick', platform), [platform]);
-
-  const isOpen = paymentStep === 'details';
-  const isLoading = isOpen && isGeneratingInvoice;
 
   // ✅ CRITICAL: useBackButton must be called BEFORE any early returns!
   const handleClose = () => {

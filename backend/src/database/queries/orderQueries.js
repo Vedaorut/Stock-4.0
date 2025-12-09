@@ -68,8 +68,11 @@ export const orderQueries = {
   },
 
   // Find orders by owner ID
+  // BE-P0-001 FIX: Enforce MAX_LIMIT to prevent DoS
   findByOwnerId: async (ownerId, options = {}) => {
+    const MAX_LIMIT = 1000;
     const { limit = 50, offset = 0, statuses = [] } = options;
+    const safeLimit = Math.min(limit, MAX_LIMIT);
 
     const params = [ownerId];
     const conditions = ['(s.owner_id = $1 OR ps.owner_id = $1)'];
@@ -81,7 +84,7 @@ export const orderQueries = {
       paramIndex += 1;
     }
 
-    params.push(limit, offset);
+    params.push(safeLimit, offset);
 
     const result = await query(
       `SELECT o.*,

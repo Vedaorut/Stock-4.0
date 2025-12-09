@@ -42,8 +42,6 @@ function formatAddress(address) {
 
 async function showQRCode(ctx, crypto) {
   try {
-    await ctx.answerCbQuery();
-
     const lang = ctx.lang || ctx.session?.language || 'ru';
     const { seller: sellerMessages } = getMessages(lang);
 
@@ -51,10 +49,14 @@ async function showQRCode(ctx, crypto) {
     const shop = await walletApi.getWallets(ctx.session.shopId, ctx.session.token);
     const address = shop[`wallet_${crypto.toLowerCase()}`];
 
+    // BOT-P0-002 FIX: Only call answerCbQuery once - either with error or success
     if (!address) {
       await ctx.answerCbQuery(sellerMessages.walletsNotFound(lang), { show_alert: true });
       return;
     }
+
+    // Success path - acknowledge callback
+    await ctx.answerCbQuery();
 
     logger.info('wallet_qr_request', {
       userId: ctx.from.id,

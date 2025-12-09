@@ -41,18 +41,21 @@ router.post('/crystalpay', async (req, res) => {
 
     await client.query('BEGIN');
 
-    const isProcessed = await processedWebhookQueries.isProcessed(webhookId, client);
-    if (isProcessed) {
-      await client.query('ROLLBACK');
-      return res.json({ status: 'already_processed' });
-    }
-
-    await processedWebhookQueries.markAsProcessed({
+    // PAY-P0-002 FIX: Atomic deduplication - try to insert first, check result
+    // markAsProcessed uses INSERT ... ON CONFLICT DO NOTHING RETURNING *
+    // If result is null, another request already processed this webhook
+    const inserted = await processedWebhookQueries.markAsProcessed({
       webhookId,
       source: 'crystalpay',
       txHash: payload.id,
       payload
     }, client);
+
+    if (!inserted) {
+      // Another request already processed this webhook
+      await client.query('ROLLBACK');
+      return res.json({ status: 'already_processed' });
+    }
 
     // 3. Find invoice by crystalpay_id
     const invoice = await invoiceQueries.findByCrystalPayId(payload.id, client);
