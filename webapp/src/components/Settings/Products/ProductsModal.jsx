@@ -177,12 +177,12 @@ export default function ProductsModal({ isOpen, onClose }) {
     loadData(controller.signal)
       .then((result) => {
         if (!controller.signal.aborted && result?.status === 'error') {
-          setError(result.error || 'Failed to load data');
+          setError(result.error || t('products.loadError'));
         }
       })
       .catch((err) => {
         if (!controller.signal.aborted) {
-          setError(err.message || 'Failed to load data');
+          setError(err.message || t('products.loadError'));
         }
       })
       .finally(() => {
@@ -191,7 +191,7 @@ export default function ProductsModal({ isOpen, onClose }) {
 
     return () => controller.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- products.length/myShop check is for initial render only
-  }, [isOpen, loadData]);
+  }, [isOpen, loadData, t]);
 
   // Reset state when modal closes
   useEffect(() => {
@@ -263,13 +263,13 @@ export default function ProductsModal({ isOpen, onClose }) {
         throw new Error('Empty response from AI service');
       }
     } catch (err) {
-      const errorMessage = err.message || 'Failed to process request. Please try again later.';
+      const errorMessage = err.message || t('products.aiError');
       setAiError(errorMessage);
       setAiHistory((current) => [
         ...current,
         {
           role: 'assistant',
-          content: 'Could not process the command. Please try again or rephrase.',
+          content: t('products.aiCommandError'),
         },
       ]);
     } finally {
@@ -322,7 +322,7 @@ export default function ProductsModal({ isOpen, onClose }) {
         });
       } else {
         if (!myShop?.id) {
-          await alert('Could not identify shop');
+          await alert(t('products.shopNotFound'));
           return;
         }
         await fetchApi('/products', {
@@ -386,18 +386,18 @@ export default function ProductsModal({ isOpen, onClose }) {
     loadData(controller.signal)
       .then((result) => {
         if (!controller.signal.aborted && result?.status === 'error') {
-          setError(result.error || 'Failed to load data');
+          setError(result.error || t('products.loadError'));
         }
       })
       .catch((err) => {
         if (!controller.signal.aborted) {
-          setError(err.message || 'Failed to load data');
+          setError(err.message || t('products.loadError'));
         }
       })
       .finally(() => {
         setLoading(false);
       });
-  }, [loadData]);
+  }, [loadData, t]);
 
   const handleAddProduct = () => {
     if (limitStatus && limitStatus.canAdd) {
@@ -413,12 +413,12 @@ export default function ProductsModal({ isOpen, onClose }) {
         is_preorder: false,
       });
     } else {
-      alert(`Limit reached! Available: ${limitStatus?.tier}`);
+      alert(t('products.limitReached', { tier: limitStatus?.tier }));
     }
   };
 
   const handleCreateShop = () => {
-    alert('Create a shop via the bot');
+    alert(t('products.createShopBot'));
   };
 
   // Error state

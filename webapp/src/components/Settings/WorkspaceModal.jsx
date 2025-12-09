@@ -4,16 +4,18 @@ import PageHeader from '../common/PageHeader';
 import { useTelegram } from '../../hooks/useTelegram';
 import { useApi } from '../../hooks/useApi';
 import { useBackButton } from '../../hooks/useBackButton';
+import { useTranslation } from '../../i18n/useTranslation';
 import { canUseWorkers } from '../../config/tierLimits';
 
 // Worker Card Component
-function WorkerCard({ worker, onRemove, isOwner }) {
+function WorkerCard({ worker, onRemove, isOwner, t }) {
   const { triggerHaptic, confirm } = useTelegram();
 
   const handleRemove = async () => {
     triggerHaptic('medium');
+    const workerName = worker.username || worker.telegram_id;
     const confirmed = await confirm(
-      `Remove worker @${worker.username || worker.telegram_id}?`
+      t('workspace.removeWorker', { username: workerName })
     );
     if (confirmed) {
       triggerHaptic('success');
@@ -80,6 +82,7 @@ function WorkerCard({ worker, onRemove, isOwner }) {
 export default function WorkspaceModal({ isOpen, onClose }) {
   const { triggerHaptic, alert } = useTelegram();
   const { fetchApi } = useApi();
+  const { t } = useTranslation();
 
   const [myShop, setMyShop] = useState(null);
   const [workers, setWorkers] = useState([]);
@@ -163,7 +166,7 @@ export default function WorkspaceModal({ isOpen, onClose }) {
     } catch (err) {
       if (signal?.aborted) return { status: 'aborted' };
 
-      setError(err.message || 'Failed to load data');
+      setError(err.message || t('workspace.loadError'));
       setCanManageWorkers(false);
       setWorkers([]);
       setMyShop(null);
@@ -207,18 +210,18 @@ export default function WorkspaceModal({ isOpen, onClose }) {
 
     try {
       if (!myShop) {
-        await alert('Create a shop first');
+        await alert(t('workspace.createShopFirst'));
         return;
       }
 
       if (!canManageWorkers) {
-        await alert('Workers are only available on the MAX plan');
+        await alert(t('workspace.proOnlyDesc'));
         return;
       }
 
       const input = telegramId.trim();
       if (!input) {
-        await alert('Enter Telegram ID or @username');
+        await alert(t('workspace.enterIdOrUsername'));
         return;
       }
 
@@ -240,7 +243,7 @@ export default function WorkspaceModal({ isOpen, onClose }) {
       await loadData();
     } catch (error) {
       if (error.name === 'AbortError') return;
-      await alert(error.message || 'Error adding worker');
+      await alert(error.message || t('workspace.addError'));
     } finally {
       if (!workerAbortController.current?.signal.aborted) {
         setSaving(false);
@@ -265,7 +268,7 @@ export default function WorkspaceModal({ isOpen, onClose }) {
       await loadData();
     } catch (error) {
       if (error.name === 'AbortError') return;
-      await alert(error.message || 'Error removing worker');
+      await alert(error.message || t('workspace.removeError'));
     }
   };
 
@@ -550,7 +553,7 @@ export default function WorkspaceModal({ isOpen, onClose }) {
                 (workers.length > 0 ? (
                   <div className="space-y-3">
                     <h3 className="text-sm font-semibold text-gray-400 px-2">
-                      Workers ({workers.length})
+                      {t('workspace.workersCount', { count: workers.length })}
                     </h3>
                     <AnimatePresence mode="popLayout">
                       {workers.map((worker) => (
@@ -559,6 +562,7 @@ export default function WorkspaceModal({ isOpen, onClose }) {
                           worker={worker}
                           onRemove={handleRemoveWorker}
                           isOwner={worker.user_id === myShop.owner_id}
+                          t={t}
                         />
                       ))}
                     </AnimatePresence>

@@ -257,6 +257,8 @@
     "amount": "Amount",
     "copyAddress": "Copy address",
     "addressCopied": "Address copied",
+    "tapToCopy": "Tap to copy",
+    "amountCopied": "Copied!",
     "orderDetails": "Order details",
     "orderDataError": "Order data error",
     "insufficientStock": "Insufficient stock",
@@ -365,7 +367,10 @@
       "pcs": "pcs",
       "anonymousHint": "No username, but buyer will get your contact"
     },
-    "updateError": "Failed to update status"
+    "updateError": "Failed to update status",
+    "noShopFound": "No shop found",
+    "noShopSelected": "No shop selected",
+    "unexpectedError": "Unexpected error"
   },
   "workspace": {
     "title": "Workspace",
@@ -401,7 +406,8 @@
     "noShops": "No available shops",
     "notWorker": "You are not a worker in any shop",
     "askOwner": "Ask the shop owner to add you to Workspace",
-    "accessSince": "Access since {date}"
+    "accessSince": "Access since {date}",
+    "loadError": "Failed to load data"
   },
   "products": {
     "title": "My Products",
@@ -432,7 +438,8 @@
     "aiWelcome": "Hi! I'm your shop AI assistant. Tell me what products to add or change - I'll take care of it.",
     "aiEmptyResponse": "Empty AI service response",
     "aiError": "Failed to process request. Try again later.",
-    "aiCommandError": "Could not process command. Try again or rephrase."
+    "aiCommandError": "Could not process command. Try again or rephrase.",
+    "loadError": "Failed to load data"
   },
   "migration": {
     "title": "Migration",
@@ -518,7 +525,8 @@
       "shipped": "Shipped",
       "delivered": "Delivered",
       "cancelled": "Cancelled"
-    }
+    },
+    "loadError": "Failed to load orders"
   },
   "confirm": {
     "title": "Confirmation",

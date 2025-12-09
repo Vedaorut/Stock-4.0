@@ -147,12 +147,12 @@ export default function WorkerModeModal({ isOpen, onClose }) {
         if (import.meta.env.DEV) {
           console.error('[WorkerModeModal] Error loading workspace shops:', err);
         }
-        setError(err.message || 'Failed to load data');
+        setError(err.message || t('workerMode.loadError'));
         setWorkspaceShops([]);
         return { status: 'error', error: err.message };
       }
     },
-    [fetchApi]
+    [fetchApi, t]
   );
 
   useEffect(() => {

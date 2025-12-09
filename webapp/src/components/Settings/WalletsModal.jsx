@@ -264,7 +264,7 @@ export default function WalletsModal({ isOpen, onClose }) {
       if (signal?.aborted) return { status: 'aborted' };
 
       if (shopsError) {
-        return { status: 'error', error: 'Failed to load shops' };
+        return { status: 'error', error: t('wallet.loadError') };
       }
 
       // ✅ FIX: Already correct - but adding validation
@@ -289,7 +289,7 @@ export default function WalletsModal({ isOpen, onClose }) {
       if (signal?.aborted) return { status: 'aborted' };
 
       if (walletsError) {
-        return { status: 'error', error: 'Failed to load wallets' };
+        return { status: 'error', error: t('wallet.loadError') };
       }
 
       syncWalletState(walletsResponse);

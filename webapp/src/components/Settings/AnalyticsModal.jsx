@@ -100,7 +100,7 @@ export default function AnalyticsModal({ isOpen, onClose }) {
           if (import.meta.env.DEV) {
             console.error('Unexpected API response:', data);
           }
-          return { status: 'error', error: 'Failed to load analytics' };
+          return { status: 'error', error: t('analytics.loadError') };
         }
       } catch (err) {
         if (signal?.aborted) return { status: 'aborted' };
@@ -108,10 +108,10 @@ export default function AnalyticsModal({ isOpen, onClose }) {
         if (import.meta.env.DEV) {
           console.error('[AnalyticsModal] fetch exception', err);
         }
-        return { status: 'error', error: err.message || 'Data loading error' };
+        return { status: 'error', error: err.message || t('analytics.fetchError') };
       }
     },
-    [get, getDateRange] // period and customRange are read via getDateRange
+    [get, getDateRange, t] // period and customRange are read via getDateRange
   );
 
   // Fetch on mount and period change

@@ -161,7 +161,7 @@ export default function OrdersModal({ isOpen, onClose }) {
           if (import.meta.env.DEV) {
             console.error('[OrdersModal] Invalid data format:', data);
           }
-          setError('Invalid orders data format');
+          setError(t('myOrders.loadError'));
           setOrders([]);
           return { status: 'error' };
         }
