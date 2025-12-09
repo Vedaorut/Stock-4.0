@@ -87,13 +87,9 @@ describe('Buyer Subscriptions Flow (P0)', () => {
       expect(text).toContain('Подписка оформлена');
       expect(text).toContain('Shop A');
 
-      // Проверяем что появилась кнопка "Подписан"
+      // B1 UX fix: "Подписан" noop button removed - subscription status shown in message text
+      // Проверяем что есть кнопка "Отписаться" (единственная кнопка подписки после subscribe)
       const markup = testBot.getLastMarkup();
-      const subscribedBtn = findButton('Подписан', markup);
-      expect(subscribedBtn).toBeTruthy();
-      expect(subscribedBtn.callback_data).toBe('noop:subscribed');
-
-      // Проверяем что есть кнопка "Отписаться"
       const unsubscribeBtn = findButton('Отписаться', markup);
       expect(unsubscribeBtn).toBeTruthy();
       expect(unsubscribeBtn.callback_data).toBe('unsubscribe:123');
@@ -122,10 +118,11 @@ describe('Buyer Subscriptions Flow (P0)', () => {
       const text = testBot.getLastReplyText();
       expect(text).toContain('уже в ваших подписках');
 
-      // Проверяем что кнопка "Подписан" уже отображается
+      // B1 UX fix: "Подписан" noop button removed - subscription status shown in message text
+      // Проверяем что кнопка "Отписаться" доступна
       const markup = testBot.getLastMarkup();
-      const subscribedBtn = findButton('Подписан', markup);
-      expect(subscribedBtn).toBeTruthy();
+      const unsubscribeBtn = findButton('Отписаться', markup);
+      expect(unsubscribeBtn).toBeTruthy();
     });
   });
 
@@ -378,10 +375,11 @@ describe('Buyer Subscriptions Flow (P0)', () => {
       await testBot.handleUpdate(callbackUpdate('subscribe:123'));
       await new Promise((resolve) => setImmediate(resolve));
 
-      // Проверяем кнопку "Подписан"
+      // B1 UX fix: "Подписан" noop button removed - subscription status shown in message text
+      // Проверяем кнопку "Отписаться"
       markup = testBot.getLastMarkup();
-      let subscribedBtn = findButton('Подписан', markup);
-      expect(subscribedBtn).toBeTruthy();
+      const unsubscribeBtn = findButton('Отписаться', markup);
+      expect(unsubscribeBtn).toBeTruthy();
 
       testBot.captor.reset();
 

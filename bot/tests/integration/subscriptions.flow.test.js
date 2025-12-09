@@ -94,13 +94,9 @@ describe('Subscriptions Flow - Subscribe/Unsubscribe/Idempotency (P0)', () => {
     const messageText = testBot.getLastReplyText();
     expect(messageText).toContain('Подписка оформлена');
 
-    // Проверяем что кнопка изменилась на "Подписан"
+    // B1 UX fix: "Подписан" noop button removed - subscription status shown in message text
+    // Проверяем что есть кнопка "Отписаться" (единственная кнопка подписки после subscribe)
     const markup2 = testBot.getLastMarkup();
-    const subscribedBtn = findButton('Подписан', markup2);
-    expect(subscribedBtn).toBeTruthy();
-    expect(subscribedBtn.callback_data).toBe('noop:subscribed');
-
-    // Проверяем что есть кнопка "Отписаться"
     const unsubscribeBtn = findButton('Отписаться', markup2);
     expect(unsubscribeBtn).toBeTruthy();
     expect(unsubscribeBtn.callback_data).toBe(`unsubscribe:${shopId}`);
@@ -123,10 +119,11 @@ describe('Subscriptions Flow - Subscribe/Unsubscribe/Idempotency (P0)', () => {
     const answers2 = testBot.captor.getAnswers();
     expect(answers2.some((a) => a.text && a.text.includes('уже в ваших подписках'))).toBe(true);
 
-    // Проверяем что markup остался с кнопкой "Подписан"
+    // B1 UX fix: "Подписан" noop button removed - subscription status shown in message text
+    // Проверяем что кнопка "Отписаться" по-прежнему доступна
     const markup3 = testBot.getLastMarkup();
-    const stillSubscribedBtn = findButton('Подписан', markup3);
-    expect(stillSubscribedBtn).toBeTruthy();
+    const stillUnsubscribeBtn = findButton('Отписаться', markup3);
+    expect(stillUnsubscribeBtn).toBeTruthy();
 
     testBot.captor.reset();
 

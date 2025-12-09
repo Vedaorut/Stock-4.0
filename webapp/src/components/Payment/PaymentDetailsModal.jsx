@@ -50,6 +50,7 @@ export default function PaymentDetailsModal() {
   const ios = isIOS(platform);
   const [copied, setCopied] = useState(false);
   const [copiedAmount, setCopiedAmount] = useState(false);
+  const [loadingTimeout, setLoadingTimeout] = useState(false);
   const copiedTimeoutRef = useRef(null);
   const copiedAmountTimeoutRef = useRef(null);
 
@@ -66,6 +67,16 @@ export default function PaymentDetailsModal() {
       }
     };
   }, []);
+
+  // Timeout protection: show cancel button after 30 seconds of loading
+  useEffect(() => {
+    if (!isLoading) {
+      setLoadingTimeout(false);
+      return;
+    }
+    const timeout = setTimeout(() => setLoadingTimeout(true), 30000);
+    return () => clearTimeout(timeout);
+  }, [isLoading]);
 
   const overlayStyle = useMemo(() => getSurfaceStyle('overlay', platform), [platform]);
 
@@ -184,7 +195,23 @@ export default function PaymentDetailsModal() {
           >
             <div className="text-center">
               <div className="w-16 h-16 border-4 border-orange-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-              <p className="text-white font-semibold text-lg">Loading payment details...</p>
+              <p className="text-white font-semibold text-lg">{t('payment.loadingPaymentDetails')}</p>
+              <p className="text-gray-400 text-sm mt-2">{t('payment.pleaseWait')}</p>
+
+              {/* Timeout protection: Cancel button after 30s */}
+              {loadingTimeout && (
+                <motion.button
+                  onClick={() => {
+                    triggerHaptic('light');
+                    setPaymentStep('method');
+                  }}
+                  className="mt-4 px-6 py-3 rounded-xl bg-red-500 text-white font-semibold"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                >
+                  {t('common.cancel')}
+                </motion.button>
+              )}
             </div>
           </motion.div>
         )}
@@ -358,14 +385,14 @@ export default function PaymentDetailsModal() {
                     d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
                   />
                 </svg>
-                <h3 className="text-lg font-semibold text-white mb-2">Loading error</h3>
-                <p className="text-sm text-gray-400 mb-4">Failed to get payment details</p>
+                <h3 className="text-lg font-semibold text-white mb-2">{t('payment.loadingError')}</h3>
+                <p className="text-sm text-gray-400 mb-4">{t('payment.failedPaymentDetails')}</p>
                 <motion.button
                   onClick={handleClose}
                   className="px-6 py-3 rounded-xl font-semibold text-white bg-orange-primary"
                   whileTap={{ scale: 0.95 }}
                 >
-                  Back
+                  {t('common.back')}
                 </motion.button>
               </div>
             </motion.div>
@@ -590,7 +617,7 @@ export default function PaymentDetailsModal() {
                     {formatCryptoAmount(cryptoAmount, selectedCrypto)} {selectedCrypto}
                   </div>
                   <p className="text-gray-500 text-[10px] mt-2">
-                    {copiedAmount ? 'Copied!' : 'Tap to copy'}
+                    {copiedAmount ? t('payment.amountCopied') : t('payment.tapToCopy')}
                   </p>
                 </motion.button>
               </div>

@@ -328,7 +328,7 @@ export default function WorkspaceModal({ isOpen, onClose }) {
                       d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
                     />
                   </svg>
-                  <h3 className="text-xl font-bold text-white mb-2">Loading Error</h3>
+                  <h3 className="text-xl font-bold text-white mb-2">{t('workspace.loadError')}</h3>
                   <p className="text-red-400 text-sm mb-6">{error}</p>
                   <motion.button
                     onClick={() => {
@@ -342,7 +342,7 @@ export default function WorkspaceModal({ isOpen, onClose }) {
                     }}
                     whileTap={{ scale: 0.98 }}
                   >
-                    Retry
+                    {t('common.retry')}
                   </motion.button>
                 </div>
               </div>
@@ -391,9 +391,9 @@ export default function WorkspaceModal({ isOpen, onClose }) {
                       d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
                     />
                   </svg>
-                  <h3 className="text-xl font-bold text-white mb-2">You don't have a shop yet</h3>
+                  <h3 className="text-xl font-bold text-white mb-2">{t('shop.noShop')}</h3>
                   <p className="text-gray-400 text-sm">
-                    Create a shop to manage workers
+                    {t('shop.createShopForWorkers')}
                   </p>
                 </div>
               </div>
@@ -444,10 +444,9 @@ export default function WorkspaceModal({ isOpen, onClose }) {
                       />
                     </svg>
                     <div>
-                      <p className="text-sm text-white font-medium mb-1">Workers can</p>
+                      <p className="text-sm text-white font-medium mb-1">{t('workspace.workersCan')}</p>
                       <p className="text-xs text-gray-400">
-                        Add, edit and delete products in your shop. Full administrator
-                        rights.
+                        {t('workspace.workersCanDesc')}
                       </p>
                     </div>
                   </div>
@@ -469,11 +468,9 @@ export default function WorkspaceModal({ isOpen, onClose }) {
                       />
                     </svg>
                     <div>
-                      <p className="text-sm text-white font-medium mb-1">Available only on MAX</p>
+                      <p className="text-sm text-white font-medium mb-1">{t('workspace.proOnly')}</p>
                       <p className="text-xs text-gray-400">
-                        Upgrade to MAX to unlock collaboration: workers will be able to
-                        manage products and sales. Go to the Subscription section to
-                        upgrade your plan.
+                        {t('workspace.proOnlyDesc')}
                       </p>
                     </div>
                   </div>
@@ -494,7 +491,7 @@ export default function WorkspaceModal({ isOpen, onClose }) {
                   }}
                   whileTap={{ scale: 0.98 }}
                 >
-                  + Add Worker
+                  {t('workspace.addWorker')}
                 </motion.button>
               )}
 
@@ -510,17 +507,17 @@ export default function WorkspaceModal({ isOpen, onClose }) {
                     >
                       <div>
                         <label className="text-sm text-gray-400 mb-2 block">
-                          Worker Telegram ID
+                          {t('workspace.workerIdLabel')}
                         </label>
                         <input
                           type="text"
                           value={telegramId}
                           onChange={(e) => setTelegramId(e.target.value)}
-                          placeholder="@username or 123456789"
+                          placeholder={t('workspace.workerIdPlaceholder')}
                           className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white font-mono text-sm focus:outline-none focus:border-orange-primary transition-colors"
                         />
                         <p className="text-xs text-gray-500 mt-2">
-                          Enter @username or user ID (via @userinfobot)
+                          {t('workspace.workerIdHint')}
                         </p>
                       </div>
 
@@ -536,7 +533,7 @@ export default function WorkspaceModal({ isOpen, onClose }) {
                         }}
                         whileTap={telegramId.trim() ? { scale: 0.98 } : {}}
                       >
-                        {saving ? 'Adding...' : 'Add'}
+                        {saving ? t('workspace.adding') : t('workspace.addWorkerShort')}
                       </motion.button>
                     </motion.div>
                   )}
@@ -583,7 +580,7 @@ export default function WorkspaceModal({ isOpen, onClose }) {
                           d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
                         />
                       </svg>
-                      <p className="text-gray-400 text-sm">No workers yet</p>
+                      <p className="text-gray-400 text-sm">{t('workspace.noWorkers')}</p>
                     </div>
                   )
                 ))

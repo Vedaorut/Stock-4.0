@@ -30,6 +30,7 @@ const refreshTokenQueries = {
    * @returns {Promise<Object|null>} Token record or null
    */
   async findValidByHash(tokenHash) {
+    // P1-005: Use timezone('UTC', NOW()) for explicit UTC comparison to prevent timezone drift
     const result = await query(
       `SELECT rt.id, rt.user_id, rt.expires_at, rt.created_at,
               u.telegram_id, u.username
@@ -37,7 +38,7 @@ const refreshTokenQueries = {
        JOIN users u ON u.id = rt.user_id
        WHERE rt.token_hash = $1
          AND rt.revoked_at IS NULL
-         AND rt.expires_at > NOW()`,
+         AND rt.expires_at > timezone('UTC', NOW())`,
       [tokenHash]
     );
     return result.rows[0] || null;

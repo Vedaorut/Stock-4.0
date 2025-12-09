@@ -218,6 +218,7 @@ export const createTestOrder = async (buyerId, productId, shopId, orderData = {}
   const order = {
     buyer_id: buyerId,
     product_id: productId,
+    shop_id: shopId,
     quantity: orderData.quantity || 1,
     total_price: orderData.total_price || '99.99',
     currency: orderData.currency || 'USD',
@@ -225,14 +226,15 @@ export const createTestOrder = async (buyerId, productId, shopId, orderData = {}
   };
 
   const result = await pool.query(
-    `INSERT INTO orders (buyer_id, product_id, quantity, total_price, currency, status)
-     VALUES ($1, $2, $3, $4, $5, $6)
-     RETURNING id, buyer_id, product_id, quantity, total_price, currency,
+    `INSERT INTO orders (buyer_id, product_id, shop_id, quantity, total_price, currency, status)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
+     RETURNING id, buyer_id, product_id, shop_id, quantity, total_price, currency,
                delivery_address, status,
                created_at, updated_at, paid_at, completed_at`,
     [
       order.buyer_id,
       order.product_id,
+      order.shop_id,
       order.quantity,
       order.total_price,
       order.currency,

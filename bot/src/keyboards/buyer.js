@@ -48,10 +48,8 @@ export const shopActionsKeyboard = (
   if (!isSubscribed) {
     buttons.push([Markup.button.callback(t('buttons.subscribe', {}, lang), `subscribe:${shopId}`)]);
   } else {
-    buttons.push(
-      [Markup.button.callback(t('buttons.subscribed', {}, lang), `noop:subscribed`)],
-      [Markup.button.callback(t('buttons.unsubscribe', {}, lang), `unsubscribe:${shopId}`)]
-    );
+    // Note: Subscription status is shown as text in the message, not as a button
+    buttons.push([Markup.button.callback(t('buttons.unsubscribe', {}, lang), `unsubscribe:${shopId}`)]);
   }
 
   buttons.push(

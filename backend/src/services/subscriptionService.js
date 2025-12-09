@@ -85,22 +85,24 @@ async function checkExpiredSubscriptions() {
   const client = await pool.connect();
 
   try {
-    const now = new Date();
+    // P1-005: Use explicit UTC timestamp to prevent timezone drift
+    const nowUTC = new Date().toISOString();
 
     logger.info('[Subscription] Checking for expired subscriptions...');
 
     // BATCH 1: Active subscriptions expired → Start grace period
     // Single UPDATE with RETURNING instead of N+1 loop
     // FIX H1: Use make_interval instead of string interpolation to prevent SQL injection
+    // P1-005: Cast to timestamptz for explicit UTC comparison
     const gracePeriodResult = await client.query(
       `UPDATE shops
        SET subscription_status = 'grace_period',
            grace_period_until = next_payment_due + make_interval(days => $2),
-           updated_at = NOW()
-       WHERE next_payment_due < $1
+           updated_at = timezone('UTC', NOW())
+       WHERE next_payment_due < $1::timestamptz
        AND subscription_status = 'active'
        RETURNING id, name, grace_period_until`,
-      [now, GRACE_PERIOD_DAYS]
+      [nowUTC, GRACE_PERIOD_DAYS]
     );
 
     const gracePeriod = gracePeriodResult.rowCount || 0;
@@ -112,15 +114,16 @@ async function checkExpiredSubscriptions() {
 
     // BATCH 2: Grace period expired → Deactivate
     // Single UPDATE instead of N+1 loop
+    // P1-005: Cast to timestamptz for explicit UTC comparison
     const deactivatedResult = await client.query(
       `UPDATE shops
        SET is_active = false,
            subscription_status = 'inactive',
-           updated_at = NOW()
+           updated_at = timezone('UTC', NOW())
        WHERE subscription_status = 'grace_period'
-       AND grace_period_until < $1
+       AND grace_period_until < $1::timestamptz
        RETURNING id, name`,
-      [now]
+      [nowUTC]
     );
 
     const deactivated = deactivatedResult.rowCount || 0;
@@ -129,13 +132,14 @@ async function checkExpiredSubscriptions() {
     }
 
     // BATCH 3: Mark expired subscription records
+    // P1-005: Cast to timestamptz for explicit UTC comparison
     const expiredSubsResult = await client.query(
       `UPDATE shop_subscriptions
        SET status = 'expired'
-       WHERE period_end < $1
+       WHERE period_end < $1::timestamptz
        AND status = 'active'
        RETURNING id`,
-      [now]
+      [nowUTC]
     );
 
     const expired = expiredSubsResult.rowCount || 0;
@@ -199,15 +203,21 @@ async function activateFreeTrial(shopId, userId) {
     await client.query('BEGIN');
 
     // FIX BUG-SUB-003: Check if user already used trial (track by user_id, not shop_id)
+    // FIX RACE CONDITION: Lock user's shops with FOR UPDATE to serialize concurrent trial activations
     const trialCheck = await client.query(
-      `SELECT COUNT(*) as trial_count
+      `SELECT id, is_trial, trial_ends_at
        FROM shops
        WHERE owner_id = $1
-       AND (is_trial = true OR trial_ends_at IS NOT NULL)`,
+       FOR UPDATE`,
       [userId]
     );
 
-    if (trialCheck.rows[0].trial_count > 0) {
+    // Check if any of user's shops already had a trial
+    const alreadyUsedTrial = trialCheck.rows.some(
+      (shop) => shop.is_trial === true || shop.trial_ends_at !== null
+    );
+
+    if (alreadyUsedTrial) {
       throw new Error('User has already used free trial');
     }
 
@@ -247,21 +257,23 @@ async function activateFreeTrial(shopId, userId) {
 async function checkExpiredTrials() {
   const client = await pool.connect();
   try {
-    const now = new Date();
+    // P1-005: Use explicit UTC timestamp to prevent timezone drift
+    const nowUTC = new Date().toISOString();
 
     // BATCH UPDATE: Expire all trials in single query instead of N+1 loop
     // Keep tier as PRO but mark trial expired - shop enters grace period
     // After grace period, shop will be deactivated until subscription is paid
     // FIX H1: Use make_interval instead of string interpolation to prevent SQL injection
+    // P1-005: Cast to timestamptz for explicit UTC comparison
     const result = await client.query(
       `UPDATE shops
        SET is_trial = false,
            subscription_status = 'grace_period',
-           grace_period_until = $1 + make_interval(days => $2),
-           updated_at = NOW()
-       WHERE is_trial = true AND trial_ends_at < $1
+           grace_period_until = $1::timestamptz + make_interval(days => $2),
+           updated_at = timezone('UTC', NOW())
+       WHERE is_trial = true AND trial_ends_at < $1::timestamptz
        RETURNING id, name, grace_period_until`,
-      [now, GRACE_PERIOD_DAYS]
+      [nowUTC, GRACE_PERIOD_DAYS]
     );
 
     const transitioned = result.rowCount || 0;

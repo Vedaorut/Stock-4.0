@@ -1,4 +1,8 @@
 {
+  "ai": {
+    "describeTask": "Describe what needs to be done...",
+    "thinking": "Thinking..."
+  },
   "common": {
     "back": "Back",
     "close": "Close",
@@ -10,7 +14,8 @@
     "loading": "Loading...",
     "error": "Error",
     "success": "Success",
-    "retry": "Try again",
+    "retry": "Retry",
+    "retrying": "Retrying...",
     "clear": "Clear",
     "confirm": "Confirm",
     "yes": "Yes",
@@ -295,7 +300,10 @@
     "verifyingDesc": "This may take a few seconds",
     "verifyError": "Payment verification error",
     "errorTitle": "Payment Error",
-    "unexpectedError": "An unexpected error occurred"
+    "unexpectedError": "An unexpected error occurred",
+    "loadingPaymentDetails": "Loading payment details...",
+    "loadingError": "Loading error",
+    "failedPaymentDetails": "Failed to get payment details"
   },
   "subscription": {
     "title": "Subscription",

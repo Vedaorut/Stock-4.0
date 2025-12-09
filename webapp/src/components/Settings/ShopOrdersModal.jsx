@@ -301,14 +301,14 @@ export default function ShopOrdersModal({ isOpen, onClose }) {
             useStore.getState().setMyShops(shops);
             shopId = shops[0].id;
           } else {
-            setError('No shop found');
+            setError(t('shopOrders.noShopFound'));
             setLoading(false);
             return;
           }
         }
 
         if (!shopId) {
-          setError('No shop selected');
+          setError(t('shopOrders.noShopSelected'));
           setLoading(false);
           return;
         }
@@ -326,7 +326,7 @@ export default function ShopOrdersModal({ isOpen, onClose }) {
       // eslint-disable-next-line no-unused-vars
       } catch (_err) {
         if (!cancelled) {
-          setError('Unexpected error');
+          setError(t('shopOrders.unexpectedError'));
         }
       } finally {
         if (!cancelled) {

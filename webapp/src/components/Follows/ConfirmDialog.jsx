@@ -1,6 +1,7 @@
 import React from 'react';
 import { m as motion, AnimatePresence } from 'framer-motion';
 import { ExclamationTriangleIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
+import { useTranslation } from 'react-i18next';
 import { useBackButton } from '../../hooks/useBackButton';
 
 const ConfirmDialog = ({
@@ -9,10 +10,11 @@ const ConfirmDialog = ({
   onConfirm,
   title,
   message,
-  confirmText = 'Confirm',
-  cancelText = 'Cancel',
+  confirmText,
+  cancelText,
   danger = false,
 }) => {
+  const { t } = useTranslation();
   const controlSpring = { type: 'spring', stiffness: 350, damping: 30 };
   
   useBackButton(isOpen ? onClose : null);
@@ -80,7 +82,7 @@ const ConfirmDialog = ({
               className="flex-1 bg-white/5 hover:bg-white/10 text-white font-semibold py-3.5 rounded-xl transition-colors border border-white/5"
               whileTap={{ scale: 0.96 }}
             >
-              {cancelText}
+              {cancelText || t('common.cancel')}
             </motion.button>
 
             <motion.button
@@ -89,13 +91,13 @@ const ConfirmDialog = ({
                 onClose();
               }}
               className={`flex-1 text-white font-semibold py-3.5 rounded-xl shadow-lg ${
-                  danger 
-                  ? 'bg-red-500 hover:bg-red-600 shadow-red-500/20' 
+                  danger
+                  ? 'bg-red-500 hover:bg-red-600 shadow-red-500/20'
                   : 'bg-[#FF6B00] hover:bg-[#FF8F00] shadow-[#FF6B00]/20'
               }`}
               whileTap={{ scale: 0.96 }}
             >
-              {confirmText}
+              {confirmText || t('common.confirm')}
             </motion.button>
           </div>
         </motion.div>

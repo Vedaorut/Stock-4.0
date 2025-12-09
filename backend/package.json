@@ -18,6 +18,7 @@
     "test:ci": "NODE_ENV=test node database/migrations.cjs --apply && npm test",
     "smoke": "NODE_OPTIONS=--experimental-vm-modules npx jest __tests__/smoke --testTimeout=30000",
     "smoke:ci": "NODE_ENV=test NODE_OPTIONS=--experimental-vm-modules npx jest __tests__/smoke --testTimeout=30000 --forceExit --detectOpenHandles",
+    "preflight": "npm run lint:check && npm test && npm run smoke && echo '✅ Preflight passed - ready for release'",
     "db:seed": "psql postgresql://sile@localhost:5432/telegram_shop -f database/seed.sql",
     "predeploy": "bash scripts/predeploy.sh",
     "deploy": "bash scripts/deploy.sh",

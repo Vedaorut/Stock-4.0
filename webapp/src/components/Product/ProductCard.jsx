@@ -210,7 +210,7 @@ const ProductCard = memo(function ProductCard({ product, onPreorder: _onPreorder
     (event) => {
       event.stopPropagation();
       if (isDisabled) {
-        toast.warning('This product is out of stock', 2000);
+        toast.warning(t('catalog.outOfStock'), 2000);
         return;
       }
       triggerHaptic('success');
@@ -220,7 +220,7 @@ const ProductCard = memo(function ProductCard({ product, onPreorder: _onPreorder
       if (addedTimeoutRef.current) clearTimeout(addedTimeoutRef.current);
       addedTimeoutRef.current = setTimeout(() => setJustAdded(false), 1500);
     },
-    [isDisabled, toast, triggerHaptic, addToCart, product]
+    [isDisabled, toast, triggerHaptic, addToCart, product, t]
   );
 
   // Scroll to highlighted product + auto-clear after 3s

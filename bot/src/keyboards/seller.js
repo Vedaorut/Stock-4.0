@@ -50,7 +50,7 @@ export const sellerToolsMenu = (isOwner = false, lang = 'ru') => {
   // Feedback button - always available
   buttons.push([Markup.button.callback(t('buttons.feedback', {}, lang), 'feedback:start')]);
 
-  buttons.push([Markup.button.callback(t('buttons.backToMenu', {}, lang), 'seller:menu')]);
+  buttons.push([Markup.button.callback(t('buttons.back', {}, lang), 'seller:menu')]);
 
   return Markup.inlineKeyboard(buttons);
 };
@@ -59,7 +59,7 @@ export const sellerToolsMenu = (isOwner = false, lang = 'ru') => {
 export const productsMenu = (lang = 'ru') =>
   Markup.inlineKeyboard([
     [Markup.button.callback(t('buttons.addProduct', {}, lang), 'seller:add_product')],
-    [Markup.button.callback(t('buttons.backToTools', {}, lang), 'seller:tools')],
+    [Markup.button.callback(t('buttons.back', {}, lang), 'seller:tools')],
   ]);
 
 // Follows menu - minimalist
@@ -72,7 +72,7 @@ export const followsMenu = (hasFollows = false, followButtons = [], lang = 'ru')
       'follows:create'
     ),
   ]);
-  keyboard.push([Markup.button.callback(t('buttons.backSimple', {}, lang), 'seller:menu')]);
+  keyboard.push([Markup.button.callback(t('buttons.back', {}, lang), 'seller:menu')]);
 
   return Markup.inlineKeyboard(keyboard);
 };
@@ -92,7 +92,7 @@ export const followDetailMenu = (followId, mode = 'monitor', lang = 'ru') => {
 
   buttons.push([Markup.button.callback(modeButtonText, `follow_mode:${followId}`)]);
   buttons.push([Markup.button.callback(t('buttons.delete', {}, lang), `follow_delete:${followId}`)]);
-  buttons.push([Markup.button.callback(t('buttons.backToFollows', {}, lang), 'follows:list')]);
+  buttons.push([Markup.button.callback(t('buttons.back', {}, lang), 'follows:list')]);
 
   return Markup.inlineKeyboard(buttons);
 };
@@ -101,7 +101,7 @@ export const followCatalogMenu = (followId, lang = 'ru') =>
   Markup.inlineKeyboard([
     [Markup.button.callback(t('buttons.refresh', {}, lang), `follow_detail:${followId}`)],
     [Markup.button.callback(t('buttons.followSettings', {}, lang), `follow_settings:${followId}`)],
-    [Markup.button.callback(t('buttons.backSimple', {}, lang), 'follows:list')],
+    [Markup.button.callback(t('buttons.back', {}, lang), 'follows:list')],
   ]);
 
 // Seller menu (no shop - need registration) - minimalist
@@ -114,4 +114,4 @@ export const sellerMenuNoShop = (lang = 'ru') =>
 
 // Subscription status menu
 export const subscriptionStatusMenu = (lang = 'ru') =>
-  Markup.inlineKeyboard([[Markup.button.callback(t('buttons.backToTools', {}, lang), 'seller:tools')]]);
+  Markup.inlineKeyboard([[Markup.button.callback(t('buttons.back', {}, lang), 'seller:tools')]]);

@@ -2,11 +2,13 @@ import { useState } from 'react';
 import { m as motion } from 'framer-motion';
 import PageHeader from '../../common/PageHeader';
 import { useTelegram } from '../../../hooks/useTelegram';
+import { useTranslation } from '../../../i18n/useTranslation';
 
 /**
  * AIChatInput - Input form for AI chat
  */
 function AIChatInput({ disabled, onSend }) {
+  const { t } = useTranslation();
   const { triggerHaptic } = useTelegram();
   const [value, setValue] = useState('');
 
@@ -27,7 +29,7 @@ function AIChatInput({ disabled, onSend }) {
         rows={1}
         value={value}
         onChange={(e) => setValue(e.target.value)}
-        placeholder="Describe what needs to be done..."
+        placeholder={t('ai.describeTask')}
         className="flex-1 resize-none bg-transparent text-base text-white focus:outline-none placeholder:text-gray-400"
         disabled={disabled}
         autoFocus
@@ -60,6 +62,8 @@ function AIChatPanel({
   onSendMessage,
   onRetry
 }) {
+  const { t } = useTranslation();
+
   return (
     <motion.div
       key="ai-chat-panel"
@@ -100,7 +104,7 @@ function AIChatPanel({
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-primary opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-orange-primary"></span>
               </span>
-              Thinking...
+              {t('ai.thinking')}
             </motion.div>
           )}
 
@@ -117,7 +121,7 @@ function AIChatPanel({
                 className="w-full px-3 py-2 rounded-lg text-xs font-medium bg-red-500/20 text-red-300 hover:bg-red-500/30 disabled:opacity-50 transition-colors"
                 whileTap={!aiLoading ? { scale: 0.98 } : {}}
               >
-                {aiLoading ? 'Retrying...' : 'Retry'}
+                {aiLoading ? t('common.retrying') : t('common.retry')}
               </motion.button>
             </motion.div>
           )}
