@@ -1062,81 +1062,54 @@ describe('Subscription Service', () => {
   });
 
   // ============================================================================
-  // getSubscriptionHistory - LOW (P2)
-  // Uses pool.query() directly (optimized - no pool.connect())
+  // getSubscriptionHistory - ownership enforced
   // ============================================================================
   describe('getSubscriptionHistory', () => {
-    it('should use pool.query() directly (not pool.connect())', async () => {
-      const mockHistory = [
-        { id: 1, shop_id: 1, tier: 'pro', created_at: new Date() },
-      ];
+    it('should check ownership before returning history', async () => {
+      const mockHistory = [{ id: 1, shop_id: 1, tier: 'pro', created_at: new Date() }];
 
-      mockPoolQuery.mockResolvedValueOnce({ rows: mockHistory });
+      mockClient.query
+        .mockResolvedValueOnce({ rows: [{ owner_id: 7 }] })
+        .mockResolvedValueOnce({ rows: mockHistory });
 
-      await getSubscriptionHistory(1, 10);
+      const result = await getSubscriptionHistory(1, 7, 10);
 
-      // Should use pool.query() not pool.connect()
-      expect(mockPoolQuery).toHaveBeenCalledTimes(1);
-      expect(mockPoolConnect).not.toHaveBeenCalled();
-    });
-
-    it('should return subscription history for shop', async () => {
-      const mockHistory = [
-        { id: 1, shop_id: 1, tier: 'pro', created_at: new Date() },
-        { id: 2, shop_id: 1, tier: 'basic', created_at: new Date() },
-      ];
-
-      mockPoolQuery.mockResolvedValueOnce({ rows: mockHistory });
-
-      const result = await getSubscriptionHistory(1, 10);
-
-      expect(result).toHaveLength(2);
-      expect(result[0].tier).toBe('pro');
-    });
-
-    it('should use default limit of 10', async () => {
-      mockPoolQuery.mockResolvedValueOnce({ rows: [] });
-
-      await getSubscriptionHistory(1);
-
-      expect(mockPoolQuery).toHaveBeenCalledWith(
-        expect.stringContaining('LIMIT $2'),
+      expect(mockPoolConnect).toHaveBeenCalled();
+      expect(mockClient.query).toHaveBeenNthCalledWith(1, 'SELECT owner_id FROM shops WHERE id = $1', [1]);
+      expect(mockClient.query).toHaveBeenNthCalledWith(
+        2,
+        expect.stringContaining('FROM shop_subscriptions'),
         [1, 10]
       );
+      expect(result).toEqual(mockHistory);
+      expect(mockClient.release).toHaveBeenCalled();
     });
 
-    it('should use custom limit when provided', async () => {
-      mockPoolQuery.mockResolvedValueOnce({ rows: [] });
+    it('should respect custom limit', async () => {
+      mockClient.query
+        .mockResolvedValueOnce({ rows: [{ owner_id: 3 }] })
+        .mockResolvedValueOnce({ rows: [] });
 
-      await getSubscriptionHistory(1, 5);
+      await getSubscriptionHistory(5, 3, 5);
 
-      expect(mockPoolQuery).toHaveBeenCalledWith(
-        expect.any(String),
-        [1, 5]
-      );
+      expect(mockClient.query).toHaveBeenNthCalledWith(2, expect.any(String), [5, 5]);
     });
 
-    it('should query with correct SQL structure', async () => {
-      mockPoolQuery.mockResolvedValueOnce({ rows: [] });
+    it('should throw for unauthorized user', async () => {
+      mockClient.query.mockResolvedValueOnce({ rows: [{ owner_id: 99 }] });
 
-      await getSubscriptionHistory(1, 10);
-
-      expect(mockPoolQuery).toHaveBeenCalledWith(
-        expect.stringContaining('SELECT * FROM shop_subscriptions'),
-        expect.any(Array)
-      );
-      expect(mockPoolQuery).toHaveBeenCalledWith(
-        expect.stringContaining('ORDER BY created_at DESC'),
-        expect.any(Array)
-      );
+      await expect(getSubscriptionHistory(1, 1, 10)).rejects.toThrow('Unauthorized');
+      expect(mockClient.release).toHaveBeenCalled();
     });
 
-    it('should return empty array when no history exists', async () => {
-      mockPoolQuery.mockResolvedValueOnce({ rows: [] });
+    it('should bubble up database errors', async () => {
+      const error = new Error('DB connection lost');
+      mockClient.query
+        .mockResolvedValueOnce({ rows: [{ owner_id: 1 }] })
+        .mockRejectedValueOnce(error);
 
-      const result = await getSubscriptionHistory(999, 10);
-
-      expect(result).toEqual([]);
+      await expect(getSubscriptionHistory(1, 1, 10)).rejects.toThrow('DB connection lost');
+      expect(mockClient.release).toHaveBeenCalled();
     });
   });
 

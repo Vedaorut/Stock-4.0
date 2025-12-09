@@ -20,6 +20,8 @@ router.get('/accessible', verifyToken, workerController.getAccessibleShops);
 router.get('/workspace', verifyToken, workerController.getWorkerShops);
 router.get('/worker', verifyToken, workerController.getWorkerShops); // alias for bots
 
+router.get('/:shopId/stats', verifyToken, workerController.getStats);
+
 /**
  * @route   POST /api/shops/:shopId/workers
  * @desc    Add worker to shop

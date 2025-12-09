@@ -80,7 +80,7 @@ const showResults = async (ctx) => {
     if (!shops || shops.length === 0) {
       await smartMessage.send(ctx, {
         text: searchMessages.noResults(lang),
-        keyboard: buyerMenu(lang),
+        keyboard: buyerMenu({ hasShop: Boolean(ctx.session?.shopId) }, lang),
       });
       return await ctx.scene.leave();
     }
@@ -110,7 +110,7 @@ const showResults = async (ctx) => {
     const { search: searchMsgs } = getMessages(langErr);
     await smartMessage.send(ctx, {
       text: searchMsgs.error(langErr),
-      keyboard: buyerMenu(langErr),
+      keyboard: buyerMenu({ hasShop: Boolean(ctx.session?.shopId) }, langErr),
     });
     return await ctx.scene.leave();
   }

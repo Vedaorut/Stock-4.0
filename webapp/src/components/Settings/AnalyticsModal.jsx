@@ -5,6 +5,7 @@ import { useApi } from '../../hooks/useApi';
 import { useBackButton } from '../../hooks/useBackButton';
 import { useTelegram } from '../../hooks/useTelegram';
 import { useTranslation } from '../../i18n/useTranslation';
+import { useScrollLock } from '../../hooks/useScrollLock';
 
 export default function AnalyticsModal({ isOpen, onClose }) {
   const { get } = useApi();
@@ -34,6 +35,7 @@ export default function AnalyticsModal({ isOpen, onClose }) {
   }, [onClose, triggerHaptic]);
 
   useBackButton(isOpen ? handleClose : null);
+  useScrollLock(isOpen);
 
   // Calculate date range based on period
   const getDateRange = useCallback(() => {

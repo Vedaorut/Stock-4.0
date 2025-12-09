@@ -370,14 +370,14 @@ const handleInput = async (ctx) => {
         const crypto = action.replace('wallet:delete:', '');
         await ctx.answerCbQuery();
 
-        await ctx.editMessageText(
-          sellerMessages.walletsDeleteConfirm(crypto, lang),
-          Markup.inlineKeyboard([
-            [Markup.button.callback(t('buttons.delete', {}, lang), `wallet:delete_confirm:${crypto}`)],
-            [Markup.button.callback(t('buttons.backToWallets', {}, lang), 'wallet:back')],
-            [Markup.button.callback(t('buttons.backToTools', {}, lang), 'seller:tools')],
-          ])
-        );
+            await ctx.editMessageText(
+              sellerMessages.walletsDeleteConfirm(crypto, lang),
+              Markup.inlineKeyboard([
+                [Markup.button.callback(t('buttons.deleteWallet', {}, lang), `wallet:delete_confirm:${crypto}`)],
+                [Markup.button.callback(t('buttons.backToWallets', {}, lang), 'wallet:back')],
+                [Markup.button.callback(t('buttons.backToTools', {}, lang), 'seller:tools')],
+              ])
+            );
         return;
       }
 

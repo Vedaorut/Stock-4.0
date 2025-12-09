@@ -79,8 +79,9 @@ const BLOCKCHAIN_CONFIG = {
   },
 };
 
-// Amount tolerance for network fees (2%)
-const AMOUNT_TOLERANCE = 0.02;
+// Amount tolerance for network fees (1% capped at $0.10)
+const AMOUNT_TOLERANCE_PERCENT = 0.01;
+const AMOUNT_TOLERANCE_MAX = 0.1;
 
 // API request timeout (10 seconds)
 const API_TIMEOUT = 10000;
@@ -96,6 +97,12 @@ class BlockchainAPIError extends Error {
     this.statusCode = statusCode;
     this.isAPIError = true;
   }
+}
+
+function getMinimumAcceptedAmount(expectedAmount) {
+  const numericExpected = Number(expectedAmount);
+  const tolerance = Math.min(numericExpected * AMOUNT_TOLERANCE_PERCENT, AMOUNT_TOLERANCE_MAX);
+  return numericExpected - tolerance;
 }
 
 /**
@@ -324,7 +331,7 @@ export async function verifyBitcoinPayment(txHash, expectedAddress, expectedAmou
   }
 
   // Check amount with tolerance
-  const minAmount = expectedBTC * (1 - AMOUNT_TOLERANCE);
+  const minAmount = getMinimumAcceptedAmount(expectedBTC);
   if (parseFloat(amountBTC) < minAmount) {
     return {
       verified: false,
@@ -431,7 +438,7 @@ export async function verifyLitecoinPayment(txHash, expectedAddress, expectedAmo
   }
 
   // Check amount with tolerance
-  const minAmount = expectedLTC * (1 - AMOUNT_TOLERANCE);
+  const minAmount = getMinimumAcceptedAmount(expectedLTC);
   if (parseFloat(amountLTC) < minAmount) {
     return {
       verified: false,
@@ -529,7 +536,7 @@ export async function verifyEthereumPayment(txHash, expectedAddress, expectedAmo
   }
 
   // Check amount with tolerance
-  const minAmount = expectedETH * (1 - AMOUNT_TOLERANCE);
+  const minAmount = getMinimumAcceptedAmount(expectedETH);
   if (parseFloat(amountETH) < minAmount) {
     return {
       verified: false,
@@ -717,7 +724,7 @@ export async function verifyUSDTTRC20Payment(txHash, expectedAddress, expectedAm
   }
 
   // Check amount with tolerance
-  const minAmount = expectedUSDT * (1 - AMOUNT_TOLERANCE);
+  const minAmount = getMinimumAcceptedAmount(expectedUSDT);
   if (parseFloat(amountUSDT) < minAmount) {
     return {
       verified: false,

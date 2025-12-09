@@ -266,16 +266,16 @@ export default function PaymentDetailsModal() {
                     />
                   </svg>
                 </div>
-                <h3 className="text-xl font-bold text-white mb-2">Unknown cryptocurrency</h3>
+                <h3 className="text-xl font-bold text-white mb-2">{t('errors.unknownCrypto')}</h3>
                 <p className="text-gray-400 mb-4">
-                  Selected cryptocurrency ({selectedCrypto}) is not supported
+                  {t('errors.cryptoNotSupported', { crypto: selectedCrypto })}
                 </p>
                 <motion.button
                   onClick={handleClose}
                   className="px-6 py-3 bg-orange-primary hover:bg-orange-light text-white font-semibold rounded-xl transition-colors"
                   whileTap={{ scale: 0.95 }}
                 >
-                  Close
+                  {t('common.close')}
                 </motion.button>
               </div>
             </motion.div>

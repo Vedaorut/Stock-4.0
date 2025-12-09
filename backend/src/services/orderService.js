@@ -69,6 +69,10 @@ export const createOrderWithItems = async (userId, validatedData, deliveryAddres
 export const returnStockForCancelledOrder = async (orderId, client) => {
   logger.info('Returning stock for cancelled order', { orderId });
 
+  if (!client) {
+    throw new Error('Database client is required to return stock');
+  }
+
   // Get order items with product info
   const items = await orderItemQueries.findByOrderIdWithStock(orderId, client);
 
@@ -126,24 +130,52 @@ export const returnStockForCancelledOrder = async (orderId, client) => {
 export const updateOrderStatusWithStockLogic = async (orderId, newStatus, currentStatus, client) => {
   logger.info('Updating order status', { orderId, currentStatus, newStatus });
 
-  // If cancelling confirmed order → return stock
-  if (newStatus === 'cancelled' && currentStatus === 'confirmed') {
-    logger.info('Cancelling confirmed order - returning stock', { orderId });
-    await returnStockForCancelledOrder(orderId, client);
-  } else if (newStatus === 'cancelled') {
-    logger.info('Cancelling non-confirmed order - no stock to return', {
+  // If caller didn't pass a client, wrap operations in their own transaction
+  let managedClient = null;
+  let transactionStarted = false;
+
+  try {
+    if (!client) {
+      const { getClient } = await import('../config/database.js');
+      managedClient = await getClient();
+      client = managedClient;
+      await client.query('BEGIN');
+      transactionStarted = true;
+    }
+
+    // If cancelling confirmed order → return stock
+    if (newStatus === 'cancelled' && currentStatus === 'confirmed') {
+      logger.info('Cancelling confirmed order - returning stock', { orderId });
+      await returnStockForCancelledOrder(orderId, client);
+    } else if (newStatus === 'cancelled') {
+      logger.info('Cancelling non-confirmed order - no stock to return', {
+        orderId,
+        currentStatus,
+      });
+    }
+
+    // Update order status
+    await client.query('UPDATE orders SET status = $1, updated_at = NOW() WHERE id = $2', [
+      newStatus,
       orderId,
-      currentStatus,
-    });
+    ]);
+
+    if (transactionStarted) {
+      await client.query('COMMIT');
+      transactionStarted = false;
+    }
+
+    logger.info('Order status updated successfully', { orderId, newStatus });
+  } catch (error) {
+    if (transactionStarted && client) {
+      await client.query('ROLLBACK');
+    }
+    throw error;
+  } finally {
+    if (managedClient) {
+      managedClient.release();
+    }
   }
-
-  // Update order status
-  await client.query('UPDATE orders SET status = $1, updated_at = NOW() WHERE id = $2', [
-    newStatus,
-    orderId,
-  ]);
-
-  logger.info('Order status updated successfully', { orderId, newStatus });
 };
 
 /**

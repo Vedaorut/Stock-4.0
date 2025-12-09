@@ -35,6 +35,7 @@ CREATE TABLE users (
   last_name VARCHAR(255),
   selected_role VARCHAR(20) CHECK (selected_role IN ('buyer', 'seller', 'worker')),
   language VARCHAR(10) DEFAULT 'ru',
+  has_used_trial BOOLEAN DEFAULT false,
   onboarding_completed BOOLEAN DEFAULT false,
   created_at TIMESTAMP NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMP NOT NULL DEFAULT NOW()

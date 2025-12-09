@@ -199,8 +199,21 @@ async function deactivateShop(shopId, client = null) {
  */
 async function activateFreeTrial(shopId, userId) {
   const client = await pool.connect();
+  let transactionStarted = false;
   try {
     await client.query('BEGIN');
+    transactionStarted = true;
+
+    const userResult = await client.query(
+      `SELECT has_used_trial FROM users WHERE id = $1 FOR UPDATE`,
+      [userId]
+    );
+
+    if (userResult.rows.length === 0) {
+      throw new Error('User not found for trial activation');
+    }
+
+    const userHasUsedTrial = userResult.rows[0].has_used_trial === true;
 
     // FIX BUG-SUB-003: Check if user already used trial (track by user_id, not shop_id)
     // FIX RACE CONDITION: Lock user's shops with FOR UPDATE to serialize concurrent trial activations
@@ -217,7 +230,17 @@ async function activateFreeTrial(shopId, userId) {
       (shop) => shop.is_trial === true || shop.trial_ends_at !== null
     );
 
-    if (alreadyUsedTrial) {
+    if (alreadyUsedTrial || userHasUsedTrial) {
+      await client.query('ROLLBACK');
+      transactionStarted = false;
+
+      // Persist flag if historical trial usage detected but flag missing
+      if (!userHasUsedTrial) {
+        await client.query(
+          `UPDATE users SET has_used_trial = true, updated_at = NOW() WHERE id = $1`,
+          [userId]
+        );
+      }
       throw new Error('User has already used free trial');
     }
 
@@ -237,12 +260,23 @@ async function activateFreeTrial(shopId, userId) {
       [trialEnd, shopId]
     );
 
+    await client.query(
+      `UPDATE users
+       SET has_used_trial = true,
+           updated_at = NOW()
+       WHERE id = $1`,
+      [userId]
+    );
+
     await client.query('COMMIT');
+    transactionStarted = false;
     logger.info(`[Subscription] Free trial activated for shop ${shopId} until ${trialEnd.toISOString()}`);
 
     return { shopId, trialEndsAt: trialEnd };
   } catch (error) {
-    await client.query('ROLLBACK');
+    if (transactionStarted) {
+      await client.query('ROLLBACK');
+    }
     throw error;
   } finally {
     client.release();
@@ -519,19 +553,43 @@ async function getSubscriptionStatus(shopId) {
  * Get subscription payment history for a shop
  *
  * @param {number} shopId - Shop ID
+ * @param {number} userId - Requesting user ID (must own the shop)
  * @param {number} limit - Number of records to return
  * @returns {Promise<array>} Payment history
  */
-async function getSubscriptionHistory(shopId, limit = 10) {
-  const result = await pool.query(
-    `SELECT * FROM shop_subscriptions
-     WHERE shop_id = $1
-     ORDER BY created_at DESC
-     LIMIT $2`,
-    [shopId, limit]
-  );
+async function getSubscriptionHistory(shopId, userId, limit = 10) {
+  const client = await pool.connect();
+  try {
+    if (!userId) {
+      throw new Error('User ID is required to fetch subscription history');
+    }
 
-  return result.rows;
+    // Authorization: ensure requesting user owns the shop
+    const shopResult = await client.query('SELECT owner_id FROM shops WHERE id = $1', [shopId]);
+    if (shopResult.rows.length === 0) {
+      throw new Error('Shop not found');
+    }
+
+    const shop = shopResult.rows[0];
+    if (shop.owner_id !== userId) {
+      throw new Error('Unauthorized access to subscription history');
+    }
+
+    const result = await client.query(
+      `SELECT * FROM shop_subscriptions
+       WHERE shop_id = $1
+       ORDER BY created_at DESC
+       LIMIT $2`,
+      [shopId, limit]
+    );
+
+    return result.rows;
+  } catch (error) {
+    logger.error('[Subscription] Error getting subscription history:', error);
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 /**

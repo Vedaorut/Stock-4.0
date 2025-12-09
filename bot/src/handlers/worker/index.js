@@ -1,13 +1,11 @@
 import { Markup } from 'telegraf';
 import { workerMenu } from '../../keyboards/worker.js';
 import { mainMenu } from '../../keyboards/main.js';
-import { shopApi, productApi, orderApi } from '../../utils/api.js';
+import { shopApi, productApi, workerApi } from '../../utils/api.js';
 import * as smartMessage from '../../utils/smartMessage.js';
 import logger from '../../utils/logger.js';
 import { messages } from '../../texts/messages.js';
 import { t } from '../../i18n/index.js';
-
-// Note: orderApi kept for handleWorkerStats (revenue calculation)
 
 const { general: generalMessages } = messages;
 
@@ -162,13 +160,12 @@ export const handleWorkerStats = async (ctx) => {
     const shop = await ensureWorkspaceShop(ctx);
     if (!shop) return;
 
-    const orders = await orderApi.getShopOrders(shop.id, ctx.session.token, { limit: 100 });
-    const completedStatuses = ['confirmed', 'shipped', 'delivered'];
-    const completed = orders.filter((o) => completedStatuses.includes(o.status));
-    const revenue = completed.reduce((sum, o) => sum + Number(o.total_price || 0), 0);
+    const stats = await workerApi.getStats(shop.id, ctx.session.token);
+    const ordersCount = Number(stats?.total_orders ?? 0);
+    const revenue = Number(stats?.revenue ?? 0);
 
     await smartMessage.send(ctx, {
-      text: ctx.t('worker.stats', { revenue, ordersCount: orders.length }),
+      text: ctx.t('worker.stats', { revenue, ordersCount }),
       keyboard: workerMenu(shop.name, ctx.lang),
     });
   } catch (error) {

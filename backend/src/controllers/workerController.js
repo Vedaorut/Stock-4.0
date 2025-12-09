@@ -3,6 +3,7 @@ import { dbErrorHandler, asyncHandler } from '../middleware/errorHandler.js';
 import { NotFoundError, UnauthorizedError, ValidationError, ConflictError } from '../utils/errors.js';
 import { TIER_LIMITS } from '../config/subscriptionPricing.js';
 import logger from '../utils/logger.js';
+import { query } from '../config/database.js';
 
 /**
  * Worker Controller
@@ -294,6 +295,52 @@ export const workerController = {
       logger.error('Get worker shops error', { error: error.message, stack: error.stack });
       throw error;
     }
+  }),
+
+  /**
+   * Get basic stats for worker-accessible shop
+   * GET /api/shops/:shopId/stats
+   */
+  getStats: asyncHandler(async (req, res) => {
+    const shopId = parseInt(req.params.shopId, 10);
+
+    if (!Number.isInteger(shopId) || shopId <= 0) {
+      throw new ValidationError('Valid shopId is required');
+    }
+
+    const shop = await shopQueries.findById(shopId);
+    if (!shop) {
+      throw new NotFoundError('Shop');
+    }
+
+    const isOwner = shop.owner_id === req.user.id;
+    const isWorker = await workerQueries.findByShopAndUser(shopId, req.user.id);
+
+    if (!isOwner && !isWorker) {
+      throw new UnauthorizedError('You do not have access to this shop');
+    }
+
+    const statsResult = await query(
+      `SELECT
+         COUNT(*) AS total_orders,
+         COUNT(*) FILTER (WHERE status IN ('confirmed','shipped','delivered')) AS completed_orders,
+         COALESCE(SUM(total_price) FILTER (WHERE status IN ('confirmed','shipped','delivered')), 0) AS revenue
+       FROM orders
+       WHERE shop_id = $1`,
+      [shopId]
+    );
+
+    const stats = statsResult.rows[0] || {};
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        shop_id: shopId,
+        total_orders: parseInt(stats.total_orders || 0, 10),
+        completed_orders: parseInt(stats.completed_orders || 0, 10),
+        revenue: Number(stats.revenue || 0),
+      },
+    });
   }),
 
 

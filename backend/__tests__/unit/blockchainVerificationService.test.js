@@ -270,12 +270,15 @@ describe('Blockchain Verification Service', () => {
     });
 
     describe('Amount Validation', () => {
-      it('should accept amount within 2% tolerance', async () => {
+      it('should accept amount within 1% tolerance (capped at $0.10)', async () => {
+        // New tolerance: 1% with max $0.10 cap
+        // For 0.001 BTC: tolerance = min(0.001 * 0.01, 0.1) = 0.00001
+        // Minimum accepted = 0.001 - 0.00001 = 0.00099 BTC = 99000 satoshis
         mockAxios
           .mockResolvedValueOnce({
             data: {
               txid: 'btc_tx',
-              vout: [{ scriptpubkey_address: 'bc1qtest', value: 98000 }], // 0.00098 BTC (2% less than 0.001)
+              vout: [{ scriptpubkey_address: 'bc1qtest', value: 99500 }], // 0.000995 BTC (within 1%)
               status: { confirmed: true, block_height: 800000 },
             },
           })
@@ -284,14 +287,16 @@ describe('Blockchain Verification Service', () => {
         const result = await verifyBitcoinPayment('btc_tx', 'bc1qtest', '0.001');
 
         expect(result.verified).toBe(true);
-        expect(result.amount).toBe('0.00098000');
+        expect(result.amount).toBe('0.00099500');
       });
 
       it('should reject amount below tolerance', async () => {
+        // 0.00098 BTC is below 1% tolerance (min 0.00099)
+        // Note: Only 1 mock needed - code returns early before block height call
         mockAxios.mockResolvedValueOnce({
           data: {
             txid: 'btc_tx',
-            vout: [{ scriptpubkey_address: 'bc1qtest', value: 90000 }], // 0.0009 BTC (10% less)
+            vout: [{ scriptpubkey_address: 'bc1qtest', value: 98000 }], // 0.00098 BTC (below 1% tolerance)
             status: { confirmed: true, block_height: 800000 },
           },
         });

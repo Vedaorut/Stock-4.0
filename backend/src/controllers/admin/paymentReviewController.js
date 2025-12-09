@@ -80,7 +80,7 @@ export async function approvePayment(req, res) {
   try {
     // Get payment and order info
     const paymentResult = await query(
-      `SELECT p.*, o.id as order_id, o.status as order_status
+      `SELECT p.*, o.id as order_id, o.status as order_status, o.created_at as order_created_at
        FROM payments p
        JOIN orders o ON p.order_id = o.id
        WHERE p.id = $1 AND p.status = 'needs_review'
@@ -96,6 +96,13 @@ export async function approvePayment(req, res) {
     }
 
     const payment = paymentResult.rows[0];
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    if (payment.order_created_at && new Date(payment.order_created_at) < sevenDaysAgo) {
+      return res.status(400).json({
+        success: false,
+        error: 'Payment too old for approval',
+      });
+    }
 
     // Update payment to confirmed
     await query(
@@ -178,7 +185,7 @@ export async function rejectPayment(req, res) {
 
   try {
     const paymentResult = await query(
-      `SELECT p.*, o.id as order_id, o.status as order_status
+      `SELECT p.*, o.id as order_id, o.status as order_status, o.created_at as order_created_at
        FROM payments p
        JOIN orders o ON p.order_id = o.id
        WHERE p.id = $1 AND p.status = 'needs_review'`,
@@ -193,6 +200,13 @@ export async function rejectPayment(req, res) {
     }
 
     const payment = paymentResult.rows[0];
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    if (payment.order_created_at && new Date(payment.order_created_at) < sevenDaysAgo) {
+      return res.status(400).json({
+        success: false,
+        error: 'Payment too old for approval',
+      });
+    }
 
     // Update payment to failed with refund note
     await query(

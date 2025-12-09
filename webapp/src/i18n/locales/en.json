@@ -145,6 +145,7 @@
     "itemsCount": "Items:",
     "amount": "Amount:",
     "crypto": "Cryptocurrency",
+    "txHash": "TX Hash",
     "status": {
       "pending": "Pending payment",
       "paid": "Paid",
@@ -564,6 +565,9 @@
     "paymentFailed": "Payment verification failed. Check your transaction.",
     "insufficientFunds": "Insufficient funds. Check the amount sent.",
     "retryLater": "Please try again in a few moments."
+  },
+  "validation": {
+    "minChars": "Minimum {count} characters"
   },
   "offline": {
     "title": "No internet connection",

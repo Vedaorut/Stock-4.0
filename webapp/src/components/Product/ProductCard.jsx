@@ -422,6 +422,7 @@ const ProductCard = memo(function ProductCard({ product, onPreorder: _onPreorder
           <motion.button
             onClick={handleAddToCart}
             disabled={isDisabled}
+            aria-label={t('product.addToCart')}
             whileHover={{
               y: android ? -1 : -2,
               scale: android ? 1.03 : 1.05,

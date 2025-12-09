@@ -46,8 +46,8 @@ const showMarkupTypeSelection = async (ctx) => {
     const existingLock = ctx.session.editingFollowId;
     const lockTimestamp = ctx.session.editingFollowTimestamp || 0;
 
-    // Lock timeout: 5 seconds (reduced from 30s to prevent race conditions)
-    const LOCK_TIMEOUT_MS = 5000;
+    // Lock timeout: 20 seconds to accommodate slow networks
+    const LOCK_TIMEOUT_MS = 20000;
 
     // If same follow being edited AND lock is fresh (< 5 seconds old)
     if (existingLock === followId && now - lockTimestamp < LOCK_TIMEOUT_MS) {

@@ -132,6 +132,13 @@ export const workerApi = {
     return data.data || data;
   },
 
+  async getStats(shopId, token) {
+    const { data } = await api.get(`/shops/${shopId}/stats`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return data.data || data;
+  },
+
   // Remove worker
   async removeWorker(shopId, workerId, token) {
     const { data } = await api.delete(`/shops/${shopId}/workers/${workerId}`, {

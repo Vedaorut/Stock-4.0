@@ -97,7 +97,16 @@ export async function finalizeSubscriptionPayment(client, { subscription, invoic
   // CALCULATE NEW SUBSCRIPTION PERIOD
   // NEW PAYMENT = NEW PERIOD (always start from NOW for subscription payments)
   // =========================================================================
-  const periodStart = new Date();
+  const now = new Date();
+  const currentPeriodEnd = subscription.period_end ? new Date(subscription.period_end) : null;
+  const periodStart = currentPeriodEnd && currentPeriodEnd > now ? currentPeriodEnd : now;
+  if (currentPeriodEnd && currentPeriodEnd > now) {
+    logger.info('[SubscriptionPayment] Aligning new period start to current end to prevent overlap', {
+      subscriptionId: subscription.id,
+      currentPeriodEnd,
+      newPeriodStart: periodStart,
+    });
+  }
   const periodEnd = new Date(
     periodStart.getTime() + SUBSCRIPTION_PERIOD_DAYS * 24 * 60 * 60 * 1000
   );

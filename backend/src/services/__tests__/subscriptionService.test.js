@@ -464,38 +464,52 @@ describe('Subscription Service', () => {
   });
 
   describe('getSubscriptionHistory', () => {
-    it('should return subscription history with default limit', async () => {
+    it('should return subscription history for shop owner', async () => {
       const mockHistory = [
         { id: 3, tier: 'pro', amount: 35, created_at: new Date('2024-01-01') },
         { id: 2, tier: 'basic', amount: 25, created_at: new Date('2023-12-01') },
-        { id: 1, tier: 'basic', amount: 25, created_at: new Date('2023-11-01') },
       ];
 
-      mockClient.query.mockResolvedValueOnce({ rows: mockHistory });
+      mockClient.query
+        .mockResolvedValueOnce({ rows: [{ owner_id: 42 }] }) // ownership check
+        .mockResolvedValueOnce({ rows: mockHistory });
 
-      const result = await getSubscriptionHistory(1);
+      const result = await getSubscriptionHistory(1, 42);
 
       expect(result).toEqual(mockHistory);
-      expect(mockClient.query).toHaveBeenCalledWith(
-        expect.stringContaining('ORDER BY created_at DESC'),
-        [1, 10] // Default limit
+      expect(mockClient.query).toHaveBeenNthCalledWith(1, 'SELECT owner_id FROM shops WHERE id = $1', [1]);
+      expect(mockClient.query).toHaveBeenNthCalledWith(
+        2,
+        expect.stringContaining('FROM shop_subscriptions'),
+        [1, 10]
       );
       expect(mockClient.release).toHaveBeenCalled();
     });
 
     it('should respect custom limit', async () => {
-      mockClient.query.mockResolvedValueOnce({ rows: [{ id: 1 }] });
+      mockClient.query
+        .mockResolvedValueOnce({ rows: [{ owner_id: 7 }] })
+        .mockResolvedValueOnce({ rows: [{ id: 1 }] });
 
-      await getSubscriptionHistory(1, 5);
+      await getSubscriptionHistory(5, 7, 5);
 
-      expect(mockClient.query).toHaveBeenCalledWith(expect.any(String), [1, 5]);
+      expect(mockClient.query).toHaveBeenNthCalledWith(2, expect.any(String), [5, 5]);
+    });
+
+    it('should throw on unauthorized access', async () => {
+      mockClient.query.mockResolvedValueOnce({ rows: [{ owner_id: 99 }] });
+
+      await expect(getSubscriptionHistory(1, 1)).rejects.toThrow('Unauthorized');
+      expect(mockClient.release).toHaveBeenCalled();
     });
 
     it('should throw error on database failure', async () => {
       const error = new Error('Query failed');
-      mockClient.query.mockRejectedValueOnce(error);
+      mockClient.query
+        .mockResolvedValueOnce({ rows: [{ owner_id: 1 }] })
+        .mockRejectedValueOnce(error);
 
-      await expect(getSubscriptionHistory(1)).rejects.toThrow('Query failed');
+      await expect(getSubscriptionHistory(1, 1)).rejects.toThrow('Query failed');
 
       expect(mockLogger.error).toHaveBeenCalledWith(
         '[Subscription] Error getting subscription history:',

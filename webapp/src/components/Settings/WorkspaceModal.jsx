@@ -172,7 +172,7 @@ export default function WorkspaceModal({ isOpen, onClose }) {
       setMyShop(null);
       return { status: 'error', error: err.message };
     }
-  }, [fetchApi]);
+  }, [fetchApi, t]);
 
   useEffect(() => {
     if (!isOpen) return;

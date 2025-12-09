@@ -180,7 +180,7 @@ function OrderRow({ order, isExpanded, onToggle, onStatusUpdate, isUpdating, t }
                 {/* TX Hash */}
                 {order.payment_hash && (
                   <div>
-                    <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-0.5">TX Hash</p>
+                    <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-0.5">{t('orders.txHash')}</p>
                     <div className="flex items-center gap-2">
                       <code className="text-[11px] text-gray-400 font-mono bg-white/5 px-2 py-1 rounded flex-1 truncate">
                         {truncateHash(order.payment_hash)}

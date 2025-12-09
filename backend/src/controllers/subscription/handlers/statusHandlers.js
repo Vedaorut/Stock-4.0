@@ -41,7 +41,7 @@ export const getHistory = asyncHandler(async (req, res) => {
       return res.status(ownershipCheck.status).json({ error: ownershipCheck.error });
     }
 
-    const history = await subscriptionService.getSubscriptionHistory(shopId, limit);
+    const history = await subscriptionService.getSubscriptionHistory(shopId, userId, limit);
 
     res.json({
       shopId,

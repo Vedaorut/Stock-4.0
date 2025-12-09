@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { m as motion } from 'framer-motion';
 import PageHeader from '../../common/PageHeader';
+import ErrorBoundary from '../../ErrorBoundary';
 import { useTelegram } from '../../../hooks/useTelegram';
 import { useTranslation } from '../../../i18n/useTranslation';
 
@@ -54,7 +55,7 @@ function AIChatInput({ disabled, onSend }) {
 /**
  * AIChatPanel - AI assistant chat interface
  */
-function AIChatPanel({
+function AIChatPanelContent({
   onClose,
   aiHistory,
   aiLoading,
@@ -138,4 +139,27 @@ function AIChatPanel({
   );
 }
 
-export default AIChatPanel;
+export default function AIChatPanel(props) {
+  const { t } = useTranslation();
+
+  const fallback = (
+    <div className="fixed inset-0 z-50 bg-dark-bg flex items-center justify-center px-6 text-center">
+      <div className="space-y-3">
+        <p className="text-lg font-semibold text-white">{t('errors.somethingWrong')}</p>
+        <p className="text-sm text-gray-400">{t('errors.unexpectedError')}</p>
+        <button
+          onClick={props.onClose}
+          className="mt-2 inline-flex items-center justify-center px-4 py-2 rounded-xl bg-white/10 text-white hover:bg-white/20 transition-colors"
+        >
+          {t('common.close')}
+        </button>
+      </div>
+    </div>
+  );
+
+  return (
+    <ErrorBoundary fallback={fallback}>
+      <AIChatPanelContent {...props} />
+    </ErrorBoundary>
+  );
+}

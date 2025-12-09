@@ -271,7 +271,7 @@ export default function PaymentHashModal() {
                     </span>
                     {txHash.length > 0 && (
                       <span className="text-xs text-gray-500 font-mono tabular-nums">
-                        {txHash.length} chars
+                        {t('validation.minChars', { count: 10 })} · {txHash.length}
                       </span>
                     )}
                   </label>

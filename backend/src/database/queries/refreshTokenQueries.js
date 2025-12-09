@@ -91,3 +91,4 @@ const refreshTokenQueries = {
 };
 
 export default refreshTokenQueries;
+export { refreshTokenQueries };

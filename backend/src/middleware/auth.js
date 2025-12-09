@@ -257,6 +257,22 @@ export const requireShopAccess = async (req, res, next) => {
         });
       }
 
+      if (!shop.is_active || shop.subscription_status === 'inactive') {
+        logger.warn('[requireShopAccess] Worker access denied - shop inactive', {
+          userId: req.user.id,
+          shopId,
+          workerId: worker.id,
+          subscriptionStatus: shop.subscription_status,
+          isActive: shop.is_active,
+        });
+        return res.status(403).json({
+          success: false,
+          error: 'SHOP_INACTIVE',
+          message: 'This shop is inactive. Worker access is disabled.',
+          code: 'SHOP_INACTIVE',
+        });
+      }
+
       // PROD GUARDRAIL: Log worker mode access for monitoring
       logger.info('[GUARDRAIL] Worker mode access', {
         userId: req.user.id,
