@@ -87,10 +87,12 @@ const ConfirmDialog = ({
               <motion.button
                 onClick={async (e) => {
                   e.stopPropagation();
+                  // Close dialog first, then execute
+                  onClose();
+                  // Small delay to let dialog start closing
+                  await new Promise(r => setTimeout(r, 100));
                   // Execute confirm logic
                   await onConfirm();
-                  // Close dialog
-                  onClose();
                 }}
                 className={`flex-1 text-white font-semibold py-3.5 rounded-xl shadow-lg ${danger
                     ? 'bg-red-500 hover:bg-red-600 shadow-red-500/20'
