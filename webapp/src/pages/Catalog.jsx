@@ -77,6 +77,7 @@ export default function Catalog() {
   const [error, setError] = useState(null);
   const [myShop, setMyShop] = useState(null);
   const [activeSection, setActiveSection] = useState('stock');
+  const [noShopsAvailable, setNoShopsAvailable] = useState(false);
 
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
@@ -198,6 +199,29 @@ export default function Catalog() {
       }
     },
     [get, setCurrentShop]
+  );
+
+  // Load user subscriptions (for buyers without own shop)
+  const loadSubscriptions = useCallback(
+    async (signal) => {
+      try {
+        const { data, error: apiError } = await get('/users/subscriptions', { signal });
+        if (signal?.aborted) return { status: 'aborted' };
+
+        if (apiError) {
+          if (import.meta.env.DEV) {
+            console.error('[Catalog] loadSubscriptions ERROR:', apiError);
+          }
+          return { status: 'error', subscriptions: [] };
+        }
+
+        const subscriptions = Array.isArray(data?.data) ? data.data : [];
+        return { status: 'success', subscriptions };
+      } catch {
+        return { status: 'error', subscriptions: [] };
+      }
+    },
+    [get]
   );
 
   // Search products - local filter for current shop's products
@@ -340,6 +364,9 @@ export default function Catalog() {
 
     const fetchData = async () => {
       try {
+        // Reset noShopsAvailable state
+        setNoShopsAvailable(false);
+
         // Step 1: Load my shops first (needed to determine ownership)
         const shopResult = await loadMyShop(signal);
         if (signal.aborted) return;
@@ -351,9 +378,29 @@ export default function Catalog() {
         }
 
         // Determine target shop
-        const targetShop = currentShop || shopResult.shop;
+        let targetShop = currentShop || shopResult.shop;
+
+        // If no shop available (buyer without own shop), try to load subscriptions
         if (!targetShop) {
-          return; // No shops available
+          const subsResult = await loadSubscriptions(signal);
+          if (signal.aborted) return;
+
+          if (subsResult.subscriptions && subsResult.subscriptions.length > 0) {
+            // Set first subscription as current shop
+            const firstSub = subsResult.subscriptions[0];
+            const subscriptionShop = {
+              id: firstSub.shop_id,
+              name: firstSub.shop_name,
+              logo: firstSub.shop_logo || null,
+              isOwned: false,
+            };
+            setCurrentShop(subscriptionShop);
+            targetShop = subscriptionShop;
+          } else {
+            // No subscriptions - show empty state
+            setNoShopsAvailable(true);
+            return;
+          }
         }
 
         // Check if viewing own shop (use store directly to avoid dependency cycle)
@@ -389,7 +436,7 @@ export default function Catalog() {
 
     return () => controller.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, currentShop?.id, loadMyShop, loadProducts, loadShopById]);
+  }, [token, currentShop?.id, loadMyShop, loadProducts, loadShopById, loadSubscriptions]);
 
   // Navigation Handlers
   const handleBack = useCallback(() => {
@@ -496,6 +543,29 @@ export default function Catalog() {
               >
                 {t('common.retry')}
               </button>
+            </>
+          ) : noShopsAvailable ? (
+            <>
+              <div className="relative w-24 h-24 mb-6">
+                <div className="absolute inset-0 bg-[#FF6B00]/10 blur-xl rounded-full"></div>
+                <div className="relative w-full h-full rounded-3xl bg-white/5 border border-white/10 flex items-center justify-center backdrop-blur-sm">
+                  <svg className="w-10 h-10 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                  </svg>
+                </div>
+              </div>
+              <h3 className="text-xl font-bold text-white mb-2">{t('catalog.selectShop')}</h3>
+              <p className="text-gray-400 mb-6 max-w-[260px]">{t('catalog.selectShopDesc')}</p>
+              <motion.button
+                onClick={() => {
+                  triggerHaptic('light');
+                  setActiveTab('follows');
+                }}
+                className="bg-gradient-to-r from-[#FF6B00] to-[#FF8533] hover:from-[#FF7A1A] hover:to-[#FF944D] text-white font-semibold px-6 py-3 rounded-xl shadow-lg shadow-[#FF6B00]/20 transition-all"
+                whileTap={{ scale: 0.95 }}
+              >
+                {t('catalog.goToSubscriptions')}
+              </motion.button>
             </>
           ) : (
             <>
