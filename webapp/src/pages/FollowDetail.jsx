@@ -239,6 +239,14 @@ export default function FollowDetail() {
     const newMode = follow.mode === 'monitor' ? 'resell' : 'monitor';
     triggerHaptic('medium');
 
+    if (import.meta.env.DEV) {
+      console.log('[FollowDetail] handleSwitchMode start', {
+        followId: followDetailId,
+        currentMode: follow.mode,
+        nextMode: newMode,
+      });
+    }
+
     try {
       // When switching to resell, pass existing markup or default 10%
       const markupData = newMode === 'resell' ? {
@@ -255,9 +263,21 @@ export default function FollowDetail() {
         setFollow(followData);
         if (newMode === 'resell') {
           loadProducts();
+          // Open markup modal for user to configure markup
+          setIsMarkupModalOpen(true);
         }
       } else {
         setFollow((prev) => ({ ...prev, mode: newMode }));
+        if (newMode === 'resell') {
+          setIsMarkupModalOpen(true);
+        }
+      }
+
+      if (import.meta.env.DEV) {
+        console.log('[FollowDetail] handleSwitchMode response', {
+          newMode,
+          hasData: Boolean(followData),
+        });
       }
       triggerHaptic('success');
     } catch (err) {
@@ -343,6 +363,7 @@ export default function FollowDetail() {
   const markupPercentage = follow?.markup_percentage ?? 25;
   const markupFixed = follow?.markup_fixed ?? 0;
   const displayMarkup = markupType === 'percentage' ? markupPercentage : markupFixed;
+  const isResellMode = mode === 'resell';
 
   return (
     <div
@@ -398,7 +419,7 @@ export default function FollowDetail() {
                     >
                       {mode === 'resell' ? t('followDetail.resale') : t('followDetail.monitor')}
                     </span>
-                    {mode === 'resell' && (
+                    {isResellMode && (
                       <span className="text-[#2ECC71] text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#2ECC71]/10 border border-[#2ECC71]/20">
                         +{markupType === 'percentage' ? `${markupPercentage}%` : `$${markupFixed}`}
                       </span>
@@ -417,18 +438,19 @@ export default function FollowDetail() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1 }}
             >
-              <ActionsList
-                mode={mode}
-                markup={displayMarkup}
-                markupType={markupType}
-                onEditMarkup={() => {
-                  triggerHaptic('light');
-                  setIsMarkupModalOpen(true);
-                }}
-                onSwitchMode={() => {
-                  triggerHaptic('light');
-                  setIsSwitchModeDialogOpen(true);
-                }}
+                      <ActionsList
+                        mode={mode}
+                        markup={displayMarkup}
+                        markupType={markupType}
+                        onEditMarkup={() => {
+                          if (!isResellMode) return;
+                          triggerHaptic('light');
+                          setIsMarkupModalOpen(true);
+                        }}
+                        onSwitchMode={() => {
+                          triggerHaptic('light');
+                          setIsSwitchModeDialogOpen(true);
+                        }}
                 onDelete={() => {
                   triggerHaptic('light');
                   setIsDeleteDialogOpen(true);
@@ -436,54 +458,63 @@ export default function FollowDetail() {
               />
             </motion.div>
 
-            {/* Products Section */}
-            {follow.mode === 'resell' && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.15 }}
-                className="mt-6"
-              >
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-white font-bold text-lg">{t('followDetail.products')}</h3>
-                  <span className="text-white/40 text-sm">{products.length} {t('followDetail.pcs')}</span>
-                </div>
+            {/* Products Section - show in BOTH modes */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.15 }}
+              className="mt-6"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-white font-bold text-lg">{t('followDetail.products')}</h3>
+                <span className="text-white/40 text-sm">{products.length} {t('followDetail.pcs')}</span>
+              </div>
 
-                {productsLoading ? (
-                  <div className="flex justify-center py-8">
-                    <div className="w-6 h-6 border-2 border-[#FF6B00] border-t-transparent rounded-full animate-spin" />
-                  </div>
-                ) : productsError ? (
-                  <div className="bg-red-500/10 rounded-2xl p-6 text-center border border-red-500/20">
-                    <div className="text-red-400 text-sm mb-3">{productsError}</div>
-                    <motion.button
-                      onClick={() => loadProducts()}
-                      className="px-4 py-2 bg-[#FF6B00] text-white text-sm font-semibold rounded-xl"
-                      whileTap={{ scale: 0.95 }}
-                    >
-                      {t('common.retry')}
-                    </motion.button>
-                  </div>
-                ) : products.length === 0 ? (
-                  <div className="bg-white/5 rounded-2xl p-6 text-center border border-white/5">
-                    <div className="text-white/30 text-sm">{t('followDetail.noSyncedProducts')}</div>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {products.map((product) => (
+              {productsLoading ? (
+                <div className="flex justify-center py-8">
+                  <div className="w-6 h-6 border-2 border-[#FF6B00] border-t-transparent rounded-full animate-spin" />
+                </div>
+              ) : productsError ? (
+                <div className="bg-red-500/10 rounded-2xl p-6 text-center border border-red-500/20">
+                  <div className="text-red-400 text-sm mb-3">{productsError}</div>
+                  <motion.button
+                    onClick={() => loadProducts()}
+                    className="px-4 py-2 bg-[#FF6B00] text-white text-sm font-semibold rounded-xl"
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    {t('common.retry')}
+                  </motion.button>
+                </div>
+                  ) : products.length === 0 ? (
+                    <div className="bg-white/5 rounded-2xl p-6 text-center border border-white/5">
+                      <div className="text-white/30 text-sm">
+                        {isResellMode ? t('followDetail.noSyncedProducts') : t('followDetail.noProducts')}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {products.map((product) => {
+                        const productName = product.synced_product?.name || product.source_product?.name || product.name;
+                        const originalPrice = parseFloat(product.source_product?.price || product.original_price || product.price || 0);
+                        const currentPrice = parseFloat(product.synced_product?.price || product.price || originalPrice);
+                        const stockQty = product.synced_product?.stock_quantity ?? product.stock_quantity ?? 0;
+
+                    return (
                       <motion.div
                         key={product.id}
-                        onClick={() => handleProductClick(product)}
-                        className="bg-white/5 rounded-2xl p-4 border border-white/5 hover:bg-white/[0.07] transition-colors cursor-pointer active:scale-[0.98]"
-                        whileTap={{ scale: 0.98 }}
+                        onClick={isResellMode ? () => handleProductClick(product) : undefined}
+                        className={`bg-white/5 rounded-2xl p-4 border border-white/5 transition-colors ${
+                          isResellMode ? 'hover:bg-white/[0.07] cursor-pointer active:scale-[0.98]' : ''
+                        }`}
+                        whileTap={isResellMode ? { scale: 0.98 } : undefined}
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex-1 min-w-0 mr-4">
                             <div className="flex items-center gap-2">
                               <h4 className="text-white font-medium text-sm truncate">
-                                {product.synced_product?.name || product.source_product?.name || product.name}
+                                {productName}
                               </h4>
-                              {product.pricing?.has_custom_markup && (
+                              {isResellMode && product.pricing?.has_custom_markup && (
                                 <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-purple-500/20 text-purple-400 border border-purple-500/30 flex items-center gap-1 flex-shrink-0">
                                   <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
@@ -493,36 +524,46 @@ export default function FollowDetail() {
                               )}
                             </div>
                             <div className="flex items-center gap-2 mt-1">
-                              <span className="text-white/40 text-xs line-through">
-                                ${(() => { const p = parseFloat(product.source_product?.price || product.original_price || product.price || 0); return p % 1 === 0 ? Math.floor(p) : p.toFixed(2); })()}
-                              </span>
-                              <span className="text-[#FF6B00] text-xs">→</span>
-                              <span className="text-[#2ECC71] font-bold text-sm">
-                                ${(() => { const p = parseFloat(product.synced_product?.price || product.price || 0); return p % 1 === 0 ? Math.floor(p) : p.toFixed(2); })()}
-                              </span>
+                              {isResellMode ? (
+                                <>
+                                  <span className="text-white/40 text-xs line-through">
+                                    ${originalPrice % 1 === 0 ? Math.floor(originalPrice) : originalPrice.toFixed(2)}
+                                  </span>
+                                  <span className="text-[#FF6B00] text-xs">→</span>
+                                  <span className="text-[#2ECC71] font-bold text-sm">
+                                    ${currentPrice % 1 === 0 ? Math.floor(currentPrice) : currentPrice.toFixed(2)}
+                                  </span>
+                                </>
+                              ) : (
+                                <span className="text-white/60 font-medium text-sm">
+                                  ${originalPrice % 1 === 0 ? Math.floor(originalPrice) : originalPrice.toFixed(2)}
+                                </span>
+                              )}
                             </div>
                           </div>
                           <div className="flex items-center gap-2">
-                            {(product.synced_product?.stock_quantity ?? product.stock_quantity) > 0 ? (
+                            {stockQty > 0 ? (
                               <span className="px-2 py-1 rounded-full text-[10px] font-medium bg-[#2ECC71]/10 text-[#2ECC71] border border-[#2ECC71]/20">
-                                {product.synced_product?.stock_quantity ?? product.stock_quantity} {t('followDetail.pcs')}
+                                {stockQty} {t('followDetail.pcs')}
                               </span>
                             ) : (
                               <span className="px-2 py-1 rounded-full text-[10px] font-medium bg-red-500/10 text-red-400 border border-red-500/20">
                                 {t('followDetail.outOfStock')}
                               </span>
                             )}
-                            <svg className="w-4 h-4 text-white/30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                            </svg>
+                            {isResellMode && (
+                              <svg className="w-4 h-4 text-white/30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                              </svg>
+                            )}
                           </div>
                         </div>
                       </motion.div>
-                    ))}
-                  </div>
-                )}
-              </motion.div>
-            )}
+                    );
+                  })}
+                </div>
+              )}
+            </motion.div>
           </>
         ) : null}
       </div>

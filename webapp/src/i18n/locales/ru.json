@@ -602,6 +602,7 @@
     "productsCount": "{count} товаров",
     "pcs": "шт",
     "noSyncedProducts": "Нет синхронизированных товаров",
+    "noProducts": "Нет товаров в этом магазине",
     "ownMarkup": "Своя",
     "outOfStock": "Нет в наличии",
     "tryAgain": "Попробовать снова",

@@ -602,6 +602,7 @@
     "productsCount": "{count} products",
     "pcs": "pcs",
     "noSyncedProducts": "No synced products",
+    "noProducts": "No products in this shop",
     "ownMarkup": "Custom",
     "outOfStock": "Out of stock",
     "tryAgain": "Try again",

@@ -86,9 +86,13 @@ const ConfirmDialog = ({
             </motion.button>
 
             <motion.button
-              onClick={() => {
-                onConfirm();
+              onClick={async () => {
+                // FIX: Close dialog FIRST, then execute async operation
+                // This prevents race condition where modal opens during dialog close animation
                 onClose();
+                // Small delay to let dialog close animation start
+                await new Promise(resolve => setTimeout(resolve, 50));
+                await onConfirm();
               }}
               className={`flex-1 text-white font-semibold py-3.5 rounded-xl shadow-lg ${
                   danger
