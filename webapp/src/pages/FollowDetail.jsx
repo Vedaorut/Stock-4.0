@@ -24,6 +24,7 @@ export default function FollowDetail() {
   const [follow, setFollow] = useState(null);
   const [products, setProducts] = useState([]);
   const [productsLoading, setProductsLoading] = useState(false);
+  const [productsError, setProductsError] = useState(null);
 
   // Modal states
   const [isMarkupModalOpen, setIsMarkupModalOpen] = useState(false);
@@ -73,15 +74,30 @@ export default function FollowDetail() {
       if (!followDetailId) return;
 
       setProductsLoading(true);
+      setProductsError(null);
       try {
         const response = await getProducts(followDetailId, { signal });
         if (signal?.aborted) return;
 
+        if (response.error) {
+          if (import.meta.env.DEV) {
+            console.error('[FollowDetail] Error loading products:', response.error);
+          }
+          setProductsError(t('followDetail.productsLoadError') || 'Failed to load products');
+          setProducts([]);
+          return;
+        }
+
         const productsData = response.data?.data?.products || response.data?.products || [];
         setProducts(Array.isArray(productsData) ? productsData : []);
+        setProductsError(null);
       } catch (err) {
         if (import.meta.env.DEV) {
           console.error('[FollowDetail] Error loading products:', err);
+        }
+        if (!signal?.aborted) {
+          setProductsError(t('followDetail.productsLoadError') || 'Failed to load products');
+          setProducts([]);
         }
       } finally {
         if (!signal?.aborted) {
@@ -89,7 +105,7 @@ export default function FollowDetail() {
         }
       }
     },
-    [followDetailId, getProducts]
+    [followDetailId, getProducts, t]
   );
 
   // Handle retry with AbortController - uses loadFollow and loadProducts
@@ -436,6 +452,17 @@ export default function FollowDetail() {
                 {productsLoading ? (
                   <div className="flex justify-center py-8">
                     <div className="w-6 h-6 border-2 border-[#FF6B00] border-t-transparent rounded-full animate-spin" />
+                  </div>
+                ) : productsError ? (
+                  <div className="bg-red-500/10 rounded-2xl p-6 text-center border border-red-500/20">
+                    <div className="text-red-400 text-sm mb-3">{productsError}</div>
+                    <motion.button
+                      onClick={() => loadProducts()}
+                      className="px-4 py-2 bg-[#FF6B00] text-white text-sm font-semibold rounded-xl"
+                      whileTap={{ scale: 0.95 }}
+                    >
+                      {t('common.retry')}
+                    </motion.button>
                   </div>
                 ) : products.length === 0 ? (
                   <div className="bg-white/5 rounded-2xl p-6 text-center border border-white/5">

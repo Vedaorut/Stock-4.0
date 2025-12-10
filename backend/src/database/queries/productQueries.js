@@ -55,10 +55,38 @@ export const productQueries = {
   },
 
   // List products with filters
+  // Returns { rows, total } for pagination support
   list: async (filters = {}) => {
-    const { shopId, isActive, limit = 50, offset = 0 } = filters;
+    const { shopId, isActive, limit = 1000, offset = 0 } = filters;
 
-    let queryText = `
+    // Build WHERE clause for both queries
+    let whereClause = 'WHERE 1=1';
+    const params = [];
+    let paramCount = 1;
+
+    if (shopId) {
+      whereClause += ` AND p.shop_id = $${paramCount}`;
+      params.push(shopId);
+      paramCount++;
+    }
+
+    if (isActive !== undefined) {
+      whereClause += ` AND p.is_active = $${paramCount}`;
+      params.push(isActive);
+      paramCount++;
+    }
+
+    // Count query (without LIMIT/OFFSET)
+    const countQuery = `
+      SELECT COUNT(*) as total
+      FROM products p
+      ${whereClause}
+    `;
+    const countResult = await query(countQuery, params);
+    const total = parseInt(countResult.rows[0].total, 10) || 0;
+
+    // Data query with LIMIT/OFFSET
+    const dataQuery = `
       SELECT p.*,
              s.name as shop_name,
              CASE WHEN sp.id IS NOT NULL THEN true ELSE false END AS is_synced,
@@ -68,28 +96,14 @@ export const productQueries = {
       LEFT JOIN synced_products sp ON sp.synced_product_id = p.id
       LEFT JOIN shop_follows sf ON sf.id = sp.follow_id
       LEFT JOIN shops source_shop ON source_shop.id = sf.source_shop_id
-      WHERE 1=1
+      ${whereClause}
+      ORDER BY p.created_at DESC
+      LIMIT $${paramCount} OFFSET $${paramCount + 1}
     `;
-    const params = [];
-    let paramCount = 1;
+    const dataParams = [...params, limit, offset];
+    const result = await query(dataQuery, dataParams);
 
-    if (shopId) {
-      queryText += ` AND p.shop_id = $${paramCount}`;
-      params.push(shopId);
-      paramCount++;
-    }
-
-    if (isActive !== undefined) {
-      queryText += ` AND p.is_active = $${paramCount}`;
-      params.push(isActive);
-      paramCount++;
-    }
-
-    queryText += ` ORDER BY p.created_at DESC LIMIT $${paramCount} OFFSET $${paramCount + 1}`;
-    params.push(limit, offset);
-
-    const result = await query(queryText, params);
-    return result.rows;
+    return { rows: result.rows, total };
   },
 
   // Update product

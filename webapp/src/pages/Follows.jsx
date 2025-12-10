@@ -43,11 +43,15 @@ export default function Follows() {
 
       if (signal?.aborted) return { status: 'aborted' };
 
-      if (!subsError && subsResponse?.data) {
-        setSubscriptions(Array.isArray(subsResponse.data) ? subsResponse.data : []);
-      } else {
-        setSubscriptions([]);
+      if (subsError) {
+        if (import.meta.env.DEV) {
+          console.error('[Follows] Error loading subscriptions:', subsError);
+        }
+        // Return error so UI can show retry option
+        return { status: 'error', error: subsError || 'Failed to load subscriptions' };
       }
+
+      setSubscriptions(Array.isArray(subsResponse?.data) ? subsResponse.data : []);
 
       // Load follows (only for sellers with a shop)
       let shop = myShop;

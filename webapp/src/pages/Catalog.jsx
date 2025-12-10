@@ -212,13 +212,13 @@ export default function Catalog() {
           if (import.meta.env.DEV) {
             console.error('[Catalog] loadSubscriptions ERROR:', apiError);
           }
-          return { status: 'error', subscriptions: [] };
+          return { status: 'error', error: apiError, subscriptions: [] };
         }
 
         const subscriptions = Array.isArray(data?.data) ? data.data : [];
         return { status: 'success', subscriptions };
-      } catch {
-        return { status: 'error', subscriptions: [] };
+      } catch (err) {
+        return { status: 'error', error: err.message || 'Failed to load subscriptions', subscriptions: [] };
       }
     },
     [get]
@@ -385,6 +385,12 @@ export default function Catalog() {
           const subsResult = await loadSubscriptions(signal);
           if (signal.aborted) return;
 
+          // Check for subscription loading error first - show error, not empty state
+          if (subsResult.status === 'error') {
+            setError(subsResult.error || 'Failed to load subscriptions');
+            return;
+          }
+
           if (subsResult.subscriptions && subsResult.subscriptions.length > 0) {
             // Set first subscription as current shop
             const firstSub = subsResult.subscriptions[0];
@@ -499,17 +505,74 @@ export default function Catalog() {
   // H13 FIX: Use ref to store AbortController to prevent memory leak
   const retryControllerRef = useRef(null);
 
-  const handleRetry = () => {
+  const handleRetry = useCallback(async () => {
+    // 1. Reset states
     setError(null);
+    setNoShopsAvailable(false);
+
     // Abort previous retry if still pending
     if (retryControllerRef.current) {
       retryControllerRef.current.abort();
     }
     retryControllerRef.current = new AbortController();
+    const signal = retryControllerRef.current.signal;
+
+    // 2. Show loading
     setLoading(true);
-    // Re-triggering load manually
-    loadMyShop(retryControllerRef.current.signal).then(() => setLoading(false));
-  };
+
+    try {
+      // 3. Load shops
+      const shopResult = await loadMyShop(signal);
+      if (signal.aborted) return;
+
+      if (shopResult.status === 'error' && !currentShop) {
+        setError(shopResult.error);
+        setLoading(false);
+        return;
+      }
+
+      // 4. Determine target shop
+      let targetShop = currentShop || shopResult.shop;
+
+      // If no shop available, try subscriptions
+      if (!targetShop) {
+        const subsResult = await loadSubscriptions(signal);
+        if (signal.aborted) return;
+
+        if (subsResult.subscriptions && subsResult.subscriptions.length > 0) {
+          const firstSub = subsResult.subscriptions[0];
+          const subscriptionShop = {
+            id: firstSub.shop_id,
+            name: firstSub.shop_name,
+            logo: firstSub.shop_logo || null,
+            isOwned: false,
+          };
+          setCurrentShop(subscriptionShop);
+          targetShop = subscriptionShop;
+        } else {
+          setNoShopsAvailable(true);
+          setLoading(false);
+          return;
+        }
+      }
+
+      // 5. Load products for targetShop
+      const productsResult = await loadProducts(targetShop.id, signal);
+      if (signal.aborted) return;
+
+      if (productsResult.status === 'error') {
+        setError(productsResult.error);
+      }
+    } catch (err) {
+      if (!signal.aborted) {
+        setError(err.message || 'Failed to load data');
+      }
+    } finally {
+      if (!retryControllerRef.current?.signal.aborted) {
+        setLoading(false);
+      }
+    }
+  }, [currentShop, loadMyShop, loadSubscriptions, loadProducts, setCurrentShop]);
 
   // --- Renders ---
 

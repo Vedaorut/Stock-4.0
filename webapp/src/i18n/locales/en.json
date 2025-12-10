@@ -228,7 +228,8 @@
     "searchPlaceholder": "Search products...",
     "searchEmpty": "Nothing found",
     "searchEmptyDesc": "Try changing your search query",
-    "searchMinChars": "Enter at least 2 characters"
+    "searchMinChars": "Enter at least 2 characters",
+    "followsLoadError": "Failed to load follows"
   },
   "shop": {
     "products": "products",
@@ -610,7 +611,8 @@
     "switchToMonitorDesc": "Switch to monitor mode? Your markup settings will be saved.",
     "switchToResaleDesc": "Switch to resale mode? Products will be copied with your markup.",
     "deleteTitle": "Delete Subscription",
-    "deleteWarning": "Are you sure? All synced products will be removed. This cannot be undone."
+    "deleteWarning": "Are you sure? All synced products will be removed. This cannot be undone.",
+    "productsLoadError": "Failed to load products"
   },
   "dialogs": {
     "switchMode": "Switch",

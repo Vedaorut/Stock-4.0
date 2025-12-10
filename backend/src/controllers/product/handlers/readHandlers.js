@@ -67,10 +67,11 @@ export const list = asyncHandler(async (req, res) => {
       userId: req.user?.id,
     });
 
-    const products = await productQueries.list(filters);
+    const { rows: products, total } = await productQueries.list(filters);
 
     logger.info('[Products List] Results:', {
       count: products.length,
+      total,
       shopId: filters.shopId,
       productIds: products.map((p) => p.id),
     });
@@ -83,7 +84,7 @@ export const list = asyncHandler(async (req, res) => {
       pagination: {
         page,
         limit,
-        total: enrichedProducts.length,
+        total,
       },
     });
   } catch (error) {

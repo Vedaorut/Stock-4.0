@@ -50,6 +50,7 @@ export default function Subscriptions() {
   const [buyerSubscriptions, setBuyerSubscriptions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [followsError, setFollowsError] = useState(null);
   const [confirmUnsubscribe, setConfirmUnsubscribe] = useState(null);
   const { get, delete: del } = useApi();
   const toast = useToast();
@@ -122,25 +123,28 @@ export default function Subscriptions() {
 
         // 2. Load follows (subscriptions to other shops)
         if (shop) {
-          const { data: followsData, error: followsError } = await get('/follows/my', {
+          const { data: followsData, error: followsErr } = await get('/follows/my', {
             params: { shopId: shop.id },
             signal,
           });
 
           if (signal?.aborted) return { status: 'aborted' };
 
-          if (followsError) {
+          if (followsErr) {
             if (import.meta.env.DEV) {
-              console.error('[Subscriptions] Error loading follows:', followsError);
+              console.error('[Subscriptions] Error loading follows:', followsErr);
             }
-            // Don't fail completely, just show my shop without follows
+            // Set follows error state - user sees error UI with retry
+            setFollowsError(t('subscriptions.followsLoadError') || 'Failed to load follows');
             setFollows([]);
           } else {
             const followsList = Array.isArray(followsData?.data) ? followsData.data : [];
             setFollows(followsList);
+            setFollowsError(null);
           }
         } else {
           setFollows([]);
+          setFollowsError(null);
         }
 
         return { status: 'success' };
@@ -151,7 +155,7 @@ export default function Subscriptions() {
         return { status: 'error', error: err.message };
       }
     },
-    [get, setMyShops, viewMode]
+    [get, setMyShops, viewMode, t]
   );
 
   // Search products across subscriptions
@@ -330,6 +334,7 @@ export default function Subscriptions() {
 
     setLoading(true);
     setError(null);
+    setFollowsError(null);
 
     loadData(retryControllerRef.current.signal)
       .then((result) => {
@@ -344,6 +349,30 @@ export default function Subscriptions() {
         }
       });
   }, [loadData]);
+
+  // Handle retry follows only (seller mode)
+  const handleRetryFollows = useCallback(() => {
+    if (!myShop) return;
+
+    const controller = new AbortController();
+    setFollowsError(null);
+
+    get('/follows/my', {
+      params: { shopId: myShop.id },
+      signal: controller.signal,
+    }).then(({ data: followsData, error: followsErr }) => {
+      if (controller.signal.aborted) return;
+
+      if (followsErr) {
+        setFollowsError(t('subscriptions.followsLoadError') || 'Failed to load follows');
+        setFollows([]);
+      } else {
+        const followsList = Array.isArray(followsData?.data) ? followsData.data : [];
+        setFollows(followsList);
+        setFollowsError(null);
+      }
+    });
+  }, [myShop, get, t]);
 
   // Cleanup debounce timer
   useEffect(() => {
@@ -627,7 +656,27 @@ export default function Subscriptions() {
             )}
 
             {/* FOLLOWED SHOPS - subscriptions to other shops */}
-            {follows.map((follow, index) => (
+            {followsError ? (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-red-500/10 rounded-2xl p-6 text-center border border-red-500/20"
+              >
+                <div className="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center mx-auto mb-3">
+                  <svg className="w-6 h-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div className="text-red-400 text-sm mb-3">{followsError}</div>
+                <motion.button
+                  onClick={handleRetryFollows}
+                  className="px-4 py-2 bg-[#FF6B00] text-white text-sm font-semibold rounded-xl"
+                  whileTap={{ scale: 0.95 }}
+                >
+                  {t('common.retry')}
+                </motion.button>
+              </motion.div>
+            ) : follows.map((follow, index) => (
               <motion.div
                 key={follow.id}
                 onClick={() => handleFollowClick(follow)}
