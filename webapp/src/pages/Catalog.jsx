@@ -885,7 +885,6 @@ export default function Catalog() {
                 ? t('catalog.preorderEmptyDesc')
                 : t('catalog.emptyDesc')
             }
-            emptyIcon={activeSection === 'preorder' ? 'clock' : 'box'}
           />
         )}
       </div>
