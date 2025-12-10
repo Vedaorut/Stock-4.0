@@ -129,13 +129,12 @@ export const getFollowProducts = asyncHandler(async (req, res) => {
     const offset = Number.parseInt(req.query.offset, 10) || 0;
 
     if (follow.mode === 'monitor') {
-      const products = await productQueries.list({
+      const { rows: products, total } = await productQueries.list({
         shopId: follow.source_shop_id,
         limit,
         offset,
         isActive: true,
       });
-      const total = toNumber(follow.source_products_count, 0);
 
       return res.json({
         success: true,

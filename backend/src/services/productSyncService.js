@@ -173,7 +173,7 @@ async function generateUniqueName(baseName, shopId, existingNamesSet = null) {
   // Use provided set or load from DB (fallback for single-product operations)
   let existingNames = existingNamesSet;
   if (!existingNames) {
-    const existingProducts = await productQueries.list({ shopId, limit: 1000 });
+    const { rows: existingProducts } = await productQueries.list({ shopId, limit: 1000 });
     existingNames = new Set(existingProducts.map((p) => p.name.toLowerCase()));
   }
 
@@ -413,7 +413,7 @@ export async function syncAllProductsForFollow(followId) {
     }
 
     // Get all active products from source shop
-    const sourceProducts = await productQueries.list({
+    const { rows: sourceProducts } = await productQueries.list({
       shopId: follow.source_shop_id,
       isActive: true,
       limit: 1000,
@@ -430,7 +430,7 @@ export async function syncAllProductsForFollow(followId) {
 
     // OPTIMIZATION: Load existing product names ONCE before the loop
     // This eliminates N+1 query pattern (was: 100 products = 100 queries x 1000 rows)
-    const existingProducts = await productQueries.list({
+    const { rows: existingProducts } = await productQueries.list({
       shopId: follow.follower_shop_id,
       limit: 1000,
     });

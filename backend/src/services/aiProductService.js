@@ -265,7 +265,7 @@ export async function handleProductAI({ shop, message, history = [] }) {
   }
 
   const normalizedHistory = normalizeHistory(history);
-  const products = await productQueries.list({ shopId: shop.id, limit: 100 });
+  const { rows: products } = await productQueries.list({ shopId: shop.id, limit: 100 });
   const prompt = generateProductAIPrompt(shop.name, products);
 
   const response = await deepseekService.chat({
@@ -309,7 +309,8 @@ export async function handleProductAI({ shop, message, history = [] }) {
 
     if (result.operation === 'deleteProduct' || result.operation === 'bulkDeleteByNames') {
       // Reload product list after deletions
-      updatedProductsCache = await productQueries.list({ shopId: shop.id, limit: 100 });
+      const { rows: reloadedProducts } = await productQueries.list({ shopId: shop.id, limit: 100 });
+      updatedProductsCache = reloadedProducts;
     }
   }
 
