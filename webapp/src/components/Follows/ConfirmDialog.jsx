@@ -85,14 +85,12 @@ const ConfirmDialog = ({
               </motion.button>
 
               <motion.button
-                onClick={async (e) => {
+                onClick={(e) => {
                   e.stopPropagation();
-                  // Close dialog first, then execute
+                  // Close and execute in parallel - don't await
                   onClose();
-                  // Small delay to let dialog start closing
-                  await new Promise(r => setTimeout(r, 100));
-                  // Execute confirm logic
-                  await onConfirm();
+                  // Execute confirm logic immediately (don't await - let it run async)
+                  onConfirm();
                 }}
                 className={`flex-1 text-white font-semibold py-3.5 rounded-xl shadow-lg ${danger
                     ? 'bg-red-500 hover:bg-red-600 shadow-red-500/20'
