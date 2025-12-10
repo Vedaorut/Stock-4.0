@@ -323,11 +323,11 @@ export async function updateSyncedProduct(syncedProductId) {
     const markupValue = markupType === 'fixed' ? follow.markup_fixed : follow.markup_percentage;
     const newPrice = calculatePriceWithMarkup(sourceProduct.price, markupType, markupValue);
 
-    // Update synced product
+    // Update synced product (price and stock only, keep is_active independent)
     await productQueries.update(syncRecord.synced_product_id, {
       price: newPrice,
       stockQuantity: sourceProduct.stock_quantity,
-      isActive: sourceProduct.is_active,
+      // NOTE: is_active NOT synced - follower controls their own product visibility
     });
 
     // Update last synced timestamp
