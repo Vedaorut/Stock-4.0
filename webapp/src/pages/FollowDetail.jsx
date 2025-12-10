@@ -239,6 +239,12 @@ export default function FollowDetail() {
     const newMode = follow.mode === 'monitor' ? 'resell' : 'monitor';
     triggerHaptic('medium');
 
+    console.log('[FollowDetail] handleSwitchMode triggered', {
+      followId: followDetailId,
+      currentMode: follow.mode,
+      targetMode: newMode
+    });
+
     if (import.meta.env.DEV) {
       console.log('[FollowDetail] handleSwitchMode start', {
         followId: followDetailId,
@@ -413,8 +419,8 @@ export default function FollowDetail() {
                   <div className="flex items-center gap-2 mt-1 flex-wrap">
                     <span
                       className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${mode === 'resell'
-                          ? 'bg-[#FF6B00]/10 text-[#FF6B00] border-[#FF6B00]/20'
-                          : 'bg-blue-500/10 text-blue-400 border-blue-500/20'
+                        ? 'bg-[#FF6B00]/10 text-[#FF6B00] border-[#FF6B00]/20'
+                        : 'bg-blue-500/10 text-blue-400 border-blue-500/20'
                         }`}
                     >
                       {mode === 'resell' ? t('followDetail.resale') : t('followDetail.monitor')}
@@ -438,19 +444,19 @@ export default function FollowDetail() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1 }}
             >
-                      <ActionsList
-                        mode={mode}
-                        markup={displayMarkup}
-                        markupType={markupType}
-                        onEditMarkup={() => {
-                          if (!isResellMode) return;
-                          triggerHaptic('light');
-                          setIsMarkupModalOpen(true);
-                        }}
-                        onSwitchMode={() => {
-                          triggerHaptic('light');
-                          setIsSwitchModeDialogOpen(true);
-                        }}
+              <ActionsList
+                mode={mode}
+                markup={displayMarkup}
+                markupType={markupType}
+                onEditMarkup={() => {
+                  if (!isResellMode) return;
+                  triggerHaptic('light');
+                  setIsMarkupModalOpen(true);
+                }}
+                onSwitchMode={() => {
+                  triggerHaptic('light');
+                  setIsSwitchModeDialogOpen(true);
+                }}
                 onDelete={() => {
                   triggerHaptic('light');
                   setIsDeleteDialogOpen(true);
@@ -485,27 +491,41 @@ export default function FollowDetail() {
                     {t('common.retry')}
                   </motion.button>
                 </div>
-                  ) : products.length === 0 ? (
-                    <div className="bg-white/5 rounded-2xl p-6 text-center border border-white/5">
-                      <div className="text-white/30 text-sm">
-                        {isResellMode ? t('followDetail.noSyncedProducts') : t('followDetail.noProducts')}
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {products.map((product) => {
-                        const productName = product.synced_product?.name || product.source_product?.name || product.name;
-                        const originalPrice = parseFloat(product.source_product?.price || product.original_price || product.price || 0);
-                        const currentPrice = parseFloat(product.synced_product?.price || product.price || originalPrice);
-                        const stockQty = product.synced_product?.stock_quantity ?? product.stock_quantity ?? 0;
+              ) : products.length === 0 ? (
+                <div className="bg-white/5 rounded-2xl p-6 text-center border border-white/5">
+                  <div className="text-white/30 text-sm">
+                    {isResellMode ? t('followDetail.noSyncedProducts') : t('followDetail.noProducts')}
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {products.map((product) => {
+                    // FIX: Robust data fallback for Monitor mode vs Resell mode
+                    const isMonitor = !isResellMode;
+
+                    // Name: Try synced -> source -> direct
+                    const productName = product.synced_product?.name || product.source_product?.name || product.name || 'Unknown Product';
+
+                    // Price: Try synced -> source -> direct
+                    // In monitor mode, we might just have 'price' on the product object itself if it's a raw listing
+                    const rawOriginalPrice = product.source_product?.price || product.original_price || product.price || 0;
+                    const originalPrice = parseFloat(rawOriginalPrice);
+
+                    // Current Price (what we sell for): 
+                    // In resell mode: synced_product.price
+                    // In monitor mode: same as original
+                    const rawCurrentPrice = product.synced_product?.price || product.price || originalPrice;
+                    const currentPrice = parseFloat(rawCurrentPrice);
+
+                    // Stock:
+                    const stockQty = product.synced_product?.stock_quantity ?? product.source_product?.stock_quantity ?? product.stock_quantity ?? 0;
 
                     return (
                       <motion.div
                         key={product.id}
                         onClick={isResellMode ? () => handleProductClick(product) : undefined}
-                        className={`bg-white/5 rounded-2xl p-4 border border-white/5 transition-colors ${
-                          isResellMode ? 'hover:bg-white/[0.07] cursor-pointer active:scale-[0.98]' : ''
-                        }`}
+                        className={`bg-white/5 rounded-2xl p-4 border border-white/5 transition-colors ${isResellMode ? 'hover:bg-white/[0.07] cursor-pointer active:scale-[0.98]' : ''
+                          }`}
                         whileTap={isResellMode ? { scale: 0.98 } : undefined}
                       >
                         <div className="flex items-center justify-between">
