@@ -197,8 +197,9 @@ export default function FollowsModal({ isOpen, onClose }) {
       const res = await fetchApi(`/shops/search?q=${encodeURIComponent(searchQuery.trim())}`, {
         signal: searchAbortControllerRef.current.signal,
       });
-      setSearchResults(res.data || []);
-      if (res.data.length === 0) {
+      const results = res.data || [];
+      setSearchResults(results);
+      if (results.length === 0) {
         await alert(t('follows.notFound'));
       }
     } catch (error) {

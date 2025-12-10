@@ -300,6 +300,12 @@ const handleRoleToggle = async (ctx) => {
     });
   } catch (error) {
     logger.error('Error in role toggle handler:', error);
+    // Always answer callback to prevent UI hang
+    try {
+      await ctx.answerCbQuery();
+    } catch {
+      // Ignore if already answered
+    }
     const lang = getLangSafe(ctx);
     const { general: generalMessages } = getMessages(lang);
     try {

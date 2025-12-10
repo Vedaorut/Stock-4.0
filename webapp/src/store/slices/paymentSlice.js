@@ -190,7 +190,10 @@ export const createPaymentSlice = (set, get) => ({
       });
 
       // Normalize order (PostgreSQL DECIMAL fields come as strings)
-      const order = normalizeOrder(response.data.data);
+      const order = normalizeOrder(response.data?.data);
+      if (!order) {
+        throw new Error('Invalid server response: missing order data');
+      }
       set({
         currentOrder: order,
       });
@@ -320,7 +323,10 @@ export const createPaymentSlice = (set, get) => ({
           }
         );
 
-        const paymentInfo = response.data.data;
+        const paymentInfo = response.data?.data;
+        if (!paymentInfo) {
+          throw new Error('Invalid server response: missing payment info');
+        }
 
         // Ensure amount is NUMBER (backend might return string from PostgreSQL)
         const cryptoAmount = parseFloat(paymentInfo.amount);
