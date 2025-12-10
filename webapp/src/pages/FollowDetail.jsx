@@ -235,7 +235,13 @@ export default function FollowDetail() {
 
   // Handle mode switch
   const handleSwitchMode = useCallback(async () => {
-    if (!followDetailId || !follow) return;
+    // Debug: log at very start
+    console.log('[FollowDetail] handleSwitchMode CALLED', { followDetailId, hasFollow: !!follow });
+
+    if (!followDetailId || !follow) {
+      console.log('[FollowDetail] handleSwitchMode EARLY RETURN - missing data');
+      return;
+    }
     const newMode = follow.mode === 'monitor' ? 'resell' : 'monitor';
     triggerHaptic('medium');
 
