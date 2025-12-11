@@ -136,7 +136,10 @@ export const switchFollowMode = asyncHandler(async (req, res) => {
         await productQueries.bulkDeleteByIds(syncedProductIds, existingFollow.follower_shop_id);
         await syncedProductQueries.deleteByFollowId(followId);
       }
-      await shopFollowQueries.updateMarkup(followId, 0, 'percentage', 0);
+      // FIX: Update mode AND markup atomically to satisfy DB constraint
+      // shop_follows_markup_percentage_check requires markup >= 0.1 when mode = 'resell'
+      // So we must change mode to 'monitor' in the SAME query as setting markup to 0
+      await shopFollowQueries.updateModeWithMarkup(followId, 'monitor', 0, 'percentage', 0);
     }
 
     if (normalizedMode === 'resell') {
@@ -172,8 +175,9 @@ export const switchFollowMode = asyncHandler(async (req, res) => {
           // Don't throw - mode is already updated, sync failure shouldn't block response
         }
       }
-    } else {
-      // For monitor mode, just update the mode
+    } else if (normalizedMode === 'monitor' && existingFollow.mode !== 'resell') {
+      // For monitor mode when NOT coming from resell (e.g., re-confirming monitor mode)
+      // updateModeWithMarkup was already called above for resell→monitor transition
       await shopFollowQueries.updateMode(followId, normalizedMode);
     }
 
