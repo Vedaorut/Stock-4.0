@@ -89,16 +89,28 @@ const ConfirmDialog = ({
                   e.stopPropagation();
                   e.preventDefault();
 
+                  console.log('[ConfirmDialog] Confirm button clicked', {
+                    onConfirmType: typeof onConfirm,
+                    onCloseType: typeof onClose,
+                    title,
+                  });
+
                   // Execute FIRST with fresh data, then close
                   if (typeof onConfirm === 'function') {
                     try {
+                      console.log('[ConfirmDialog] Calling onConfirm...');
                       await onConfirm();
+                      console.log('[ConfirmDialog] onConfirm completed successfully');
                     } catch (err) {
-                      console.error('[ConfirmDialog] Error:', err);
+                      console.error('[ConfirmDialog] onConfirm threw error:', err);
                     }
+                  } else {
+                    console.warn('[ConfirmDialog] onConfirm is not a function!', { onConfirm });
                   }
 
+                  console.log('[ConfirmDialog] Calling onClose...');
                   onClose();
+                  console.log('[ConfirmDialog] onClose completed');
                 }}
                 className={`flex-1 text-white font-semibold py-3.5 rounded-xl shadow-lg ${danger
                     ? 'bg-red-500 hover:bg-red-600 shadow-red-500/20'

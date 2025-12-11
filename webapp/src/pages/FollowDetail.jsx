@@ -272,42 +272,75 @@ export default function FollowDetail() {
 
   // Handle mode switch
   const handleSwitchMode = useCallback(async () => {
+    console.log('[handleSwitchMode] START', {
+      followDetailId,
+      followFromState: follow,
+      followRefCurrent: followRef.current,
+      followRefMode: followRef.current?.mode,
+    });
+
     const currentFollowId = followDetailId || useStore.getState().followDetailId;
     const currentFollow = followRef.current;
 
-    if (!currentFollowId || !currentFollow) return;
+    console.log('[handleSwitchMode] After getting values', {
+      currentFollowId,
+      currentFollow,
+      currentFollowMode: currentFollow?.mode,
+    });
+
+    if (!currentFollowId || !currentFollow) {
+      console.log('[handleSwitchMode] EARLY RETURN - missing data', { currentFollowId, currentFollow });
+      return;
+    }
 
     const newMode = currentFollow.mode === 'monitor' ? 'resell' : 'monitor';
+    console.log('[handleSwitchMode] Mode calculation', {
+      currentMode: currentFollow.mode,
+      newMode,
+      conditionResult: currentFollow.mode === 'monitor',
+    });
+
     triggerHaptic('medium');
 
     // Resell: open markup modal (API call happens when user saves)
     if (newMode === 'resell') {
+      console.log('[handleSwitchMode] Opening MarkupModal for resell');
       setIsMarkupModalOpen(true);
       return;
     }
 
     // Monitor: call API directly
+    console.log('[handleSwitchMode] Calling API for monitor mode', { currentFollowId, newMode });
     try {
       const response = await switchMode(currentFollowId, newMode, null);
+      console.log('[handleSwitchMode] API response', { response, responseData: response?.data });
+
       const followData = response?.data?.data || response?.data;
+      console.log('[handleSwitchMode] Extracted followData', { followData });
+
       if (followData) {
         setFollow(followData);
         followRef.current = followData;
+        console.log('[handleSwitchMode] Updated follow state with API data');
       } else {
         setFollow((prev) => {
           const updated = { ...prev, mode: newMode };
           followRef.current = updated;
+          console.log('[handleSwitchMode] Updated follow state manually', { prev, updated });
           return updated;
         });
       }
       // Reload products to show source shop products in monitor mode
+      console.log('[handleSwitchMode] Reloading products...');
       await loadProducts();
+      console.log('[handleSwitchMode] Products reloaded, triggering success haptic');
       triggerHaptic('success');
-    } catch (_err) {
+    } catch (err) {
+      console.error('[handleSwitchMode] ERROR', { error: err, message: err?.message });
       triggerHaptic('error');
       showToast(t('follows.modeError') || 'Failed to switch mode', 'error');
     }
-  }, [followDetailId, switchMode, triggerHaptic, loadProducts, showToast, t]);
+  }, [followDetailId, follow, switchMode, triggerHaptic, loadProducts, showToast, t]);
 
   // Handle delete
   const handleDelete = useCallback(async () => {
