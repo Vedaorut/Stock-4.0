@@ -300,12 +300,14 @@ export default function FollowDetail() {
           return updated;
         });
       }
+      // Reload products to show source shop products in monitor mode
+      await loadProducts();
       triggerHaptic('success');
     } catch (_err) {
       triggerHaptic('error');
       showToast(t('follows.modeError') || 'Failed to switch mode', 'error');
     }
-  }, [followDetailId, switchMode, triggerHaptic, showToast, t]);
+  }, [followDetailId, switchMode, triggerHaptic, loadProducts, showToast, t]);
 
   // Handle delete
   const handleDelete = useCallback(async () => {
