@@ -4,6 +4,8 @@ import { useStore } from '../../store/useStore';
 import { useShallow } from 'zustand/react/shallow';
 import { useTelegram } from '../../hooks/useTelegram';
 import { useTranslation } from '../../i18n/useTranslation';
+import { useToast } from '../../hooks/useToast';
+import PendingOrderBadge from './PendingOrderBadge';
 
 // --- Premium Animated Icons ---
 const Icons = {
@@ -385,7 +387,9 @@ const TabBar = memo(function TabBar() {
         setPaymentStep,
         hasFollows,
         setFollowDetailId,
-        viewMode
+        viewMode,
+        pendingOrders,
+        resumePayment
     } = useStore(
         useShallow((state) => ({
             activeTab: state.activeTab,
@@ -396,8 +400,50 @@ const TabBar = memo(function TabBar() {
             hasFollows: state.hasFollows,
             setFollowDetailId: state.setFollowDetailId,
             viewMode: state.viewMode,
+            pendingOrders: state.pendingOrders,
+            resumePayment: state.resumePayment,
         }))
     );
+
+    // Get first pending order (most recent)
+    const activePendingOrder = useMemo(() => pendingOrders?.[0], [pendingOrders]);
+
+    // Timer for reactive expiration check (updates every 30s)
+    const [now, setNow] = useState(Date.now());
+    useEffect(() => {
+        if (!activePendingOrder?.expiresAt) return;
+        const interval = setInterval(() => setNow(Date.now()), 30000);
+        return () => clearInterval(interval);
+    }, [activePendingOrder?.expiresAt]);
+
+    // Check if expiring soon (< 10 minutes) - reactive with timer
+    const isExpiringSoon = useMemo(() => {
+        if (!activePendingOrder?.expiresAt) return false;
+        return new Date(activePendingOrder.expiresAt) - now < 10 * 60 * 1000;
+    }, [activePendingOrder, now]);
+
+    // Toast for error feedback
+    const toast = useToast();
+
+    // Handler for pending order click - use fresh state to avoid stale closure
+    const handlePendingOrderClick = useCallback(() => {
+        const currentPending = pendingOrders?.[0];
+        if (currentPending) {
+            triggerHaptic('medium');
+            const result = resumePayment(currentPending.id);
+
+            // Handle errors with toast feedback
+            if (result && !result.success) {
+                if (result.error === 'ORDER_EXPIRED') {
+                    toast.error(t('payment.orderExpired') || 'Order has expired');
+                    triggerHaptic('error');
+                } else if (result.error === 'MISSING_PAYMENT_DATA') {
+                    toast.error(t('payment.cannotResume') || 'Cannot resume payment');
+                    triggerHaptic('error');
+                }
+            }
+        }
+    }, [pendingOrders, triggerHaptic, resumePayment, toast, t]);
 
     const tabs = useMemo(() => {
         const list = [
@@ -448,6 +494,32 @@ const TabBar = memo(function TabBar() {
                 delay: 0.1
             }}
         >
+            {/* Pending Order Badge - positioned above TabBar */}
+            <AnimatePresence>
+                {activePendingOrder && (
+                    <motion.div
+                        initial={{ opacity: 0, y: 20, scale: 0.8 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 10, scale: 0.9 }}
+                        transition={{
+                            type: 'spring',
+                            stiffness: 400,
+                            damping: 30
+                        }}
+                        className="absolute right-4 -top-14 z-10"
+                    >
+                        <PendingOrderBadge
+                            order={{
+                                ...activePendingOrder,
+                                count: pendingOrders?.length || 1
+                            }}
+                            onClick={handlePendingOrderClick}
+                            isExpiringSoon={isExpiringSoon}
+                        />
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
             {/* Main glass container - Floating style */}
             <div
                 className="relative mx-auto w-full max-w-lg overflow-hidden"

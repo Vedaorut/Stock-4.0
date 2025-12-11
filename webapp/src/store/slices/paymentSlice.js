@@ -457,6 +457,7 @@ export const createPaymentSlice = (set, get) => ({
         if (response.data.success) {
           // Payment submitted - status is 'pending' until blockchain confirms
           // Show success UI, verification happens in background
+          const { paymentWallet, cryptoAmount, invoiceExpiresAt } = get();
           const submittedOrder = normalizeOrder({
             ...currentOrder,
             crypto: selectedCrypto,
@@ -464,6 +465,10 @@ export const createPaymentSlice = (set, get) => ({
             paymentId: response.data.data?.paymentId,
             status: 'pending', // Will become 'confirmed' after blockchain verification
             submittedAt: new Date().toISOString(),
+            // Store payment details for resumePayment functionality
+            walletAddress: paymentWallet,
+            cryptoAmount: cryptoAmount,
+            expiresAt: invoiceExpiresAt,
           });
 
           set({
@@ -604,5 +609,62 @@ export const createPaymentSlice = (set, get) => ({
         return orderIdNum === normalizedId ? { ...order, status } : order;
       }),
     }));
+  },
+
+  // Resume payment for a pending order (when user clicks badge)
+  resumePayment: (orderId) => {
+    const state = get();
+
+    // Normalize orderId for comparison
+    const normalizedId = typeof orderId === 'string' ? parseInt(orderId, 10) : orderId;
+
+    // Find the pending order
+    const pendingOrder = state.pendingOrders.find((o) => {
+      const orderIdNum = typeof o.id === 'string' ? parseInt(o.id, 10) : o.id;
+      return orderIdNum === normalizedId;
+    });
+
+    if (!pendingOrder) {
+      if (import.meta.env.DEV) {
+        console.error('[Payment] Pending order not found:', orderId);
+      }
+      return false;
+    }
+
+    // Check if order has required payment data
+    if (!pendingOrder.walletAddress || !pendingOrder.cryptoAmount) {
+      if (import.meta.env.DEV) {
+        console.error('[Payment] Pending order missing payment data:', pendingOrder);
+      }
+      // Remove invalid order from pendingOrders so badge disappears
+      get().removePendingOrder(orderId);
+      return { success: false, error: 'MISSING_PAYMENT_DATA' };
+    }
+
+    // Check if order has expired
+    if (pendingOrder.expiresAt && new Date(pendingOrder.expiresAt) < new Date()) {
+      if (import.meta.env.DEV) {
+        console.error('[Payment] Pending order expired:', orderId);
+      }
+      // Remove expired order
+      get().removePendingOrder(orderId);
+      return { success: false, error: 'ORDER_EXPIRED' };
+    }
+
+    // Restore payment state - go directly to payment details screen
+    set({
+      currentOrder: pendingOrder,
+      selectedCrypto: pendingOrder.crypto,
+      paymentWallet: pendingOrder.walletAddress,
+      cryptoAmount: pendingOrder.cryptoAmount,
+      invoiceExpiresAt: pendingOrder.expiresAt || null,
+      paymentStep: 'details', // Go directly to payment details
+      verifyError: null,
+      isVerifying: false,
+      isCreatingOrder: false,
+      isGeneratingInvoice: false,
+    });
+
+    return { success: true };
   },
 });
