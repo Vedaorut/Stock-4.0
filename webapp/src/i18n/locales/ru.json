@@ -229,12 +229,7 @@
     "searchEmpty": "Ничего не найдено",
     "searchEmptyDesc": "Попробуйте изменить запрос",
     "searchMinChars": "Введите минимум 2 символа",
-    "followsLoadError": "Не удалось загрузить подписки",
-    "mySubscribers": "Мои подписчики",
-    "subscribersCount": "{count} подписчиков",
-    "noSubscribers": "Пока нет подписчиков",
-    "noSubscribersDesc": "Поделитесь ссылкой на магазин",
-    "subscribedAt": "Подписан"
+    "followsLoadError": "Не удалось загрузить подписки"
   },
   "shop": {
     "products": "товаров",

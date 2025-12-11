@@ -229,12 +229,7 @@
     "searchEmpty": "Nothing found",
     "searchEmptyDesc": "Try changing your search query",
     "searchMinChars": "Enter at least 2 characters",
-    "followsLoadError": "Failed to load follows",
-    "mySubscribers": "My Subscribers",
-    "subscribersCount": "{count} subscribers",
-    "noSubscribers": "No subscribers yet",
-    "noSubscribersDesc": "Share your shop invite link",
-    "subscribedAt": "Subscribed"
+    "followsLoadError": "Failed to load follows"
   },
   "shop": {
     "products": "products",

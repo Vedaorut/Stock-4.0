@@ -45,13 +45,9 @@ function SearchResultItem({ product, onClick }) {
 }
 
 export default function Subscriptions() {
-  const [myShop, setMyShop] = useState(null);
-  const [follows, setFollows] = useState([]);
-  const [subscribers, setSubscribers] = useState([]);
   const [buyerSubscriptions, setBuyerSubscriptions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [followsError, setFollowsError] = useState(null);
   const [confirmUnsubscribe, setConfirmUnsubscribe] = useState(null);
   const { get, delete: del } = useApi();
   const toast = useToast();
@@ -70,8 +66,6 @@ export default function Subscriptions() {
   const { triggerHaptic } = useTelegram();
   const { t } = useTranslation();
   const token = useStore((state) => state.token);
-  const viewMode = useStore((state) => state.viewMode);
-  const setMyShops = useStore((state) => state.setMyShops);
 
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
@@ -84,78 +78,20 @@ export default function Subscriptions() {
   const loadData = useCallback(
     async (signal) => {
       try {
-        // BUYER MODE: fetch user's subscriptions to shops
-        if (viewMode === 'buyer') {
-          const { data: subsData, error: subsError } = await get('/users/subscriptions', { signal });
-
-          if (signal?.aborted) return { status: 'aborted' };
-
-          if (subsError) {
-            if (import.meta.env.DEV) {
-              console.error('[Subscriptions] Error loading buyer subscriptions:', subsError);
-            }
-            return { status: 'error', error: 'Failed to load subscriptions' };
-          }
-
-          const subsList = Array.isArray(subsData?.data) ? subsData.data : [];
-          setBuyerSubscriptions(subsList);
-
-          return { status: 'success' };
-        }
-
-        // SELLER MODE: existing logic
-        // 1. Load my shop
-        const { data: shopsData, error: shopsError } = await get('/shops/my', { signal });
+        // Load user's subscriptions to shops (same for both modes)
+        const { data: subsData, error: subsError } = await get('/users/subscriptions', { signal });
 
         if (signal?.aborted) return { status: 'aborted' };
 
-        if (shopsError) {
+        if (subsError) {
           if (import.meta.env.DEV) {
-            console.error('[Subscriptions] Error loading shops:', shopsError);
+            console.error('[Subscriptions] Error loading subscriptions:', subsError);
           }
-          return { status: 'error', error: 'Failed to load data' };
+          return { status: 'error', error: 'Failed to load subscriptions' };
         }
 
-        const shops = Array.isArray(shopsData?.data) ? shopsData.data : [];
-        const shop = shops[0] || null;
-
-        setMyShop(shop);
-        setMyShops(shops); // Save to global store
-
-        // 2. Load follows (subscriptions to other shops) and subscribers (who subscribed to my shop)
-        if (shop) {
-          // Load follows and subscribers in parallel
-          const [followsResult, subscribersResult] = await Promise.all([
-            get('/follows/my', { params: { shopId: shop.id }, signal }),
-            get(`/shops/${shop.id}/subscribers`, { signal }),
-          ]);
-
-          if (signal?.aborted) return { status: 'aborted' };
-
-          // Handle follows
-          if (followsResult.error) {
-            if (import.meta.env.DEV) {
-              console.error('[Subscriptions] Error loading follows:', followsResult.error);
-            }
-            setFollowsError(t('subscriptions.followsLoadError') || 'Failed to load follows');
-            setFollows([]);
-          } else {
-            const followsList = Array.isArray(followsResult.data?.data) ? followsResult.data.data : [];
-            setFollows(followsList);
-            setFollowsError(null);
-          }
-
-          // Handle subscribers
-          if (!subscribersResult.error && subscribersResult.data?.data) {
-            setSubscribers(subscribersResult.data.data);
-          } else {
-            setSubscribers([]);
-          }
-        } else {
-          setFollows([]);
-          setSubscribers([]);
-          setFollowsError(null);
-        }
+        const subsList = Array.isArray(subsData?.data) ? subsData.data : [];
+        setBuyerSubscriptions(subsList);
 
         return { status: 'success' };
       } catch (err) {
@@ -165,7 +101,7 @@ export default function Subscriptions() {
         return { status: 'error', error: err.message };
       }
     },
-    [get, setMyShops, viewMode, t]
+    [get]
   );
 
   // Search products across subscriptions
@@ -177,10 +113,9 @@ export default function Subscriptions() {
     setIsSearching(true);
     try {
       const { data, error } = await get('/products/search', {
-        params: { 
+        params: {
           query: query.trim(),
-          subscriptions: viewMode === 'buyer' ? 'true' : 'false',
-          follows: viewMode === 'seller' ? 'true' : 'false',
+          subscriptions: 'true',
           limit: 20
         }
       });
@@ -194,7 +129,7 @@ export default function Subscriptions() {
     } finally {
       setIsSearching(false);
     }
-  }, [get, viewMode]);
+  }, [get]);
 
   const handleSearchChange = useCallback((e) => {
     const query = e.target.value;
@@ -240,10 +175,7 @@ export default function Subscriptions() {
     }
 
     // OPTIMIZATION: Only show loading if no cached data exists
-    const hasExistingData = viewMode === 'buyer'
-      ? buyerSubscriptions.length > 0
-      : (myShop !== null || follows.length > 0);
-    if (!hasExistingData) {
+    if (buyerSubscriptions.length === 0) {
       setLoading(true);
     }
     setError(null);
@@ -266,31 +198,7 @@ export default function Subscriptions() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- cached data check is for initial render only
   }, [token, loadData]);
 
-  // Click on MY shop (seller mode)
-  const handleMyShopClick = () => {
-    triggerHaptic('medium');
-    const { setCurrentShop, setActiveTab } = useStore.getState();
-
-    setCurrentShop(null); // null = show my shop in Catalog
-    setActiveTab('catalog');
-  };
-
-  // Click on followed shop (seller mode - subscription to other shop)
-  const handleFollowClick = (follow) => {
-    triggerHaptic('medium');
-    const { setCurrentShop, setActiveTab } = useStore.getState();
-
-    setCurrentShop({
-      id: follow.source_shop_id,
-      name: follow.source_shop_name,
-      logo: null,
-      isOwned: false, // This is NOT my shop
-    });
-
-    setActiveTab('catalog');
-  };
-
-  // Click on buyer subscription (buyer mode - navigate to shop catalog)
+  // Click on subscription - navigate to shop catalog
   const handleBuyerSubscriptionClick = (sub) => {
     triggerHaptic('medium');
     const { setCurrentShop, setActiveTab } = useStore.getState();
@@ -344,7 +252,6 @@ export default function Subscriptions() {
 
     setLoading(true);
     setError(null);
-    setFollowsError(null);
 
     loadData(retryControllerRef.current.signal)
       .then((result) => {
@@ -359,30 +266,6 @@ export default function Subscriptions() {
         }
       });
   }, [loadData]);
-
-  // Handle retry follows only (seller mode)
-  const handleRetryFollows = useCallback(() => {
-    if (!myShop) return;
-
-    const controller = new AbortController();
-    setFollowsError(null);
-
-    get('/follows/my', {
-      params: { shopId: myShop.id },
-      signal: controller.signal,
-    }).then(({ data: followsData, error: followsErr }) => {
-      if (controller.signal.aborted) return;
-
-      if (followsErr) {
-        setFollowsError(t('subscriptions.followsLoadError') || 'Failed to load follows');
-        setFollows([]);
-      } else {
-        const followsList = Array.isArray(followsData?.data) ? followsData.data : [];
-        setFollows(followsList);
-        setFollowsError(null);
-      }
-    });
-  }, [myShop, get, t]);
 
   // Cleanup debounce timer
   useEffect(() => {
@@ -426,10 +309,8 @@ export default function Subscriptions() {
     return () => document.removeEventListener('visibilitychange', handleVisibility);
   }, [token, loading, loadData]);
 
-  // Determine if we have data based on mode
-  const hasData = viewMode === 'buyer'
-    ? buyerSubscriptions.length > 0
-    : (myShop || follows.length > 0 || subscribers.length > 0);
+  // Determine if we have data (same for both modes now)
+  const hasData = buyerSubscriptions.length > 0;
 
   return (
     <div
@@ -569,8 +450,8 @@ export default function Subscriptions() {
             <h3 className="text-xl font-bold text-white mb-2">{t('subscriptions.empty')}</h3>
             <p className="text-white/50 text-sm max-w-[240px] leading-relaxed">{t('subscriptions.emptyDesc')}</p>
           </div>
-        ) : viewMode === 'buyer' ? (
-          // BUYER MODE: Show subscriptions to shops
+        ) : (
+          // Show subscriptions to shops (same for both modes)
           <div className="space-y-4">
             {buyerSubscriptions.map((sub, index) => (
               <motion.div
@@ -624,151 +505,6 @@ export default function Subscriptions() {
                 </div>
               </motion.div>
             ))}
-          </div>
-        ) : (
-          // SELLER MODE: Show my shop + follows
-          <div className="space-y-4">
-            {/* MY SHOP - always on top */}
-            {myShop && (
-              <motion.div
-                onClick={handleMyShopClick}
-                className="glass-card rounded-2xl p-6 cursor-pointer min-h-[90px] border border-orange-primary/30"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                whileHover={{ scale: 1.01, y: -2 }}
-                whileTap={{ scale: 0.99 }}
-                transition={{ duration: 0.2 }}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <h3
-                      className="text-xl font-bold text-white"
-                      style={{ letterSpacing: '-0.01em' }}
-                    >
-                      {myShop.name}
-                    </h3>
-                  </div>
-                  <svg
-                    className="w-6 h-6 text-orange-primary flex-shrink-0 ml-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2.5}
-                      d="M9 5l7 7-7 7"
-                    />
-                  </svg>
-                </div>
-              </motion.div>
-            )}
-
-            {/* FOLLOWED SHOPS - subscriptions to other shops */}
-            {followsError ? (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="bg-red-500/10 rounded-2xl p-6 text-center border border-red-500/20"
-              >
-                <div className="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center mx-auto mb-3">
-                  <svg className="w-6 h-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <div className="text-red-400 text-sm mb-3">{followsError}</div>
-                <motion.button
-                  onClick={handleRetryFollows}
-                  className="px-4 py-2 bg-[#FF6B00] text-white text-sm font-semibold rounded-xl"
-                  whileTap={{ scale: 0.95 }}
-                >
-                  {t('common.retry')}
-                </motion.button>
-              </motion.div>
-            ) : follows.map((follow, index) => (
-              <motion.div
-                key={follow.id}
-                onClick={() => handleFollowClick(follow)}
-                className="glass-card rounded-2xl p-6 cursor-pointer min-h-[90px]"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                whileHover={{ scale: 1.01, y: -2 }}
-                whileTap={{ scale: 0.99 }}
-                transition={{ duration: 0.2, delay: index * 0.05 }}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex-1 space-y-2">
-                    <h3
-                      className="text-xl font-bold text-white"
-                      style={{ letterSpacing: '-0.01em' }}
-                    >
-                      {follow.source_shop_name}
-                    </h3>
-                    <div className="flex items-center gap-2">
-                      <span className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-blue-500/20 text-blue-400">
-                        {follow.source_products_count || 0} {t('common.products')}
-                      </span>
-                    </div>
-                  </div>
-                  <svg
-                    className="w-6 h-6 text-orange-primary flex-shrink-0 ml-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2.5}
-                      d="M9 5l7 7-7 7"
-                    />
-                  </svg>
-                </div>
-              </motion.div>
-            ))}
-
-            {/* MY SUBSCRIBERS - who subscribed to my shop */}
-            {subscribers.length > 0 && (
-              <div className="mt-8">
-                <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">
-                  {t('subscriptions.mySubscribers')} ({subscribers.length})
-                </h3>
-                <div className="space-y-3">
-                  {subscribers.map((sub, index) => (
-                    <motion.div
-                      key={sub.id}
-                      className="glass-card rounded-xl p-4"
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.2, delay: index * 0.03 }}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-primary/20 to-orange-primary/5 flex items-center justify-center">
-                          <span className="text-orange-primary font-semibold text-sm">
-                            {(sub.first_name?.[0] || sub.username?.[0] || '?').toUpperCase()}
-                          </span>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-white font-medium truncate">
-                            {sub.first_name || sub.username || 'User'}
-                            {sub.last_name ? ` ${sub.last_name}` : ''}
-                          </p>
-                          {sub.username && (
-                            <p className="text-xs text-gray-500 truncate">@{sub.username}</p>
-                          )}
-                        </div>
-                        <div className="text-right">
-                          <p className="text-xs text-gray-500">
-                            {new Date(sub.created_at).toLocaleDateString()}
-                          </p>
-                        </div>
-                      </div>
-                    </motion.div>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
         )}
       </div>
