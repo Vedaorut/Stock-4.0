@@ -319,14 +319,14 @@ const paySubscriptionScene = new Scenes.WizardScene(
         `<i>${t('paySubscription.emailHint', {}, lang)}</i>`,
         '',
         t('paySubscription.clickToPay', {}, lang),
+        '',
+        `✅ ${t('paySubscription.autoActivationNotice', {}, lang)}`,
       ].join('\n');
 
       await ctx.editMessageText(message, {
         parse_mode: 'HTML',
         ...Markup.inlineKeyboard([
           [Markup.button.url(t('paySubscription.payButton', {}, lang), invoiceResponse.paymentUrl)],
-          // P0-4 FIX: Add check payment button
-          [Markup.button.callback(t('buttons.checkPayment', {}, lang) || '🔄 Check Payment', 'subscription:check_payment')],
           [Markup.button.callback(t('buttons.cancel', {}, lang), 'seller:menu')],
         ]),
       });
@@ -374,143 +374,7 @@ const paySubscriptionScene = new Scenes.WizardScene(
       return;
     }
 
-    // Handle check payment status
-    if (data === 'subscription:check_payment') {
-      // Answer callback immediately, ignore timeout errors
-      try {
-        await ctx.answerCbQuery(t('subscription.checkingStatus', {}, lang));
-      } catch (cbError) {
-        // Ignore "query is too old" or timeout errors
-        if (!cbError.message?.includes('query is too old')) {
-          throw cbError;
-        }
-      }
-
-      try {
-        const { invoiceId, tier, createShopAfter, subscriptionId, crystalPayUrl, paymentMethod } = ctx.wizard.state;
-        const token = ctx.session.token;
-
-        // Check auth token before API call
-        if (!token) {
-          logger.error('[PaySubscription] No auth token in Step 4', {
-            userId: ctx.from.id,
-            invoiceId,
-          });
-          await ctx.editMessageText(generalMessages.authorizationRequired(lang), {
-            parse_mode: 'HTML',
-            ...Markup.inlineKeyboard([
-              [Markup.button.callback(t('buttons.cancel', {}, lang), 'seller:menu')],
-            ]),
-          });
-          return;
-        }
-
-        // Check invoice status via backend
-        const statusResponse = await subscriptionApi.getInvoiceStatus(invoiceId, token);
-        const status = statusResponse.status;
-
-        logger.info(`[PaySubscription] Invoice ${invoiceId} status: ${status}`);
-
-        // SUCCESS FLOW
-        if (status === 'paid' || status === 'confirmed') {
-          // Check if user already has a shop (for renewal vs new)
-          let hasShop = Boolean(ctx.session.shopId);
-          if (!hasShop && token) {
-            try {
-              const myShops = await shopApi.getMyShop(token);
-              if (Array.isArray(myShops) && myShops.length > 0) {
-                hasShop = true;
-                ctx.session.shopId = myShops[0].id;
-              }
-            } catch { /* Intentionally ignored */ }
-          }
-
-          // If new shop creation flow
-          if (createShopAfter && !hasShop) {
-            await ctx.editMessageText(
-              `${t('paySubscription.paymentReceived', {}, lang)}\n\n${t('paySubscription.enterShopName', {}, lang)}`,
-              { parse_mode: 'HTML' }
-            );
-
-            const transitionData = {
-              tier,
-              subscriptionId,
-              paidSubscription: true, // Flag to skip payment check
-            };
-            // Clear wizard state before scene transition
-            ctx.wizard.state = {};
-            // NOTE: Do NOT call ctx.scene.leave() before enter() - Telegraf does it automatically
-            return ctx.scene.enter('createShop', transitionData);
-          }
-
-          // Renewal / Existing Shop Flow
-          await ctx.editMessageText(t('subscription.renewedSuccessfully', {}, lang), {
-            parse_mode: 'HTML',
-            ...Markup.inlineKeyboard([[Markup.button.callback(t('buttons.mainMenu', {}, lang), 'seller:menu')]]),
-          });
-
-          await ctx.scene.leave();
-          return;
-        }
-
-        // EXPIRED FLOW
-        if (status === 'expired') {
-          await ctx.editMessageText(
-            `${t('paySubscription.timeExpired', {}, lang)}\n\n${t('paySubscription.selectMethodAgain', {}, lang)}`,
-            {
-              parse_mode: 'HTML',
-              ...Markup.inlineKeyboard([
-                [Markup.button.callback('Bitcoin (BTC)', 'subscription:method:BTC')],
-                [Markup.button.callback('Litecoin (LTC)', 'subscription:method:LTC')],
-                [Markup.button.callback(t('buttons.cancel', {}, lang), 'seller:menu')],
-              ]),
-            }
-          );
-          return ctx.wizard.selectStep(2);
-        }
-
-        // PENDING FLOW - still waiting for payment
-        const methodLabel = PAYMENT_METHOD_LABELS[
-          Object.keys(PAYMENT_METHODS).find(k => PAYMENT_METHODS[k] === paymentMethod) || 'BTC'
-        ];
-        const tierLabel = tier === 'max' ? 'MAX' : 'PRO';
-
-        await ctx.editMessageText(
-          [
-            `${t('paySubscription.subscriptionLabel', {}, lang)} <b>${tierLabel}</b>`,
-            `${t('paySubscription.methodLabel', {}, lang)} ${methodLabel}`,
-            '',
-            `<b>${t('paySubscription.paymentNotReceived', {}, lang)}</b>`,
-            '',
-            t('paySubscription.clickToPay', {}, lang),
-          ].join('\n'),
-          {
-            parse_mode: 'HTML',
-            ...Markup.inlineKeyboard([
-              [Markup.button.url(t('paySubscription.payButton', {}, lang), crystalPayUrl)],
-              // P0-4 FIX: Add check payment button in pending flow
-              [Markup.button.callback(t('buttons.checkPayment', {}, lang) || '🔄 Check Payment', 'subscription:check_payment')],
-              [Markup.button.callback(t('buttons.cancel', {}, lang), 'seller:menu')],
-            ]),
-          }
-        );
-
-        return;
-      } catch (error) {
-        logger.error('[PaySubscription] Status check error:', error);
-
-        await ctx.editMessageText(
-          t('subscription.paymentStatusError', {}, lang),
-          {
-            parse_mode: 'HTML',
-            ...Markup.inlineKeyboard([
-              [Markup.button.callback(t('buttons.cancel', {}, lang), 'seller:menu')],
-            ]),
-          }
-        );
-        return;
-      }
-    }
+    // NOTE: check_payment handler removed - webhook handles payment confirmation automatically
 
     // Handle retry (go back to payment method selection)
     if (data === 'subscription:retry') {

@@ -626,7 +626,8 @@
     "enterShopName": "Введите название для вашего магазина:",
     "timeExpired": "Время на оплату истекло.",
     "selectMethodAgain": "Выберите метод оплаты заново:",
-    "paymentNotReceived": "Оплата пока не получена."
+    "paymentNotReceived": "Оплата пока не получена.",
+    "autoActivationNotice": "После оплаты подписка активируется автоматически (1-2 минуты)."
   },
   "upgradeShop": {
     "upgradeToMax": "Улучшить до MAX",

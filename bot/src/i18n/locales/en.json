@@ -626,7 +626,8 @@
     "enterShopName": "Enter your shop name:",
     "timeExpired": "Payment time expired.",
     "selectMethodAgain": "Select payment method again:",
-    "paymentNotReceived": "Payment not received yet."
+    "paymentNotReceived": "Payment not received yet.",
+    "autoActivationNotice": "After payment, subscription activates automatically (1-2 minutes)."
   },
   "upgradeShop": {
     "upgradeToMax": "Upgrade to MAX",
