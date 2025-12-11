@@ -228,6 +228,7 @@ export async function checkProductLimit(req, res, next) {
 /**
  * Release advisory lock and client
  * Called automatically when response finishes or on error
+ * FIX: Wrapped in try-finally to guarantee client.release() even on errors
  */
 function releaseProductLimitLock(req) {
   if (req.productLimitClient && req.productLimitLockId) {
@@ -239,17 +240,22 @@ function releaseProductLimitLock(req) {
     req.productLimitClient = null;
     req.productLimitLockId = null;
 
-    // Release lock and client asynchronously
-    client.query('SELECT pg_advisory_unlock($1)', [lockId])
-      .then(() => {
+    // Release lock and client asynchronously with guaranteed cleanup
+    (async () => {
+      try {
+        await client.query('SELECT pg_advisory_unlock($1)', [lockId]);
         logger.debug(`[ProductLimit] Advisory lock released for shop ${shopId}`);
-      })
-      .catch((err) => {
+      } catch (err) {
         logger.error(`[ProductLimit] Error releasing advisory lock for shop ${shopId}:`, err);
-      })
-      .finally(() => {
-        client.release();
-      });
+      } finally {
+        // ALWAYS release client back to pool
+        try {
+          client.release();
+        } catch (releaseErr) {
+          logger.error(`[ProductLimit] Critical: client.release() failed for shop ${shopId}:`, releaseErr);
+        }
+      }
+    })();
   }
 }
 

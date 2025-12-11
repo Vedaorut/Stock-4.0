@@ -147,6 +147,22 @@ export async function processOrderPayment({
   const payment = paymentResult.rows[0];
   const verifyTxHash = txHash || payment.tx_hash;
 
+  // SECURITY: Verify currency consistency (prevent substitution attacks)
+  if (preliminaryInvoice.currency !== payment.currency) {
+    logger.error('[InvoicePayment] SECURITY: Currency mismatch detected', {
+      orderId,
+      invoiceCurrency: preliminaryInvoice.currency,
+      paymentCurrency: payment.currency,
+      securityNote: 'Possible currency substitution attempt',
+    });
+    return {
+      ok: false,
+      state: 'failed',
+      code: 'CURRENCY_MISMATCH',
+      message: 'Payment currency does not match invoice. Security check failed.',
+    };
+  }
+
   if (!verifyTxHash) {
     return {
       ok: false,
