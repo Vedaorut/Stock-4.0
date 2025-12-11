@@ -17,6 +17,7 @@ import {
   TRIAL_PERIOD_DAYS,
   SUBSCRIPTION_TIERS,
 } from '../config/subscriptionPricing.js';
+import { workerQueries } from '../models/workerQueries.js';
 // paymentVerificationService removed - only CrystalPay payments supported
 
 function addDays(date, days) {
@@ -127,8 +128,22 @@ async function checkExpiredSubscriptions() {
     );
 
     const deactivated = deactivatedResult.rowCount || 0;
+
+    // SECURITY: Remove all workers from deactivated shops
+    // Workers should not have access after shop deactivation
     for (const shop of deactivatedResult.rows) {
       logger.error(`[Subscription] Shop ${shop.id} (${shop.name}) deactivated after grace period expiry`);
+      try {
+        const removedWorkers = await workerQueries.removeAllByShop(shop.id, client);
+        if (removedWorkers.length > 0) {
+          logger.info(
+            `[Subscription] SECURITY: Removed ${removedWorkers.length} workers from shop ${shop.id} on deactivation`
+          );
+        }
+      } catch (workerError) {
+        // Log but don't fail the deactivation process
+        logger.error(`[Subscription] Failed to remove workers from shop ${shop.id}:`, workerError);
+      }
     }
 
     // BATCH 3: Mark expired subscription records
@@ -171,13 +186,27 @@ async function deactivateShop(shopId, client = null) {
 
   try {
     await client.query(
-      `UPDATE shops 
+      `UPDATE shops
        SET is_active = false,
            subscription_status = 'inactive',
            updated_at = NOW()
        WHERE id = $1`,
       [shopId]
     );
+
+    // SECURITY: Remove all workers when shop is deactivated
+    // Workers should not have access to deactivated shops
+    try {
+      const removedWorkers = await workerQueries.removeAllByShop(shopId, client);
+      if (removedWorkers.length > 0) {
+        logger.info(
+          `[Subscription] SECURITY: Removed ${removedWorkers.length} workers from shop ${shopId} on deactivation`
+        );
+      }
+    } catch (workerError) {
+      // Log but don't fail the deactivation process
+      logger.error(`[Subscription] Failed to remove workers from shop ${shopId}:`, workerError);
+    }
 
     logger.warn(`[Subscription] Shop ${shopId} deactivated`);
   } catch (error) {

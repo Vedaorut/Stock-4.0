@@ -260,6 +260,26 @@ export const workerQueries = {
     );
     return result.rows[0]?.notification_muted ?? null;
   },
+
+  /**
+   * Remove all workers from a shop
+   * Used when shop tier downgrades from MAX to PRO or when shop is deactivated
+   * SECURITY: Prevents unauthorized access after tier change
+   *
+   * @param {number} shopId - Shop ID
+   * @param {object} client - Database client (optional, for transactions)
+   * @returns {Array} Array of removed worker records with worker_user_id and telegram_id
+   */
+  removeAllByShop: async (shopId, client = null) => {
+    const queryFn = client || { query };
+    const result = await queryFn.query(
+      `DELETE FROM shop_workers
+       WHERE shop_id = $1
+       RETURNING worker_user_id, telegram_id`,
+      [shopId]
+    );
+    return result.rows;
+  },
 };
 
 export default workerQueries;
