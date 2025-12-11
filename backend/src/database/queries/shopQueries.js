@@ -116,8 +116,26 @@ export const shopQueries = {
   },
 
   // Update shop
+  // AUTO-SYNC: If name changes and description contains old name, update description too
   update: async (id, shopData) => {
     const { name, description, logo, isActive, channelUrl } = shopData;
+
+    let finalDescription = description;
+
+    // If name is changing, check if we need to sync description
+    if (name && !description) {
+      const currentShop = await query('SELECT name, description FROM shops WHERE id = $1', [id]);
+      if (currentShop.rows[0]) {
+        const oldName = currentShop.rows[0].name;
+        const currentDesc = currentShop.rows[0].description;
+
+        // If description contains old name, replace it with new name
+        if (currentDesc && oldName && currentDesc.toLowerCase().includes(oldName.toLowerCase())) {
+          finalDescription = currentDesc.replace(new RegExp(oldName, 'gi'), name);
+        }
+      }
+    }
+
     const result = await query(
       `UPDATE shops
        SET name = COALESCE($2, name),
@@ -128,7 +146,7 @@ export const shopQueries = {
            updated_at = NOW()
        WHERE id = $1
        RETURNING id, owner_id, name, description, logo, channel_url, tier, is_active, is_trial, trial_ends_at, subscription_status, next_payment_due, grace_period_until, registration_paid, wallet_btc, wallet_eth, wallet_usdt, wallet_ltc, invite_code, created_at, updated_at`,
-      [id, name, description, logo, isActive, channelUrl]
+      [id, name, finalDescription, logo, isActive, channelUrl]
     );
     return result.rows[0];
   },
