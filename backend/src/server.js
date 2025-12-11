@@ -213,6 +213,8 @@ app.use(
           'wss://localhost:3000',
           'http://localhost:3000',
           'https://*.ngrok-free.app',
+          // Production URLs (added dynamically)
+          ...(config.frontendUrl ? [config.frontendUrl, config.frontendUrl.replace('https://', 'wss://')] : []),
         ],
         fontSrc: ["'self'", 'https://fonts.gstatic.com'],
         frameAncestors: [

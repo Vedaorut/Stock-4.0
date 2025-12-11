@@ -31,10 +31,8 @@ COMMENT ON COLUMN ai_usage_log.request_type IS 'Type of AI request (product_ai, 
 CREATE INDEX IF NOT EXISTS idx_ai_usage_user_date ON ai_usage_log(user_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_ai_usage_created_at ON ai_usage_log(created_at);
 
--- Index for daily limit checks (partial index for recent records only)
-CREATE INDEX IF NOT EXISTS idx_ai_usage_daily_check
-ON ai_usage_log(user_id, created_at)
-WHERE created_at > (NOW() - INTERVAL '2 days');
+-- Note: Partial index with NOW() removed (NOW() is not IMMUTABLE)
+-- The idx_ai_usage_user_date index is sufficient for daily limit checks
 
 -- ============================================
 -- AI User Settings table (for custom limits)
