@@ -35,7 +35,10 @@ export default function FollowDetail() {
 
   // AbortController for retry requests
   const retryControllerRef = useRef(null);
-  
+
+  // P1-4 FIX: AbortController for user actions (markup update, mode switch, etc.)
+  const actionControllerRef = useRef(null);
+
   // P1-2 FIX: Track current followId to prevent race conditions
   // This ref always holds the latest followDetailId for validation
   const currentFollowIdRef = useRef(followDetailId);
@@ -52,6 +55,10 @@ export default function FollowDetail() {
     return () => {
       if (retryControllerRef.current) {
         retryControllerRef.current.abort();
+      }
+      // P1-4 FIX: Also cleanup action controller
+      if (actionControllerRef.current) {
+        actionControllerRef.current.abort();
       }
     };
   }, []);
@@ -156,8 +163,10 @@ export default function FollowDetail() {
     retryControllerRef.current = new AbortController();
 
     // P1-3 FIX: Invalidate cache on retry to ensure fresh data
+    // P1-4 FIX: Also invalidate products cache
     if (followDetailId) {
       invalidateCache(`/follows/${followDetailId}`);
+      invalidateCache(`/follows/${followDetailId}/products`);
     }
 
     setIsLoading(true);
@@ -226,7 +235,9 @@ export default function FollowDetail() {
     setError(null);
 
     // P1-3 FIX: Invalidate cache for this follow to ensure fresh data
+    // P1-4 FIX: Explicitly invalidate products cache too
     invalidateCache(`/follows/${followDetailId}`);
+    invalidateCache(`/follows/${followDetailId}/products`);
 
     const controller = new AbortController();
     const requestFollowId = followDetailId; // Capture for closure
@@ -266,12 +277,20 @@ export default function FollowDetail() {
     async (markupData) => {
       if (!followDetailId || !follow) return;
 
+      // P1-4 FIX: Cancel previous action request if running
+      if (actionControllerRef.current) {
+        actionControllerRef.current.abort();
+      }
+      actionControllerRef.current = new AbortController();
+      const signal = actionControllerRef.current.signal;
+
       triggerHaptic('medium');
 
       try {
         // If currently in monitor mode, switch to resell with markup
         if (follow.mode === 'monitor') {
           const response = await switchMode(followDetailId, 'resell', markupData);
+          if (signal.aborted) return;
           const followData = response?.data?.data || response?.data;
           if (followData) {
             setFollow(followData);
@@ -288,6 +307,7 @@ export default function FollowDetail() {
         } else {
           // Already in resell mode, just update markup
           const response = await updateMarkup(followDetailId, markupData);
+          if (signal.aborted) return;
           const followData = response?.data?.data || response?.data;
           if (followData) {
             setFollow(followData);
@@ -301,9 +321,10 @@ export default function FollowDetail() {
           }
         }
         triggerHaptic('success');
-        // Reload products to update prices with new markup
-        await loadProducts();
+        // P1-4 FIX: Pass signal to loadProducts to prevent race conditions
+        await loadProducts(signal);
       } catch (err) {
+        if (signal.aborted) return;
         if (import.meta.env.DEV) {
           console.error('[FollowDetail] Error updating markup:', err);
         }
@@ -331,9 +352,17 @@ export default function FollowDetail() {
       return;
     }
 
+    // P1-4 FIX: Cancel previous action request if running
+    if (actionControllerRef.current) {
+      actionControllerRef.current.abort();
+    }
+    actionControllerRef.current = new AbortController();
+    const signal = actionControllerRef.current.signal;
+
     // Monitor: call API directly
     try {
       const response = await switchMode(currentFollowId, newMode, null);
+      if (signal.aborted) return;
       const followData = response?.data?.data || response?.data;
 
       if (followData) {
@@ -341,17 +370,18 @@ export default function FollowDetail() {
       } else {
         setFollow((prev) => ({ ...prev, mode: newMode }));
       }
-      // Reload products to show source shop products in monitor mode
-      await loadProducts();
+      // P1-4 FIX: Pass signal to loadProducts
+      await loadProducts(signal);
       triggerHaptic('success');
     } catch (err) {
+      if (signal.aborted) return;
       if (import.meta.env.DEV) {
         console.error('[FollowDetail] Error switching mode:', err);
       }
       triggerHaptic('error');
       showToast(t('follows.modeError') || 'Failed to switch mode', 'error');
     }
-  }, [followDetailId, follow, switchMode, triggerHaptic, loadProducts, showToast, t]);
+  }, [followDetailId, switchMode, triggerHaptic, loadProducts, showToast, t]); // follow accessed via ref
 
   // Handle delete
   const handleDelete = useCallback(async () => {
@@ -382,14 +412,23 @@ export default function FollowDetail() {
     async (markupData) => {
       if (!followDetailId || !selectedProduct) return;
 
+      // P1-4 FIX: Cancel previous action request if running
+      if (actionControllerRef.current) {
+        actionControllerRef.current.abort();
+      }
+      actionControllerRef.current = new AbortController();
+      const signal = actionControllerRef.current.signal;
+
       triggerHaptic('medium');
       try {
         const productId = selectedProduct.synced_product?.id || selectedProduct.id;
         await updateProductMarkup(followDetailId, productId, markupData);
+        if (signal.aborted) return;
         triggerHaptic('success');
-        // Reload products to see updated price
-        loadProducts();
+        // P1-4 FIX: Pass signal and await loadProducts
+        await loadProducts(signal);
       } catch (err) {
+        if (signal.aborted) return;
         if (import.meta.env.DEV) {
           console.error('[FollowDetail] Error updating product markup:', err);
         }
@@ -404,14 +443,23 @@ export default function FollowDetail() {
   const handleResetProductMarkup = useCallback(async () => {
     if (!followDetailId || !selectedProduct) return;
 
+    // P1-4 FIX: Cancel previous action request if running
+    if (actionControllerRef.current) {
+      actionControllerRef.current.abort();
+    }
+    actionControllerRef.current = new AbortController();
+    const signal = actionControllerRef.current.signal;
+
     triggerHaptic('medium');
     try {
       const productId = selectedProduct.synced_product?.id || selectedProduct.id;
       await resetProductMarkup(followDetailId, productId);
+      if (signal.aborted) return;
       triggerHaptic('success');
-      // Reload products to see updated price
-      loadProducts();
+      // P1-4 FIX: Pass signal and await loadProducts
+      await loadProducts(signal);
     } catch (err) {
+      if (signal.aborted) return;
       if (import.meta.env.DEV) {
         console.error('[FollowDetail] Error resetting product markup:', err);
       }
@@ -542,7 +590,14 @@ export default function FollowDetail() {
                 <div className="bg-red-500/10 rounded-2xl p-6 text-center border border-red-500/20">
                   <div className="text-red-400 text-sm mb-3">{productsError}</div>
                   <motion.button
-                    onClick={() => loadProducts()}
+                    onClick={() => {
+                      // P1-4 FIX: Use AbortController for retry
+                      if (actionControllerRef.current) {
+                        actionControllerRef.current.abort();
+                      }
+                      actionControllerRef.current = new AbortController();
+                      loadProducts(actionControllerRef.current.signal);
+                    }}
                     className="px-4 py-2 bg-[#FF6B00] text-white text-sm font-semibold rounded-xl"
                     whileTap={{ scale: 0.95 }}
                   >
@@ -559,7 +614,7 @@ export default function FollowDetail() {
                 <div className="space-y-3">
                   {products.map((product) => {
                     // FIX: Robust data fallback for Monitor mode vs Resell mode
-                    const isMonitor = !isResellMode;
+                    const _isMonitor = !isResellMode;
 
                     // Name: Try synced -> source -> direct
                     const productName = product.synced_product?.name || product.source_product?.name || product.name || 'Unknown Product';
