@@ -93,6 +93,7 @@ export default function Catalog() {
   // Optimized Store Selection
   const {
     products,
+    productsShopId,
     currentShop,
     setCurrentShop,
     setProducts,
@@ -103,6 +104,7 @@ export default function Catalog() {
   } = useStore(
     useShallow((state) => ({
       products: state.products,
+      productsShopId: state.productsShopId,
       currentShop: state.currentShop,
       setCurrentShop: state.setCurrentShop,
       setProducts: state.setProducts,
@@ -119,6 +121,7 @@ export default function Catalog() {
 
   // Derived State (moved up to fix ReferenceError - used in searchProducts)
   const displayShop = currentShop || myShop;
+  const isProductsForDisplayShop = displayShop && productsShopId === displayShop.id;
 
   // Data Loading Logic
   const loadMyShop = useCallback(
@@ -167,6 +170,15 @@ export default function Catalog() {
         }
 
         const items = Array.isArray(data?.data) ? data.data : [];
+        // Guard against stale responses when user switches shops quickly
+        const activeShopId = useStore.getState().currentShop?.id || useStore.getState().productsShopId;
+        if (activeShopId && activeShopId !== shopId) {
+          if (import.meta.env.DEV) {
+            console.log('[Catalog] Skipping stale products response', { requested: shopId, activeShopId });
+          }
+          return { status: 'stale' };
+        }
+
         setProducts(items, shopId); // Using action from hook, not getState()
         return { status: 'success' };
       } catch (err) {
@@ -381,7 +393,7 @@ export default function Catalog() {
 
     // OPTIMIZATION: Only show loading spinner if no cached data
     // This allows instant display of existing products while refreshing in background
-    const hasExistingData = products.length > 0;
+    const hasExistingData = isProductsForDisplayShop && products.length > 0;
     if (!hasExistingData) {
       setLoading(true);
     }
@@ -435,6 +447,11 @@ export default function Catalog() {
             setNoShopsAvailable(true);
             return;
           }
+        }
+
+        // If currently showing products from a different shop, clear to avoid mismatched UI
+        if (targetShop && productsShopId && productsShopId !== targetShop.id) {
+          setProducts([], targetShop.id);
         }
 
         // Check if viewing own shop (use store directly to avoid dependency cycle)
