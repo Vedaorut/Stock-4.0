@@ -70,16 +70,17 @@ export const orderItemQueries = {
     return result.rows;
   },
 
-  // Get order items with product stock info (for payment verification)
+  // Get order items with product stock info (for payment verification and stock return)
   findByOrderIdWithStock: async (orderId, client = null) => {
     const queryFn = client ? client.query.bind(client) : query;
 
     const result = await queryFn(
-      `SELECT 
-         oi.id as item_id,
+      `SELECT
+         oi.id,
          oi.product_id,
          oi.quantity as ordered_quantity,
          oi.price as price_at_purchase,
+         oi.stock_deducted,
          p.name as product_name,
          p.stock_quantity,
          p.is_preorder,

@@ -1,4 +1,4 @@
-import { query } from '../config/database.js';
+import { pool } from '../config/database.js';
 import logger from '../utils/logger.js';
 
 /**
@@ -6,13 +6,16 @@ import logger from '../utils/logger.js';
  * IMPORTANT: Only cancels orders WITHOUT a submitted payment (tx_hash)
  */
 async function cancelUnpaidOrders() {
+  const client = await pool.connect();
+
   try {
+    await client.query('BEGIN');
+
     // Find orders pending for > 20 minutes that have NO payment with tx_hash
     // Orders with submitted tx_hash should NOT be cancelled - they're awaiting blockchain confirmation
-    const result = await query(
-      `SELECT o.id, o.product_id, o.quantity, p.name as product_name
+    const result = await client.query(
+      `SELECT o.id
        FROM orders o
-       JOIN products p ON o.product_id = p.id
        WHERE o.status = 'pending'
        AND o.created_at < NOW() - INTERVAL '20 minutes'
        AND NOT EXISTS (
@@ -22,21 +25,18 @@ async function cancelUnpaidOrders() {
        )`
     );
 
-    const orders = result.rows;
+    const orderIds = result.rows.map(o => o.id);
 
-    if (orders.length === 0) {
+    if (orderIds.length === 0) {
       logger.info('No unpaid orders to cancel');
+      await client.query('COMMIT');
       return;
     }
 
-    logger.info(`Found ${orders.length} unpaid orders to cancel`);
-
-    // OPTIMIZATION: Batch cancel orders instead of N+1 loop
-    // Atomic batch update - only cancels orders that are still pending and have no tx_hash
-    const orderIds = orders.map(o => o.id);
+    logger.info(`Found ${orderIds.length} unpaid orders to cancel`);
 
     // Batch cancel orders with atomic check
-    const cancelResult = await query(
+    const cancelResult = await client.query(
       `UPDATE orders
        SET status = 'cancelled', updated_at = NOW()
        WHERE id = ANY($1)
@@ -54,17 +54,20 @@ async function cancelUnpaidOrders() {
     const skippedCount = orderIds.length - cancelledIds.length;
 
     if (cancelledIds.length > 0) {
-      // Batch unreserve stock for cancelled orders
-      // Uses subquery to aggregate quantities per product
-      await query(
+      // Batch unreserve stock for cancelled orders using order_items (supports multi-item orders)
+      // Only unreserve for non-preorder products where stock wasn't already deducted
+      await client.query(
         `UPDATE products p
          SET reserved_quantity = GREATEST(0, p.reserved_quantity - sub.total_qty),
              updated_at = NOW()
          FROM (
-           SELECT product_id, SUM(quantity) as total_qty
-           FROM orders
-           WHERE id = ANY($1)
-           GROUP BY product_id
+           SELECT oi.product_id, SUM(oi.quantity) as total_qty
+           FROM order_items oi
+           JOIN products prod ON oi.product_id = prod.id
+           WHERE oi.order_id = ANY($1)
+             AND prod.is_preorder = false
+             AND oi.stock_deducted = false
+           GROUP BY oi.product_id
          ) sub
          WHERE p.id = sub.product_id`,
         [cancelledIds]
@@ -77,9 +80,13 @@ async function cancelUnpaidOrders() {
       logger.info(`Skipped ${skippedCount} orders (paid or status changed)`);
     }
 
-    logger.info(`Successfully processed ${orders.length} unpaid orders`);
+    await client.query('COMMIT');
+    logger.info(`Successfully processed ${orderIds.length} unpaid orders`);
   } catch (error) {
+    await client.query('ROLLBACK');
     logger.error('Error in cancelUnpaidOrders:', error);
+  } finally {
+    client.release();
   }
 }
 
@@ -89,8 +96,12 @@ async function cancelUnpaidOrders() {
  * FIX: Removed 'confirmed' from list - paid orders should never be expired
  */
 async function expireOldOrders() {
+  const client = await pool.connect();
+
   try {
-    const result = await query(
+    await client.query('BEGIN');
+
+    const result = await client.query(
       `UPDATE orders
        SET status = $1, updated_at = NOW()
        WHERE status = 'pending'
@@ -101,16 +112,40 @@ async function expireOldOrders() {
 
     if (result.rowCount > 0) {
       const orderIds = result.rows.map((r) => r.id);
-      logger.info(`[expireOldOrders] Expired ${result.rowCount} old orders`, {
+
+      // Unreserve stock for expired orders using order_items (supports multi-item orders)
+      // Only unreserve for non-preorder products where stock wasn't already deducted
+      await client.query(
+        `UPDATE products p
+         SET reserved_quantity = GREATEST(0, p.reserved_quantity - sub.total_qty),
+             updated_at = NOW()
+         FROM (
+           SELECT oi.product_id, SUM(oi.quantity) as total_qty
+           FROM order_items oi
+           JOIN products prod ON oi.product_id = prod.id
+           WHERE oi.order_id = ANY($1)
+             AND prod.is_preorder = false
+             AND oi.stock_deducted = false
+           GROUP BY oi.product_id
+         ) sub
+         WHERE p.id = sub.product_id`,
+        [orderIds]
+      );
+
+      logger.info(`[expireOldOrders] Expired ${result.rowCount} old orders and unreserved stock`, {
         orderIds,
         totalExpired: result.rowCount,
       });
     }
 
+    await client.query('COMMIT');
     return result.rows;
   } catch (error) {
+    await client.query('ROLLBACK');
     logger.error('[expireOldOrders] Error:', error);
     throw error;
+  } finally {
+    client.release();
   }
 }
 

@@ -3,6 +3,16 @@ import logger from '../../utils/logger.js';
 import { normalizePrice } from '../../utils/helpers.js';
 
 /**
+ * Helper to execute query with optional transaction client
+ */
+const execQuery = async (sql, params, client = null) => {
+  if (client) {
+    return client.query(sql, params);
+  }
+  return query(sql, params);
+};
+
+/**
  * Product database queries
  */
 export const productQueries = {
@@ -264,15 +274,29 @@ export const productQueries = {
   },
 
   // Bulk delete products by IDs (with ownership check via shopId, excludes synced products)
-  bulkDeleteByIds: async (productIds, shopId) => {
-    const result = await query(
+  bulkDeleteByIds: async (productIds, shopId, client = null) => {
+    const result = await execQuery(
       `DELETE FROM products p
        WHERE p.id = ANY($1) AND p.shop_id = $2
          AND NOT EXISTS (
            SELECT 1 FROM synced_products sp WHERE sp.synced_product_id = p.id
          )
        RETURNING id, shop_id, name`,
-      [productIds, shopId]
+      [productIds, shopId],
+      client
+    );
+    return result.rows;
+  },
+
+  // Internal: Delete synced products without the synced_products check
+  // Used in transactions where synced_products are deleted first
+  bulkDeleteSyncedProducts: async (productIds, shopId, client = null) => {
+    const result = await execQuery(
+      `DELETE FROM products p
+       WHERE p.id = ANY($1) AND p.shop_id = $2
+       RETURNING id, shop_id, name`,
+      [productIds, shopId],
+      client
     );
     return result.rows;
   },

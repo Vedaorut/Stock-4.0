@@ -1,8 +1,19 @@
 /**
  * Payment Verification Worker
- * 
+ *
  * Background process that polls blockchain APIs every 30 seconds
  * to verify pending crypto payments.
+ *
+ * PAY-P1-2 TODO: Implement blockchain reorg protection
+ * Currently, confirmed payments are NOT re-verified. In rare cases of blockchain
+ * reorganization (reorg), a confirmed transaction could be rolled back.
+ *
+ * Recommended solution for high-value transactions:
+ * 1. Add periodic re-verification for recently confirmed payments (<24h)
+ * 2. Alert if confirmations decrease (indicates potential reorg)
+ * 3. For amounts >$1000, require more confirmations (2x normal)
+ *
+ * Risk: Low (reorgs are rare), Impact: High (money loss if it happens)
  */
 
 import { getClient, query } from '../config/database.js';
@@ -479,10 +490,17 @@ async function confirmOrderPayment(orderId, paymentId, verificationResult) {
       await client.query(
         `UPDATE products p
          SET stock_quantity = p.stock_quantity - u.quantity,
+             reserved_quantity = GREATEST(0, p.reserved_quantity - u.quantity),
              updated_at = NOW()
          FROM unnest($1::int[], $2::int[]) AS u(product_id, quantity)
          WHERE p.id = u.product_id`,
         [productIds, quantities]
+      );
+
+      // Mark items as stock_deducted (for proper stock return on cancellation)
+      await client.query(
+        `UPDATE order_items SET stock_deducted = true WHERE order_id = $1`,
+        [orderId]
       );
     }
 

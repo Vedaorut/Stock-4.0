@@ -47,8 +47,27 @@ export const createOrderWithItems = async (userId, validatedData, deliveryAddres
 
   logger.debug('Order items created', { orderId: order.id, itemCount: items.length });
 
-  // NOTE: Stock reservation happens on payment confirmation, not order creation
-  // This is first-come-first-served on payment
+  // RESERVE stock for non-preorder items (prevents overselling)
+  // Stock is unreserved on cancellation/expiration, or converted to deduction on payment
+  for (const item of items) {
+    if (!item.isPreorder) {
+      const reserved = await productQueries.reserveStock(item.productId, item.quantity, client);
+      if (!reserved) {
+        // This shouldn't happen if validateProductsForOrder worked correctly,
+        // but handle it for safety (concurrent order might have taken the stock)
+        throw new Error(
+          `Failed to reserve stock for product ${item.productId} (${item.productName}). ` +
+          `Requested: ${item.quantity}. Please try again.`
+        );
+      }
+      logger.debug('Stock reserved for item', {
+        orderId: order.id,
+        productId: item.productId,
+        quantity: item.quantity,
+        newReserved: reserved.reserved_quantity,
+      });
+    }
+  }
 
   logger.info('Order created successfully', {
     orderId: order.id,
@@ -58,6 +77,58 @@ export const createOrderWithItems = async (userId, validatedData, deliveryAddres
   });
 
   return order;
+};
+
+/**
+ * Unreserve stock for pending order (stock was reserved but not deducted)
+ * Called when pending order is cancelled or expires before payment
+ *
+ * @param {number} orderId - Order ID
+ * @param {Object} client - Database client (transaction)
+ */
+export const unreserveStockForOrder = async (orderId, client) => {
+  logger.info('Unreserving stock for order', { orderId });
+
+  if (!client) {
+    throw new Error('Database client is required to unreserve stock');
+  }
+
+  // Get order items with product info
+  const items = await orderItemQueries.findByOrderIdWithStock(orderId, client);
+
+  logger.debug('Found order items for unreserve', { orderId, itemCount: items.length });
+
+  // Unreserve stock for non-preorder items that haven't been deducted yet
+  for (const item of items) {
+    if (!item.is_preorder && item.product_id && !item.stock_deducted) {
+      // Check product still exists
+      const productExists = await client.query(
+        'SELECT id, reserved_quantity FROM products WHERE id = $1 FOR UPDATE',
+        [item.product_id]
+      );
+
+      if (productExists.rows.length === 0) {
+        logger.warn('Product deleted, skipping unreserve', {
+          orderId,
+          productId: item.product_id,
+          productName: item.product_name,
+        });
+        continue;
+      }
+
+      // Unreserve stock
+      await productQueries.unreserveStock(item.product_id, item.ordered_quantity, client);
+
+      logger.info('Stock unreserved for cancelled item', {
+        orderId,
+        productId: item.product_id,
+        productName: item.product_name,
+        quantityUnreserved: item.ordered_quantity,
+      });
+    }
+  }
+
+  logger.info('Stock unreserve completed', { orderId });
 };
 
 /**
@@ -78,12 +149,10 @@ export const returnStockForCancelledOrder = async (orderId, client) => {
 
   logger.debug('Found order items', { orderId, itemCount: items.length });
 
-  // Return stock for non-preorder items
-  // TODO: Add stock_deducted field to order_items table to track if stock was actually deducted.
-  // Currently we only return stock for confirmed orders (checked in updateOrderStatusWithStockLogic),
-  // but ideally we should check item.stock_deducted === true before returning.
+  // Return stock for non-preorder items ONLY if stock was actually deducted
   for (const item of items) {
-    if (!item.is_preorder && item.product_id) {
+    // Only return stock if it was actually deducted (prevents double return on edge cases)
+    if (!item.is_preorder && item.product_id && item.stock_deducted) {
       // Check product still exists before returning stock
       const productExists = await client.query(
         'SELECT id, stock_quantity FROM products WHERE id = $1 FOR UPDATE',
@@ -106,12 +175,24 @@ export const returnStockForCancelledOrder = async (orderId, client) => {
         client
       );
 
+      // Mark as not deducted after return (prevents double return)
+      await client.query(
+        `UPDATE order_items SET stock_deducted = false WHERE id = $1`,
+        [item.id]
+      );
+
       logger.info('Stock returned for cancelled item', {
         orderId,
         productId: item.product_id,
         productName: item.product_name,
         quantityReturned: item.ordered_quantity,
         newStock: productExists.rows[0].stock_quantity + item.ordered_quantity,
+      });
+    } else if (!item.is_preorder && item.product_id && !item.stock_deducted) {
+      logger.debug('Skipping stock return - stock was not deducted', {
+        orderId,
+        productId: item.product_id,
+        productName: item.product_name,
       });
     }
   }
@@ -143,15 +224,52 @@ export const updateOrderStatusWithStockLogic = async (orderId, newStatus, curren
       transactionStarted = true;
     }
 
-    // If cancelling confirmed order → return stock
-    if (newStatus === 'cancelled' && currentStatus === 'confirmed') {
-      logger.info('Cancelling confirmed order - returning stock', { orderId });
-      await returnStockForCancelledOrder(orderId, client);
-    } else if (newStatus === 'cancelled') {
-      logger.info('Cancelling non-confirmed order - no stock to return', {
+    // Lock the order row and re-check status to prevent race conditions
+    // (e.g., two concurrent cancellations both returning stock)
+    const currentOrderResult = await client.query(
+      'SELECT status FROM orders WHERE id = $1 FOR UPDATE',
+      [orderId]
+    );
+
+    if (currentOrderResult.rows.length === 0) {
+      throw new Error(`Order ${orderId} not found`);
+    }
+
+    const actualCurrentStatus = currentOrderResult.rows[0].status;
+
+    // Check if status changed during processing (race condition detection)
+    if (actualCurrentStatus !== currentStatus) {
+      logger.warn('[OrderService] Status changed during processing - race condition prevented', {
         orderId,
-        currentStatus,
+        expected: currentStatus,
+        actual: actualCurrentStatus,
+        requestedNewStatus: newStatus,
       });
+      throw new Error(`Order status changed from ${currentStatus} to ${actualCurrentStatus}`);
+    }
+
+    // Handle stock on cancellation based on current status
+    if (newStatus === 'cancelled') {
+      if (currentStatus === 'confirmed') {
+        // Confirmed order = stock was deducted, need to return it
+        logger.info('Cancelling confirmed order - returning deducted stock', { orderId });
+        await returnStockForCancelledOrder(orderId, client);
+      } else if (currentStatus === 'pending') {
+        // Pending order = stock was only reserved, need to unreserve it
+        logger.info('Cancelling pending order - unreserving stock', { orderId });
+        await unreserveStockForOrder(orderId, client);
+      } else {
+        logger.info('Cancelling order with no stock action needed', {
+          orderId,
+          currentStatus,
+        });
+      }
+    }
+
+    // Handle stock on expiration (same as pending cancellation)
+    if (newStatus === 'expired' && currentStatus === 'pending') {
+      logger.info('Expiring pending order - unreserving stock', { orderId });
+      await unreserveStockForOrder(orderId, client);
     }
 
     // Update order status
@@ -274,6 +392,7 @@ export const getOrderAnalytics = async (userId, fromDate, toDate) => {
 
 export default {
   createOrderWithItems,
+  unreserveStockForOrder,
   returnStockForCancelledOrder,
   updateOrderStatusWithStockLogic,
   getOrderAnalytics,
