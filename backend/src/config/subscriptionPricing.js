@@ -18,7 +18,7 @@
 
 const DEFAULT_SUBSCRIPTION_PRICES = {
   pro: 25.0,
-  max: 35.0,
+  max: 1.0,  // TEMP: $1 for testing CrystalPay (was $35)
 };
 
 const parsePrice = (value, fallback) => {
