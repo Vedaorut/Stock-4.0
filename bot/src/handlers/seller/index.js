@@ -5,7 +5,7 @@ import { shopApi, orderApi, workerApi, followApi } from '../../utils/api.js';
 import logger from '../../utils/logger.js';
 import { messages } from '../../texts/messages.js';
 import { t } from '../../i18n/index.js';
-import { checkShopHealth } from '../../utils/shopHealthCheck.js';
+import { checkShopHealth, calculateDaysRemaining } from '../../utils/shopHealthCheck.js';
 import { getTipForShop } from '../../utils/sellerTips.js';
 import {
   handleActiveOrders,
@@ -170,6 +170,10 @@ const formatSubscriptionStatus = (ctx, data) => {
   const dateSource =
     data.nextPaymentDue || data.periodEnd || data.currentSubscription?.period_end || null;
 
+  // Calculate days remaining (use '—' as fallback for null)
+  const rawDays = calculateDaysRemaining(dateSource);
+  const daysRemaining = rawDays !== null ? rawDays : '—';
+
   // Use detailed messages based on tier (PRO or MAX)
   if (tier === 'pro') {
     return t(
@@ -177,6 +181,7 @@ const formatSubscriptionStatus = (ctx, data) => {
       {
         status,
         renewDate: dateSource,
+        daysRemaining,
       },
       lang
     );
@@ -188,6 +193,7 @@ const formatSubscriptionStatus = (ctx, data) => {
       {
         status,
         renewDate: dateSource,
+        daysRemaining,
       },
       lang
     );
@@ -197,7 +203,7 @@ const formatSubscriptionStatus = (ctx, data) => {
   const fallbackDate = dateSource ? new Date(dateSource).toLocaleDateString() : '—';
   return t(
     'seller.subscriptionFallback',
-    { tier: tier.toUpperCase(), status, date: fallbackDate },
+    { tier: tier.toUpperCase(), status, date: fallbackDate, daysRemaining },
     lang
   );
 };

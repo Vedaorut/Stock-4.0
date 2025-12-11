@@ -51,13 +51,22 @@ function getContextualTipKeys(shopHealth) {
 /**
  * Get tip/warning for shop based on its state
  * @param {Object} ctx - Telegraf context
- * @param {Object} shopHealth - Shop state { hasWallets, wallets, productsCount, tier, hasWorkers }
+ * @param {Object} shopHealth - Shop state { hasWallets, wallets, productsCount, tier, hasWorkers, subscriptionDaysRemaining }
  * @returns {string|null} - Text to show or null
  */
 function getTipForShop(ctx, shopHealth) {
   const lang = ctx.lang || 'ru';
 
   // Priority 1: Critical warnings (with warning emoji)
+
+  // Check subscription expiring soon (≤2 days) - CRITICAL
+  if (
+    shopHealth.subscriptionDaysRemaining !== null &&
+    shopHealth.subscriptionDaysRemaining <= 2 &&
+    shopHealth.subscriptionDaysRemaining >= 0
+  ) {
+    return t('warnings.subscriptionExpiringSoon', { days: shopHealth.subscriptionDaysRemaining }, lang);
+  }
 
   // Check wallets - CRITICAL
   if (!shopHealth.hasWallets) {

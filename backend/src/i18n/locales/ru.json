@@ -71,6 +71,18 @@
       "validUntil": "Действует до: {date}",
       "goToMenu": "Перейти в меню"
     },
+    "new": {
+      "title": "Оплата получена!",
+      "thankYou": "Спасибо за оплату тарифа {tier}!",
+      "validUntil": "Действует до: {date}",
+      "nextStep": "Теперь создайте магазин — придумайте название и настройте его.",
+      "setupShopButton": "🛍 Создать магазин"
+    },
+    "renewed": {
+      "title": "Подписка продлена!",
+      "tier": "Тариф: {tier}",
+      "extendedUntil": "Продлена до: {date}"
+    },
     "pendingSetup": {
       "title": "Оплата получена",
       "tier": "Тариф: {tier}",

@@ -621,6 +621,22 @@ export default function PaymentDetailsModal() {
                     {copiedAmount ? t('payment.amountCopied') : t('payment.tapToCopy')}
                   </p>
                 </motion.button>
+
+                {/* Manual Delivery Notice */}
+                <motion.div
+                  initial={{ y: 10, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  transition={{ delay: 0.4 }}
+                  className="rounded-xl p-3 text-center"
+                  style={{
+                    background: 'rgba(59, 130, 246, 0.1)',
+                    border: '1px solid rgba(59, 130, 246, 0.2)',
+                  }}
+                >
+                  <p className="text-blue-400 text-xs">
+                    📦 {t('payment.manualDeliveryNotice')}
+                  </p>
+                </motion.div>
               </div>
 
               {/* Footer - Compact */}

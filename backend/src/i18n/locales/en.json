@@ -71,6 +71,18 @@
       "validUntil": "Valid until: {date}",
       "goToMenu": "Go to Menu"
     },
+    "new": {
+      "title": "Payment Received!",
+      "thankYou": "Thank you for subscribing to {tier}!",
+      "validUntil": "Valid until: {date}",
+      "nextStep": "Now create your shop — choose a name and set it up.",
+      "setupShopButton": "🛍 Create Shop"
+    },
+    "renewed": {
+      "title": "Subscription Renewed!",
+      "tier": "Plan: {tier}",
+      "extendedUntil": "Extended until: {date}"
+    },
     "pendingSetup": {
       "title": "Payment Received",
       "tier": "Plan: {tier}",

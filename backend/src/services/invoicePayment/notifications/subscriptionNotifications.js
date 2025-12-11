@@ -51,8 +51,12 @@ async function sendNotificationWithRetry(sendFn, context) {
 /**
  * Notify shop owner about activated subscription
  * @param {number} subscriptionId - Subscription ID to notify about
+ * @param {Object} options - Notification options
+ * @param {string} options.purpose - Invoice purpose (subscription_new, subscription_renewal, subscription_upgrade)
  */
-export async function notifySubscriptionActivated(subscriptionId) {
+export async function notifySubscriptionActivated(subscriptionId, options = {}) {
+  const { purpose = 'subscription' } = options;
+
   try {
     const subscription = await subscriptionQueries.findShopSubscriptionById(subscriptionId);
     if (!subscription || !subscription.shop_id) {
@@ -62,7 +66,7 @@ export async function notifySubscriptionActivated(subscriptionId) {
     const shop = await shopQueries.findById(subscription.shop_id);
     const owner = shop ? await userQueries.findById(shop.owner_id) : null;
 
-    if (owner?.telegram_id && shop && global.botInstance) {
+    if (owner?.telegram_id && global.botInstance) {
       const lang = owner.language || DEFAULT_LANGUAGE;
       const tierEmoji = subscription.tier === 'max' ? '👑' : '⭐';
       const tierLabel = (subscription.tier || 'pro').toUpperCase();
@@ -75,21 +79,47 @@ export async function notifySubscriptionActivated(subscriptionId) {
           })
         : null;
 
-      const message = `${tierEmoji} <b>${t('subscription.activated.title', {}, lang)}</b>
+      // Check if this is a NEW subscription (needs shop setup) or RENEWAL
+      const isNewSubscription = purpose === 'subscription_new';
+
+      let message;
+      let keyboard;
+
+      if (isNewSubscription) {
+        // NEW SUBSCRIPTION: Show setup prompt with button to configure shop
+        message = `${tierEmoji} <b>${t('subscription.new.title', {}, lang)}</b>
+
+${t('subscription.new.thankYou', { tier: tierLabel }, lang)}
+${nextDue ? t('subscription.new.validUntil', { date: nextDue }, lang) : ''}
+
+${t('subscription.new.nextStep', {}, lang)}`;
+
+        keyboard = {
+          inline_keyboard: [
+            [{ text: t('subscription.new.setupShopButton', {}, lang), callback_data: `start_create_shop:${subscription.tier || 'pro'}` }],
+          ],
+        };
+      } else {
+        // RENEWAL / UPGRADE: Show confirmation with date extended
+        message = `${tierEmoji} <b>${t('subscription.renewed.title', {}, lang)}</b>
 
 <b>${shop.name}</b>
-${t('subscription.activated.tier', { tier: tierLabel }, lang)}${nextDue ? `\n${t('subscription.activated.validUntil', { date: nextDue }, lang)}` : ''}`;
+${t('subscription.renewed.tier', { tier: tierLabel }, lang)}
+${nextDue ? t('subscription.renewed.extendedUntil', { date: nextDue }, lang) : ''}`;
+
+        keyboard = {
+          inline_keyboard: [[{ text: t('subscription.activated.goToMenu', {}, lang), callback_data: 'back_to_main' }]],
+        };
+      }
 
       const result = await sendNotificationWithRetry(
         async () => {
           await global.botInstance.telegram.sendMessage(owner.telegram_id, message.trim(), {
             parse_mode: 'HTML',
-            reply_markup: {
-              inline_keyboard: [[{ text: t('subscription.activated.goToMenu', {}, lang), callback_data: 'back_to_main' }]],
-            },
+            reply_markup: keyboard,
           });
         },
-        { type: 'subscription_activated', subscriptionId, ownerTelegramId: owner.telegram_id }
+        { type: 'subscription_activated', subscriptionId, ownerTelegramId: owner.telegram_id, purpose }
       );
 
       if (!result.success) {

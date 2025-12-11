@@ -276,7 +276,8 @@ export async function processSubscriptionPayment({
 
     // CRITICAL: Notification OUTSIDE transaction
     if (finalizeResult.ok && finalizeResult.state === 'confirmed') {
-      await notifySubscriptionActivated(subscriptionId);
+      // Pass purpose to notification for new vs renewal messaging
+      await notifySubscriptionActivated(subscriptionId, { purpose: invoicePurpose });
 
       // Emit WebSocket event for real-time UI updates
       broadcast('subscription_payment_confirmed', {

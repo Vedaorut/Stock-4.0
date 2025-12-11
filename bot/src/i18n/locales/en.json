@@ -219,8 +219,9 @@
     "subscriptionUpgradePrompt": "Upgrade to PRO to unlock additional features.",
     "subscriptionProBenefits": "PRO gives access to advanced analytics and pro tools.",
     "subscriptionStatusError": "Failed to load subscription status. Please try again.",
-    "subscriptionProInfo": "Manage Subscription\n\nTier: PRO\nStatus: {status}\nRenewal: {renewDate}",
-    "subscriptionMaxInfo": "Manage Subscription\n\nTier: MAX\nStatus: {status}\nRenewal: {renewDate}",
+    "subscriptionProInfo": "Manage Subscription\n\nTier: PRO\nStatus: {status}\nRenewal: {renewDate}\nRemaining: {daysRemaining} days",
+    "subscriptionMaxInfo": "Manage Subscription\n\nTier: MAX\nStatus: {status}\nRenewal: {renewDate}\nRemaining: {daysRemaining} days",
+    "subscriptionFallback": "Manage Subscription\n\nTier: {tier}\nStatus: {status}\nValid until: {date}\nRemaining: {daysRemaining} days",
     "walletsContext": "Wallets for Receiving Payments\n\nAdd your crypto wallet addresses - customer payments will be sent there.\n\nSupported currencies:\nBTC (Bitcoin)\nETH (Ethereum)\nUSDT (Tether TRC-20)\nLTC (Litecoin)\n\nYou can add all 4 currencies - buyers will choose their preferred one at checkout.",
     "workersContext": "Shop Workers\n\nThis feature is only available on PRO tier.\n\nWhy use it?\nAdd employees who can manage products and orders on your behalf. You remain the shop owner.\n\nWhat workers CAN do:\nAdd and edit products\nView orders\nMark orders as shipped\n\nWhat workers CANNOT do:\nChange shop settings\nManage subscription\nDelete shop",
     "activeOrdersContext": "Active Orders\n\nHere are orders that have been paid by the buyer and are awaiting shipment.\n\nAfter shipping, click \"Shipped\" - the buyer will be notified.",
@@ -534,7 +535,8 @@
   "warnings": {
     "noWallets": "No wallets configured - buyers won't be able to pay for products.",
     "noWalletsCritical": "⚠️ Set up wallets or customers won't be able to pay!",
-    "noProducts": "📦 No products in shop yet - add products to start selling."
+    "noProducts": "📦 No products in shop yet - add products to start selling.",
+    "subscriptionExpiringSoon": "⏰ Subscription expires in {days} days — renew to keep your shop running!"
   },
   "inviteLink": {
     "title": "Invite Link",
@@ -564,7 +566,7 @@
     "linkTitle": "Your store link",
     "linkText": "Customer clicks → your store opens → auto-subscribe.\nShare in your channel and with clients.",
     "productsTitle": "Adding products",
-    "productsText": "Two ways:\n\nAI assistant — type in chat:\n• \"Add 5 T-shirts for $15\"\n• \"Delete product Cap\"\n• \"Change price T-shirt to $20\"\n• \"Set 20% discount on MacBook for 4 hours\"\n\nApp — open store and add manually.",
+    "productsText": "Two ways:\n\nAI assistant — type in chat:\n• \"Add 5 T-shirts for $15\"\n• \"Delete product Cap\"\n• \"Change price T-shirt to $20\"\n• \"Set 20% discount on MacBook for 4 hours\"\n\nApp — open store and add manually.\n\n📦 <b>Manual delivery</b>\nBuyer receives your contact for communication — auto-delivery is disabled for product privacy.",
     "walletsTitle": "Set up payouts",
     "walletsText": "Send wallet addresses — each on a new line.\nBTC, ETH, LTC, USDT — we'll detect automatically.\n\n💡 You can add or change wallets anytime via tools or the app.",
     "followingTitle": "Tool: Following",

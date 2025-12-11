@@ -407,15 +407,17 @@ export default function Catalog() {
         // Reset noShopsAvailable state
         setNoShopsAvailable(false);
 
+        // FIX: Immediate stale data check - clear if shop changed
+        if (currentShop && productsShopId && productsShopId !== currentShop.id) {
+          setProducts([], currentShop.id);
+        }
+
         // Step 1: Load my shops first (needed to determine ownership)
         const shopResult = await loadMyShop(signal);
         if (signal.aborted) return;
 
-        if (shopResult.status === 'error' && !currentShop) {
-          // Only block if we have absolutely no shop to show
-          setError(shopResult.error);
-          return;
-        }
+        // FIX: Don't block on shop error immediately - try loading subscriptions first
+        // We only block if we truly cant find any content to show
 
         // Determine target shop
         let targetShop = currentShop || shopResult.shop;
@@ -424,12 +426,6 @@ export default function Catalog() {
         if (!targetShop) {
           const subsResult = await loadSubscriptions(signal);
           if (signal.aborted) return;
-
-          // Check for subscription loading error first - show error, not empty state
-          if (subsResult.status === 'error') {
-            setError(subsResult.error || 'Failed to load subscriptions');
-            return;
-          }
 
           if (subsResult.subscriptions && subsResult.subscriptions.length > 0) {
             // Set first subscription as current shop
@@ -443,7 +439,17 @@ export default function Catalog() {
             setCurrentShop(subscriptionShop);
             targetShop = subscriptionShop;
           } else {
-            // No subscriptions - show empty state
+            // Now strictly check for errors if we still have no shop
+            if (shopResult.status === 'error') {
+              setError(shopResult.error);
+              return;
+            }
+            if (subsResult.status === 'error') {
+              setError(subsResult.error);
+              return;
+            }
+
+            // No subscriptions and no errors - show empty state
             setNoShopsAvailable(true);
             return;
           }

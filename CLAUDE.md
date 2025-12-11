@@ -166,3 +166,16 @@ users → shops → products → orders → order_items
 2. Subagent returns findings → Review and verify
 3. Apply minimal edits directly (no need to delegate simple fixes)
 4. Restart services and confirm
+
+---
+
+## Anthropic Plugins (claude-code-plugins)
+
+| Plugin | Use For |
+|--------|---------|
+| `frontend-design` | Production UI components |
+| `pr-review-toolkit` | PR review (6 agents) |
+| `feature-dev` | Feature dev (3 agents) |
+| `code-review` | Code review PR |
+| `security-guidance` | Security analysis |
+| `hookify` | Create hooks |
