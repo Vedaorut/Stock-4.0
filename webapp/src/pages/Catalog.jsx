@@ -407,23 +407,31 @@ export default function Catalog() {
         // Reset noShopsAvailable state
         setNoShopsAvailable(false);
 
-        // FIX: Immediate stale data check - clear if shop changed
+        // Immediate stale data check (optional but good practice)
         if (currentShop && productsShopId && productsShopId !== currentShop.id) {
           setProducts([], currentShop.id);
         }
 
-        // Step 1: Load my shops first (needed to determine ownership)
-        const shopResult = await loadMyShop(signal);
-        if (signal.aborted) return;
+        // Determine target shop and ownership first
+        // Optimization: Only load "my shop" if we don't have a current shop (initial load)
+        let targetShop = currentShop;
+
+        let shopResult = { status: 'skipped' };
+        if (!targetShop) {
+          shopResult = await loadMyShop(signal);
+          if (signal.aborted) return;
+          // If success, loadMyShop sets myShop AND returns it
+          if (shopResult.status === 'success') {
+            targetShop = shopResult.shop;
+          }
+        }
 
         // FIX: Don't block on shop error immediately - try loading subscriptions first
-        // We only block if we truly cant find any content to show
-
-        // Determine target shop
-        let targetShop = currentShop || shopResult.shop;
 
         // If no shop available (buyer without own shop), try to load subscriptions
         if (!targetShop) {
+          // If we failed to load myShop, we continue here
+
           const subsResult = await loadSubscriptions(signal);
           if (signal.aborted) return;
 
@@ -527,6 +535,13 @@ export default function Catalog() {
 
   // Product Filtering
   const { stockProducts, preorderProducts } = useMemo(() => {
+    // V2 FIX: Strict UI Guard
+    // If we have a display shop but the products in store belong to a different ID,
+    // treat it as empty/loading (don't show stale data).
+    if (displayShop && productsShopId !== displayShop.id) {
+      return { stockProducts: [], preorderProducts: [] };
+    }
+
     const stock = [];
     const preorder = [];
 
@@ -540,7 +555,7 @@ export default function Catalog() {
       }
     }
     return { stockProducts: stock, preorderProducts: preorder };
-  }, [products]);
+  }, [products, displayShop, productsShopId]);
 
   const displayedProducts = activeSection === 'preorder' ? preorderProducts : stockProducts;
 

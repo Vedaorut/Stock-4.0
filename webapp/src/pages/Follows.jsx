@@ -148,10 +148,12 @@ export default function Follows() {
     [triggerHaptic]
   );
 
-  // Handle click on subscription - navigate to shop catalog
   const handleSubscriptionClick = useCallback((subscription) => {
     triggerHaptic('light');
-    const { setCurrentShop, setActiveTab } = useStore.getState();
+    const { setCurrentShop, setActiveTab, setProducts } = useStore.getState();
+
+    // FIX: Explicitly clear products BEFORE navigation to prevent stale data
+    setProducts([], null);
 
     setCurrentShop({
       id: subscription.shop_id,
@@ -239,26 +241,26 @@ export default function Follows() {
         {isLoading ? (
           <div className="flex items-center justify-center py-20">
             <div className="relative w-10 h-10">
-                <div className="absolute inset-0 border-4 border-white/10 rounded-full"></div>
-                <div className="absolute inset-0 border-4 border-[#FF6B00] border-t-transparent rounded-full animate-spin"></div>
+              <div className="absolute inset-0 border-4 border-white/10 rounded-full"></div>
+              <div className="absolute inset-0 border-4 border-[#FF6B00] border-t-transparent rounded-full animate-spin"></div>
             </div>
           </div>
         ) : error ? (
           <div className="flex flex-col items-center justify-center py-12 text-center">
             <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center mb-4">
-                <svg
-                  className="w-8 h-8 text-red-500"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
+              <svg
+                className="w-8 h-8 text-red-500"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
             </div>
             <h3 className="text-lg font-semibold text-white mb-2">{error}</h3>
             <motion.button
@@ -272,22 +274,22 @@ export default function Follows() {
         ) : subscriptions.length === 0 && follows.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <div className="relative w-24 h-24 mb-6">
-                <div className="absolute inset-0 bg-[#FF6B00]/10 blur-xl rounded-full"></div>
-                <div className="relative w-full h-full rounded-3xl bg-white/5 border border-white/10 flex items-center justify-center backdrop-blur-sm">
-                  <svg
-                    className="w-10 h-10 text-white/40"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={1.5}
-                      d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
-                    />
-                  </svg>
-                </div>
+              <div className="absolute inset-0 bg-[#FF6B00]/10 blur-xl rounded-full"></div>
+              <div className="relative w-full h-full rounded-3xl bg-white/5 border border-white/10 flex items-center justify-center backdrop-blur-sm">
+                <svg
+                  className="w-10 h-10 text-white/40"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1.5}
+                    d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
+                  />
+                </svg>
+              </div>
             </div>
             <h3 className="text-xl font-bold text-white mb-2">{t('follows.empty')}</h3>
             <p className="text-white/50 text-sm max-w-[240px] leading-relaxed">
