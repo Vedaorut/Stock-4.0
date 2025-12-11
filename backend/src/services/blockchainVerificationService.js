@@ -79,12 +79,31 @@ const BLOCKCHAIN_CONFIG = {
   },
 };
 
+// PAY-P2-1 FIX: Centralized tolerance configuration
 // Amount tolerance for network fees (1% capped at $0.10)
-const AMOUNT_TOLERANCE_PERCENT = 0.01;
-const AMOUNT_TOLERANCE_MAX = 0.1;
+// NOTE: These values are kept here for clarity, but TOLERANCE_BOUNDS in paymentTolerance.js
+// is the authoritative source. If you change these, update paymentTolerance.js as well.
+const AMOUNT_TOLERANCE_PERCENT = 0.01; // 1% - same as TOLERANCE_BOUNDS.MAX_TOLERANCE
+const AMOUNT_TOLERANCE_MAX = 0.10;     // $0.10 cap - not in TOLERANCE_BOUNDS (specific to verification)
 
 // API request timeout (10 seconds)
 const API_TIMEOUT = 10000;
+
+/**
+ * PAY-P3-1 FIX: Sanitize URL to remove API keys before logging
+ * Prevents accidental API key leakage to logs/monitoring systems
+ *
+ * @param {string} url - URL to sanitize
+ * @returns {string} URL with API keys masked
+ */
+function sanitizeUrl(url) {
+  if (!url) {return url;}
+  return url
+    .replace(/token=[^&]+/gi, 'token=***')
+    .replace(/apikey=[^&]+/gi, 'apikey=***')
+    .replace(/api_key=[^&]+/gi, 'api_key=***')
+    .replace(/key=[^&]+/gi, 'key=***');
+}
 
 /**
  * Custom error class for API failures
@@ -101,6 +120,17 @@ class BlockchainAPIError extends Error {
 
 function getMinimumAcceptedAmount(expectedAmount) {
   const numericExpected = Number(expectedAmount);
+
+  // PAY-P1-3 FIX: Block zero or negative expected amounts
+  // This prevents edge cases where amount=0 could pass verification
+  if (!Number.isFinite(numericExpected) || numericExpected <= 0) {
+    logger.error('[BlockchainVerification] Invalid expected amount in getMinimumAcceptedAmount', {
+      expectedAmount,
+      numericExpected,
+    });
+    return Infinity; // Force amount check to fail
+  }
+
   const tolerance = Math.min(numericExpected * AMOUNT_TOLERANCE_PERCENT, AMOUNT_TOLERANCE_MAX);
   return numericExpected - tolerance;
 }
@@ -133,14 +163,14 @@ async function fetchWithRetry(url, options = {}, retries = 3) {
       if (!isLastAttempt) {
         const waitTime = 1000 * Math.pow(2, attempt - 1); // Exponential backoff: 1s, 2s, 4s
         logger.warn(`[BlockchainVerification] API request failed (attempt ${attempt}/${retries}), retrying in ${waitTime}ms...`, {
-          url,
+          url: sanitizeUrl(url), // PAY-P3-1: Sanitize URL to hide API keys
           error: error.message,
         });
         await new Promise((resolve) => setTimeout(resolve, waitTime));
       } else {
         // Final attempt failed
         logger.error('[BlockchainVerification] API request failed after all retries', {
-          url,
+          url: sanitizeUrl(url), // PAY-P3-1: Sanitize URL to hide API keys
           error: error.message,
           response: error.response?.data,
         });
@@ -355,6 +385,19 @@ export async function verifyBitcoinPayment(txHash, expectedAddress, expectedAmou
 
   const verified = confirmations >= config.minConfirmations;
 
+  // PAY-P2-2 FIX: Log overpayment for accounting purposes
+  // Overpayment is ALWAYS accepted (good for seller), but logged for audit trail
+  const receivedBTC = parseFloat(amountBTC);
+  if (receivedBTC > expectedBTC) {
+    logger.info('[BlockchainVerification] Overpayment received (BTC)', {
+      txHash: txHash.substring(0, 20),
+      expected: expectedBTC,
+      received: receivedBTC,
+      overpayment: (receivedBTC - expectedBTC).toFixed(8),
+      overpaymentPercent: (((receivedBTC - expectedBTC) / expectedBTC) * 100).toFixed(2) + '%',
+    });
+  }
+
   return {
     verified,
     status: verified ? 'confirmed' : 'pending',
@@ -454,6 +497,18 @@ export async function verifyLitecoinPayment(txHash, expectedAddress, expectedAmo
   const confirmations = tx.confirmations || 0;
   const verified = confirmations >= config.minConfirmations;
 
+  // PAY-P2-2 FIX: Log overpayment for accounting purposes
+  const receivedLTC = parseFloat(amountLTC);
+  if (receivedLTC > expectedLTC) {
+    logger.info('[BlockchainVerification] Overpayment received (LTC)', {
+      txHash: txHash.substring(0, 20),
+      expected: expectedLTC,
+      received: receivedLTC,
+      overpayment: (receivedLTC - expectedLTC).toFixed(8),
+      overpaymentPercent: (((receivedLTC - expectedLTC) / expectedLTC) * 100).toFixed(2) + '%',
+    });
+  }
+
   return {
     verified,
     status: verified ? 'confirmed' : 'pending',
@@ -518,8 +573,17 @@ export async function verifyEthereumPayment(txHash, expectedAddress, expectedAmo
   }
 
   // Convert wei to ETH
-  const valueWei = parseInt(tx.value, 16);
-  const amountETH = (valueWei / Math.pow(10, config.decimals)).toFixed(6); // 6 decimals for display
+  // PAY-P1-1 FIX: Use BigInt to handle large values (>2^53) without precision loss
+  const valueWei = BigInt(tx.value);
+  const amountETH = (Number(valueWei) / Math.pow(10, config.decimals)).toFixed(6); // 6 decimals for display
+
+  // Safety check for extremely large values that exceed safe integer range
+  if (valueWei > BigInt(Number.MAX_SAFE_INTEGER)) {
+    logger.warn('[BlockchainVerification] ETH value exceeds MAX_SAFE_INTEGER, precision may be affected', {
+      txHash: txHash.substring(0, 20),
+      valueWei: valueWei.toString(),
+    });
+  }
   const expectedETH = parseFloat(expectedAmount);
 
   // P0 SECURITY: Validate expectedAmount to prevent NaN bypass
@@ -589,6 +653,18 @@ export async function verifyEthereumPayment(txHash, expectedAddress, expectedAmo
   // BUG-PAY-003 FIX: Off-by-one error - include the block itself in confirmations
   const confirmations = currentBlock - blockNumber + 1;
   const verified = confirmations >= config.minConfirmations;
+
+  // PAY-P2-2 FIX: Log overpayment for accounting purposes
+  const receivedETH = parseFloat(amountETH);
+  if (receivedETH > expectedETH) {
+    logger.info('[BlockchainVerification] Overpayment received (ETH)', {
+      txHash: txHash.substring(0, 20),
+      expected: expectedETH,
+      received: receivedETH,
+      overpayment: (receivedETH - expectedETH).toFixed(8),
+      overpaymentPercent: (((receivedETH - expectedETH) / expectedETH) * 100).toFixed(2) + '%',
+    });
+  }
 
   return {
     verified,
@@ -705,9 +781,18 @@ export async function verifyUSDTTRC20Payment(txHash, expectedAddress, expectedAm
   }
 
   // Decode amount from data field
+  // PAY-P1-1 FIX: Use BigInt to handle large values without precision loss
   const amountHex = transferEvent.data;
-  const amountRaw = parseInt(amountHex, 16);
-  const amountUSDT = (amountRaw / Math.pow(10, config.decimals)).toFixed(config.decimals);
+  const amountRaw = BigInt('0x' + amountHex);
+  const amountUSDT = (Number(amountRaw) / Math.pow(10, config.decimals)).toFixed(config.decimals);
+
+  // Safety check for extremely large values
+  if (amountRaw > BigInt(Number.MAX_SAFE_INTEGER)) {
+    logger.warn('[BlockchainVerification] USDT amount exceeds MAX_SAFE_INTEGER, precision may be affected', {
+      txHash: txHash.substring(0, 20),
+      amountRaw: amountRaw.toString(),
+    });
+  }
   const expectedUSDT = parseFloat(expectedAmount);
 
   // P0 SECURITY: Validate expectedAmount to prevent NaN bypass
@@ -763,6 +848,18 @@ export async function verifyUSDTTRC20Payment(txHash, expectedAddress, expectedAm
 
   const verified = confirmations >= config.minConfirmations;
 
+  // PAY-P2-2 FIX: Log overpayment for accounting purposes
+  const receivedUSDT = parseFloat(amountUSDT);
+  if (receivedUSDT > expectedUSDT) {
+    logger.info('[BlockchainVerification] Overpayment received (USDT)', {
+      txHash: txHash.substring(0, 20),
+      expected: expectedUSDT,
+      received: receivedUSDT,
+      overpayment: (receivedUSDT - expectedUSDT).toFixed(6),
+      overpaymentPercent: (((receivedUSDT - expectedUSDT) / expectedUSDT) * 100).toFixed(2) + '%',
+    });
+  }
+
   return {
     verified,
     status: verified ? 'confirmed' : 'pending',
@@ -793,7 +890,8 @@ async function getTronConfirmations(blockNumber) {
   });
 
   const currentBlockNumber = currentBlock.block_header?.raw_data?.number || 0;
-  return currentBlockNumber - blockNumber;
+  // PAY-P0-1 FIX: Add +1 for consistency with BTC/ETH confirmation calculation
+  return currentBlockNumber - blockNumber + 1;
 }
 
 /**

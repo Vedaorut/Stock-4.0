@@ -172,9 +172,11 @@ router.get('/invoices/:id/status', verifyToken, async (req, res) => {
     let status = 'pending';
 
     // CrystalPay fallback: Check gateway if webhook might have failed
-    // Only for pending invoices with crystalpay_id (older than 30 seconds to avoid race with webhook)
+    // Only for pending invoices with crystalpay_id (older than 5 minutes to avoid race with webhook)
     const invoiceAge = Date.now() - new Date(invoice.created_at).getTime();
-    const MIN_AGE_FOR_FALLBACK = 30 * 1000; // 30 seconds
+    // 5 minutes - allow time for CrystalPay webhook delivery/retries before fallback check
+    // CrystalPay may retry webhooks on failure, and network delays can occur
+    const MIN_AGE_FOR_FALLBACK = 5 * 60 * 1000;
 
     if (invoice.crystalpay_id && invoice.status === 'pending' && invoiceAge > MIN_AGE_FOR_FALLBACK) {
       try {

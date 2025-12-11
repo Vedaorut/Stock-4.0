@@ -21,6 +21,7 @@ import { paymentQueries } from '../../../database/queries/index.js';
 import { markInvoicePaid } from '../utils/paymentRecords.js';
 import { SUBSCRIPTION_PERIOD_DAYS } from '../../../config/subscriptionPricing.js';
 import logger from '../../../utils/logger.js';
+import { workerQueries } from '../../../models/workerQueries.js';
 
 /**
  * Finalizes a subscription payment after successful verification.
@@ -177,6 +178,29 @@ export async function finalizeSubscriptionPayment(client, { subscription, invoic
   // (Handles both regular renewal AND trial-to-paid conversion)
   // =========================================================================
   if (subscription.shop_id) {
+    // SECURITY: Check for tier downgrade (MAX -> PRO) and remove workers
+    // Workers are only allowed on MAX tier, so they must be removed on downgrade
+    const shopResult = await client.query(
+      'SELECT tier FROM shops WHERE id = $1',
+      [subscription.shop_id]
+    );
+    const currentTier = shopResult.rows[0]?.tier;
+
+    if (currentTier === 'max' && subscription.tier === 'pro') {
+      logger.info(`[SubscriptionPayment] SECURITY: Tier downgrade detected (MAX -> PRO) for shop ${subscription.shop_id}`);
+      try {
+        const removedWorkers = await workerQueries.removeAllByShop(subscription.shop_id, client);
+        if (removedWorkers.length > 0) {
+          logger.info(
+            `[SubscriptionPayment] SECURITY: Removed ${removedWorkers.length} workers from shop ${subscription.shop_id} on tier downgrade`
+          );
+        }
+      } catch (workerError) {
+        logger.error(`[SubscriptionPayment] Failed to remove workers on downgrade for shop ${subscription.shop_id}:`, workerError);
+        // Don't fail the payment - workers will still be blocked by tier check in auth middleware
+      }
+    }
+
     // Update shop subscription status
     // is_trial = false converts trial shop to paid
     // trial_ends_at = NULL clears trial expiration
@@ -235,11 +259,13 @@ export async function finalizeSubscriptionPayment(client, { subscription, invoic
     }
 
     // =========================================================================
-    // RACE CONDITION FIX: Check if user already has an active shop
+    // RACE CONDITION FIX: Check if user already has ANY shop
     // Another concurrent payment might have created a shop already
+    // INV-P2-2 FIX: Add FOR UPDATE to prevent TOCTOU race condition
+    // SUB-BUG3 FIX: Remove is_active=true to catch ALL shops (including inactive/newly created)
     // =========================================================================
     const existingShopResult = await client.query(
-      `SELECT id, name FROM shops WHERE owner_id = $1 AND is_active = true LIMIT 1`,
+      `SELECT id, name, is_active FROM shops WHERE owner_id = $1 ORDER BY created_at DESC LIMIT 1 FOR UPDATE`,
       [subscription.user_id]
     );
 
@@ -247,7 +273,12 @@ export async function finalizeSubscriptionPayment(client, { subscription, invoic
     if (existingShopResult.rows.length > 0) {
       // Use existing shop instead of creating duplicate
       newShop = existingShopResult.rows[0];
-      logger.info(`[SubscriptionPayment] Using existing shop: ${newShop.id} for user ${subscription.user_id}`);
+      logger.info(`[SubscriptionPayment] Using existing shop: ${newShop.id} for user ${subscription.user_id} (was_active: ${newShop.is_active})`);
+
+      // SUB-BUG3 FIX: Reactivate shop if it was inactive
+      if (!newShop.is_active) {
+        logger.info(`[SubscriptionPayment] Reactivating inactive shop ${newShop.id}`);
+      }
     } else {
       // Create new shop only if none exists
       const shopName = `Shop_${user.username || user.telegram_id}_${Date.now()}`;
@@ -283,10 +314,21 @@ export async function finalizeSubscriptionPayment(client, { subscription, invoic
       ]
     );
 
-    // Update shop's next payment due
+    // Update shop's subscription status and next payment due
+    // SUB-BUG3 FIX: Also reactivate shop if it was inactive
     await client.query(
-      `UPDATE shops SET next_payment_due = $1, updated_at = NOW() WHERE id = $2`,
-      [periodEnd, newShop.id]
+      `UPDATE shops
+       SET tier = $1,
+           subscription_status = 'active',
+           next_payment_due = $2,
+           grace_period_until = NULL,
+           registration_paid = true,
+           is_active = true,
+           is_trial = false,
+           trial_ends_at = NULL,
+           updated_at = NOW()
+       WHERE id = $3`,
+      [subscription.tier, periodEnd, newShop.id]
     );
   }
 

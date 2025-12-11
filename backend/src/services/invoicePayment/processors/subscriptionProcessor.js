@@ -199,6 +199,9 @@ export async function processSubscriptionPayment({
     );
     const currentInvoice = currentInvoiceResult.rows[0];
 
+    // INV-P1-2 FIX: Add advisory lock for additional safety (consistent with orderProcessor)
+    await client.query('SELECT pg_advisory_xact_lock($1)', [invoice.id]);
+
     // Check activity and handle expiration atomically
     const activity = await ensureInvoiceActive(currentInvoice, client);
 
@@ -297,7 +300,8 @@ export async function processSubscriptionPayment({
       logger.warn(
         `[InvoicePayment] Lock contention for subscription ${subscriptionId}. Failed to acquire lock within 5s.`
       );
-      throw new ValidationError('System is busy (Lock Timeout), please try again shortly.');
+      // INV-P3-1 FIX: Include subscription ID in error message for debugging
+      throw new ValidationError(`System is busy processing subscription ${subscriptionId}. Please try again shortly.`);
     }
 
     logger.error('[InvoicePayment] Subscription payment failed:', {

@@ -63,16 +63,23 @@ export async function cleanupExpiredInvoices() {
       );
 
       // Release reserved stock only for actually cancelled orders
+      // Only unreserve for non-preorder products where stock wasn't already deducted
       cancelledOrderIds = cancelResult.rows.map((r) => r.id);
       if (cancelledOrderIds.length > 0) {
         await client.query(
-          `
-          UPDATE products p
-          SET reserved_quantity = reserved_quantity - oi.quantity
-          FROM order_items oi
-          WHERE oi.product_id = p.id
-          AND oi.order_id = ANY($1)
-        `,
+          `UPDATE products p
+           SET reserved_quantity = GREATEST(0, p.reserved_quantity - sub.total_qty),
+               updated_at = NOW()
+           FROM (
+             SELECT oi.product_id, SUM(oi.quantity) as total_qty
+             FROM order_items oi
+             JOIN products prod ON oi.product_id = prod.id
+             WHERE oi.order_id = ANY($1)
+               AND prod.is_preorder = false
+               AND oi.stock_deducted = false
+             GROUP BY oi.product_id
+           ) sub
+           WHERE p.id = sub.product_id`,
           [cancelledOrderIds]
         );
       }
