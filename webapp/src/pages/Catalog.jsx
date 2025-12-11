@@ -84,9 +84,11 @@ export default function Catalog() {
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
   const [isSearchActive, setIsSearchActive] = useState(false);
+  const [highlightedProductId, setHighlightedProductId] = useState(null);
   const searchInputRef = useRef(null);
   const searchContainerRef = useRef(null);
   const debounceTimerRef = useRef(null);
+  const highlightTimeoutRef = useRef(null);
 
   // Optimized Store Selection
   const {
@@ -294,28 +296,54 @@ export default function Catalog() {
     triggerHaptic('light');
   }, [triggerHaptic]);
 
-  // Handle search result click - navigate to shop
+  // Handle search result click - switch category, highlight and scroll to product
   const handleSearchResultClick = useCallback(
     (product) => {
       triggerHaptic('light');
 
-      // Set current shop from product
-      const shop = {
-        id: product.shop_id,
-        name: product.shop_name || 'Shop',
-      };
+      // Determine which category the product belongs to
+      const productCategory = product.availability === 'preorder' ? 'preorder' : 'stock';
 
-      setCurrentShop(shop);
+      // Switch to correct category if needed
+      if (activeSection !== productCategory) {
+        setActiveSection(productCategory);
+      }
+
+      // Clear previous highlight timeout
+      if (highlightTimeoutRef.current) {
+        clearTimeout(highlightTimeoutRef.current);
+      }
+
+      // Set highlighted product
+      setHighlightedProductId(product.id);
+
+      // Auto-clear highlight after 3 seconds
+      highlightTimeoutRef.current = setTimeout(() => {
+        setHighlightedProductId(null);
+      }, 3000);
+
+      // Close search
       clearSearch();
+
+      // Scroll to product after a small delay (for category switch animation)
+      setTimeout(() => {
+        const productElement = document.getElementById(`product-${product.id}`);
+        if (productElement) {
+          productElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 100);
     },
-    [setCurrentShop, clearSearch, triggerHaptic]
+    [activeSection, clearSearch, triggerHaptic]
   );
 
-  // Cleanup debounce timer on unmount
+  // Cleanup timers on unmount
   useEffect(() => {
     return () => {
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current);
+      }
+      if (highlightTimeoutRef.current) {
+        clearTimeout(highlightTimeoutRef.current);
       }
     };
   }, []);
@@ -885,6 +913,7 @@ export default function Catalog() {
                 ? t('catalog.preorderEmptyDesc')
                 : t('catalog.emptyDesc')
             }
+            highlightedProductId={highlightedProductId}
           />
         )}
       </div>

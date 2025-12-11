@@ -25,6 +25,7 @@ const ProductGrid = memo(function ProductGrid({
   emptyDescription,
   emptyIcon,
   onPreorder,
+  highlightedProductId = null,
 }) {
   const { t } = useTranslation();
   const platform = usePlatform();
@@ -104,9 +105,15 @@ const ProductGrid = memo(function ProductGrid({
       >
         {products.map((product) => {
           const isWide = product.name.length > 45;
+          const isHighlighted = highlightedProductId === product.id;
 
           return (
-            <motion.div key={product.id} variants={item} className={isWide ? 'col-span-2' : ''}>
+            <motion.div
+              key={product.id}
+              id={`product-${product.id}`}
+              variants={item}
+              className={`${isWide ? 'col-span-2' : ''} ${isHighlighted ? 'ring-2 ring-orange-500 rounded-2xl animate-pulse' : ''}`}
+            >
               <ProductCard product={product} onPreorder={onPreorder} isWide={isWide} />
             </motion.div>
           );
@@ -132,10 +139,12 @@ const ProductGrid = memo(function ProductGrid({
         {virtualizer.getVirtualItems().map((virtualItem) => {
           const product = products[virtualItem.index];
           const isWide = product.name.length > 45;
+          const isHighlighted = highlightedProductId === product.id;
 
           return (
             <div
               key={virtualItem.key}
+              id={`product-${product.id}`}
               data-index={virtualItem.index}
               ref={virtualizer.measureElement}
               style={{
@@ -146,7 +155,7 @@ const ProductGrid = memo(function ProductGrid({
                 transform: `translateY(${virtualItem.start}px)`,
               }}
             >
-              <div className={`grid grid-cols-2 gap-4 ${isWide ? 'grid-cols-1' : ''}`}>
+              <div className={`grid grid-cols-2 gap-4 ${isWide ? 'grid-cols-1' : ''} ${isHighlighted ? 'ring-2 ring-orange-500 rounded-2xl animate-pulse' : ''}`}>
                 <ProductCard product={product} onPreorder={onPreorder} isWide={isWide} />
               </div>
             </div>
