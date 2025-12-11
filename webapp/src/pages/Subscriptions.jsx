@@ -47,6 +47,7 @@ function SearchResultItem({ product, onClick }) {
 export default function Subscriptions() {
   const [myShop, setMyShop] = useState(null);
   const [follows, setFollows] = useState([]);
+  const [subscribers, setSubscribers] = useState([]);
   const [buyerSubscriptions, setBuyerSubscriptions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -121,29 +122,38 @@ export default function Subscriptions() {
         setMyShop(shop);
         setMyShops(shops); // Save to global store
 
-        // 2. Load follows (subscriptions to other shops)
+        // 2. Load follows (subscriptions to other shops) and subscribers (who subscribed to my shop)
         if (shop) {
-          const { data: followsData, error: followsErr } = await get('/follows/my', {
-            params: { shopId: shop.id },
-            signal,
-          });
+          // Load follows and subscribers in parallel
+          const [followsResult, subscribersResult] = await Promise.all([
+            get('/follows/my', { params: { shopId: shop.id }, signal }),
+            get(`/shops/${shop.id}/subscribers`, { signal }),
+          ]);
 
           if (signal?.aborted) return { status: 'aborted' };
 
-          if (followsErr) {
+          // Handle follows
+          if (followsResult.error) {
             if (import.meta.env.DEV) {
-              console.error('[Subscriptions] Error loading follows:', followsErr);
+              console.error('[Subscriptions] Error loading follows:', followsResult.error);
             }
-            // Set follows error state - user sees error UI with retry
             setFollowsError(t('subscriptions.followsLoadError') || 'Failed to load follows');
             setFollows([]);
           } else {
-            const followsList = Array.isArray(followsData?.data) ? followsData.data : [];
+            const followsList = Array.isArray(followsResult.data?.data) ? followsResult.data.data : [];
             setFollows(followsList);
             setFollowsError(null);
           }
+
+          // Handle subscribers
+          if (!subscribersResult.error && subscribersResult.data?.data) {
+            setSubscribers(subscribersResult.data.data);
+          } else {
+            setSubscribers([]);
+          }
         } else {
           setFollows([]);
+          setSubscribers([]);
           setFollowsError(null);
         }
 
@@ -419,7 +429,7 @@ export default function Subscriptions() {
   // Determine if we have data based on mode
   const hasData = viewMode === 'buyer'
     ? buyerSubscriptions.length > 0
-    : (myShop || follows.length > 0);
+    : (myShop || follows.length > 0 || subscribers.length > 0);
 
   return (
     <div
@@ -717,6 +727,48 @@ export default function Subscriptions() {
                 </div>
               </motion.div>
             ))}
+
+            {/* MY SUBSCRIBERS - who subscribed to my shop */}
+            {subscribers.length > 0 && (
+              <div className="mt-8">
+                <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">
+                  {t('subscriptions.mySubscribers')} ({subscribers.length})
+                </h3>
+                <div className="space-y-3">
+                  {subscribers.map((sub, index) => (
+                    <motion.div
+                      key={sub.id}
+                      className="glass-card rounded-xl p-4"
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.2, delay: index * 0.03 }}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-primary/20 to-orange-primary/5 flex items-center justify-center">
+                          <span className="text-orange-primary font-semibold text-sm">
+                            {(sub.first_name?.[0] || sub.username?.[0] || '?').toUpperCase()}
+                          </span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-white font-medium truncate">
+                            {sub.first_name || sub.username || 'User'}
+                            {sub.last_name ? ` ${sub.last_name}` : ''}
+                          </p>
+                          {sub.username && (
+                            <p className="text-xs text-gray-500 truncate">@{sub.username}</p>
+                          )}
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xs text-gray-500">
+                            {new Date(sub.created_at).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
