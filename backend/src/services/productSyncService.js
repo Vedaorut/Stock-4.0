@@ -384,13 +384,23 @@ export async function handleSourceProductDelete(sourceProductId) {
  * @returns {Promise<Object>} Sync results
  */
 export async function syncAllProductsForFollow(followId) {
+  logger.info('[syncAllProductsForFollow] START', { followId });
   try {
     const follow = await shopFollowQueries.findById(followId);
+    logger.info('[syncAllProductsForFollow] Follow loaded', {
+      followId,
+      found: !!follow,
+      mode: follow?.mode,
+      sourceShopId: follow?.source_shop_id,
+      followerShopId: follow?.follower_shop_id,
+    });
+
     if (!follow) {
       throw new Error(`Follow ${followId} not found`);
     }
 
     if (follow.mode !== 'resell') {
+      logger.warn('[syncAllProductsForFollow] Not in resell mode, skipping', { followId, mode: follow.mode });
       return { synced: 0, skipped: 0, errors: 0 };
     }
 
@@ -417,6 +427,13 @@ export async function syncAllProductsForFollow(followId) {
       shopId: follow.source_shop_id,
       isActive: true,
       limit: 1000,
+    });
+
+    logger.info('[syncAllProductsForFollow] Source products loaded', {
+      followId,
+      sourceShopId: follow.source_shop_id,
+      sourceProductsCount: sourceProducts.length,
+      productIds: sourceProducts.map(p => p.id),
     });
 
     const results = { synced: 0, skipped: 0, errors: 0, blockedCopies: 0, duplicates: 0, limitReached: false };

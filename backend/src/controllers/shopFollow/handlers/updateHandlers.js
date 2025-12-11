@@ -105,8 +105,17 @@ export const switchFollowMode = asyncHandler(async (req, res) => {
     }
 
     if (normalizedMode === 'resell') {
-      if (!Number.isFinite(markupValue) || markupValue < 0.1 || markupValue > 500) {
-        throw new ValidationError('Markup must be between 0.1% and 500% for resell mode');
+      const type = markupType || 'percentage';
+
+      if (type === 'percentage') {
+        if (!Number.isFinite(markupValue) || markupValue < 0.1 || markupValue > 500) {
+          throw new ValidationError('Markup must be between 0.1% and 500% for resell mode');
+        }
+      } else if (type === 'fixed') {
+        const fixedValue = markupFixed !== undefined ? Number(markupFixed) : 0;
+        if (!Number.isFinite(fixedValue) || fixedValue < 0 || fixedValue > 1000) {
+          throw new ValidationError('Fixed markup must be between $0 and $1000');
+        }
       }
     }
 
@@ -130,18 +139,42 @@ export const switchFollowMode = asyncHandler(async (req, res) => {
       await shopFollowQueries.updateMarkup(followId, 0, 'percentage', 0);
     }
 
-    await shopFollowQueries.updateMode(followId, normalizedMode);
-
     if (normalizedMode === 'resell') {
       // Preserve existing markup type/fixed if not provided in request
       const type = markupType || existingFollow.markup_type || 'percentage';
       const fixed = markupFixed ?? existingFollow.markup_fixed ?? 0;
-      await shopFollowQueries.updateMarkup(followId, markupValue, type, fixed);
+
+      logger.info('[switchFollowMode] Switching to resell', {
+        followId,
+        needsSync,
+        previousMode: existingFollow.mode,
+        markupType: type,
+        markupValue,
+        markupFixed: fixed,
+      });
+
+      // CRITICAL: Update mode AND markup in single query to satisfy DB constraint
+      // shop_follows_markup_percentage_check requires markup >= 0.1 when mode = 'resell'
+      await shopFollowQueries.updateModeWithMarkup(followId, normalizedMode, markupValue, type, fixed);
 
       // Only sync if switching to resell OR if products are missing
       if (needsSync) {
-        await syncAllProductsForFollow(followId);
+        logger.info('[switchFollowMode] Starting syncAllProductsForFollow', { followId });
+        try {
+          const syncResult = await syncAllProductsForFollow(followId);
+          logger.info('[switchFollowMode] syncAllProductsForFollow completed', { followId, syncResult });
+        } catch (syncError) {
+          logger.error('[switchFollowMode] syncAllProductsForFollow FAILED', {
+            followId,
+            error: syncError.message,
+            stack: syncError.stack,
+          });
+          // Don't throw - mode is already updated, sync failure shouldn't block response
+        }
       }
+    } else {
+      // For monitor mode, just update the mode
+      await shopFollowQueries.updateMode(followId, normalizedMode);
     }
 
     const updatedFollow = await shopFollowQueries.findById(followId);

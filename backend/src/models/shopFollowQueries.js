@@ -184,6 +184,26 @@ export const shopFollowQueries = {
   },
 
   /**
+   * Update mode AND markup in a single query (for DB constraint compatibility)
+   * @param {number} id - Follow ID
+   * @param {string} mode - New mode ('monitor' or 'resell')
+   * @param {number} markupPercentage - Markup percentage
+   * @param {string} markupType - Markup type ('percentage' or 'fixed')
+   * @param {number} markupFixed - Fixed markup amount
+   * @returns {Promise<Object>} Updated follow record
+   */
+  updateModeWithMarkup: async (id, mode, markupPercentage, markupType = 'percentage', markupFixed = 0) => {
+    const result = await query(
+      `UPDATE shop_follows
+       SET mode = $2, markup_percentage = $3, markup_type = $4, markup_fixed = $5, updated_at = NOW()
+       WHERE id = $1
+       RETURNING *`,
+      [id, mode, markupPercentage, markupType, markupFixed]
+    );
+    return result.rows[0];
+  },
+
+  /**
    * Update markup settings
    * @param {number} id - Follow ID
    * @param {number} markupPercentage - New markup percentage (0.1-200)
