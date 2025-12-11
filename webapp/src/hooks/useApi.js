@@ -71,11 +71,38 @@ const CACHE_TTL = {
   default: 60 * 1000                 // 1 minute default
 };
 
-function getCacheKey(method, endpoint) {
-  return `${method}:${endpoint}`;
+function serializeParams(params) {
+  if (!params) return '';
+
+  try {
+    const search = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value === undefined || value === null) return;
+      if (Array.isArray(value)) {
+        value.forEach((item) => search.append(key, String(item)));
+      } else {
+        search.append(key, String(value));
+      }
+    });
+    const queryString = search.toString();
+    return queryString ? `?${queryString}` : '';
+  } catch {
+    // Fallback in case params contain non-serializable values
+    return `?${JSON.stringify(params)}`;
+  }
+}
+
+function getCacheKey(method, endpoint, params = null) {
+  return `${method}:${endpoint}${serializeParams(params)}`;
 }
 
 function getCacheTTL(endpoint) {
+  // P2-1 FIX: Never cache follow products to prevent stale data showing
+  // This prevents "header shows Shop A, products from Shop B" bug
+  if (endpoint.includes('/follows/') && endpoint.includes('/products')) {
+    return 0;
+  }
+
   for (const [pattern, ttl] of Object.entries(CACHE_TTL)) {
     if (pattern !== 'default' && endpoint.startsWith(pattern)) {
       return ttl;
@@ -192,7 +219,7 @@ export function useApi() {
           }
 
           // Check cache for GET requests
-          const cacheKey = getCacheKey(method, endpoint);
+          const cacheKey = getCacheKey(method, endpoint, config.params);
           if (shouldCache(method)) {
             const cached = apiCache.get(cacheKey);
             if (cached && Date.now() - cached.timestamp < getCacheTTL(endpoint)) {
