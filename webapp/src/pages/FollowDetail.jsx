@@ -197,7 +197,7 @@ export default function FollowDetail() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- follow check is for initial render only
   }, [followDetailId, loadFollow, loadProducts]);
 
-  // Handle markup update
+  // Handle markup update (also switches mode to resell if needed)
   const handleUpdateMarkup = useCallback(
     async (markupData) => {
       if (!followDetailId || !follow) return;
@@ -205,23 +205,54 @@ export default function FollowDetail() {
       triggerHaptic('medium');
 
       try {
-        const response = await updateMarkup(followDetailId, markupData);
-
-        // Use server response for state update - unpack nested data
-        const followData = response?.data?.data || response?.data;
-        if (followData) {
-          setFollow(followData);
+        // If currently in monitor mode, switch to resell with markup
+        if (follow.mode === 'monitor') {
+          const response = await switchMode(followDetailId, 'resell', markupData);
+          const followData = response?.data?.data || response?.data;
+          if (followData) {
+            setFollow(followData);
+            followRef.current = followData;
+          } else {
+            setFollow((prev) => ({
+              ...prev,
+              mode: 'resell',
+              markup_type: markupData.markupType,
+              markup_percentage: markupData.markupPercentage,
+              markup_fixed: markupData.markupFixed,
+            }));
+            followRef.current = {
+              ...(follow || {}),
+              mode: 'resell',
+              markup_type: markupData.markupType,
+              markup_percentage: markupData.markupPercentage,
+              markup_fixed: markupData.markupFixed,
+            };
+          }
         } else {
-          setFollow((prev) => ({
-            ...prev,
-            markup_type: markupData.markupType,
-            markup_percentage: markupData.markupPercentage,
-            markup_fixed: markupData.markupFixed,
-          }));
+          // Already in resell mode, just update markup
+          const response = await updateMarkup(followDetailId, markupData);
+          const followData = response?.data?.data || response?.data;
+          if (followData) {
+            setFollow(followData);
+            followRef.current = followData;
+          } else {
+            setFollow((prev) => ({
+              ...prev,
+              markup_type: markupData.markupType,
+              markup_percentage: markupData.markupPercentage,
+              markup_fixed: markupData.markupFixed,
+            }));
+            followRef.current = {
+              ...(follow || {}),
+              markup_type: markupData.markupType,
+              markup_percentage: markupData.markupPercentage,
+              markup_fixed: markupData.markupFixed,
+            };
+          }
         }
         triggerHaptic('success');
         // Reload products to update prices with new markup
-        loadProducts();
+        await loadProducts();
       } catch (err) {
         if (import.meta.env.DEV) {
           console.error('[FollowDetail] Error updating markup:', err);
@@ -230,76 +261,51 @@ export default function FollowDetail() {
         showToast(t('follows.markupError') || 'Failed to update markup', 'error');
       }
     },
-    [followDetailId, follow, updateMarkup, triggerHaptic, loadProducts, showToast, t]
+    [followDetailId, follow, updateMarkup, switchMode, triggerHaptic, loadProducts, showToast, t]
   );
+
+  // Keep follow data in ref for stable access during async operations
+  const followRef = useRef(follow);
+  useEffect(() => {
+    followRef.current = follow;
+  }, [follow]);
 
   // Handle mode switch
   const handleSwitchMode = useCallback(async () => {
-    // Debug: log at very start
-    console.log('[FollowDetail] handleSwitchMode CALLED', { followDetailId, hasFollow: !!follow });
+    const currentFollowId = followDetailId || useStore.getState().followDetailId;
+    const currentFollow = followRef.current;
 
-    if (!followDetailId || !follow) {
-      console.log('[FollowDetail] handleSwitchMode EARLY RETURN - missing data');
-      return;
-    }
-    const newMode = follow.mode === 'monitor' ? 'resell' : 'monitor';
+    if (!currentFollowId || !currentFollow) return;
+
+    const newMode = currentFollow.mode === 'monitor' ? 'resell' : 'monitor';
     triggerHaptic('medium');
 
-    console.log('[FollowDetail] handleSwitchMode triggered', {
-      followId: followDetailId,
-      currentMode: follow.mode,
-      targetMode: newMode
-    });
-
-    if (import.meta.env.DEV) {
-      console.log('[FollowDetail] handleSwitchMode start', {
-        followId: followDetailId,
-        currentMode: follow.mode,
-        nextMode: newMode,
-      });
+    // Resell: open markup modal (API call happens when user saves)
+    if (newMode === 'resell') {
+      setIsMarkupModalOpen(true);
+      return;
     }
 
+    // Monitor: call API directly
     try {
-      // When switching to resell, pass existing markup or default 10%
-      const markupData = newMode === 'resell' ? {
-        markupType: follow.markup_type || 'percentage',
-        markupPercentage: follow.markup_percentage || 10,
-        markupFixed: follow.markup_fixed || 0,
-      } : null;
-
-      const response = await switchMode(followDetailId, newMode, markupData);
-
-      // Use server response for state update - unpack nested data
+      const response = await switchMode(currentFollowId, newMode, null);
       const followData = response?.data?.data || response?.data;
       if (followData) {
         setFollow(followData);
-        if (newMode === 'resell') {
-          loadProducts();
-          // Open markup modal for user to configure markup
-          setIsMarkupModalOpen(true);
-        }
+        followRef.current = followData;
       } else {
-        setFollow((prev) => ({ ...prev, mode: newMode }));
-        if (newMode === 'resell') {
-          setIsMarkupModalOpen(true);
-        }
-      }
-
-      if (import.meta.env.DEV) {
-        console.log('[FollowDetail] handleSwitchMode response', {
-          newMode,
-          hasData: Boolean(followData),
+        setFollow((prev) => {
+          const updated = { ...prev, mode: newMode };
+          followRef.current = updated;
+          return updated;
         });
       }
       triggerHaptic('success');
-    } catch (err) {
-      if (import.meta.env.DEV) {
-        console.error('[FollowDetail] Error switching mode:', err);
-      }
+    } catch (_err) {
       triggerHaptic('error');
       showToast(t('follows.modeError') || 'Failed to switch mode', 'error');
     }
-  }, [followDetailId, follow, switchMode, triggerHaptic, loadProducts, showToast, t]);
+  }, [followDetailId, switchMode, triggerHaptic, showToast, t]);
 
   // Handle delete
   const handleDelete = useCallback(async () => {

@@ -85,12 +85,20 @@ const ConfirmDialog = ({
               </motion.button>
 
               <motion.button
-                onClick={(e) => {
+                onClick={async (e) => {
                   e.stopPropagation();
-                  // Close and execute in parallel - don't await
+                  e.preventDefault();
+
+                  // Execute FIRST with fresh data, then close
+                  if (typeof onConfirm === 'function') {
+                    try {
+                      await onConfirm();
+                    } catch (err) {
+                      console.error('[ConfirmDialog] Error:', err);
+                    }
+                  }
+
                   onClose();
-                  // Execute confirm logic immediately (don't await - let it run async)
-                  onConfirm();
                 }}
                 className={`flex-1 text-white font-semibold py-3.5 rounded-xl shadow-lg ${danger
                     ? 'bg-red-500 hover:bg-red-600 shadow-red-500/20'
