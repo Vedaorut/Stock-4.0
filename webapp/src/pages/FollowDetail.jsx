@@ -5,7 +5,7 @@ import ActionsList from '../components/Follows/ActionsList';
 import ConfirmDialog from '../components/Follows/ConfirmDialog';
 import MarkupSliderModal from '../components/Follows/MarkupSliderModal';
 import ProductMarkupModal from '../components/Follows/ProductMarkupModal';
-import { useFollowsApi } from '../hooks/useApi';
+import { useFollowsApi, invalidateCache } from '../hooks/useApi';
 import { useStore } from '../store/useStore';
 import { useTelegram } from '../hooks/useTelegram';
 import { useBackButton } from '../hooks/useBackButton';
@@ -35,6 +35,10 @@ export default function FollowDetail() {
 
   // AbortController for retry requests
   const retryControllerRef = useRef(null);
+  
+  // P1-2 FIX: Track current followId to prevent race conditions
+  // This ref always holds the latest followDetailId for validation
+  const currentFollowIdRef = useRef(followDetailId);
 
   // P1-1 FIX: Keep follow data in ref for stable access during async operations
   // Moved BEFORE functions that use it to fix undefined reference
@@ -57,9 +61,23 @@ export default function FollowDetail() {
     async (signal) => {
       if (!followDetailId) return { status: 'error', error: 'No follow ID' };
 
+      // P1-2 FIX: Capture followId at start of request
+      const requestFollowId = followDetailId;
+
       const response = await getDetail(followDetailId, { signal });
 
       if (signal?.aborted) return { status: 'aborted' };
+
+      // P1-2 FIX: Validate followId hasn't changed during request
+      if (currentFollowIdRef.current !== requestFollowId) {
+        if (import.meta.env.DEV) {
+          console.log('[FollowDetail] Ignoring stale follow response', {
+            requested: requestFollowId,
+            current: currentFollowIdRef.current,
+          });
+        }
+        return { status: 'aborted' };
+      }
 
       if (response.error) {
         if (import.meta.env.DEV) {
@@ -80,11 +98,25 @@ export default function FollowDetail() {
     async (signal) => {
       if (!followDetailId) return;
 
+      // P1-2 FIX: Capture followId at start of request
+      const requestFollowId = followDetailId;
+
       setProductsLoading(true);
       setProductsError(null);
       try {
         const response = await getProducts(followDetailId, { signal });
         if (signal?.aborted) return;
+
+        // P1-2 FIX: Validate followId hasn't changed during request
+        if (currentFollowIdRef.current !== requestFollowId) {
+          if (import.meta.env.DEV) {
+            console.log('[FollowDetail] Ignoring stale products response', {
+              requested: requestFollowId,
+              current: currentFollowIdRef.current,
+            });
+          }
+          return;
+        }
 
         if (response.error) {
           if (import.meta.env.DEV) {
@@ -102,12 +134,12 @@ export default function FollowDetail() {
         if (import.meta.env.DEV) {
           console.error('[FollowDetail] Error loading products:', err);
         }
-        if (!signal?.aborted) {
+        if (!signal?.aborted && currentFollowIdRef.current === requestFollowId) {
           setProductsError(t('followDetail.productsLoadError') || 'Failed to load products');
           setProducts([]);
         }
       } finally {
-        if (!signal?.aborted) {
+        if (!signal?.aborted && currentFollowIdRef.current === requestFollowId) {
           setProductsLoading(false);
         }
       }
@@ -122,6 +154,11 @@ export default function FollowDetail() {
       retryControllerRef.current.abort();
     }
     retryControllerRef.current = new AbortController();
+
+    // P1-3 FIX: Invalidate cache on retry to ensure fresh data
+    if (followDetailId) {
+      invalidateCache(`/follows/${followDetailId}`);
+    }
 
     setIsLoading(true);
     setError(null);
@@ -141,7 +178,7 @@ export default function FollowDetail() {
           setIsLoading(false);
         }
       });
-  }, [loadFollow, loadProducts]);
+  }, [followDetailId, loadFollow, loadProducts]);
 
   // Back button handler
   const handleBack = useCallback(() => {
@@ -177,6 +214,9 @@ export default function FollowDetail() {
       return;
     }
 
+    // P1-2 FIX: Update ref immediately to track current followId
+    currentFollowIdRef.current = followDetailId;
+
     // CRITICAL FIX: Clear state when switching between follows
     // This prevents showing products from previous follow
     setProducts([]);
@@ -185,10 +225,25 @@ export default function FollowDetail() {
     setIsLoading(true);
     setError(null);
 
+    // P1-3 FIX: Invalidate cache for this follow to ensure fresh data
+    invalidateCache(`/follows/${followDetailId}`);
+
     const controller = new AbortController();
+    const requestFollowId = followDetailId; // Capture for closure
 
     loadFollow(controller.signal)
       .then((result) => {
+        // P1-2 FIX: Double-check followId hasn't changed during request
+        if (currentFollowIdRef.current !== requestFollowId) {
+          if (import.meta.env.DEV) {
+            console.log('[FollowDetail] Ignoring stale follow response', {
+              requested: requestFollowId,
+              current: currentFollowIdRef.current,
+            });
+          }
+          return;
+        }
+
         if (!controller.signal.aborted && result?.status === 'error') {
           setError(result.error);
           setFollow(null);
@@ -197,13 +252,13 @@ export default function FollowDetail() {
         }
       })
       .finally(() => {
-        if (!controller.signal.aborted) {
+        // Only update loading state if this is still the current request
+        if (!controller.signal.aborted && currentFollowIdRef.current === requestFollowId) {
           setIsLoading(false);
         }
       });
 
     return () => controller.abort();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- follow check is for initial render only
   }, [followDetailId, loadFollow, loadProducts]);
 
   // Handle markup update (also switches mode to resell if needed)
