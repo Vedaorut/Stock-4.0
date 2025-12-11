@@ -22,6 +22,7 @@ const mockClient = {
 
 jest.unstable_mockModule('../../src/config/database.js', () => ({
   getClient: jest.fn().mockResolvedValue(mockClient),
+  query: jest.fn(),
 }));
 
 // Mock validators
@@ -79,6 +80,13 @@ jest.unstable_mockModule('../../src/utils/websocket.js', () => ({
 // Mock alerts
 jest.unstable_mockModule('../../src/utils/alerts.js', () => ({
   alertStockDeductionFailed: jest.fn(),
+}));
+
+// Mock productQueries
+jest.unstable_mockModule('../../src/database/queries/index.js', () => ({
+  productQueries: {
+    unreserveStock: jest.fn().mockResolvedValue({ rowCount: 1 }),
+  },
 }));
 
 // Mock logger

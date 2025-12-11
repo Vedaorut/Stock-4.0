@@ -44,14 +44,18 @@ export const validateWalletAddress = (address, currency) => {
 };
 
 /**
- * Sanitize user input
+ * Sanitize user input to prevent XSS attacks
+ * Removes HTML angle brackets and limits string length
  */
 export const sanitizeInput = (str) => {
   if (typeof str !== 'string') {
     return str;
   }
 
-  return str.trim().replace(/[<>]/g, '').substring(0, 1000);
+  return str
+    .trim()
+    .replace(/[<>]/g, '') // Remove angle brackets (basic XSS prevention)
+    .substring(0, 2000);  // Limit length
 };
 
 /**

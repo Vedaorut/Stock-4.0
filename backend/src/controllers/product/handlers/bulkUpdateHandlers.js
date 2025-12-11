@@ -2,6 +2,7 @@ import { getClient } from '../../../config/database.js';
 import { productQueries as _productQueries, shopQueries } from '../../../database/queries/index.js';
 import { asyncHandler } from '../../../middleware/errorHandler.js';
 import { NotFoundError, UnauthorizedError } from '../../../utils/errors.js';
+import { sanitizeInput } from '../../../utils/helpers.js';
 import logger from '../../../utils/logger.js';
 import { broadcast } from '../../../utils/websocket.js';
 import { isAuthorizedToManageShop } from '../utils/authorization.js';
@@ -89,8 +90,6 @@ export const bulkUpdateProducts = asyncHandler(async (req, res) => {
         }
 
         const {
-          name,
-          description,
           price,
           stockQuantity,
           isActive,
@@ -99,6 +98,8 @@ export const bulkUpdateProducts = asyncHandler(async (req, res) => {
           originalPrice,
           isPreorder,
         } = productUpdates;
+        const name = sanitizeInput(productUpdates.name);
+        const description = sanitizeInput(productUpdates.description);
 
         const params = [
           productId,

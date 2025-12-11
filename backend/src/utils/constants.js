@@ -98,7 +98,7 @@ export const RATE_LIMITS = {
   },
   WEBHOOK: {
     WINDOW_MS: 60 * 1000, // 1 minute
-    MAX_REQUESTS: 100, // Webhooks need high limit (external services)
+    MAX_REQUESTS: 20, // Reduced - payment webhooks shouldn't be this frequent, prevents DoS
   },
   SHOP_CREATION: {
     WINDOW_MS: 60 * 60 * 1000, // 1 hour

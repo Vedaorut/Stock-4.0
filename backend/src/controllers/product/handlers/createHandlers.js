@@ -2,6 +2,7 @@ import { productQueries, shopQueries } from '../../../database/queries/index.js'
 import { asyncHandler } from '../../../middleware/errorHandler.js';
 import { invalidateProductLimitCache } from '../../../middleware/productLimits.js';
 import { NotFoundError, UnauthorizedError } from '../../../utils/errors.js';
+import { sanitizeInput } from '../../../utils/helpers.js';
 import logger from '../../../utils/logger.js';
 import { isAuthorizedToManageShop } from '../utils/authorization.js';
 import { respondWithDbError } from '../utils/errors.js';
@@ -13,7 +14,9 @@ import { broadcast } from '../../../utils/websocket.js';
  */
 export const create = asyncHandler(async (req, res) => {
   try {
-    const { shopId, name, description, price, is_preorder, merge } = req.body;
+    const { shopId, price, is_preorder, merge } = req.body;
+    const name = sanitizeInput(req.body.name);
+    const description = sanitizeInput(req.body.description);
     const stockQuantity = req.body.stockQuantity ?? req.body.stock ?? 0;
     const currency = req.body.currency || 'USD';
 

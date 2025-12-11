@@ -1,6 +1,7 @@
 import { productQueries } from '../../../database/queries/index.js';
 import { asyncHandler } from '../../../middleware/errorHandler.js';
 import { NotFoundError, UnauthorizedError } from '../../../utils/errors.js';
+import { sanitizeInput } from '../../../utils/helpers.js';
 import logger from '../../../utils/logger.js';
 import { broadcast } from '../../../utils/websocket.js';
 import { isAuthorizedToManageShop } from '../utils/authorization.js';
@@ -12,7 +13,9 @@ import { respondWithDbError } from '../utils/errors.js';
 export const update = asyncHandler(async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, description, price, isActive, is_preorder } = req.body;
+    const { price, isActive, is_preorder } = req.body;
+    const name = sanitizeInput(req.body.name);
+    const description = sanitizeInput(req.body.description);
     const stockQuantity = req.body.stockQuantity ?? req.body.stock;
     const discountPercentage = req.body.discountPercentage ?? req.body.discount_percentage;
     const discountExpiresAt = req.body.discountExpiresAt ?? req.body.discount_expires_at;

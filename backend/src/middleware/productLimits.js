@@ -8,12 +8,19 @@
  * OPTIMIZATIONS:
  * - Combined shop + count query (1 query instead of 2)
  * - In-memory cache for limit checks (5 min TTL)
+ *
+ * RACE CONDITION FIX:
+ * - Uses PostgreSQL advisory locks to serialize product creation per shop
+ * - Lock is acquired in middleware and released after controller completes
  */
 
-import { pool } from '../config/database.js';
+import { pool, getClient } from '../config/database.js';
 import { workerQueries } from '../database/queries/index.js';
 import { TIER_LIMITS } from '../config/subscriptionPricing.js';
 import logger from '../utils/logger.js';
+
+// Advisory lock namespace offset to avoid collisions with other lock usages
+const PRODUCT_LIMIT_LOCK_NAMESPACE = 1000000;
 
 // In-memory cache for product counts (5 min TTL)
 const productCountCache = new Map();
@@ -42,58 +49,104 @@ function getProductLimit(tier) {
 /**
  * Check if shop can add more products
  * Middleware for POST /api/products
- * OPTIMIZED: Combined query + caching
+ *
+ * RACE CONDITION FIX:
+ * Uses PostgreSQL advisory lock to serialize product creation per shop.
+ * This prevents two concurrent requests from both passing the count check.
+ *
+ * Flow:
+ * 1. Try to acquire advisory lock for shop (with retry)
+ * 2. Count products (now guaranteed accurate)
+ * 3. If limit OK, pass to controller (lock still held)
+ * 4. Controller creates product
+ * 5. Response middleware releases lock
  */
 export async function checkProductLimit(req, res, next) {
-  try {
-    const shopId = req.body.shopId;
+  let client = null;
+  const shopId = req.body.shopId;
 
+  try {
     if (!shopId) {
       return res.status(400).json({
         error: 'shopId is required',
       });
     }
 
-    // Check cache first
-    const cacheKey = `limit_${shopId}`;
-    const cached = productCountCache.get(cacheKey);
+    // Get dedicated client for advisory lock
+    // Advisory lock is session-level, so we need to keep the same client
+    client = await getClient();
 
-    let shop, currentCount;
+    // Try to acquire advisory lock with retry logic
+    // This prevents connection pool exhaustion under high concurrency
+    const lockId = shopId + PRODUCT_LIMIT_LOCK_NAMESPACE;
+    const maxRetries = 5;
+    const retryDelayMs = 100;
+    let lockAcquired = false;
 
-    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-      // Use cached data
-      shop = cached.shop;
-      currentCount = cached.count;
-      logger.debug(`[ProductLimit] Cache hit for shop ${shopId}`);
-    } else {
-      // OPTIMIZED: Combined query (1 query instead of 2)
-      const result = await pool.query(
-        `SELECT 
-           s.id, s.tier, s.owner_id,
-           COUNT(p.id)::int as product_count
-         FROM shops s
-         LEFT JOIN products p ON p.shop_id = s.id
-         WHERE s.id = $1
-         GROUP BY s.id, s.tier, s.owner_id`,
-        [shopId]
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      const lockResult = await client.query(
+        'SELECT pg_try_advisory_lock($1) as acquired',
+        [lockId]
       );
+      lockAcquired = lockResult.rows[0].acquired;
 
-      if (result.rows.length === 0) {
-        return res.status(404).json({
-          error: 'Shop not found',
-        });
+      if (lockAcquired) {
+        break;
       }
 
-      shop = result.rows[0];
-      currentCount = shop.product_count;
+      // Wait before retry (exponential backoff)
+      if (attempt < maxRetries - 1) {
+        await new Promise(resolve => setTimeout(resolve, retryDelayMs * (attempt + 1)));
+      }
+    }
 
-      // Cache the result
-      productCountCache.set(cacheKey, {
-        shop: { id: shop.id, tier: shop.tier, owner_id: shop.owner_id },
-        count: currentCount,
-        timestamp: Date.now(),
+    if (!lockAcquired) {
+      // Release client if we couldn't acquire lock
+      client.release();
+      logger.warn(`[ProductLimit] Could not acquire lock for shop ${shopId} after ${maxRetries} attempts`);
+      return res.status(503).json({
+        error: 'SERVICE_BUSY',
+        message: 'Too many concurrent requests. Please try again.',
+        retryAfter: 1,
       });
     }
+
+    logger.debug(`[ProductLimit] Advisory lock acquired for shop ${shopId}`);
+
+    // Store client and lock info on request for cleanup
+    req.productLimitClient = client;
+    req.productLimitLockId = lockId;
+
+    // Hook into response finish to release lock
+    res.on('finish', () => {
+      releaseProductLimitLock(req);
+    });
+    res.on('close', () => {
+      releaseProductLimitLock(req);
+    });
+
+    // Now count products WITH lock held (no cache - must be fresh count)
+    // Note: products use is_active=true for active products (no deleted_at column)
+    const result = await client.query(
+      `SELECT
+         s.id, s.tier, s.owner_id,
+         COUNT(p.id)::int as product_count
+       FROM shops s
+       LEFT JOIN products p ON p.shop_id = s.id AND p.is_active = true
+       WHERE s.id = $1
+       GROUP BY s.id, s.tier, s.owner_id`,
+      [shopId]
+    );
+
+    if (result.rows.length === 0) {
+      releaseProductLimitLock(req);
+      return res.status(404).json({
+        error: 'Shop not found',
+      });
+    }
+
+    const shop = result.rows[0];
+    const currentCount = shop.product_count;
 
     // Verify authorization: owner OR worker
     const isOwner = shop.owner_id === req.user.id;
@@ -102,6 +155,7 @@ export async function checkProductLimit(req, res, next) {
       : !!(await workerQueries.findByShopAndUser(shopId, req.user.id));
 
     if (!isOwner && !isWorker) {
+      releaseProductLimitLock(req);
       return res.status(403).json({
         success: false,
         error: 'You can only manage products in shops you own or manage as a worker',
@@ -111,8 +165,15 @@ export async function checkProductLimit(req, res, next) {
     const tier = shop.tier || 'pro';
     const limit = getProductLimit(tier);
 
-    // Max tier has no limits
+    // Max tier has no limits (but keep lock to ensure count accuracy)
     if (tier === 'max' || limit === Infinity) {
+      // Update cache even for max tier
+      const cacheKey = `limit_${shopId}`;
+      productCountCache.set(cacheKey, {
+        shop: { id: shop.id, tier: shop.tier, owner_id: shop.owner_id },
+        count: currentCount,
+        timestamp: Date.now(),
+      });
       return next();
     }
 
@@ -122,6 +183,7 @@ export async function checkProductLimit(req, res, next) {
         `[ProductLimit] Shop ${shopId} (${tier}) reached limit: ${currentCount}/${limit}`
       );
 
+      releaseProductLimitLock(req);
       return res.status(403).json({
         error: 'PRODUCT_LIMIT_REACHED',
         message: `${tier.toUpperCase()} tier allows max ${limit} products. Upgrade to MAX for unlimited.`,
@@ -135,6 +197,14 @@ export async function checkProductLimit(req, res, next) {
 
     logger.info(`[ProductLimit] Shop ${shopId} (${tier}): ${currentCount}/${limit} products`);
 
+    // Update cache
+    const cacheKey = `limit_${shopId}`;
+    productCountCache.set(cacheKey, {
+      shop: { id: shop.id, tier: shop.tier, owner_id: shop.owner_id },
+      count: currentCount,
+      timestamp: Date.now(),
+    });
+
     // Attach limit info to request for later use
     req.productLimitInfo = {
       tier,
@@ -143,12 +213,43 @@ export async function checkProductLimit(req, res, next) {
       canAdd: true,
     };
 
+    // Lock is still held - will be released when response finishes
     next();
   } catch (error) {
+    // Release lock on error
+    releaseProductLimitLock(req);
     logger.error('[ProductLimit] Error checking product limit:', error);
     return res.status(500).json({
       error: 'Failed to check product limit',
     });
+  }
+}
+
+/**
+ * Release advisory lock and client
+ * Called automatically when response finishes or on error
+ */
+function releaseProductLimitLock(req) {
+  if (req.productLimitClient && req.productLimitLockId) {
+    const client = req.productLimitClient;
+    const lockId = req.productLimitLockId;
+    const shopId = lockId - PRODUCT_LIMIT_LOCK_NAMESPACE;
+
+    // Clear from request immediately to prevent double-release
+    req.productLimitClient = null;
+    req.productLimitLockId = null;
+
+    // Release lock and client asynchronously
+    client.query('SELECT pg_advisory_unlock($1)', [lockId])
+      .then(() => {
+        logger.debug(`[ProductLimit] Advisory lock released for shop ${shopId}`);
+      })
+      .catch((err) => {
+        logger.error(`[ProductLimit] Error releasing advisory lock for shop ${shopId}:`, err);
+      })
+      .finally(() => {
+        client.release();
+      });
   }
 }
 
