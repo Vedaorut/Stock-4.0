@@ -177,10 +177,12 @@ export default function FollowDetail() {
       return;
     }
 
-    // OPTIMIZATION: Only show loading if no cached data exists
-    if (!follow) {
-      setIsLoading(true);
-    }
+    // CRITICAL FIX: Clear state when switching between follows
+    // This prevents showing products from previous follow
+    setProducts([]);
+    setFollow(null);
+    setProductsError(null);
+    setIsLoading(true);
     setError(null);
 
     const controller = new AbortController();
