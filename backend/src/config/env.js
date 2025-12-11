@@ -130,6 +130,7 @@ export const config = {
   // AI
   ai: {
     deepseekApiKey: process.env.DEEPSEEK_API_KEY || process.env.DEEPSEEK_API_KEY_BACKEND,
+    dailyLimitUsd: parseFloat(process.env.AI_DAILY_LIMIT_USD) || 5.0, // Default $5/day per user
   },
 
   // Rate Limiting

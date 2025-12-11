@@ -3,6 +3,7 @@ import { deepseekService } from './deepseekService.js';
 import { productTools } from '../ai/productTools.js';
 import { generateProductAIPrompt, sanitizeUserInput } from '../ai/systemPrompts.js';
 import { productQueries, shopQueries } from '../database/queries/index.js';
+import { aiCostService, AICostLimitError } from './aiCostService.js';
 
 function normalizeHistory(history = []) {
   if (!Array.isArray(history)) {
@@ -254,9 +255,31 @@ async function executeToolCall(shopId, products, toolCall) {
   }
 }
 
-export async function handleProductAI({ shop, message, history = [] }) {
+export async function handleProductAI({ shop, message, history = [], userId }) {
   if (!deepseekService.isAvailable()) {
     throw new Error('AI сервис недоступен. Проверьте ключ DeepSeek.');
+  }
+
+  // Get userId from shop owner if not provided
+  const effectiveUserId = userId || shop.owner_id;
+
+  // Check daily cost limit before making AI request
+  const limitCheck = await aiCostService.checkDailyLimit(effectiveUserId);
+  if (!limitCheck.canProceed) {
+    logger.warn('AI daily limit exceeded', {
+      userId: effectiveUserId,
+      shopId: shop.id,
+      currentCost: limitCheck.currentCost,
+      dailyLimit: limitCheck.dailyLimit,
+    });
+    throw new AICostLimitError(
+      `Достигнут дневной лимит AI ($${limitCheck.dailyLimit}). Лимит сбросится в полночь UTC.`,
+      {
+        currentCost: limitCheck.currentCost,
+        dailyLimit: limitCheck.dailyLimit,
+        remaining: limitCheck.remaining,
+      }
+    );
   }
 
   const sanitizedMessage = sanitizeUserInput(message);
@@ -275,6 +298,18 @@ export async function handleProductAI({ shop, message, history = [] }) {
     tools: productTools,
   });
 
+  // Log AI usage and cost after successful request
+  const usage = response.usage || {};
+  await aiCostService.logUsage({
+    userId: effectiveUserId,
+    shopId: shop.id,
+    model: 'deepseek-chat',
+    promptTokens: usage.prompt_tokens || 0,
+    completionTokens: usage.completion_tokens || 0,
+    totalTokens: usage.total_tokens || 0,
+    requestType: 'product_ai',
+  });
+
   const choice = response.choices?.[0];
   const assistantText = choice?.message?.content?.trim() || '';
   const toolCalls = choice?.message?.tool_calls || [];
@@ -286,7 +321,7 @@ export async function handleProductAI({ shop, message, history = [] }) {
   for (const toolCall of toolCalls) {
     const result = await executeToolCall(shop.id, updatedProductsCache, toolCall);
     if (result.error) {
-      operations.push(`⚠️ ${result.error}`);
+      operations.push(`${result.error}`);
       continue;
     }
 
@@ -322,11 +357,20 @@ export async function handleProductAI({ shop, message, history = [] }) {
     { role: 'assistant', content: replyText },
   ].slice(-20);
 
+  // Get updated usage info to return to client
+  const updatedUsage = await aiCostService.getDailyUsage(effectiveUserId);
+
   return {
     reply: replyText,
     history: newHistory,
     operations,
     productsChanged,
+    aiUsage: {
+      dailyCost: updatedUsage.cost,
+      dailyLimit: updatedUsage.limit,
+      remaining: updatedUsage.remaining,
+      percentUsed: updatedUsage.percentUsed,
+    },
   };
 }
 

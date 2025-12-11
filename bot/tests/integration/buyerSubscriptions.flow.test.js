@@ -416,7 +416,7 @@ describe('Buyer Subscriptions Flow (P0)', () => {
       subscribeBtn = findButton('Подписаться', markup);
       expect(subscribeBtn).toBeTruthy();
 
-      subscribedBtn = findButton('Подписан', markup);
+      const subscribedBtn = findButton('Подписан', markup);
       expect(subscribedBtn).toBeNull();
     });
   });

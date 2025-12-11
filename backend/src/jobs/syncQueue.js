@@ -2,6 +2,7 @@ import Queue from 'bull';
 import logger from '../utils/logger.js';
 import { shopFollowQueries } from '../models/shopFollowQueries.js';
 import { syncAllProductsForFollow } from '../services/productSyncService.js';
+import { getRedisConfig } from '../config/redis.js';
 
 /**
  * Product Sync Queue
@@ -10,10 +11,7 @@ import { syncAllProductsForFollow } from '../services/productSyncService.js';
  */
 
 export const syncQueue = new Queue('product-sync', {
-  redis: {
-    host: process.env.REDIS_HOST || 'localhost',
-    port: process.env.REDIS_PORT || 6379,
-  },
+  redis: getRedisConfig(),
   defaultJobOptions: {
     removeOnComplete: 100, // Keep last 100 completed jobs
     removeOnFail: 500, // Keep last 500 failed jobs for debugging

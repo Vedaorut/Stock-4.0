@@ -128,9 +128,8 @@ describe('Stock Reservation System', () => {
       .post('/api/orders')
       .set('Authorization', `Bearer ${buyerToken}`)
       .send({
-        shop_id: shop.id,
         items: items.map((item) => ({
-          product_id: item.productId,
+          productId: item.productId,  // camelCase required
           quantity: item.quantity,
         })),
       })
@@ -222,7 +221,7 @@ describe('Stock Reservation System', () => {
     it('should handle partial release for multiple orders', async () => {
       // Create two orders
       const order1 = await createOrder([{ productId: product.id, quantity: 3 }]);
-      const order2 = await createOrder([{ productId: product.id, quantity: 4 }]);
+      const _order2 = await createOrder([{ productId: product.id, quantity: 4 }]);
 
       // Verify total reservation
       let stock = await getProductStock(product.id);
@@ -335,26 +334,24 @@ describe('Stock Reservation System', () => {
       // Product has stock=10
       // Launch 3 concurrent orders for 4 items each (total 12 > 10)
 
-      const orderPromises = [
-        createOrder([{ productId: product.id, quantity: 4 }], undefined), // Don't check status
-        createOrder([{ productId: product.id, quantity: 4 }], undefined),
-        createOrder([{ productId: product.id, quantity: 4 }], undefined),
-      ];
+      // Helper to make order request without status assertion
+      const makeOrderRequest = () =>
+        request(app)
+          .post('/api/orders')
+          .set('Authorization', `Bearer ${buyerToken}`)
+          .send({
+            items: [{ productId: product.id, quantity: 4 }],
+          });
 
-      const results = await Promise.allSettled(
-        orderPromises.map((p) =>
-          p.catch((e) => {
-            throw e;
-          })
-        )
-      );
+      const results = await Promise.allSettled([
+        makeOrderRequest(),
+        makeOrderRequest(),
+        makeOrderRequest(),
+      ]);
 
-      // Count successful orders
+      // Count successful orders (201)
       const successful = results.filter(
-        (r) => r.status === 'fulfilled' && r.value.data && r.value.data.id
-      );
-      const failed = results.filter(
-        (r) => r.status === 'fulfilled' && r.value.error
+        (r) => r.status === 'fulfilled' && r.value.status === 201
       );
 
       // At most 2 orders should succeed (4+4=8 <= 10, but 4+4+4=12 > 10)
@@ -419,8 +416,7 @@ describe('Stock Reservation System', () => {
         .post('/api/orders')
         .set('Authorization', `Bearer ${buyerToken}`)
         .send({
-          shop_id: shop.id,
-          items: [{ product_id: preorderProduct.id, quantity: 3 }],
+          items: [{ productId: preorderProduct.id, quantity: 3 }],  // camelCase
         })
         .expect(201);
 

@@ -15,7 +15,7 @@ import debounceMiddleware from './middleware/debounce.js';
 import sessionRecoveryMiddleware from './middleware/sessionRecovery.js';
 import { createRedisSession } from './middleware/redisSession.js';
 import analyticsMiddleware from './middleware/analytics.js'; // P1-BOT-012
-import userRateLimitMiddleware from './middleware/userRateLimit.js'; // P1-BOT-014
+import { createUserRateLimitMiddleware } from './middleware/userRateLimit.js'; // P1-BOT-014
 
 // Scenes
 import chooseTierScene from './scenes/chooseTier.js';
@@ -167,7 +167,7 @@ bot.use((ctx, next) => {
 
 // Apply middleware
 bot.use(analyticsMiddleware); // P1-BOT-012: Track usage
-bot.use(userRateLimitMiddleware); // P1-BOT-014: Rate limiting
+bot.use(createUserRateLimitMiddleware(redis)); // P1-BOT-014: Redis-based rate limiting (30 req/min)
 bot.use(debounceMiddleware); // Prevent rapid clicks
 
 // CRITICAL: Auth MUST run BEFORE sessionRecovery
