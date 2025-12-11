@@ -233,10 +233,14 @@ ${t('order.new.buyer', { username: orderData.buyerUsername }, lang)}${sourceStr}
   async notifyOrderStatusUpdate(buyerTelegramId, orderData, lang = DEFAULT_LANGUAGE) {
     const statusEmoji = {
       pending: '⏳',
+      paid: '✅',
+      completed: '📦',
+      cancelled: '❌',
+      expired: '⏰',
+      // Legacy statuses
       confirmed: '✅',
       shipped: '🚚',
       delivered: '📦',
-      cancelled: '❌',
     };
 
     const emoji = statusEmoji[orderData.status] || '📋';
@@ -252,6 +256,33 @@ ${t('order.status.status', { status }, lang)}
     `.trim();
 
     return this.sendMessage(buyerTelegramId, message);
+  }
+
+  /**
+   * Notify shop team about order completion (выдача)
+   * @param {number} telegramId - Recipient's Telegram ID
+   * @param {object} orderData - Order information
+   * @param {string} lang - User language preference
+   */
+  async notifyOrderCompleted(telegramId, orderData, lang = DEFAULT_LANGUAGE) {
+    const quantityStr = orderData.quantity > 1
+      ? `\n${t('order.completed.quantity', { quantity: orderData.quantity }, lang)}`
+      : '';
+
+    const completedByStr = orderData.completedByUsername
+      ? `\n\n👤 ${t('order.completed.completedBy', { username: orderData.completedByUsername }, lang)}`
+      : '';
+
+    const message = `
+✅ ${t('order.completed.title', {}, lang)}
+
+${t('order.completed.orderId', { orderId: orderData.orderId }, lang)}
+${t('order.completed.product', { productName: orderData.productName }, lang)}${quantityStr}
+${t('order.completed.amount', { amount: orderData.totalPrice }, lang)}
+${t('order.completed.buyer', { username: orderData.buyerUsername }, lang)}${completedByStr}
+    `.trim();
+
+    return this.sendMessage(telegramId, message);
   }
 
   /**

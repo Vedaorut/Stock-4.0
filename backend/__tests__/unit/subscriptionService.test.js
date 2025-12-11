@@ -30,6 +30,7 @@ jest.unstable_mockModule('../../src/config/database.js', () => ({
     connect: mockPoolConnect,
     query: mockPoolQuery,
   },
+  query: mockPoolQuery, // Also export query directly for modules that import { query }
 }));
 
 jest.unstable_mockModule('../../src/utils/logger.js', () => ({

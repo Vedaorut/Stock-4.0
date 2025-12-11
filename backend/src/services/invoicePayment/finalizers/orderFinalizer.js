@@ -10,7 +10,7 @@
  * - Validate stock availability (legacy single-item + order_items)
  * - Handle PRODUCT_UNAVAILABLE and STOCK_INSUFFICIENT scenarios
  * - Deduct stock for non-preorder items
- * - Update order status to CONFIRMED
+ * - Update order status to PAID
  * - Mark invoice as paid
  * - Update payment status
  *
@@ -30,7 +30,7 @@ import { ORDER_STATES } from '../constants.js';
  * 2. Locks products to prevent concurrent stock modifications
  * 3. Validates stock availability for all order items
  * 4. Deducts stock for non-preorder items
- * 5. Updates order status to CONFIRMED
+ * 5. Updates order status to PAID
  * 6. Marks invoice as paid
  * 7. Updates payment record status
  *
@@ -192,10 +192,10 @@ export async function finalizeOrderPayment(client, { order, invoice, verificatio
   }
 
   // =========================================================================
-  // STEP 5: Update order status to CONFIRMED
+  // STEP 5: Update order status to PAID
   // =========================================================================
   await client.query('UPDATE orders SET status = $1, updated_at = NOW(), paid_at = NOW() WHERE id = $2', [
-    ORDER_STATES.CONFIRMED,
+    ORDER_STATES.PAID,
     order.id,
   ]);
 
@@ -213,6 +213,6 @@ export async function finalizeOrderPayment(client, { order, invoice, verificatio
 
   return {
     ok: true,
-    state: 'confirmed',
+    state: 'paid',
   };
 }

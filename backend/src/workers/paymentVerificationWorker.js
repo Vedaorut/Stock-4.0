@@ -430,13 +430,13 @@ async function confirmOrderPayment(orderId, paymentId, verificationResult) {
           [paymentId]
         );
         logger.warn(`[PaymentWorker] Order ${orderId} not found, payment ${paymentId} returned to pending`);
-      } else if (order.status === 'confirmed') {
-        // Order already confirmed - sync payment status
+      } else if (order.status === 'paid' || order.status === 'confirmed') {
+        // Order already paid - sync payment status (backward compat: check both 'paid' and legacy 'confirmed')
         await query(
           `UPDATE payments SET status = 'confirmed', verification_status = 'confirmed', updated_at = NOW() WHERE id = $1`,
           [paymentId]
         );
-        logger.info(`[PaymentWorker] Order ${orderId} already confirmed, synced payment ${paymentId}`);
+        logger.info(`[PaymentWorker] Order ${orderId} already paid, synced payment ${paymentId}`);
       } else {
         // Order cancelled/failed - mark payment accordingly
         await query(
@@ -504,10 +504,10 @@ async function confirmOrderPayment(orderId, paymentId, verificationResult) {
       );
     }
 
-    // 3. Update order status
+    // 3. Update order status to 'paid'
     await client.query(
-      `UPDATE orders 
-       SET status = 'confirmed', 
+      `UPDATE orders
+       SET status = 'paid',
            paid_at = NOW(),
            updated_at = NOW()
        WHERE id = $1`,
@@ -531,7 +531,7 @@ async function confirmOrderPayment(orderId, paymentId, verificationResult) {
     logOrderStatusChange({
       orderId,
       statusFrom: 'pending',
-      statusTo: 'confirmed',
+      statusTo: 'paid',
       reason: 'payment_verified',
       requestId,
       extra: { paymentId, confirmations: verificationResult.confirmations },
@@ -547,7 +547,7 @@ async function confirmOrderPayment(orderId, paymentId, verificationResult) {
       extra: { confirmations: verificationResult.confirmations },
     });
 
-    logger.info(`[PaymentWorker] Order ${orderId} confirmed`, {
+    logger.info(`[PaymentWorker] Order ${orderId} paid`, {
       paymentId,
       txHash: verificationResult.txHash,
       confirmations: verificationResult.confirmations

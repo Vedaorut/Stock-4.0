@@ -10,6 +10,7 @@ import { getTipForShop } from '../../utils/sellerTips.js';
 import {
   handleActiveOrders,
   handleOrderHistory,
+  handleMarkCompleted,
   handleMarkShipped,
   handleMarkDelivered,
   handleCancelOrder,
@@ -503,22 +504,44 @@ export const setupSellerHandlers = (bot) => {
   // Active orders management
   bot.action('seller:active_orders', handleActiveOrders);
 
+  // New: Mark order as completed (single order)
+  bot.action(/^order:complete:(\d+)$/, handleMarkCompleted);
+
+  // Legacy: Keep old handlers for backward compatibility
   bot.action(/^order:ship:(\d+)$/, handleMarkShipped);
   bot.action(/^order:deliver:(\d+)$/, handleMarkDelivered);
   bot.action(/^order:cancel:(\d+)$/, handleCancelOrder);
 
-  // Bulk mark shipped scene
+  // Bulk mark completed scene (new)
+  bot.action('seller:mark_completed', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+
+      // Validate shop before entering scene
+      const isValid = await validateShopBeforeScene(ctx, 'markOrdersCompleted');
+      if (!isValid) return;
+
+      await ctx.scene.enter('markOrdersCompleted');
+    } catch (error) {
+      logger.error('Error entering markOrdersCompleted scene:', error);
+      const lang = getLangSafe(ctx);
+      await ctx.reply(t('errors.genericError', {}, lang));
+    }
+  });
+
+  // Legacy: Bulk mark shipped scene (redirects to completed)
   bot.action('seller:mark_shipped', async (ctx) => {
     try {
       await ctx.answerCbQuery();
 
       // Validate shop before entering scene
-      const isValid = await validateShopBeforeScene(ctx, 'markOrdersShipped');
+      const isValid = await validateShopBeforeScene(ctx, 'markOrdersCompleted');
       if (!isValid) return;
 
-      await ctx.scene.enter('markOrdersShipped');
+      // Use new scene instead
+      await ctx.scene.enter('markOrdersCompleted');
     } catch (error) {
-      logger.error('Error entering markOrdersShipped scene:', error);
+      logger.error('Error entering markOrdersCompleted scene (via legacy mark_shipped):', error);
       const lang = getLangSafe(ctx);
       await ctx.reply(t('errors.genericError', {}, lang));
     }

@@ -540,12 +540,20 @@ describe('Order Controller', () => {
   // ============================================================
   // submitPayment Tests
   // ============================================================
+  // Valid tx_hash lengths:
+  // BTC: 64 hex chars (32 bytes)
+  // ETH: 66 hex chars (0x + 32 bytes)
+  // LTC: 64 hex chars
+  // USDT_TRC20: 64 hex chars
+  const VALID_BTC_TX_HASH = 'a'.repeat(64);  // 64 hex chars for BTC
+  const VALID_ETH_TX_HASH = '0x' + 'b'.repeat(64);  // 66 chars (0x + 64)
+
   describe('submitPayment', () => {
     describe('Happy Path', () => {
       it('should create payment record and return paymentId', async () => {
         const { req, res } = createMockReqRes({
           params: { id: '123' },
-          body: { tx_hash: 'abc123def456', currency: 'BTC' },
+          body: { tx_hash: VALID_BTC_TX_HASH, currency: 'BTC' },
           user: { id: 1 },
         });
 
@@ -574,7 +582,7 @@ describe('Order Controller', () => {
         paymentQueries.createForDirectCrypto.mockResolvedValue({
           id: 456,
           order_id: 123,
-          tx_hash: 'abc123def456',
+          tx_hash: VALID_BTC_TX_HASH,
         });
 
         orderQueries.updatePaymentHash.mockResolvedValue({});
@@ -598,7 +606,7 @@ describe('Order Controller', () => {
       it('should return already_confirmed for confirmed order', async () => {
         const { req, res } = createMockReqRes({
           params: { id: '123' },
-          body: { tx_hash: 'abc123def456', currency: 'BTC' },
+          body: { tx_hash: VALID_BTC_TX_HASH, currency: 'BTC' },
           user: { id: 1 },
         });
 
@@ -622,7 +630,7 @@ describe('Order Controller', () => {
       it('should be idempotent for duplicate tx_hash same order', async () => {
         const { req, res } = createMockReqRes({
           params: { id: '123' },
-          body: { tx_hash: 'abc123def456', currency: 'BTC' },
+          body: { tx_hash: VALID_BTC_TX_HASH, currency: 'BTC' },
           user: { id: 1 },
         });
 
@@ -638,7 +646,7 @@ describe('Order Controller', () => {
         const existingPayment = {
           id: 456,
           order_id: 123,
-          tx_hash: 'abc123def456',
+          tx_hash: VALID_BTC_TX_HASH,
         };
 
         paymentQueries.findByTxHash.mockResolvedValue(existingPayment);
@@ -676,7 +684,7 @@ describe('Order Controller', () => {
       it('should throw ConflictError for duplicate tx_hash different order', async () => {
         const { req, res } = createMockReqRes({
           params: { id: '123' },
-          body: { tx_hash: 'abc123def456', currency: 'BTC' },
+          body: { tx_hash: VALID_BTC_TX_HASH, currency: 'BTC' },
           user: { id: 1 },
         });
 
@@ -691,7 +699,7 @@ describe('Order Controller', () => {
         paymentQueries.findByTxHash.mockResolvedValue({
           id: 456,
           order_id: 999, // Different order!
-          tx_hash: 'abc123def456',
+          tx_hash: VALID_BTC_TX_HASH,
         });
 
         // ConflictError is thrown BEFORE verifyPayment is called
@@ -735,7 +743,7 @@ describe('Order Controller', () => {
       it('should throw NotFoundError for non-existent order', async () => {
         const { req, res } = createMockReqRes({
           params: { id: '999' },
-          body: { tx_hash: 'abc123def456', currency: 'BTC' },
+          body: { tx_hash: VALID_BTC_TX_HASH, currency: 'BTC' },
           user: { id: 1 },
         });
 
@@ -747,7 +755,7 @@ describe('Order Controller', () => {
       it('should throw UnauthorizedError if not buyer', async () => {
         const { req, res } = createMockReqRes({
           params: { id: '123' },
-          body: { tx_hash: 'abc123def456', currency: 'BTC' },
+          body: { tx_hash: VALID_BTC_TX_HASH, currency: 'BTC' },
           user: { id: 999 },
         });
 
@@ -763,7 +771,7 @@ describe('Order Controller', () => {
       it('should throw ValidationError for cancelled order', async () => {
         const { req, res } = createMockReqRes({
           params: { id: '123' },
-          body: { tx_hash: 'abc123def456', currency: 'BTC' },
+          body: { tx_hash: VALID_BTC_TX_HASH, currency: 'BTC' },
           user: { id: 1 },
         });
 

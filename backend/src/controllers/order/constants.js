@@ -1,15 +1,23 @@
 export const VALID_ORDER_STATUSES = new Set([
   'pending',
+  'paid',
+  'completed',
+  'cancelled',
+  'expired',
+  // Legacy statuses for backward compatibility
   'confirmed',
   'shipped',
   'delivered',
-  'cancelled',
 ]);
 
 export const STATUS_ALIASES = new Map([
-  ['completed', 'delivered'],
-  ['complete', 'delivered'],
-  ['active', 'confirmed'],
+  // Legacy → new mapping
+  ['confirmed', 'paid'],
+  ['shipped', 'paid'],
+  ['delivered', 'completed'],
+  // Common aliases
+  ['complete', 'completed'],
+  ['active', 'paid'],
 ]);
 
 export const VALID_PAYMENT_CURRENCIES = ['BTC', 'ETH', 'LTC', 'USDT_TRC20'];

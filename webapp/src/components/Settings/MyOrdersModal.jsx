@@ -12,10 +12,16 @@ import { ListLoadingState } from '../common/LoadingSpinner';
 const STATUS_CONFIG = {
   pending: { key: 'myOrders.status.pending', color: '#FFCC00', dot: 'bg-yellow-400' },
   verifying: { key: 'myOrders.status.verifying', color: '#3B82F6', dot: 'bg-blue-500' },
-  confirmed: { key: 'myOrders.status.confirmed', color: '#22C55E', dot: 'bg-green-500' },
-  shipped: { key: 'myOrders.status.shipped', color: '#8B5CF6', dot: 'bg-purple-500' },
-  delivered: { key: 'myOrders.status.delivered', color: '#22C55E', dot: 'bg-green-500' },
+  paid: { key: 'myOrders.status.paid', color: '#22C55E', dot: 'bg-green-500' },
+  completed: { key: 'myOrders.status.completed', color: '#10B981', dot: 'bg-emerald-500' },
   cancelled: { key: 'myOrders.status.cancelled', color: '#EF4444', dot: 'bg-red-500' },
+};
+
+// Backward compatibility: map old statuses to new ones
+const normalizeStatus = (status) => {
+  if (status === 'confirmed') return 'paid';
+  if (status === 'shipped' || status === 'delivered') return 'completed';
+  return status;
 };
 
 // Truncate hash: abc123...xyz789
@@ -35,9 +41,9 @@ const getCryptoSymbol = (currency) => {
 function OrderRow({ order, isExpanded, onToggle, t }) {
   const { triggerHaptic } = useTelegram();
 
-  // Determine status
-  let effectiveStatus = order.status;
-  if (order.status === 'pending' && order.payment_hash) {
+  // Determine status (normalize for backward compatibility)
+  let effectiveStatus = normalizeStatus(order.status);
+  if (effectiveStatus === 'pending' && order.payment_hash) {
     effectiveStatus = 'verifying';
   }
   const statusConfig = STATUS_CONFIG[effectiveStatus] || STATUS_CONFIG.pending;

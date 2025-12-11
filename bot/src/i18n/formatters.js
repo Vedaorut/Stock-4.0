@@ -76,9 +76,14 @@ export function formatOrders(orders, lang = 'ru') {
   const statusMap = {
     pending: t('formatters.orderStatusPending', {}, lang),
     processing: t('formatters.orderStatusProcessing', {}, lang),
+    // New statuses
+    paid: t('formatters.orderStatusPaid', {}, lang),
     completed: t('formatters.orderStatusCompleted', {}, lang),
     cancelled: t('formatters.orderStatusCancelled', {}, lang),
+    // Legacy statuses for backward compatibility
+    confirmed: t('formatters.orderStatusConfirmed', {}, lang),
     shipped: t('formatters.orderStatusShipped', {}, lang),
+    delivered: t('formatters.orderStatusDelivered', {}, lang),
   };
 
   return orders

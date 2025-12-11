@@ -3,13 +3,17 @@
  */
 
 // Order statuses (align with database constraint & validation)
+// Simplified flow: pending → paid → completed
 export const ORDER_STATUS = {
   PENDING: 'pending',
-  CONFIRMED: 'confirmed',
-  SHIPPED: 'shipped',
-  DELIVERED: 'delivered',
+  PAID: 'paid',           // Was 'confirmed' - buyer sees seller contact
+  COMPLETED: 'completed', // Was 'delivered' - internal "выдан" status
   CANCELLED: 'cancelled',
   EXPIRED: 'expired',
+  // Legacy aliases for backward compatibility
+  CONFIRMED: 'paid',      // Alias → paid
+  DELIVERED: 'completed', // Alias → completed
+  SHIPPED: 'completed',   // Alias → completed (removed status)
 };
 
 // Payment statuses (align with database constraint)

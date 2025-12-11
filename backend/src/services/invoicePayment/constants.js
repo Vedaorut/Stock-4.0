@@ -6,6 +6,7 @@
 
 export const ORDER_STATES = {
   PENDING: 'pending',
-  CONFIRMED: 'confirmed',
+  PAID: 'paid',
+  CONFIRMED: 'confirmed', // Deprecated: kept for backward compatibility
   CANCELLED: 'cancelled',
 };

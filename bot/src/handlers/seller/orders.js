@@ -36,7 +36,8 @@ const ensureShopSession = (ctx) => {
 };
 
 /**
- * Show active orders (status = confirmed)
+ * Show active orders (status = paid)
+ * Backward compatible: also checks for 'confirmed' status
  */
 export const handleActiveOrders = async (ctx) => {
   try {
@@ -55,10 +56,15 @@ export const handleActiveOrders = async (ctx) => {
       return;
     }
 
-    const result = await orderApi.getShopOrders(shopId, token, { status: 'confirmed' });
+    // Use 'paid' status (new) and 'confirmed' for backward compatibility
+    const result = await orderApi.getShopOrders(shopId, token, { status: 'paid,confirmed' });
 
     // Parse response correctly - API returns { success, data, pagination }
-    const activeOrders = result.success && Array.isArray(result.data) ? result.data : [];
+    const orders = result.success && Array.isArray(result.data) ? result.data : [];
+    // Filter for active statuses (paid, confirmed, processing)
+    const activeOrders = orders.filter((order) =>
+      ['paid', 'confirmed', 'processing'].includes(order.status)
+    );
 
     if (activeOrders.length === 0) {
       const message = ctx.t('orders.activeEmpty');
@@ -92,7 +98,7 @@ export const handleActiveOrders = async (ctx) => {
 
     const lang = getLangSafe(ctx);
     const buttons = Markup.inlineKeyboard([
-      [Markup.button.callback(ctx.t('orders.markShipped'), 'seller:mark_shipped')],
+      [Markup.button.callback(ctx.t('orders.markCompleted'), 'seller:mark_completed')],
       [Markup.button.callback(t('buttons.refresh', {}, lang), 'seller:active_orders')],
       [Markup.button.callback(t('buttons.backToMenu', {}, lang), 'seller:menu')],
     ]);
@@ -209,8 +215,9 @@ export const handleOrderHistory = async (ctx, page = 1) => {
     }
 
     // Fetch orders with pagination
+    // Use new statuses (paid, completed) and old ones for backward compatibility
     const result = await orderApi.getShopOrders(shopId, token, {
-      status: 'confirmed,shipped,delivered',
+      status: 'paid,completed,confirmed,shipped,delivered',
       page: page,
       limit: PER_PAGE,
     });
@@ -326,7 +333,51 @@ export const handleOrderHistory = async (ctx, page = 1) => {
 };
 
 /**
- * Mark order as shipped
+ * Mark order as completed (single order)
+ * SECURITY FIX: Verify order belongs to user's shop via backend before update
+ * Note: This replaces the old shipped/delivered flow with a single 'completed' status
+ */
+export const handleMarkCompleted = async (ctx) => {
+  try {
+    const orderId = ctx.match[1];
+    const token = ctx.session.token;
+
+    if (!token) {
+      await ctx.answerCbQuery(ctx.t('errors.authRequired'));
+      return;
+    }
+
+    // SECURITY FIX: Verify order access via backend (checks owner/worker)
+    try {
+      await orderApi.getOrder(orderId, token);
+    } catch (error) {
+      const status = error.response?.status;
+      if (status === 401 || status === 403 || status === 404) {
+        await ctx.answerCbQuery(ctx.t('orders.orderNotFound'));
+        return;
+      }
+      throw error;
+    }
+
+    await orderApi.updateOrderStatus(orderId, 'completed', token);
+
+    await ctx.answerCbQuery(ctx.t('orders.orderCompleted'));
+
+    // Final message - no more buttons (completed is final state)
+    const completedText = ctx.t('orders.completed');
+    const newMessage = ctx.callbackQuery.message.text + '\n\n' + completedText;
+    await ctx.editMessageText(newMessage);
+
+    logger.info(`Order ${orderId} marked as completed by user ${ctx.from.id}`);
+  } catch (error) {
+    logger.error('Error marking order as completed:', error);
+    await ctx.answerCbQuery(ctx.t('orders.statusUpdateError'));
+  }
+};
+
+/**
+ * @deprecated Use handleMarkCompleted instead
+ * Mark order as shipped - kept for backward compatibility
  * SECURITY FIX: Verify order belongs to user's shop via backend before update
  */
 export const handleMarkShipped = async (ctx) => {
@@ -351,18 +402,17 @@ export const handleMarkShipped = async (ctx) => {
       throw error;
     }
 
-    await orderApi.updateOrderStatus(orderId, 'shipped', token);
+    // Use 'completed' instead of 'shipped' for new flow
+    await orderApi.updateOrderStatus(orderId, 'completed', token);
 
-    await ctx.answerCbQuery(ctx.t('orders.orderShipped'));
+    await ctx.answerCbQuery(ctx.t('orders.orderCompleted'));
 
-    // Update message with new status
-    const newMessage = ctx.callbackQuery.message.text + '\n\n' + ctx.t('orders.shipped');
-    await ctx.editMessageText(
-      newMessage,
-      Markup.inlineKeyboard([[Markup.button.callback(ctx.t('orders.delivered'), `order:deliver:${orderId}`)]])
-    );
+    // Final message - no more buttons
+    const completedText = ctx.t('orders.completed');
+    const newMessage = ctx.callbackQuery.message.text + '\n\n' + completedText;
+    await ctx.editMessageText(newMessage);
 
-    logger.info(`Order ${orderId} marked as shipped by user ${ctx.from.id}`);
+    logger.info(`Order ${orderId} marked as completed (via legacy shipped) by user ${ctx.from.id}`);
   } catch (error) {
     logger.error('Error marking order as shipped:', error);
     await ctx.answerCbQuery(ctx.t('orders.statusUpdateError'));
@@ -370,7 +420,8 @@ export const handleMarkShipped = async (ctx) => {
 };
 
 /**
- * Mark order as delivered (complete)
+ * @deprecated Use handleMarkCompleted instead
+ * Mark order as delivered (complete) - kept for backward compatibility
  * SECURITY FIX: Verify order belongs to user's shop via backend before update
  */
 export const handleMarkDelivered = async (ctx) => {
@@ -395,18 +446,16 @@ export const handleMarkDelivered = async (ctx) => {
       throw error;
     }
 
-    await orderApi.updateOrderStatus(orderId, 'delivered', token);
+    await orderApi.updateOrderStatus(orderId, 'completed', token);
 
-    await ctx.answerCbQuery(ctx.t('orders.orderDelivered'));
+    await ctx.answerCbQuery(ctx.t('orders.orderCompleted'));
 
     // Final message - no more buttons
-    const shippedText = ctx.t('orders.shipped');
-    const deliveredText = ctx.t('orders.delivered');
-    const newMessage =
-      ctx.callbackQuery.message.text.replace('\n\n' + shippedText, '') + '\n\n' + deliveredText;
+    const completedText = ctx.t('orders.completed');
+    const newMessage = ctx.callbackQuery.message.text + '\n\n' + completedText;
     await ctx.editMessageText(newMessage);
 
-    logger.info(`Order ${orderId} marked as delivered by user ${ctx.from.id}`);
+    logger.info(`Order ${orderId} marked as completed (via legacy delivered) by user ${ctx.from.id}`);
   } catch (error) {
     logger.error('Error marking order as delivered:', error);
     await ctx.answerCbQuery(ctx.t('orders.statusUpdateError'));

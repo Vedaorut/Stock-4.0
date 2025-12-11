@@ -11,20 +11,23 @@ import { useTranslation } from '../../i18n/useTranslation';
 const STATUS_CONFIG = {
   pending: { key: 'shopOrders.status.pending', color: '#FFCC00', dot: 'bg-yellow-400' },
   verifying: { key: 'shopOrders.status.verifying', color: '#3B82F6', dot: 'bg-blue-500' },
-  confirmed: { key: 'shopOrders.status.confirmed', color: '#22C55E', dot: 'bg-green-500' },
-  shipped: { key: 'shopOrders.status.shipped', color: '#8B5CF6', dot: 'bg-purple-500' },
-  delivered: { key: 'shopOrders.status.delivered', color: '#10B981', dot: 'bg-emerald-500' },
+  paid: { key: 'shopOrders.status.paid', color: '#22C55E', dot: 'bg-green-500' },
+  completed: { key: 'shopOrders.status.completed', color: '#10B981', dot: 'bg-emerald-500' },
   cancelled: { key: 'shopOrders.status.cancelled', color: '#EF4444', dot: 'bg-red-500' },
+};
+
+// Backward compatibility: map old statuses to new ones
+const normalizeStatus = (status) => {
+  if (status === 'confirmed') return 'paid';
+  if (status === 'shipped' || status === 'delivered') return 'completed';
+  return status;
 };
 
 // Status transitions for seller/worker actions (labels will be replaced with t() in component)
 const STATUS_ACTIONS_CONFIG = {
-  confirmed: [
-    { status: 'shipped', key: 'shopOrders.actions.issue', color: 'bg-purple-500' },
+  paid: [
+    { status: 'completed', key: 'shopOrders.actions.complete', color: 'bg-emerald-500' },
     { status: 'cancelled', key: 'shopOrders.actions.cancel', color: 'bg-red-500/20 text-red-400' },
-  ],
-  shipped: [
-    { status: 'delivered', key: 'shopOrders.actions.complete', color: 'bg-emerald-500' },
   ],
 };
 
@@ -45,9 +48,9 @@ const getCryptoSymbol = (currency) => {
 function OrderRow({ order, isExpanded, onToggle, onStatusUpdate, isUpdating, t }) {
   const { triggerHaptic } = useTelegram();
 
-  // Determine status
-  let effectiveStatus = order.status;
-  if (order.status === 'pending' && order.payment_hash) {
+  // Determine status (normalize for backward compatibility)
+  let effectiveStatus = normalizeStatus(order.status);
+  if (effectiveStatus === 'pending' && order.payment_hash) {
     effectiveStatus = 'verifying';
   }
   const statusConfig = STATUS_CONFIG[effectiveStatus] || STATUS_CONFIG.pending;
@@ -385,9 +388,9 @@ export default function ShopOrdersModal({ isOpen, onClose }) {
     triggerHaptic('light');
   };
 
-  // Count orders by status
-  const confirmedCount = orders.filter((o) => o.status === 'confirmed').length;
-  const issuedCount = orders.filter((o) => o.status === 'issued').length;
+  // Count orders by status (normalize for backward compat)
+  const paidCount = orders.filter((o) => normalizeStatus(o.status) === 'paid').length;
+  const completedCount = orders.filter((o) => normalizeStatus(o.status) === 'completed').length;
 
   // Modal title with shop name
   const modalTitle = effectiveShop?.name
@@ -442,16 +445,16 @@ export default function ShopOrdersModal({ isOpen, onClose }) {
                     {t('common.total')}: <span className="text-white font-medium">{orders.length}</span>
                   </p>
                   <div className="flex gap-3">
-                    {confirmedCount > 0 && (
+                    {paidCount > 0 && (
                       <p className="text-xs">
                         <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-500 mr-1.5" />
-                        <span className="text-green-400">{confirmedCount} {t('shopOrders.toIssue')}</span>
+                        <span className="text-green-400">{paidCount} {t('shopOrders.toIssue')}</span>
                       </p>
                     )}
-                    {issuedCount > 0 && (
+                    {completedCount > 0 && (
                       <p className="text-xs">
-                        <span className="inline-block w-1.5 h-1.5 rounded-full bg-purple-500 mr-1.5" />
-                        <span className="text-purple-400">{issuedCount} {t('shopOrders.issued')}</span>
+                        <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5" />
+                        <span className="text-emerald-400">{completedCount} {t('shopOrders.completed')}</span>
                       </p>
                     )}
                   </div>

@@ -53,7 +53,63 @@ async function sendNotificationWithRetry(sendFn, context) {
 }
 
 /**
- * Notify seller and buyer about confirmed order payment
+ * Notify entire shop team (owner + workers)
+ * @param {number} shopId - Shop ID
+ * @param {Function} notifyFn - Async function(telegramId, lang) to send notification
+ * @param {Object} options - { excludeUserId: number } - user to exclude from notifications
+ * @returns {Promise<{successCount: number, totalCount: number}>}
+ */
+async function notifyShopTeam(shopId, notifyFn, options = {}) {
+  const { excludeUserId } = options;
+
+  const shop = await shopQueries.findById(shopId);
+  if (!shop) {
+    logger.error('[Notifications] Shop not found for team notification', { shopId });
+    return { successCount: 0, totalCount: 0 };
+  }
+
+  const owner = await userQueries.findById(shop.owner_id);
+  const ownerLang = owner?.language || DEFAULT_LANGUAGE;
+  let successCount = 0;
+  let totalCount = 0;
+
+  // Notify owner (unless excluded)
+  if (owner?.telegram_id && shop.owner_id !== excludeUserId) {
+    totalCount++;
+    const result = await sendNotificationWithRetry(
+      async () => notifyFn(owner.telegram_id, ownerLang),
+      { type: 'shop_team_owner', shopId, ownerTelegramId: owner.telegram_id }
+    );
+    if (result.success) {successCount++;}
+  }
+
+  // Notify workers
+  try {
+    const workers = await workerQueries.getWorkersForNotification(shopId);
+    for (const worker of workers) {
+      if (worker.user_id === excludeUserId) {continue;}
+
+      totalCount++;
+      const result = await sendNotificationWithRetry(
+        async () => notifyFn(worker.telegram_id, ownerLang),
+        { type: 'shop_team_worker', shopId, workerId: worker.id, workerTelegramId: worker.telegram_id }
+      );
+      if (result.success) {successCount++;}
+    }
+  } catch (error) {
+    logger.error('[Notifications] Error fetching workers for team notification', { error: error.message, shopId });
+  }
+
+  if (totalCount > 0) {
+    logger.info('[Notifications] Shop team notified', { shopId, totalCount, successCount });
+  }
+
+  return { successCount, totalCount };
+}
+
+/**
+ * Notify seller and buyer about paid order (confirmed payment)
+ * Buyer receives seller contact immediately!
  * @param {number} orderId - Order ID to notify about
  */
 export async function notifyOrderConfirmed(orderId) {
@@ -187,4 +243,52 @@ export async function notifyOrderConfirmed(orderId) {
       logger.error('[InvoicePayment] Workers notification fetch error', { error: error.message });
     }
   }
+}
+
+/**
+ * Notify shop team about completed order (выдан)
+ * NOTE: Does NOT notify buyer - this is internal status for shop team only!
+ * @param {number} orderId - Order ID to notify about
+ * @param {number} completedByUserId - User ID who marked order as completed
+ */
+export async function notifyOrderCompleted(orderId, completedByUserId) {
+  const order = await orderQueries.findById(orderId);
+  if (!order) {
+    logger.error('[Notifications] Order not found for completion notification', { orderId });
+    return;
+  }
+
+  const product = await productQueries.findById(order.product_id);
+  const shop = product ? await shopQueries.findById(product.shop_id) : null;
+  const buyer = await userQueries.findById(order.buyer_id);
+  const completedByUser = completedByUserId ? await userQueries.findById(completedByUserId) : null;
+
+  if (!shop) {
+    logger.error('[Notifications] Shop not found for completion notification', { orderId, productId: order.product_id });
+    return;
+  }
+
+  const orderData = {
+    orderId: order.id,
+    productName: product?.name || 'Unknown',
+    quantity: order.quantity,
+    totalPrice: order.total_price,
+    buyerUsername: buyer?.username || 'Anonymous',
+    completedByUsername: completedByUser?.username,
+  };
+
+  // Notify shop team (owner + workers) but NOT the person who marked it completed
+  await notifyShopTeam(
+    shop.id,
+    async (telegramId, lang) => {
+      await telegramService.notifyOrderCompleted(telegramId, orderData, lang);
+    },
+    { excludeUserId: completedByUserId }
+  );
+
+  logger.info('[Notifications] Order completion notification sent to shop team', {
+    orderId,
+    shopId: shop.id,
+    completedByUserId,
+  });
 }

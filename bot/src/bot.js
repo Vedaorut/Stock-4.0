@@ -30,6 +30,7 @@ import paySubscriptionScene from './scenes/paySubscription.js';
 import upgradeShopScene from './scenes/upgradeShop.js';
 import manageWorkersScene from './scenes/manageWorkers.js';
 import markOrdersShippedScene from './scenes/markOrdersShipped.js';
+import markOrdersCompletedScene from './scenes/markOrdersCompleted.js';
 import shopOnboardingScene from './scenes/shopOnboarding.js';
 import feedbackScene from './scenes/feedback.js';
 import renameShopScene from './scenes/renameShop.js';
@@ -92,7 +93,8 @@ const stage = new Scenes.Stage([
   paySubscriptionScene,
   upgradeShopScene,
   manageWorkersScene,
-  markOrdersShippedScene,
+  markOrdersShippedScene, // Legacy: kept for backward compatibility
+  markOrdersCompletedScene, // New: replaces markOrdersShipped
   shopOnboardingScene,
   feedbackScene,
   renameShopScene,

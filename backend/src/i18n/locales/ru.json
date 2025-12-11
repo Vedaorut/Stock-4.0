@@ -25,10 +25,22 @@
       "orderId": "Заказ #{orderId}",
       "status": "Статус: {status}",
       "pending": "Ожидание оплаты",
-      "confirmed": "Подтверждён",
-      "shipped": "Отправлен",
-      "delivered": "Доставлен",
-      "cancelled": "Отменён"
+      "paid": "Оплачен",
+      "completed": "Выдан",
+      "cancelled": "Отменён",
+      "expired": "Истёк",
+      "confirmed": "Оплачен",
+      "shipped": "Оплачен",
+      "delivered": "Выдан"
+    },
+    "completed": {
+      "title": "Заказ выдан!",
+      "orderId": "Заказ #{orderId}",
+      "product": "Товар: {productName}",
+      "quantity": "Количество: {quantity} шт",
+      "amount": "Сумма: ${amount}",
+      "buyer": "Покупатель: @{username}",
+      "completedBy": "Выдал: @{username}"
     },
     "submitted": {
       "buyer": {

@@ -25,10 +25,22 @@
       "orderId": "Order #{orderId}",
       "status": "Status: {status}",
       "pending": "Pending Payment",
-      "confirmed": "Confirmed",
-      "shipped": "Shipped",
-      "delivered": "Delivered",
-      "cancelled": "Cancelled"
+      "paid": "Paid",
+      "completed": "Completed",
+      "cancelled": "Cancelled",
+      "expired": "Expired",
+      "confirmed": "Paid",
+      "shipped": "Paid",
+      "delivered": "Completed"
+    },
+    "completed": {
+      "title": "Order Completed!",
+      "orderId": "Order #{orderId}",
+      "product": "Product: {productName}",
+      "quantity": "Quantity: {quantity} pcs",
+      "amount": "Amount: ${amount}",
+      "buyer": "Buyer: @{username}",
+      "completedBy": "Completed by: @{username}"
     },
     "submitted": {
       "buyer": {

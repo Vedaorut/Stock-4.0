@@ -77,12 +77,13 @@ export async function processOrderPayment({
   const preliminaryOrder = orderResult.rows[0];
 
   // 1.2. Preliminary idempotency check (fast exit)
-  if (preliminaryOrder.status === ORDER_STATES.CONFIRMED) {
+  // Backward compat: accept both 'paid' and legacy 'confirmed'
+  if (preliminaryOrder.status === ORDER_STATES.PAID || preliminaryOrder.status === ORDER_STATES.CONFIRMED) {
     return {
       ok: true,
-      state: 'confirmed',
+      state: 'paid',
       idempotent: true,
-      message: 'Order already confirmed',
+      message: 'Order already paid',
     };
   }
 
@@ -109,7 +110,7 @@ export async function processOrderPayment({
   if (preliminaryInvoice.status === 'paid') {
     return {
       ok: true,
-      state: 'confirmed',
+      state: 'paid',
       idempotent: true,
       message: 'Invoice already paid',
     };
@@ -245,13 +246,14 @@ export async function processOrderPayment({
     const order = await validateAndLockOrder(client, orderId, actorUserId, { allowSeller });
 
     // 2.2. Re-check idempotency (TOCTOU protection)
-    if (order.status === ORDER_STATES.CONFIRMED) {
+    // Backward compat: accept both 'paid' and legacy 'confirmed'
+    if (order.status === ORDER_STATES.PAID || order.status === ORDER_STATES.CONFIRMED) {
       await client.query('ROLLBACK');
       return {
         ok: true,
-        state: 'confirmed',
+        state: 'paid',
         idempotent: true,
-        message: 'Order confirmed by concurrent process',
+        message: 'Order paid by concurrent process',
       };
     }
 
@@ -276,7 +278,7 @@ export async function processOrderPayment({
     if (!activity.active) {
       if (activity.reason === 'already_paid') {
         await client.query('ROLLBACK');
-        return { ok: true, state: 'confirmed', idempotent: true, message: 'Invoice paid concurrently' };
+        return { ok: true, state: 'paid', idempotent: true, message: 'Invoice paid concurrently' };
       }
 
       await client.query('COMMIT');
@@ -298,7 +300,7 @@ export async function processOrderPayment({
       notifyOrderConfirmed(order.id).catch((err) => {
         logger.error('[InvoicePayment] Notification error:', err);
       });
-      return { ok: true, state: 'confirmed', idempotent: true };
+      return { ok: true, state: 'paid', idempotent: true };
     }
 
     // 2.6. Update payment confirmations
@@ -371,10 +373,10 @@ export async function processOrderPayment({
       [orderId]
     );
 
-    // 2.8. Update order status
+    // 2.8. Update order status to 'paid'
     await client.query(
       `UPDATE orders
-       SET status = 'confirmed',
+       SET status = 'paid',
            paid_at = NOW(),
            updated_at = NOW()
        WHERE id = $1`,
@@ -405,7 +407,7 @@ export async function processOrderPayment({
     // Emit WebSocket event for real-time UI updates
     broadcast('order_status', {
       orderId: order.id,
-      status: 'confirmed',
+      status: 'paid',
       shopId: order.shop_id,
     });
 
@@ -416,8 +418,8 @@ export async function processOrderPayment({
 
     return {
       ok: true,
-      state: 'confirmed',
-      message: 'Payment verified and order confirmed',
+      state: 'paid',
+      message: 'Payment verified and order paid',
       confirmations: verificationResult.confirmations,
       amount: verificationResult.amount,
     };

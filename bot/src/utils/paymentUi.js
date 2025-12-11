@@ -9,8 +9,12 @@ import { t } from '../i18n/index.js';
 const getStateLabels = (lang = 'ru') => ({
   pending: t('paymentUi.pending', {}, lang),
   processing: t('paymentUi.processing', {}, lang),
+  // New status (paid replaces confirmed)
+  paid: t('paymentUi.paid', {}, lang),
+  // Legacy status kept for backward compatibility
   confirmed: t('paymentUi.confirmed', {}, lang),
-  paid: t('paymentUi.confirmed', {}, lang),
+  // completed is the new final status
+  completed: t('paymentUi.completed', {}, lang),
   failed: t('paymentUi.failed', {}, lang),
   expired: t('paymentUi.expired', {}, lang),
 });
@@ -28,8 +32,11 @@ export function paymentStateMessage(state, extra = {}, lang = 'ru') {
   const label = stateLabels[state] || stateLabels.pending;
 
   switch (state) {
-    case 'confirmed':
+    // New statuses
     case 'paid':
+    case 'completed':
+    // Legacy statuses for backward compatibility
+    case 'confirmed':
       return `${label}\n\n${t('paymentUi.allDone', {}, lang)}`;
     case 'expired':
       return `${label}\n${t('paymentUi.expiredHint', {}, lang)}`;
@@ -42,8 +49,11 @@ export function paymentStateMessage(state, extra = {}, lang = 'ru') {
 
 export function paymentStateKeyboard(state, { retryCb = 'payment:retry', cancelCb = 'seller:menu', lang = 'ru' } = {}) {
   switch (state) {
-    case 'confirmed':
+    // New statuses
     case 'paid':
+    case 'completed':
+    // Legacy status for backward compatibility
+    case 'confirmed':
       return Markup.inlineKeyboard([[Markup.button.callback(t('buttons.mainMenu', {}, lang), 'seller:menu')]]);
     case 'expired':
     case 'failed':
@@ -59,5 +69,7 @@ export function paymentStateKeyboard(state, { retryCb = 'payment:retry', cancelC
 }
 
 export function isTerminalState(state) {
-  return state === 'confirmed' || state === 'paid' || state === 'expired' || state === 'failed';
+  // New statuses: paid, completed
+  // Legacy statuses: confirmed (kept for backward compatibility)
+  return state === 'paid' || state === 'completed' || state === 'confirmed' || state === 'expired' || state === 'failed';
 }

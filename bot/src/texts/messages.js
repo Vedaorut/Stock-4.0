@@ -389,6 +389,7 @@ const buildMessages = () => ({
     },
     walletsContext: (lang = 'ru') => t('seller.walletsContext', {}, lang),
     workersContext: (lang = 'ru') => t('seller.workersContext', {}, lang),
+    // Legacy: bulkShip kept for backward compatibility
     bulkShip: {
       prompt: (lang = 'ru') => t('bulkShip.prompt', {}, lang),
       confirmTitle: (count, lang = 'ru') => t('bulkShip.confirmTitle', { count }, lang),
@@ -404,6 +405,23 @@ const buildMessages = () => ({
       invalidInput: (lang = 'ru') => t('bulkShip.invalidInput', {}, lang),
       invalidNumbers: (invalid, lang = 'ru') => t('bulkShip.invalidNumbers', { invalid: safe(invalid.join(', ')) }, lang),
       cancelled: (lang = 'ru') => t('bulkShip.cancelled', {}, lang),
+    },
+    // New: bulkComplete replaces bulkShip
+    bulkComplete: {
+      prompt: (lang = 'ru') => t('bulkComplete.prompt', {}, lang),
+      confirmTitle: (count, lang = 'ru') => t('bulkComplete.confirmTitle', { count }, lang),
+      confirmList: (orders, lang = 'ru') => {
+        return orders
+          .map((o, i) => {
+            const buyer = o.buyer_username ? `@${safe(o.buyer_username)}` : t('orders.buyerDefault', {}, lang);
+            return `${i + 1}. ${buyer} - ${safe(o.product_name)} (${safe(o.quantity)}) - $${safe(o.total_price)}`;
+          })
+          .join('\n');
+      },
+      success: (count, lang = 'ru') => t('bulkComplete.success', { count }, lang),
+      invalidInput: (lang = 'ru') => t('bulkComplete.invalidInput', {}, lang),
+      invalidNumbers: (invalid, lang = 'ru') => t('bulkComplete.invalidNumbers', { invalid: safe(invalid.join(', ')) }, lang),
+      cancelled: (lang = 'ru') => t('bulkComplete.cancelled', {}, lang),
     },
   },
   follows: {
