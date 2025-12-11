@@ -117,6 +117,20 @@ export const switchFollowMode = asyncHandler(async (req, res) => {
           throw new ValidationError('Fixed markup must be between $0 and $1000');
         }
       }
+
+      // Check for resell+resell cycle (mutual resell is forbidden - infinite copy loop)
+      // source_shop_id is the shop WE follow, follower_shop_id is OUR shop
+      // We need to check if source_shop follows US in resell mode
+      const reverseFollow = await shopFollowQueries.findByRelationship(
+        existingFollow.source_shop_id,  // Source shop as follower
+        existingFollow.follower_shop_id // Our shop as source
+      );
+      if (reverseFollow && reverseFollow.mode === 'resell') {
+        throw new ValidationError(
+          'Cannot enable resell mode: the source shop is already reselling your products. ' +
+          'This would create an infinite product copy loop.'
+        );
+      }
     }
 
     // Check if already in same mode (skip for resell - may need to re-sync if products missing)

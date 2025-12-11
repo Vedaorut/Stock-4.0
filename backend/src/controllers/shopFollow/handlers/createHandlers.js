@@ -94,10 +94,17 @@ export const createFollow = asyncHandler(async (req, res) => {
       throw new ConflictError('Already following this shop');
     }
 
-    // Check circular follows
-    const wouldCreateCycle = await shopFollowQueries.checkCircularFollow(followerId, sourceId);
-    if (wouldCreateCycle) {
-      throw new ValidationError('Cannot create circular follow relationship');
+    // Check for resell+resell cycle (mutual resell is forbidden - infinite copy loop)
+    // NOTE: Mutual follows ARE allowed, only resell+resell creates infinite copy cycle
+    if (normalizedMode === 'resell') {
+      // Check if reverse follow exists and is in resell mode
+      const reverseFollow = await shopFollowQueries.findByRelationship(sourceId, followerId);
+      if (reverseFollow && reverseFollow.mode === 'resell') {
+        throw new ValidationError(
+          'Cannot enable resell mode: the source shop is already reselling your products. ' +
+          'This would create an infinite product copy loop.'
+        );
+      }
     }
 
     const followerTier = (followerShop.tier || 'pro').toLowerCase();
