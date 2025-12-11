@@ -63,13 +63,36 @@ export const syncedProductQueries = {
   /**
    * Find synced product by synced product ID
    * @param {number} syncedProductId - The product ID in follower shop
-   * @returns {Promise<Object|undefined>} Synced product record
+   * @returns {Promise<Object|undefined>} Synced product record with source_shop_id
    */
   findBySyncedProductId: async (syncedProductId) => {
     const result = await query(
-      `SELECT sp.*, sf.markup_percentage, sf.mode
+      `SELECT sp.*, sf.markup_percentage, sf.mode, sf.source_shop_id
        FROM synced_products sp
        JOIN shop_follows sf ON sp.follow_id = sf.id
+       WHERE sp.synced_product_id = $1`,
+      [syncedProductId]
+    );
+    return result.rows[0];
+  },
+
+  /**
+   * Find synced product with source shop and owner info (for notifications)
+   * @param {number} syncedProductId - The product ID in follower shop
+   * @returns {Promise<Object|undefined>} Synced product with source shop name and owner username
+   */
+  findWithSourceInfo: async (syncedProductId) => {
+    const result = await query(
+      `SELECT sp.*,
+              sf.mode,
+              sf.source_shop_id,
+              s.name as source_shop_name,
+              u.username as source_owner_username,
+              u.telegram_id as source_owner_telegram_id
+       FROM synced_products sp
+       JOIN shop_follows sf ON sp.follow_id = sf.id
+       JOIN shops s ON sf.source_shop_id = s.id
+       JOIN users u ON s.owner_id = u.id
        WHERE sp.synced_product_id = $1`,
       [syncedProductId]
     );

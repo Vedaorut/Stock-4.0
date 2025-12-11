@@ -15,7 +15,7 @@ export const STATUS_ALIASES = new Map([
 export const VALID_PAYMENT_CURRENCIES = ['BTC', 'ETH', 'LTC', 'USDT_TRC20'];
 
 export const MIN_CONFIRMATIONS = {
-  BTC: 3,
+  BTC: 1, // Reduced for faster confirmation
   LTC: 6,
   ETH: 12,
   USDT: 19, // FIX: Added USDT alias - code uses currencyUpper which is 'USDT' not 'USDT_TRC20'

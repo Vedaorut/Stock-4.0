@@ -7,7 +7,9 @@
       "amount": "Сумма: ${amount}",
       "payment": "Оплата: {currency}",
       "buyer": "Покупатель: @{username}",
-      "markDelivered": "Отметить выдачу"
+      "markDelivered": "Отметить выдачу",
+      "sourceShop": "Товар от: {shopName}",
+      "sourceContact": "Контакт: @{username}"
     },
     "confirmed": {
       "title": "Заказ оформлен!",

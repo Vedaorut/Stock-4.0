@@ -27,7 +27,7 @@ export const SUPPORTED_CURRENCIES = {
     name: 'Bitcoin',
     symbol: 'BTC',
     decimals: 8,
-    confirmations: 3,
+    confirmations: 1, // Reduced for faster confirmation
     network: 'bitcoin',
   },
   ETH: {

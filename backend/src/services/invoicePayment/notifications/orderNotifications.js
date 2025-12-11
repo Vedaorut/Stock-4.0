@@ -10,6 +10,7 @@ import {
   userQueries,
 } from '../../../database/queries/index.js';
 import { workerQueries } from '../../../models/workerQueries.js';
+import { syncedProductQueries } from '../../../models/syncedProductQueries.js';
 import telegramService from '../../telegram.js';
 import logger from '../../../utils/logger.js';
 import { DEFAULT_LANGUAGE } from '../../../i18n/index.js';
@@ -67,6 +68,23 @@ export async function notifyOrderConfirmed(orderId) {
   const buyer = await userQueries.findById(order.buyer_id);
   const seller = shop ? await userQueries.findById(shop.owner_id) : null;
 
+  // Check if this is a synced product (resell) - get source shop info
+  let sourceInfo = null;
+  if (product) {
+    try {
+      const syncedProduct = await syncedProductQueries.findWithSourceInfo(product.id);
+      if (syncedProduct && syncedProduct.mode === 'resell') {
+        sourceInfo = {
+          shopName: syncedProduct.source_shop_name,
+          ownerUsername: syncedProduct.source_owner_username,
+          shopId: syncedProduct.source_shop_id,
+        };
+      }
+    } catch (error) {
+      logger.error('[InvoicePayment] Error fetching source info', { error: error.message, productId: product.id });
+    }
+  }
+
   // Notify seller
   if (seller?.telegram_id && product && shop) {
     const sellerLang = seller.language || DEFAULT_LANGUAGE;
@@ -80,6 +98,7 @@ export async function notifyOrderConfirmed(orderId) {
           currency: order.currency,
           buyerUsername: buyer?.username || 'Anonymous',
           buyerTelegramId: buyer?.telegram_id,
+          sourceInfo, // Include source shop info for resell products
         }, sellerLang);
       },
       { type: 'order_confirmed_seller', orderId: order.id, sellerTelegramId: seller.telegram_id }

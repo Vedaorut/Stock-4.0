@@ -196,6 +196,15 @@ ${t('order.confirmed.contactSeller', {}, lang)}
       ? `\n${t('order.new.quantity', { quantity: orderData.quantity }, lang)}`
       : '';
 
+    // Add source shop info for resell products
+    let sourceStr = '';
+    if (orderData.sourceInfo) {
+      sourceStr = `\n\n📦 ${t('order.new.sourceShop', { shopName: orderData.sourceInfo.shopName }, lang)}`;
+      if (orderData.sourceInfo.ownerUsername) {
+        sourceStr += `\n👤 ${t('order.new.sourceContact', { username: orderData.sourceInfo.ownerUsername }, lang)}`;
+      }
+    }
+
     const message = `
 🛍 ${t('order.new.title', {}, lang)}
 
@@ -203,7 +212,7 @@ ${t('order.new.product', { productName: orderData.productName }, lang)}${quantit
 ${t('order.new.amount', { amount: orderData.totalPrice }, lang)}
 ${t('order.new.payment', { currency: orderData.currency }, lang)}
 
-${t('order.new.buyer', { username: orderData.buyerUsername }, lang)}
+${t('order.new.buyer', { username: orderData.buyerUsername }, lang)}${sourceStr}
     `.trim();
 
     return this.sendMessage(sellerTelegramId, message, {

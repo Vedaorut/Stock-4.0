@@ -7,7 +7,9 @@
       "amount": "Amount: ${amount}",
       "payment": "Payment: {currency}",
       "buyer": "Buyer: @{username}",
-      "markDelivered": "Mark as Delivered"
+      "markDelivered": "Mark as Delivered",
+      "sourceShop": "Product from: {shopName}",
+      "sourceContact": "Contact: @{username}"
     },
     "confirmed": {
       "title": "Order Confirmed!",
