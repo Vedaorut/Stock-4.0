@@ -7,6 +7,7 @@ import { validateStatusUpdate } from '../../../validators/orderValidator.js';
 import { NotFoundError, UnauthorizedError, ValidationError } from '../../../utils/errors.js';
 import { updateOrderStatusWithStockLogic } from '../../../services/orderService.js';
 import { broadcast } from '../../../utils/websocket.js';
+import { notifyOrderCompleted } from '../../../services/invoicePayment/notifications/orderNotifications.js';
 
 /**
  * Update order status
@@ -52,14 +53,24 @@ export const updateStatus = asyncHandler(async (req, res) => {
       shopId: order.shop_id,
     });
 
-    try {
-      await telegramService.notifyOrderStatusUpdate(order.buyer_telegram_id, {
-        id: updatedOrder.id,
-        status: updatedOrder.status,
-        product_name: order.product_name,
+    // Notify buyer about status change (except 'completed' which is internal)
+    if (newStatus !== 'completed') {
+      try {
+        await telegramService.notifyOrderStatusUpdate(order.buyer_telegram_id, {
+          id: updatedOrder.id,
+          status: updatedOrder.status,
+          product_name: order.product_name,
+        });
+      } catch (notifError) {
+        logger.error('Notification error', { error: notifError.message });
+      }
+    }
+
+    // For 'completed' status, notify shop team (not buyer)
+    if (newStatus === 'completed') {
+      notifyOrderCompleted(updatedOrder.id, userId).catch((err) => {
+        logger.error('Order completion notification error', { error: err.message, orderId: id });
       });
-    } catch (notifError) {
-      logger.error('Notification error', { error: notifError.message });
     }
 
     return res.json({
@@ -99,10 +110,11 @@ export const getActiveCount = asyncHandler(async (req, res) => {
   try {
     // P1-004 FIX: Use o.shop_id directly instead of JOIN products
     // This ensures orders remain visible even if product is deleted
+    // Include both legacy 'confirmed' and new 'paid' statuses
     const result = await client.query(
       `SELECT COUNT(*) as count
          FROM orders o
-         WHERE o.shop_id = $1 AND o.status = 'confirmed'`,
+         WHERE o.shop_id = $1 AND o.status IN ('confirmed', 'paid')`,
       [shopId]
     );
 

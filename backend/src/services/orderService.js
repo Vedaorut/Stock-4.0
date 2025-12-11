@@ -250,9 +250,9 @@ export const updateOrderStatusWithStockLogic = async (orderId, newStatus, curren
 
     // Handle stock on cancellation based on current status
     if (newStatus === 'cancelled') {
-      if (currentStatus === 'confirmed') {
-        // Confirmed order = stock was deducted, need to return it
-        logger.info('Cancelling confirmed order - returning deducted stock', { orderId });
+      if (currentStatus === 'confirmed' || currentStatus === 'paid') {
+        // Paid/confirmed order = stock was deducted, need to return it
+        logger.info('Cancelling paid order - returning deducted stock', { orderId, currentStatus });
         await returnStockForCancelledOrder(orderId, client);
       } else if (currentStatus === 'pending') {
         // Pending order = stock was only reserved, need to unreserve it
@@ -335,9 +335,9 @@ export const getOrderAnalytics = async (userId, fromDate, toDate) => {
        )
        SELECT
          COUNT(*) as total_orders,
-         SUM(CASE WHEN status IN ('confirmed', 'shipped', 'delivered') THEN 1 ELSE 0 END) as completed_orders,
-         SUM(CASE WHEN status IN ('confirmed', 'shipped', 'delivered') THEN item_total ELSE 0 END) as total_revenue,
-         AVG(CASE WHEN status IN ('confirmed', 'shipped', 'delivered') THEN item_total ELSE NULL END) as avg_order_value
+         SUM(CASE WHEN status IN ('paid', 'completed', 'confirmed', 'shipped', 'delivered') THEN 1 ELSE 0 END) as completed_orders,
+         SUM(CASE WHEN status IN ('paid', 'completed', 'confirmed', 'shipped', 'delivered') THEN item_total ELSE 0 END) as total_revenue,
+         AVG(CASE WHEN status IN ('paid', 'completed', 'confirmed', 'shipped', 'delivered') THEN item_total ELSE NULL END) as avg_order_value
        FROM order_totals`,
       [userId, fromDate, toDateExclusive]
     );
@@ -353,7 +353,7 @@ export const getOrderAnalytics = async (userId, fromDate, toDate) => {
          WHERE (s.owner_id = $1 OR ps.owner_id = $1)
            AND o.created_at >= $2
            AND o.created_at < $3
-           AND o.status IN ('confirmed', 'shipped', 'delivered')
+           AND o.status IN ('paid', 'completed', 'confirmed', 'shipped', 'delivered')
        )
        SELECT
          COALESCE(p.name, oi.product_name) as name,
