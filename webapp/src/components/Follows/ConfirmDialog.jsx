@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ExclamationTriangleIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
 import { useTranslation } from '../../i18n/useTranslation';
@@ -16,6 +16,16 @@ const ConfirmDialog = ({
 }) => {
   const { t } = useTranslation();
   const controlSpring = { type: 'spring', stiffness: 350, damping: 30 };
+
+  // P2-2 FIX: Double-tap prevention
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  // Reset processing state when dialog opens
+  useEffect(() => {
+    if (isOpen) {
+      setIsProcessing(false);
+    }
+  }, [isOpen]);
 
   useBackButton(isOpen ? onClose : null);
 
@@ -89,36 +99,33 @@ const ConfirmDialog = ({
                   e.stopPropagation();
                   e.preventDefault();
 
-                  console.log('[ConfirmDialog] Confirm button clicked', {
-                    onConfirmType: typeof onConfirm,
-                    onCloseType: typeof onClose,
-                    title,
-                  });
+                  // P2-2 FIX: Prevent double-tap
+                  if (isProcessing) return;
+                  setIsProcessing(true);
 
                   // Execute FIRST with fresh data, then close
                   if (typeof onConfirm === 'function') {
                     try {
-                      console.log('[ConfirmDialog] Calling onConfirm...');
                       await onConfirm();
-                      console.log('[ConfirmDialog] onConfirm completed successfully');
                     } catch (err) {
-                      console.error('[ConfirmDialog] onConfirm threw error:', err);
+                      if (import.meta.env.DEV) {
+                        console.error('[ConfirmDialog] onConfirm error:', err);
+                      }
                     }
-                  } else {
-                    console.warn('[ConfirmDialog] onConfirm is not a function!', { onConfirm });
                   }
 
-                  console.log('[ConfirmDialog] Calling onClose...');
                   onClose();
-                  console.log('[ConfirmDialog] onClose completed');
                 }}
-                className={`flex-1 text-white font-semibold py-3.5 rounded-xl shadow-lg ${danger
+                disabled={isProcessing}
+                className={`flex-1 text-white font-semibold py-3.5 rounded-xl shadow-lg transition-opacity ${
+                  isProcessing ? 'opacity-50 cursor-not-allowed' : ''
+                } ${danger
                     ? 'bg-red-500 hover:bg-red-600 shadow-red-500/20'
                     : 'bg-[#FF6B00] hover:bg-[#FF8F00] shadow-[#FF6B00]/20'
                   }`}
-                whileTap={{ scale: 0.96 }}
+                whileTap={isProcessing ? {} : { scale: 0.96 }}
               >
-                {confirmText || t('common.confirm')}
+                {isProcessing ? '...' : (confirmText || t('common.confirm'))}
               </motion.button>
             </div>
           </motion.div>

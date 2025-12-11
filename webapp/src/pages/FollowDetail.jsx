@@ -36,6 +36,13 @@ export default function FollowDetail() {
   // AbortController for retry requests
   const retryControllerRef = useRef(null);
 
+  // P1-1 FIX: Keep follow data in ref for stable access during async operations
+  // Moved BEFORE functions that use it to fix undefined reference
+  const followRef = useRef(follow);
+  useEffect(() => {
+    followRef.current = follow;
+  }, [follow]);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -211,7 +218,7 @@ export default function FollowDetail() {
           const followData = response?.data?.data || response?.data;
           if (followData) {
             setFollow(followData);
-            followRef.current = followData;
+            // P1-1 FIX: followRef.current is auto-synced via useEffect
           } else {
             setFollow((prev) => ({
               ...prev,
@@ -220,13 +227,6 @@ export default function FollowDetail() {
               markup_percentage: markupData.markupPercentage,
               markup_fixed: markupData.markupFixed,
             }));
-            followRef.current = {
-              ...(follow || {}),
-              mode: 'resell',
-              markup_type: markupData.markupType,
-              markup_percentage: markupData.markupPercentage,
-              markup_fixed: markupData.markupFixed,
-            };
           }
         } else {
           // Already in resell mode, just update markup
@@ -234,7 +234,6 @@ export default function FollowDetail() {
           const followData = response?.data?.data || response?.data;
           if (followData) {
             setFollow(followData);
-            followRef.current = followData;
           } else {
             setFollow((prev) => ({
               ...prev,
@@ -242,12 +241,6 @@ export default function FollowDetail() {
               markup_percentage: markupData.markupPercentage,
               markup_fixed: markupData.markupFixed,
             }));
-            followRef.current = {
-              ...(follow || {}),
-              markup_type: markupData.markupType,
-              markup_percentage: markupData.markupPercentage,
-              markup_fixed: markupData.markupFixed,
-            };
           }
         }
         triggerHaptic('success');
@@ -264,79 +257,40 @@ export default function FollowDetail() {
     [followDetailId, follow, updateMarkup, switchMode, triggerHaptic, loadProducts, showToast, t]
   );
 
-  // Keep follow data in ref for stable access during async operations
-  const followRef = useRef(follow);
-  useEffect(() => {
-    followRef.current = follow;
-  }, [follow]);
-
   // Handle mode switch
+  // P1-1 FIX: Removed manual followRef assignments, P3-6: Removed debug logs
   const handleSwitchMode = useCallback(async () => {
-    console.log('[handleSwitchMode] START', {
-      followDetailId,
-      followFromState: follow,
-      followRefCurrent: followRef.current,
-      followRefMode: followRef.current?.mode,
-    });
-
     const currentFollowId = followDetailId || useStore.getState().followDetailId;
     const currentFollow = followRef.current;
 
-    console.log('[handleSwitchMode] After getting values', {
-      currentFollowId,
-      currentFollow,
-      currentFollowMode: currentFollow?.mode,
-    });
-
-    if (!currentFollowId || !currentFollow) {
-      console.log('[handleSwitchMode] EARLY RETURN - missing data', { currentFollowId, currentFollow });
-      return;
-    }
+    if (!currentFollowId || !currentFollow) return;
 
     const newMode = currentFollow.mode === 'monitor' ? 'resell' : 'monitor';
-    console.log('[handleSwitchMode] Mode calculation', {
-      currentMode: currentFollow.mode,
-      newMode,
-      conditionResult: currentFollow.mode === 'monitor',
-    });
-
     triggerHaptic('medium');
 
     // Resell: open markup modal (API call happens when user saves)
     if (newMode === 'resell') {
-      console.log('[handleSwitchMode] Opening MarkupModal for resell');
       setIsMarkupModalOpen(true);
       return;
     }
 
     // Monitor: call API directly
-    console.log('[handleSwitchMode] Calling API for monitor mode', { currentFollowId, newMode });
     try {
       const response = await switchMode(currentFollowId, newMode, null);
-      console.log('[handleSwitchMode] API response', { response, responseData: response?.data });
-
       const followData = response?.data?.data || response?.data;
-      console.log('[handleSwitchMode] Extracted followData', { followData });
 
       if (followData) {
         setFollow(followData);
-        followRef.current = followData;
-        console.log('[handleSwitchMode] Updated follow state with API data');
       } else {
-        setFollow((prev) => {
-          const updated = { ...prev, mode: newMode };
-          followRef.current = updated;
-          console.log('[handleSwitchMode] Updated follow state manually', { prev, updated });
-          return updated;
-        });
+        setFollow((prev) => ({ ...prev, mode: newMode }));
       }
       // Reload products to show source shop products in monitor mode
-      console.log('[handleSwitchMode] Reloading products...');
       await loadProducts();
-      console.log('[handleSwitchMode] Products reloaded, triggering success haptic');
       triggerHaptic('success');
     } catch (err) {
-      console.error('[handleSwitchMode] ERROR', { error: err, message: err?.message });
+      if (import.meta.env.DEV) {
+        console.error('[FollowDetail] Error switching mode:', err);
+      }
       triggerHaptic('error');
       showToast(t('follows.modeError') || 'Failed to switch mode', 'error');
     }

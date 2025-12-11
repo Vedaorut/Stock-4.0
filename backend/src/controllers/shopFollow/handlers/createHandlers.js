@@ -94,15 +94,24 @@ export const createFollow = asyncHandler(async (req, res) => {
       throw new ConflictError('Already following this shop');
     }
 
-    // Check for resell+resell cycle (mutual resell is forbidden - infinite copy loop)
-    // NOTE: Mutual follows ARE allowed, only resell+resell creates infinite copy cycle
+    // P0-3 FIX: Check for resell chain cycles (A→B→C→A where all are resell)
+    // This prevents infinite product copy loops in multi-level chains
     if (normalizedMode === 'resell') {
-      // Check if reverse follow exists and is in resell mode
+      // Check direct cycle (A↔B in resell mode)
       const reverseFollow = await shopFollowQueries.findByRelationship(sourceId, followerId);
       if (reverseFollow && reverseFollow.mode === 'resell') {
         throw new ValidationError(
           'Cannot enable resell mode: the source shop is already reselling your products. ' +
           'This would create an infinite product copy loop.'
+        );
+      }
+
+      // Check multi-level resell chain cycle (A→B→C→A)
+      const hasResellCycle = await shopFollowQueries.checkCircularResellChain(followerId, sourceId);
+      if (hasResellCycle) {
+        throw new ValidationError(
+          'Cannot enable resell mode: this would create a circular resell chain. ' +
+          'Circular product syncing loops are not allowed.'
         );
       }
     }

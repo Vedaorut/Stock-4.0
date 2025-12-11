@@ -1,6 +1,20 @@
 import { query } from '../config/database.js';
 
 /**
+ * Helper to execute query with optional transaction client
+ * @param {string} sql - SQL query
+ * @param {Array} params - Query parameters
+ * @param {Object} client - Optional transaction client (from getClient())
+ * @returns {Promise<Object>} Query result
+ */
+const execQuery = async (sql, params, client = null) => {
+  if (client) {
+    return client.query(sql, params);
+  }
+  return query(sql, params);
+};
+
+/**
  * Synced Product database queries
  * Tracks synced products between follower and source shops
  */
@@ -79,11 +93,12 @@ export const syncedProductQueries = {
   /**
    * Find all synced products for a follow relationship
    * @param {number} followId - Follow relationship ID
+   * @param {Object} client - Optional transaction client
    * @returns {Promise<Array>} Array of synced products with details
    */
-  findByFollowId: async (followId) => {
-    const result = await query(
-      `SELECT 
+  findByFollowId: async (followId, client = null) => {
+    const result = await execQuery(
+      `SELECT
         sp.*,
         p_synced.name as synced_product_name,
         p_synced.price as synced_product_price,
@@ -98,7 +113,8 @@ export const syncedProductQueries = {
        JOIN products p_source ON sp.source_product_id = p_source.id
        WHERE sp.follow_id = $1
        ORDER BY sp.created_at DESC`,
-      [followId]
+      [followId],
+      client
     );
     return result.rows;
   },
@@ -207,12 +223,15 @@ export const syncedProductQueries = {
    * Delete all synced products for a follow relationship
    * Called when follow is deleted
    * @param {number} followId - Follow relationship ID
+   * @param {Object} client - Optional transaction client
    * @returns {Promise<number>} Number of deleted records
    */
-  deleteByFollowId: async (followId) => {
-    const result = await query('DELETE FROM synced_products WHERE follow_id = $1 RETURNING id', [
-      followId,
-    ]);
+  deleteByFollowId: async (followId, client = null) => {
+    const result = await execQuery(
+      'DELETE FROM synced_products WHERE follow_id = $1 RETURNING id',
+      [followId],
+      client
+    );
     return result.rows.length;
   },
 

@@ -31,7 +31,22 @@ const MarkupSliderModal = ({
     }
   }, [isOpen, currentMarkup, currentMarkupType, currentMarkupFixed]);
 
+  // P2-1 FIX: Validate markup before sending to server
   const handleConfirm = () => {
+    // Validate percentage: 0.1-500%
+    if (markupType === 'percentage') {
+      if (markup < 0.1 || markup > 500) {
+        return; // Silently reject invalid values (slider prevents this anyway)
+      }
+    }
+
+    // Validate fixed: 0-$1000
+    if (markupType === 'fixed') {
+      if (markupFixed < 0 || markupFixed > 1000) {
+        return;
+      }
+    }
+
     onConfirm({
       markupType,
       markupPercentage: markupType === 'percentage' ? markup : 0,
@@ -54,7 +69,7 @@ const MarkupSliderModal = ({
 
   const sheetSpring = { type: 'spring', damping: 25, stiffness: 200 };
 
-  const percentageQuickValues = [10, 25, 50, 100];
+  const percentageQuickValues = [5, 10, 25, 50];
   const fixedQuickValues = [5, 10, 25, 50];
 
   return (
@@ -129,7 +144,7 @@ const MarkupSliderModal = ({
               <div className="text-center mb-4 h-16 flex items-center justify-center">
                 {markupType === 'percentage' ? (
                   <span className="text-5xl font-bold text-white tracking-tighter">
-                    {markup}<span className="text-[#FF6B00] text-3xl">%</span>
+                    {Number.isInteger(markup) ? markup : markup.toFixed(1)}<span className="text-[#FF6B00] text-3xl">%</span>
                   </span>
                 ) : (
                   <div className="flex items-center justify-center gap-1">
@@ -151,21 +166,21 @@ const MarkupSliderModal = ({
                   <div className="absolute w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
                     <div
                       className="h-full bg-gradient-to-r from-[#FF6B00] to-[#FF9F00]"
-                      style={{ width: `${((markup - 1) / 499) * 100}%` }}
+                      style={{ width: `${((markup - 0.1) / 499.9) * 100}%` }}
                     />
                   </div>
                   <input
                     type="range"
-                    min="1"
+                    min="0.1"
                     max="500"
-                    step="1"
+                    step="0.1"
                     value={markup}
                     onChange={(e) => setMarkup(Number(e.target.value))}
                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
                   />
                   <div
                     className="absolute h-6 w-6 bg-white rounded-full shadow-[0_0_0_3px_rgba(255,107,0,0.2)] pointer-events-none z-10"
-                    style={{ left: `calc(${((markup - 1) / 499) * 100}% - 12px)` }}
+                    style={{ left: `calc(${((markup - 0.1) / 499.9) * 100}% - 12px)` }}
                   />
                 </div>
               )}

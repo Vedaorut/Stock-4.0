@@ -1,6 +1,20 @@
 import { query } from '../config/database.js';
 
 /**
+ * Helper to execute query with optional transaction client
+ * @param {string} sql - SQL query
+ * @param {Array} params - Query parameters
+ * @param {Object} client - Optional transaction client (from getClient())
+ * @returns {Promise<Object>} Query result
+ */
+const execQuery = async (sql, params, client = null) => {
+  if (client) {
+    return client.query(sql, params);
+  }
+  return query(sql, params);
+};
+
+/**
  * Shop Follow database queries
  * Handles follower → source shop relationships for dropshipping/reseller functionality
  */
@@ -170,15 +184,17 @@ export const shopFollowQueries = {
    * Update follow mode
    * @param {number} id - Follow ID
    * @param {string} mode - New mode ('monitor' or 'resell')
+   * @param {Object} client - Optional transaction client
    * @returns {Promise<Object>} Updated follow record
    */
-  updateMode: async (id, mode) => {
-    const result = await query(
+  updateMode: async (id, mode, client = null) => {
+    const result = await execQuery(
       `UPDATE shop_follows
        SET mode = $2, updated_at = NOW()
        WHERE id = $1
        RETURNING *`,
-      [id, mode]
+      [id, mode],
+      client
     );
     return result.rows[0];
   },
@@ -190,15 +206,17 @@ export const shopFollowQueries = {
    * @param {number} markupPercentage - Markup percentage
    * @param {string} markupType - Markup type ('percentage' or 'fixed')
    * @param {number} markupFixed - Fixed markup amount
+   * @param {Object} client - Optional transaction client
    * @returns {Promise<Object>} Updated follow record
    */
-  updateModeWithMarkup: async (id, mode, markupPercentage, markupType = 'percentage', markupFixed = 0) => {
-    const result = await query(
+  updateModeWithMarkup: async (id, mode, markupPercentage, markupType = 'percentage', markupFixed = 0, client = null) => {
+    const result = await execQuery(
       `UPDATE shop_follows
        SET mode = $2, markup_percentage = $3, markup_type = $4, markup_fixed = $5, updated_at = NOW()
        WHERE id = $1
        RETURNING *`,
-      [id, mode, markupPercentage, markupType, markupFixed]
+      [id, mode, markupPercentage, markupType, markupFixed],
+      client
     );
     return result.rows[0];
   },
@@ -250,7 +268,7 @@ export const shopFollowQueries = {
   },
 
   /**
-   * Check for circular follows (A→B→C→A)
+   * Check for circular follows (A→B→C→A) - all modes
    * Uses recursive CTE to detect cycles
    * @param {number} followerShopId - Shop that wants to follow
    * @param {number} sourceShopId - Shop to be followed
@@ -263,9 +281,9 @@ export const shopFollowQueries = {
         SELECT source_shop_id as shop_id, follower_shop_id, 1 as depth
         FROM shop_follows
         WHERE follower_shop_id = $2 AND status = 'active'
-        
+
         UNION ALL
-        
+
         -- Recursive case: follow the chain
         SELECT sf.source_shop_id, sf.follower_shop_id, fc.depth + 1
         FROM shop_follows sf
@@ -274,6 +292,42 @@ export const shopFollowQueries = {
       )
       SELECT EXISTS(
         SELECT 1 FROM follow_chain WHERE shop_id = $1
+      ) as has_cycle`,
+      [followerShopId, sourceShopId]
+    );
+    return result.rows[0].has_cycle;
+  },
+
+  /**
+   * P0-3 FIX: Check for circular RESELL chains (A→B→C→A where all are resell)
+   * Only blocks cycles where ALL follows in the chain are in resell mode
+   * This prevents infinite product copy loops
+   * @param {number} followerShopId - Shop that wants to follow in resell mode
+   * @param {number} sourceShopId - Shop to be followed
+   * @returns {Promise<boolean>} True if would create an infinite resell cycle
+   */
+  checkCircularResellChain: async (followerShopId, sourceShopId) => {
+    const result = await query(
+      `WITH RECURSIVE resell_chain AS (
+        -- Base case: resell follows FROM the source shop (who does source shop follow in resell?)
+        SELECT sf.source_shop_id as shop_id, sf.follower_shop_id, 1 as depth
+        FROM shop_follows sf
+        WHERE sf.follower_shop_id = $2
+          AND sf.status = 'active'
+          AND sf.mode = 'resell'
+
+        UNION ALL
+
+        -- Recursive case: follow the resell chain
+        SELECT sf.source_shop_id, sf.follower_shop_id, rc.depth + 1
+        FROM shop_follows sf
+        JOIN resell_chain rc ON sf.follower_shop_id = rc.shop_id
+        WHERE sf.status = 'active'
+          AND sf.mode = 'resell'
+          AND rc.depth < 10
+      )
+      SELECT EXISTS(
+        SELECT 1 FROM resell_chain WHERE shop_id = $1
       ) as has_cycle`,
       [followerShopId, sourceShopId]
     );

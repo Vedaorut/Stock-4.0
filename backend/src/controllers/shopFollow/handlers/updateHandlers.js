@@ -1,6 +1,7 @@
 import { shopFollowQueries } from '../../../models/shopFollowQueries.js';
 import { workerQueries, productQueries } from '../../../database/queries/index.js';
 import { syncedProductQueries } from '../../../models/syncedProductQueries.js';
+import { getClient } from '../../../config/database.js';
 import { asyncHandler } from '../../../middleware/errorHandler.js';
 import { NotFoundError, UnauthorizedError, ValidationError } from '../../../utils/errors.js';
 import { syncAllProductsForFollow, updateMarkupForFollow, calculatePriceWithMarkup } from '../../../services/productSyncService.js';
@@ -118,9 +119,8 @@ export const switchFollowMode = asyncHandler(async (req, res) => {
         }
       }
 
-      // Check for resell+resell cycle (mutual resell is forbidden - infinite copy loop)
-      // source_shop_id is the shop WE follow, follower_shop_id is OUR shop
-      // We need to check if source_shop follows US in resell mode
+      // P0-3 FIX: Check for resell chain cycles
+      // Check direct cycle (A↔B in resell mode)
       const reverseFollow = await shopFollowQueries.findByRelationship(
         existingFollow.source_shop_id,  // Source shop as follower
         existingFollow.follower_shop_id // Our shop as source
@@ -129,6 +129,18 @@ export const switchFollowMode = asyncHandler(async (req, res) => {
         throw new ValidationError(
           'Cannot enable resell mode: the source shop is already reselling your products. ' +
           'This would create an infinite product copy loop.'
+        );
+      }
+
+      // Check multi-level resell chain cycle (A→B→C→A)
+      const hasResellCycle = await shopFollowQueries.checkCircularResellChain(
+        existingFollow.follower_shop_id,
+        existingFollow.source_shop_id
+      );
+      if (hasResellCycle) {
+        throw new ValidationError(
+          'Cannot enable resell mode: this would create a circular resell chain. ' +
+          'Circular product syncing loops are not allowed.'
         );
       }
     }
@@ -142,18 +154,47 @@ export const switchFollowMode = asyncHandler(async (req, res) => {
     const needsSync = normalizedMode === 'resell' &&
       (existingFollow.mode !== 'resell' || existingFollow.synced_products_count === 0);
 
+    // P0-1 FIX: Wrap resell→monitor transition in transaction to prevent race conditions
     // BUG-FOLLOW-003: Delete synced products BEFORE updating mode to prevent orphaned records
     if (normalizedMode === 'monitor' && existingFollow.mode === 'resell') {
-      const synced = await syncedProductQueries.findByFollowId(followId);
-      if (synced.length > 0) {
-        const syncedProductIds = synced.map((row) => row.synced_product_id);
-        await productQueries.bulkDeleteByIds(syncedProductIds, existingFollow.follower_shop_id);
-        await syncedProductQueries.deleteByFollowId(followId);
+      const client = await getClient();
+      try {
+        await client.query('BEGIN');
+
+        // 1. Find synced products (within transaction for consistency)
+        const synced = await syncedProductQueries.findByFollowId(followId, client);
+
+        if (synced.length > 0) {
+          const syncedProductIds = synced.map((row) => row.synced_product_id);
+
+          // 2. Delete synced_products records FIRST (FK constraint)
+          await syncedProductQueries.deleteByFollowId(followId, client);
+
+          // 3. Delete the actual products (use bulkDeleteSyncedProducts - no FK check needed)
+          await productQueries.bulkDeleteSyncedProducts(syncedProductIds, existingFollow.follower_shop_id, client);
+        }
+
+        // 4. Update mode AND markup atomically to satisfy DB constraint
+        // shop_follows_markup_percentage_check requires markup >= 0.1 when mode = 'resell'
+        await shopFollowQueries.updateModeWithMarkup(followId, 'monitor', 0, 'percentage', 0, client);
+
+        await client.query('COMMIT');
+
+        logger.info('[switchFollowMode] resell→monitor transition completed', {
+          followId,
+          deletedProducts: synced.length,
+        });
+      } catch (txError) {
+        await client.query('ROLLBACK');
+        logger.error('[switchFollowMode] Transaction failed', {
+          followId,
+          error: txError.message,
+          stack: txError.stack,
+        });
+        throw txError;
+      } finally {
+        client.release();
       }
-      // FIX: Update mode AND markup atomically to satisfy DB constraint
-      // shop_follows_markup_percentage_check requires markup >= 0.1 when mode = 'resell'
-      // So we must change mode to 'monitor' in the SAME query as setting markup to 0
-      await shopFollowQueries.updateModeWithMarkup(followId, 'monitor', 0, 'percentage', 0);
     }
 
     if (normalizedMode === 'resell') {
