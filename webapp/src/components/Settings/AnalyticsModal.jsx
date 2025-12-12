@@ -197,7 +197,7 @@ export default function AnalyticsModal({ isOpen, onClose }) {
             <div
               style={{
                 paddingTop: 'calc(env(safe-area-inset-top) + 56px)',
-                paddingBottom: 'var(--tabbar-total)',
+                paddingBottom: 'calc(var(--tabbar-total) + 20px)',
               }}
               className="px-4"
             >
