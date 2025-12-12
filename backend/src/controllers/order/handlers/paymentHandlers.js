@@ -164,13 +164,32 @@ export const submitPayment = asyncHandler(async (req, res) => {
     throw new ValidationError(`Cannot submit payment for ${order.status} order`);
   }
 
-  // P0 SECURITY: Prevent tx_hash submission if crypto_amount is NULL
-  // Without this check, parseFloat(NULL) = NaN bypasses amount verification
-  if (!order.crypto_amount) {
-    logger.error('[submitPayment] crypto_amount is NULL', { orderId: id });
+  // P0 SECURITY: Prevent tx_hash submission if crypto payment details are not initialized
+  // Without this check, NaN/NULL values can bypass verification or allow currency switching.
+  const expectedCurrencyUpper = order.crypto_currency?.toUpperCase?.();
+  if (!order.crypto_amount || !expectedCurrencyUpper || !order.payment_address) {
+    logger.error('[submitPayment] crypto payment not initialized', {
+      orderId: id,
+      crypto_amount: order.crypto_amount,
+      crypto_currency: order.crypto_currency,
+      has_payment_address: !!order.payment_address,
+    });
     throw new ValidationError(
       'Payment info not initialized. Call GET /api/orders/:id/payment-info first.',
       { code: 'PAYMENT_NOT_INITIALIZED' }
+    );
+  }
+
+  // P0 SECURITY: Enforce currency match with invoice to prevent cross-chain/cross-amount injection
+  if (currencyUpper !== expectedCurrencyUpper) {
+    logger.warn('[submitPayment] Currency mismatch', {
+      orderId: id,
+      expectedCurrency: expectedCurrencyUpper,
+      submittedCurrency: currencyUpper,
+    });
+    throw new ValidationError(
+      `Currency mismatch. Expected ${expectedCurrencyUpper}, got ${currencyUpper}. Please refresh payment info and resubmit.`,
+      { code: 'CURRENCY_MISMATCH' }
     );
   }
 
@@ -202,7 +221,15 @@ export const submitPayment = asyncHandler(async (req, res) => {
   logger.info('[submitPayment] Getting invoice data...');
   const orderData = await orderQueries.getInvoiceData(id);
   const walletMap = buildWalletMap(orderData);
-  const recipientAddress = walletMap[currencyUpper];
+  const recipientAddress = order.payment_address || walletMap[currencyUpper];
+
+  if (!recipientAddress) {
+    throw new ValidationError(
+      `Seller does not accept ${currencyUpper}. Please request payment info again.`,
+      { code: 'ADDRESS_NOT_FOUND' }
+    );
+  }
+
   logger.info('[submitPayment] Wallet info', { currencyUpper, recipientAddress: recipientAddress?.substring(0, 10) });
 
   // ============================================
@@ -234,6 +261,8 @@ export const submitPayment = asyncHandler(async (req, res) => {
     error: verificationResult.error,
   });
 
+  const isApiError = verificationResult.resultStatus === VERIFICATION_STATUS.API_ERROR;
+
   // Handle verification failures
   if (verificationResult.resultStatus === VERIFICATION_STATUS.TX_NOT_FOUND) {
     throw new ValidationError(
@@ -250,14 +279,14 @@ export const submitPayment = asyncHandler(async (req, res) => {
     );
   }
 
-  if (verificationResult.resultStatus === VERIFICATION_STATUS.API_ERROR) {
+  if (isApiError) {
     // API error - allow retry but warn user
     logger.warn('[submitPayment] Blockchain API error, allowing payment with warning', {
       orderId: id,
       txHash: cleanTxHash,
       error: verificationResult.error,
     });
-    // Continue with payment creation but mark for priority verification
+    // Continue with payment creation but DO NOT notify seller until worker verifies on-chain
   }
 
   // SUCCESS or API_ERROR (with retry) - transaction is valid, proceed
@@ -312,40 +341,51 @@ export const submitPayment = asyncHandler(async (req, res) => {
   });
 
   // Non-blocking Telegram notifications with tracking and alerting
-  // Notifications are best-effort but failures are tracked for debugging
-  Promise.allSettled([
-    // Notify buyer
-    order.buyer_telegram_id && telegramService.notifyPaymentSubmittedBuyer(
-      order.buyer_telegram_id,
-      {
-        shopName: order.shop_name,
-        productName: order.product_name,
-        amount: order.total_price,
-        cryptoAmount: order.crypto_amount,
-        currency: currencyUpper,
-        txHash: cleanTxHash,
-      },
-      order.buyer_language || 'ru'
-    ),
-    // Notify seller - only after blockchain verification confirmed tx exists and is valid
-    order.seller_telegram_id && telegramService.notifyPaymentSubmittedSeller(
-      order.seller_telegram_id,
-      {
-        orderId: parseInt(id),
-        productName: order.product_name,
-        amount: order.total_price,
-        cryptoAmount: order.crypto_amount,
-        currency: currencyUpper,
-        buyerUsername: order.buyer_username,
-        txHash: cleanTxHash,
-      },
-      order.seller_language || 'ru'
-    ),
-  ]).then(async (results) => {
-    const targets = ['buyer', 'seller'];
+  // Seller notification is deferred on API_ERROR to prevent spam.
+  const notificationPromises = [];
+  const targets = [];
+
+  if (order.buyer_telegram_id) {
+    notificationPromises.push(
+      telegramService.notifyPaymentSubmittedBuyer(
+        order.buyer_telegram_id,
+        {
+          shopName: order.shop_name,
+          productName: order.product_name,
+          amount: order.total_price,
+          cryptoAmount: order.crypto_amount,
+          currency: currencyUpper,
+          txHash: cleanTxHash,
+        },
+        order.buyer_language || 'ru'
+      )
+    );
+    targets.push('buyer');
+  }
+
+  if (!isApiError && order.seller_telegram_id) {
+    notificationPromises.push(
+      telegramService.notifyPaymentSubmittedSeller(
+        order.seller_telegram_id,
+        {
+          orderId: parseInt(id),
+          productName: order.product_name,
+          amount: order.total_price,
+          cryptoAmount: order.crypto_amount,
+          currency: currencyUpper,
+          buyerUsername: order.buyer_username,
+          txHash: cleanTxHash,
+        },
+        order.seller_language || 'ru'
+      )
+    );
+    targets.push('seller');
+  }
+
+  Promise.allSettled(notificationPromises).then(async (results) => {
     const notificationStatus = {
-      buyer: results[0]?.status === 'fulfilled' ? 'sent' : 'failed',
-      seller: results[1]?.status === 'fulfilled' ? 'sent' : 'failed',
+      buyer: order.buyer_telegram_id ? 'failed' : 'skipped',
+      seller: isApiError ? 'deferred' : (order.seller_telegram_id ? 'failed' : 'skipped'),
       timestamp: new Date().toISOString(),
     };
 
@@ -353,24 +393,35 @@ export const submitPayment = asyncHandler(async (req, res) => {
     const failedTargets = [];
     const errors = [];
     results.forEach((result, idx) => {
-      if (result.status === 'rejected') {
-        const target = targets[idx];
-        const errorMsg = result.reason?.message || String(result.reason);
-        failedTargets.push(target);
-        errors.push(`${target}: ${errorMsg}`);
-        notificationStatus[`${target}_error`] = errorMsg;
-
-        logger.error('[Payment] Telegram notification failed', {
-          orderId: id,
-          target,
-          error: errorMsg,
-        });
+      const target = targets[idx];
+      if (result.status === 'fulfilled') {
+        notificationStatus[target] = 'sent';
+        return;
       }
+
+      const errorMsg = result.reason?.message || String(result.reason);
+      failedTargets.push(target);
+      errors.push(`${target}: ${errorMsg}`);
+      notificationStatus[`${target}_error`] = errorMsg;
+
+      logger.error('[Payment] Telegram notification failed', {
+        orderId: id,
+        target,
+        error: errorMsg,
+      });
     });
 
     // Alert admin if any notifications failed
     if (failedTargets.length > 0) {
-      alertNotificationFailed(id, failedTargets, errors);
+      try {
+        alertNotificationFailed(id, failedTargets, errors);
+      } catch (alertError) {
+        logger.error('[Payment] Failed to send notification failure alert', {
+          orderId: id,
+          failedTargets,
+          alertError: alertError.message,
+        });
+      }
     }
 
     // Track notification status in database for debugging
@@ -382,18 +433,27 @@ export const submitPayment = asyncHandler(async (req, res) => {
         error: dbError.message,
       });
     }
+  }).catch((unexpectedError) => {
+    logger.error('[Payment] Unexpected error in notification handler', {
+      orderId: id,
+      error: unexpectedError.message,
+      stack: unexpectedError.stack,
+    });
   });
 
+  const requiredConfirmations = MIN_CONFIRMATIONS[currencyUpper] || 3;
   return res.json({
     success: true,
     data: {
       paymentId: payment.id,
       status: verificationResult.verified ? 'verified' : 'pending_confirmations',
       confirmations: verificationResult.confirmations,
-      required: MIN_CONFIRMATIONS[currencyUpper] || 3,
-      message: verificationResult.verified
-        ? 'Payment verified and confirmed!'
-        : `Payment verified. Waiting for ${MIN_CONFIRMATIONS[currencyUpper] || 3} confirmations.`,
+      required: requiredConfirmations,
+      message: isApiError
+        ? 'Hash received. Verification delayed due to blockchain API issues. We will recheck automatically.'
+        : verificationResult.verified
+          ? 'Payment verified and confirmed!'
+          : `Payment verified. Waiting for ${requiredConfirmations} confirmations.`,
     },
   });
 });

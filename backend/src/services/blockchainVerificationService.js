@@ -279,13 +279,40 @@ export async function verifyPayment(txHash, chain, expectedAddress, expectedAmou
 
     return result;
   } catch (error) {
+    const statusCode = error.statusCode || error.response?.status || null;
+
     logger.error('[BlockchainVerification] Verification error', {
       txHash,
       chain,
+      statusCode,
       error: error.message,
       isAPIError: error.isAPIError || false,
       stack: error.stack,
     });
+
+    // Provider-level not found should not be treated as transient API_ERROR
+    if (statusCode === 404) {
+      return {
+        verified: false,
+        status: 'failed',
+        resultStatus: VERIFICATION_STATUS.TX_NOT_FOUND,
+        confirmations: 0,
+        amount: '0',
+        error: 'Transaction not found',
+      };
+    }
+
+    // Bad request / unprocessable usually means invalid hash or permanently invalid tx
+    if (statusCode === 400 || statusCode === 422) {
+      return {
+        verified: false,
+        status: 'failed',
+        resultStatus: VERIFICATION_STATUS.TX_INVALID,
+        confirmations: 0,
+        amount: '0',
+        error: `Invalid transaction: ${error.message}`,
+      };
+    }
 
     // Distinguish API errors from other errors
     const isAPIError = error.isAPIError || error.code === 'ECONNREFUSED' ||

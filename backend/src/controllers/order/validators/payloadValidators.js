@@ -111,22 +111,52 @@ export function validateTxHash(txHash, currency = null) {
     throw new ValidationError('Transaction hash must contain only hexadecimal characters (0-9, a-f)');
   }
 
-  // Chain-specific length validation (if currency provided)
+  // Chain-specific format validation (if currency provided)
   if (currency) {
-    const currencyUpper = currency.toUpperCase();
-    const expectedLengths = {
-      BTC: 64,
-      LTC: 64,
-      ETH: 66, // 0x + 64 hex chars
-      USDT: 64, // TRON
-      USDT_TRC20: 64,
-    };
+    // Normalize USDT_TRC20 to USDT for consistent validation
+    const rawCurrency = currency.toUpperCase();
+    const currencyUpper = rawCurrency === 'USDT_TRC20' ? 'USDT' : rawCurrency;
 
-    const expectedLength = expectedLengths[currencyUpper];
-    if (expectedLength && trimmedHash.length !== expectedLength) {
-      throw new ValidationError(
-        `Invalid ${currencyUpper} transaction hash length (expected ${expectedLength} characters, got ${trimmedHash.length})`
-      );
+    // ETH requires 0x prefix
+    if (currencyUpper === 'ETH') {
+      if (!trimmedHash.startsWith('0x')) {
+        throw new ValidationError(
+          'ETH transaction hash must start with 0x prefix'
+        );
+      }
+      if (trimmedHash.length !== 66) {
+        throw new ValidationError(
+          `Invalid ETH transaction hash length (expected 66 characters with 0x prefix, got ${trimmedHash.length})`
+        );
+      }
+    }
+
+    // BTC/LTC must NOT have 0x prefix and must be exactly 64 hex chars
+    if (currencyUpper === 'BTC' || currencyUpper === 'LTC') {
+      if (trimmedHash.startsWith('0x')) {
+        throw new ValidationError(
+          `${currencyUpper} transaction hash must not start with 0x prefix (that's for Ethereum)`
+        );
+      }
+      if (trimmedHash.length !== 64) {
+        throw new ValidationError(
+          `Invalid ${currencyUpper} transaction hash length (expected 64 characters, got ${trimmedHash.length})`
+        );
+      }
+    }
+
+    // USDT TRC20 (TRON) - 64 hex chars, no 0x prefix
+    if (currencyUpper === 'USDT') {
+      if (trimmedHash.startsWith('0x')) {
+        throw new ValidationError(
+          'USDT TRC20 transaction hash must not start with 0x prefix (that\'s for Ethereum)'
+        );
+      }
+      if (trimmedHash.length !== 64) {
+        throw new ValidationError(
+          `Invalid USDT TRC20 transaction hash length (expected 64 characters, got ${trimmedHash.length})`
+        );
+      }
     }
   }
 
