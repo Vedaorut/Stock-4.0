@@ -5,7 +5,7 @@ import { useTelegram } from '../../hooks/useTelegram';
 import { useTranslation } from '../../i18n/useTranslation';
 import { CRYPTO_OPTIONS, formatTxHash } from '../../utils/paymentUtils';
 import { usePlatform } from '../../hooks/usePlatform';
-import { getSpringPreset, getSurfaceStyle, isAndroid } from '../../utils/platform';
+import { getSpringPreset, getSurfaceStyle, getSheetMaxHeight, isAndroid, isIOS } from '../../utils/platform';
 import { useBackButton } from '../../hooks/useBackButton';
 
 export default function OrderStatusModal() {
@@ -14,6 +14,7 @@ export default function OrderStatusModal() {
   const { t } = useTranslation();
   const platform = usePlatform();
   const android = isAndroid(platform);
+  const ios = isIOS(platform);
 
   const overlayStyle = useMemo(() => getSurfaceStyle('overlay', platform), [platform]);
 
@@ -70,9 +71,10 @@ export default function OrderStatusModal() {
 
           {/* Modal - Converted to Bottom Sheet */}
           <motion.div
-            className="fixed inset-x-0 bottom-0 z-50 flex flex-col"
+            className="fixed inset-x-0 z-50 flex flex-col"
             style={{
-              maxHeight: '90vh',
+              bottom: 'var(--tabbar-total)',
+              maxHeight: getSheetMaxHeight(platform, ios ? -24 : 32),
             }}
             initial={{ y: '100%' }}
             animate={{ y: 0 }}
