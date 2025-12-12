@@ -73,7 +73,6 @@ export default function OrderStatusModal() {
           <motion.div
             className="fixed inset-x-0 z-50 flex flex-col"
             style={{
-              bottom: 'var(--tabbar-total)',
               maxHeight: getSheetMaxHeight(platform, ios ? -24 : 32),
             }}
             initial={{ y: '100%' }}
