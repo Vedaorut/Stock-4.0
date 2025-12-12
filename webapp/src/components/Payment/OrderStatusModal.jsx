@@ -53,6 +53,7 @@ export default function OrderStatusModal() {
   const completedOrder = pendingOrders?.[pendingOrders.length - 1];
 
   return (
+
     <AnimatePresence>
       {isOpen && (
         <>
@@ -67,18 +68,21 @@ export default function OrderStatusModal() {
             style={overlayStyle}
           />
 
-          {/* Modal */}
+          {/* Modal - Converted to Bottom Sheet */}
           <motion.div
-            className="fixed inset-x-4 top-1/2 -translate-y-1/2 z-50 max-w-md mx-auto"
-            initial={{ scale: 0.8, opacity: 0, y: '-40%' }}
-            animate={{ scale: 1, opacity: 1, y: '-50%' }}
-            exit={{ scale: 0.8, opacity: 0, y: '-40%' }}
+            className="fixed inset-x-0 bottom-0 z-50 flex flex-col"
+            style={{
+              maxHeight: '90vh', // Limit height but allow scrolling
+            }}
+            initial={{ y: '100%' }}
+            animate={{ y: 0 }}
+            exit={{ y: '100%' }}
             transition={sheetSpring}
           >
-            <div className="rounded-3xl overflow-hidden" style={modalStyle}>
+            <div className="rounded-t-[32px] overflow-hidden flex flex-col bg-[#1C1C1C]" style={modalStyle}>
               {/* Header with gradient */}
               <div
-                className="relative p-8 text-center overflow-hidden"
+                className="relative p-8 text-center overflow-hidden shrink-0"
                 style={{
                   background:
                     'linear-gradient(180deg, rgba(255, 107, 0, 0.15) 0%, transparent 100%)',
@@ -94,7 +98,7 @@ export default function OrderStatusModal() {
                     damping: 15,
                     delay: 0.2,
                   }}
-                  className="inline-flex items-center justify-center w-24 h-24 rounded-full mb-4"
+                  className="inline-flex items-center justify-center w-20 h-20 rounded-full mb-4"
                   style={{
                     background: 'linear-gradient(135deg, #FF6B00 0%, #FF8F3D 100%)',
                     boxShadow: `
@@ -106,7 +110,7 @@ export default function OrderStatusModal() {
                   }}
                 >
                   <motion.svg
-                    className="w-12 h-12 text-white"
+                    className="w-10 h-10 text-white"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -143,12 +147,13 @@ export default function OrderStatusModal() {
                 </motion.p>
               </div>
 
-              {/* Order Details */}
+              {/* Order Details - Scrollable */}
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.5 }}
-                className="p-6 space-y-4"
+                className="p-6 space-y-4 overflow-y-auto"
+                style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 80px)' }}
               >
                 {/* Order ID */}
                 <div
@@ -293,16 +298,17 @@ export default function OrderStatusModal() {
                 </div>
               </motion.div>
 
-              {/* Footer */}
+              {/* Fixed Footer */}
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.6 }}
-                className="p-6 pt-2"
+                className="absolute bottom-0 inset-x-0 p-6 pt-2 bg-[#1C1C1C]/90 backdrop-blur-md border-t border-white/5"
+                style={{ paddingBottom: 'max(24px, env(safe-area-inset-bottom))' }}
               >
                 <motion.button
                   onClick={handleClose}
-                  className="w-full touch-target text-white font-bold rounded-xl overflow-hidden"
+                  className="w-full touch-target text-white font-bold rounded-xl overflow-hidden py-3"
                   style={{
                     background: 'linear-gradient(135deg, #FF6B00 0%, #FF8F3D 100%)',
                     boxShadow: `

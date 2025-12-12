@@ -1,6 +1,8 @@
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
-import { memo, useState, useCallback } from 'react';
+import { memo, useState, useCallback, useRef, useEffect } from 'react';
 import PropTypes from 'prop-types';
+
+const LONG_PRESS_DURATION_MS = 500;
 
 /**
  * Animated badge showing pending order status with pulsing and ripple effects.
@@ -8,20 +10,85 @@ import PropTypes from 'prop-types';
  *
  * @param {Object} props
  * @param {Object} props.order - The pending order object
- * @param {Function} props.onClick - Click handler
+ * @param {Function} props.onClick - Click handler (short tap - resume payment)
+ * @param {Function} props.onLongPress - Long press handler (show cancel options)
  * @param {boolean} props.isExpiringSoon - If true, shows red color instead of orange
  */
 const PendingOrderBadge = memo(function PendingOrderBadge({
   order,
   onClick,
+  onLongPress,
   isExpiringSoon = false
 }) {
   const shouldReduceMotion = useReducedMotion();
   const [showTooltip, setShowTooltip] = useState(false);
+  const longPressTimer = useRef(null);
+  const isLongPress = useRef(false);
 
-  const handleClick = useCallback(() => {
-    onClick?.(order);
-  }, [onClick, order]);
+  // Refs for latest props to avoid stale closures in timer
+  const onLongPressRef = useRef(onLongPress);
+  const onClickRef = useRef(onClick);
+  const orderRef = useRef(order);
+
+  // Keep refs in sync (direct assignment is safe during render)
+  onLongPressRef.current = onLongPress;
+  onClickRef.current = onClick;
+  orderRef.current = order;
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (longPressTimer.current) {
+        clearTimeout(longPressTimer.current);
+        longPressTimer.current = null;
+      }
+    };
+  }, []);
+
+  // DRY: Shared timer cleanup helper
+  const clearLongPressTimer = useCallback(() => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  }, []);
+
+  const handleTapStart = useCallback(() => {
+    isLongPress.current = false;
+    setShowTooltip(true);
+
+    // Start long press timer
+    longPressTimer.current = setTimeout(() => {
+      isLongPress.current = true;
+      setShowTooltip(false);
+      try {
+        onLongPressRef.current?.(orderRef.current);
+      } catch (error) {
+        console.error('[PendingOrderBadge] onLongPress error:', error);
+      }
+    }, LONG_PRESS_DURATION_MS);
+  }, []);
+
+  const handleTapEnd = useCallback(() => {
+    clearLongPressTimer();
+    setShowTooltip(false);
+
+    // Only trigger click if it wasn't a long press
+    if (!isLongPress.current) {
+      try {
+        onClickRef.current?.(orderRef.current);
+      } catch (error) {
+        console.error('[PendingOrderBadge] onClick error:', error);
+      }
+    }
+    isLongPress.current = false;
+  }, [clearLongPressTimer]);
+
+  const handleTapCancel = useCallback(() => {
+    clearLongPressTimer();
+    setShowTooltip(false);
+    isLongPress.current = false;
+  }, [clearLongPressTimer]);
 
   // Colors based on urgency
   const baseColor = isExpiringSoon ? '#EF4444' : '#FF6B00';
@@ -127,12 +194,11 @@ const PendingOrderBadge = memo(function PendingOrderBadge({
 
       {/* Main badge button */}
       <motion.button
-        onClick={handleClick}
         onHoverStart={() => setShowTooltip(true)}
         onHoverEnd={() => setShowTooltip(false)}
-        onTapStart={() => setShowTooltip(true)}
-        onTap={() => setShowTooltip(false)}
-        onTapCancel={() => setShowTooltip(false)}
+        onTapStart={handleTapStart}
+        onTap={handleTapEnd}
+        onTapCancel={handleTapCancel}
         className="relative w-10 h-10 rounded-full flex items-center justify-center cursor-pointer outline-none touch-manipulation"
         style={{
           background: `linear-gradient(135deg, ${baseColor} 0%, ${lightColor} 100%)`,
@@ -198,6 +264,7 @@ PendingOrderBadge.propTypes = {
     count: PropTypes.number
   }),
   onClick: PropTypes.func,
+  onLongPress: PropTypes.func,
   isExpiringSoon: PropTypes.bool
 };
 

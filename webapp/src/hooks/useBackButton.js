@@ -25,17 +25,34 @@ import { useTelegram } from './useTelegram';
  * }
  * ```
  */
+const DEBOUNCE_DELAY_MS = 300;
+
 export function useBackButton(onBack) {
   const { tg } = useTelegram();
   const onBackRef = useRef(onBack);
   const handlerRef = useRef(null);
+  const isProcessingRef = useRef(false);
+  const debounceTimerRef = useRef(null);
 
   // Always keep ref in sync
   onBackRef.current = onBack;
 
-  // Stable handler that always calls current callback
+  // Stable handler that always calls current callback with debounce protection
   const stableHandler = useCallback(() => {
-    onBackRef.current?.();
+    // Prevent double clicks / rapid navigation
+    if (isProcessingRef.current) return;
+    isProcessingRef.current = true;
+
+    try {
+      onBackRef.current?.();
+    } catch (error) {
+      console.error('[useBackButton] Callback error:', error);
+    }
+
+    // Reset after debounce delay
+    debounceTimerRef.current = setTimeout(() => {
+      isProcessingRef.current = false;
+    }, DEBOUNCE_DELAY_MS);
   }, []);
 
   useEffect(() => {
@@ -63,6 +80,12 @@ export function useBackButton(onBack) {
     }
 
     return () => {
+      // Cleanup debounce timer and reset processing state
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = null;
+      }
+      isProcessingRef.current = false;
       // Cleanup on unmount
       if (handlerRef.current) {
         tg.BackButton.offClick(handlerRef.current);

@@ -375,9 +375,16 @@ const AuroraBackground = memo(function AuroraBackground({ activeIndex, totalTabs
 
 const TabBar = memo(function TabBar() {
     const { t } = useTranslation();
-    const { triggerHaptic } = useTelegram();
+    const { tg, triggerHaptic } = useTelegram();
     const shouldReduceMotion = useReducedMotion();
     const containerRef = useRef(null);
+
+    // Refs for popup callback to avoid stale closures
+    const resumePaymentRef = useRef(null);
+    const removePendingOrderRef = useRef(null);
+    const toastRef = useRef(null);
+    const tRef = useRef(null);
+    const triggerHapticRef = useRef(null);
 
     const {
         activeTab,
@@ -389,7 +396,8 @@ const TabBar = memo(function TabBar() {
         setFollowDetailId,
         viewMode,
         pendingOrders,
-        resumePayment
+        resumePayment,
+        removePendingOrder
     } = useStore(
         useShallow((state) => ({
             activeTab: state.activeTab,
@@ -402,6 +410,7 @@ const TabBar = memo(function TabBar() {
             viewMode: state.viewMode,
             pendingOrders: state.pendingOrders,
             resumePayment: state.resumePayment,
+            removePendingOrder: state.removePendingOrder,
         }))
     );
 
@@ -425,10 +434,19 @@ const TabBar = memo(function TabBar() {
     // Toast for error feedback
     const toast = useToast();
 
+    // Keep refs in sync for popup callback (avoid stale closures)
+    resumePaymentRef.current = resumePayment;
+    removePendingOrderRef.current = removePendingOrder;
+    toastRef.current = toast;
+    tRef.current = t;
+    triggerHapticRef.current = triggerHaptic;
+
     // Handler for pending order click - use fresh state to avoid stale closure
     const handlePendingOrderClick = useCallback(() => {
         const currentPending = pendingOrders?.[0];
-        if (currentPending) {
+        if (!currentPending) return;
+
+        try {
             triggerHaptic('medium');
             const result = resumePayment(currentPending.id);
 
@@ -436,14 +454,79 @@ const TabBar = memo(function TabBar() {
             if (result && !result.success) {
                 if (result.error === 'ORDER_EXPIRED') {
                     toast.error(t('payment.orderExpired') || 'Order has expired');
-                    triggerHaptic('error');
                 } else if (result.error === 'MISSING_PAYMENT_DATA') {
                     toast.error(t('payment.cannotResume') || 'Cannot resume payment');
-                    triggerHaptic('error');
+                } else {
+                    // Handle unknown error types
+                    toast.error(t('payment.resumeFailed') || 'Failed to resume payment');
                 }
+                triggerHaptic('error');
             }
+        } catch (error) {
+            console.error('[TabBar] handlePendingOrderClick error:', error);
+            toast.error(t('errors.unexpectedError') || 'An unexpected error occurred');
+            triggerHaptic('error');
         }
     }, [pendingOrders, triggerHaptic, resumePayment, toast, t]);
+
+    // Handler for long press on pending order badge - show cancel dialog
+    const handleLongPressOrder = useCallback((order) => {
+        if (!order) return;
+
+        triggerHaptic('medium');
+
+        // Fallback if showPopup is not available
+        if (!tg?.showPopup) {
+            console.error('[TabBar] tg.showPopup not available - Telegram WebApp API may not be loaded');
+            toast.info(t('payment.tapToResume') || 'Tap to resume payment');
+            return;
+        }
+
+        // Store order.id in closure - it won't change during popup display
+        const orderId = order.id;
+
+        try {
+            tg.showPopup({
+                title: t('payment.pendingOrderTitle') || 'Ожидающий заказ',
+                message: t('payment.cancelOrderMessage') || 'Что вы хотите сделать с этим заказом?',
+                buttons: [
+                    { id: 'resume', type: 'default', text: t('payment.resumePayment') || 'Продолжить оплату' },
+                    { id: 'cancel', type: 'destructive', text: t('payment.cancelOrder') || 'Отменить заказ' },
+                ]
+            }, (buttonId) => {
+                // Use refs to get fresh values and avoid stale closures
+                try {
+                    if (buttonId === 'resume') {
+                        // Resume payment
+                        const result = resumePaymentRef.current?.(orderId);
+                        if (result && !result.success) {
+                            if (result.error === 'ORDER_EXPIRED') {
+                                toastRef.current?.error(tRef.current?.('payment.orderExpired') || 'Order has expired');
+                            } else if (result.error === 'MISSING_PAYMENT_DATA') {
+                                toastRef.current?.error(tRef.current?.('payment.cannotResume') || 'Cannot resume payment');
+                            } else {
+                                toastRef.current?.error(tRef.current?.('payment.resumeFailed') || 'Failed to resume payment');
+                            }
+                            triggerHapticRef.current?.('error');
+                        }
+                    } else if (buttonId === 'cancel') {
+                        // Cancel order - remove from pending
+                        removePendingOrderRef.current?.(orderId);
+                        triggerHapticRef.current?.('success');
+                        toastRef.current?.success(tRef.current?.('payment.orderCancelled') || 'Заказ отменён');
+                    }
+                } catch (error) {
+                    console.error('[TabBar] Popup callback error:', error);
+                    toastRef.current?.error(tRef.current?.('errors.unexpectedError') || 'An unexpected error occurred');
+                    triggerHapticRef.current?.('error');
+                }
+            });
+        } catch (error) {
+            console.error('[TabBar] tg.showPopup call failed:', error);
+            toast.error(t('errors.popupFailed') || 'Could not show dialog');
+            triggerHaptic('error');
+        }
+    }, [tg, t, toast, triggerHaptic]); // Reduced dependencies - using refs for callback
 
     const tabs = useMemo(() => {
         const list = [
@@ -514,6 +597,7 @@ const TabBar = memo(function TabBar() {
                                 count: pendingOrders?.length || 1
                             }}
                             onClick={handlePendingOrderClick}
+                            onLongPress={handleLongPressOrder}
                             isExpiringSoon={isExpiringSoon}
                         />
                     </motion.div>
