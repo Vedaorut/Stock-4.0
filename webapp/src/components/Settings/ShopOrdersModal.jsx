@@ -325,7 +325,7 @@ export default function ShopOrdersModal({ isOpen, onClose }) {
           setOrders(Array.isArray(ordersData?.data) ? ordersData.data : []);
           setError(null);
         }
-      // eslint-disable-next-line no-unused-vars
+        // eslint-disable-next-line no-unused-vars
       } catch (_err) {
         if (!cancelled) {
           setError(t('shopOrders.unexpectedError'));
@@ -413,7 +413,7 @@ export default function ShopOrdersModal({ isOpen, onClose }) {
             className="flex-1 min-h-0 overflow-y-auto"
             style={{
               paddingTop: 'calc(env(safe-area-inset-top) + 56px)',
-              paddingBottom: 'calc(var(--tabbar-total) + 24px)',
+              paddingBottom: 'calc(var(--tabbar-total, 100px) + 40px)',
               WebkitOverflowScrolling: 'touch',
             }}
           >
@@ -553,6 +553,9 @@ export default function ShopOrdersModal({ isOpen, onClose }) {
                   {t('shopOrders.autoRefresh')}
                 </motion.p>
               )}
+
+              {/* Spacer for TabBar to prevent content hiding */}
+              <div className="h-24 shrink-0" aria-hidden="true" />
             </div>
           </div>
         </motion.div>
