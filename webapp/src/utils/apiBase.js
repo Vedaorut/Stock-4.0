@@ -42,7 +42,7 @@ export function getApiBaseUrl() {
   const originUrl = getOriginApiBase();
 
   const shouldIgnoreEnv =
-    import.meta.env.PROD && envUrl && isLocalhost(envUrl) && originUrl && !isLocalhost(originUrl);
+    envUrl && isLocalhost(envUrl) && originUrl && !isLocalhost(originUrl);
 
   let resolved =
     (!shouldIgnoreEnv && envUrl) ||

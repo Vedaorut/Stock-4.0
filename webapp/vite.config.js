@@ -95,6 +95,11 @@ export default defineConfig({
     port: 5173,
     host: true,
     allowedHosts: ['.trycloudflare.com'],
+    headers: {
+      // Allow Telegram to embed webapp in iframe
+      'X-Frame-Options': 'ALLOWALL',
+      'Content-Security-Policy': "frame-ancestors 'self' https://web.telegram.org https://telegram.org https://*.telegram.org",
+    },
     proxy: {
       '/api': {
         target: 'http://localhost:3000',

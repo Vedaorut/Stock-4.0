@@ -270,33 +270,8 @@ export async function startBot() {
       logger.warn('Failed to set bot commands:', cmdError.message);
     }
 
-    // Set Menu Button to default (opens /start command menu)
-    // This shows "Menu" button that triggers bot commands, not WebApp
-    // Set Menu Button to default (opens /start command menu)
-    // This shows "Menu" button that triggers bot commands, not WebApp
-    try {
-      // Explicitly forcefully set the menu button to commands
-      await bot.telegram.setChatMenuButton({
-        menu_button: {
-          type: 'commands',
-        },
-      });
-      logger.info('✅ Menu Button configured: commands (default)');
-    } catch (menuError) {
-      logger.error('❌ Failed to set Menu Button:', menuError.message);
-    }
-
-    // Debug command to force fix menu button
-    bot.command('fixmenu', async (ctx) => {
-      try {
-        await ctx.setChatMenuButton({ type: 'commands' });
-        await ctx.reply('✅ Menu button force-reset to "commands". Please restart the app or clear cache if it persists.');
-        logger.info(`Manually fixed menu button for ${ctx.from.id}`);
-      } catch (err) {
-        logger.error('Failed to fix menu:', err);
-        await ctx.reply(`❌ Error: ${err.message}`);
-      }
-    });
+    // Menu Button is configured by dev.sh (web_app) or production deploy script
+    // Bot does NOT override it to preserve WebApp link
 
     // Launch bot (this starts polling and won't return in polling mode)
     await bot.launch({

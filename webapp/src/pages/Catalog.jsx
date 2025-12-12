@@ -757,6 +757,21 @@ export default function Catalog() {
               >
                 {displayShop.name}
               </h2>
+
+              {/* Navigation: Back to My Shop (shown only when viewing a subscription) */}
+              {isViewingSubscription && (
+                <motion.button
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  onClick={handleBackToMyShop}
+                  className="mt-3 flex items-center gap-2 px-4 py-1.5 bg-white/10 hover:bg-white/15 rounded-full backdrop-blur-md transition-colors border border-white/5"
+                >
+                  <svg className="w-3.5 h-3.5 text-orange-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                  </svg>
+                  <span className="text-sm font-medium text-white/90">{t('common.backToMyShop') || 'My Shop'}</span>
+                </motion.button>
+              )}
             </div>
 
             {/* Bottom accent line */}

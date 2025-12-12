@@ -27,7 +27,7 @@ tg?.ready?.();
 // Start MSW before rendering the application
 enableMocking().then(() => {
   ReactDOM.createRoot(document.getElementById('root')).render(
-    <LazyMotion features={domAnimation} strict>
+    <LazyMotion features={domAnimation}>
       <ErrorBoundary>
         <TelegramProvider>
           <App />

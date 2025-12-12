@@ -25,6 +25,11 @@
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" />
     <!-- Telegram SDK (defer to not block render) -->
     <script src="https://telegram.org/js/telegram-web-app.js" defer></script>
+    <!-- DEBUG: Early URL logging -->
+    <script>
+      console.log('[EARLY] URL:', window.location.href);
+      console.log('[EARLY] Origin:', window.location.origin);
+    </script>
     <!-- Platform Detection (BEFORE React hydration) -->
     <script>
       (function(){

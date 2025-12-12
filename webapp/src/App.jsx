@@ -242,16 +242,6 @@ function App() {
           }}
         />
 
-        {import.meta.env.DEV && (
-          <div className="fixed top-2 right-2 z-50">
-            <div
-              className={`px-2 py-1 rounded text-xs font-medium transition-colors ${isConnected ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
-                }`}
-            >
-              {isConnected ? '🟢 WS Connected' : '🔴 WS Disconnected'}
-            </div>
-          </div>
-        )}
 
         <div
           className="flex-1 min-h-0 overflow-y-auto bg-[#181818] [-webkit-overflow-scrolling:touch]"

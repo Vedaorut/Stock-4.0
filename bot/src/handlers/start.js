@@ -209,15 +209,6 @@ export const handleStart = async (ctx) => {
   try {
     logger.info(`/start command from user ${ctx.from.id}`);
 
-    // FIX: Force set Menu Button to 'commands' for this user
-    // This fixes the bug where the button gets stuck on WebApp for some users
-    try {
-      await ctx.setChatMenuButton({ type: 'commands' });
-      logger.debug(`Force-fixed Menu Button for user ${ctx.from.id}`);
-    } catch (menuErr) {
-      logger.warn(`Failed to force-fix Menu Button for user ${ctx.from.id}:`, menuErr.message);
-    }
-
     // Parse deep link payload (e.g., shop_123)
     const deepLink = parseDeepLink(ctx.message?.text);
     if (deepLink) {

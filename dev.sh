@@ -80,12 +80,32 @@ stop_all() {
     echo "========================================"
     echo ""
 
-    stop_tunnel
+    # NOTE: We do NOT stop tunnel here to preserve the URL
+    # Use './dev.sh tunnel' to force restart tunnel with new URL
     stop_bot
     stop_backend
     stop_webapp
 
     # Extra cleanup
+    sleep 1
+
+    echo ""
+    log_success "All services stopped (tunnel preserved)"
+}
+
+# Stop everything including tunnel
+stop_everything() {
+    echo ""
+    echo "========================================"
+    echo "  Stopping ALL services including tunnel..."
+    echo "========================================"
+    echo ""
+
+    stop_tunnel
+    stop_bot
+    stop_backend
+    stop_webapp
+
     sleep 1
 
     echo ""
@@ -149,8 +169,43 @@ start_webapp() {
     fi
 }
 
+# Check if tunnel is alive and responding
+is_tunnel_alive() {
+    # Check if cloudflared process exists
+    if ! pgrep -f "cloudflared" > /dev/null 2>&1; then
+        return 1
+    fi
+    
+    # Check if we have a saved URL
+    if [ ! -f "$PROJECT_DIR/.tunnel_url" ]; then
+        return 1
+    fi
+    
+    local SAVED_URL=$(cat "$PROJECT_DIR/.tunnel_url")
+    
+    # Check if URL responds with 200
+    if curl -s -o /dev/null -w "%{http_code}" "$SAVED_URL" 2>/dev/null | grep -q "200"; then
+        return 0
+    fi
+    
+    return 1
+}
+
 start_tunnel() {
+    # Check if tunnel is already alive
+    if is_tunnel_alive; then
+        local EXISTING_URL=$(cat "$PROJECT_DIR/.tunnel_url")
+        log_success "Tunnel already running: $EXISTING_URL"
+        # Just update env files in case they were reset
+        update_env_files "$EXISTING_URL"
+        return 0
+    fi
+    
     log_info "Starting Cloudflare tunnel..."
+    
+    # Kill any stale cloudflared processes
+    pkill -f "cloudflared" 2>/dev/null || true
+    sleep 1
 
     # Start tunnel and capture URL
     cloudflared tunnel --url http://localhost:5173 > "$PROJECT_DIR/.logs/tunnel.log" 2>&1 &
@@ -188,7 +243,7 @@ update_bot_menu_button() {
         # Set default menu button for all chats
         curl -s -X POST "https://api.telegram.org/bot$BOT_TOKEN/setChatMenuButton" \
             -H "Content-Type: application/json" \
-            -d "{\"menu_button\":{\"type\":\"web_app\",\"text\":\"Open Shop\",\"web_app\":{\"url\":\"$URL\"}}}" \
+            -d "{\"menu_button\":{\"type\":\"web_app\",\"text\":\"Open Shop\",\"web_app\":{\"url\":\"$URL?v=$(date +%s)\"}}}" \
             > /dev/null 2>&1
 
         if [ $? -eq 0 ]; then
@@ -352,6 +407,9 @@ case "${1:-start}" in
         ;;
     stop)
         stop_all
+        ;;
+    fullstop)
+        stop_everything
         ;;
     restart)
         start_all
