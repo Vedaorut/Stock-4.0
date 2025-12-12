@@ -283,7 +283,7 @@ export default function MyOrdersModal({ isOpen, onClose }) {
     <AnimatePresence>
       {isOpen && (
         <motion.div
-          className="fixed inset-0 z-50 bg-dark-bg"
+          className="fixed inset-0 z-50 bg-dark-bg flex flex-col"
           initial={{ x: '100%' }}
           animate={{ x: 0 }}
           exit={{ x: '100%' }}
@@ -292,7 +292,7 @@ export default function MyOrdersModal({ isOpen, onClose }) {
           <PageHeader title={t('settings.items.myOrders')} onBack={handleClose} variant="close" />
 
           <div
-            className="flex-1 overflow-y-auto"
+            className="flex-1 min-h-0 overflow-y-auto"
             style={{
               paddingTop: 'calc(env(safe-area-inset-top) + 56px)',
               paddingBottom: 'calc(var(--tabbar-total) + 24px)',
