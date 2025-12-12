@@ -114,7 +114,7 @@ export default function PaymentHashModal() {
               damping: 30,
             }}
           >
-            <div className="rounded-t-3xl flex flex-col overflow-hidden h-full" style={modalStyle}>
+            <div className="w-full rounded-t-3xl flex flex-col overflow-hidden h-full" style={modalStyle}>
               {/* ============================================
                   FIXED HEADER - Always visible navigation
                   ============================================ */}

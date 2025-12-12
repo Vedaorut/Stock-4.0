@@ -433,7 +433,7 @@ export default function PaymentDetailsModal() {
             exit={{ y: '100%', opacity: 0 }}
             transition={sheetSpring}
           >
-            <div className="rounded-t-[32px] flex flex-col" style={sheetStyle}>
+            <div className="w-full rounded-t-[32px] flex flex-col" style={sheetStyle}>
               {/* Header - Centered */}
               <div className="relative flex items-center justify-center p-4 border-b border-white/10">
                 {/* Back Button - Absolute Left */}

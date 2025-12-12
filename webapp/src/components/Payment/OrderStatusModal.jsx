@@ -5,7 +5,7 @@ import { useTelegram } from '../../hooks/useTelegram';
 import { useTranslation } from '../../i18n/useTranslation';
 import { CRYPTO_OPTIONS, formatTxHash } from '../../utils/paymentUtils';
 import { usePlatform } from '../../hooks/usePlatform';
-import { getSpringPreset, getSurfaceStyle, isAndroid } from '../../utils/platform';
+import { getSpringPreset, getSurfaceStyle, getSheetMaxHeight, isAndroid, isIOS } from '../../utils/platform';
 import { useBackButton } from '../../hooks/useBackButton';
 
 export default function OrderStatusModal() {
@@ -14,6 +14,7 @@ export default function OrderStatusModal() {
   const { t } = useTranslation();
   const platform = usePlatform();
   const android = isAndroid(platform);
+  const ios = isIOS(platform);
 
   const overlayStyle = useMemo(() => getSurfaceStyle('overlay', platform), [platform]);
 
@@ -70,16 +71,17 @@ export default function OrderStatusModal() {
 
           {/* Modal - Converted to Bottom Sheet */}
           <motion.div
-            className="fixed inset-x-0 bottom-0 z-50 flex flex-col"
+            className="fixed inset-x-0 z-50 flex flex-col"
             style={{
-              maxHeight: '90vh', // Limit height but allow scrolling
+              bottom: 'var(--tabbar-total)',
+              maxHeight: getSheetMaxHeight(platform, ios ? -24 : 32),
             }}
             initial={{ y: '100%' }}
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
             transition={sheetSpring}
           >
-            <div className="rounded-t-[32px] overflow-hidden flex flex-col bg-[#1C1C1C]" style={modalStyle}>
+            <div className="w-full rounded-t-[32px] overflow-hidden flex flex-col bg-[#1C1C1C]" style={modalStyle}>
               {/* Header with gradient */}
               <div
                 className="relative p-8 text-center overflow-hidden shrink-0"
