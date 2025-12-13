@@ -257,7 +257,7 @@ export const requireShopAccess = async (req, res, next) => {
         });
       }
 
-      if (!shop.is_active || shop.subscription_status === 'inactive') {
+      if (!shop.is_active || shop.subscription_status === 'inactive' || shop.subscription_status === 'pending') {
         logger.warn('[requireShopAccess] Worker access denied - shop inactive', {
           userId: req.user.id,
           shopId,

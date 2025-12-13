@@ -205,16 +205,11 @@ async function deactivateShop(shopId, client = null) {
 
     // SECURITY: Remove all workers when shop is deactivated
     // Workers should not have access to deactivated shops
-    try {
-      const removedWorkers = await workerQueries.removeAllByShop(shopId, client);
-      if (removedWorkers.length > 0) {
-        logger.info(
-          `[Subscription] SECURITY: Removed ${removedWorkers.length} workers from shop ${shopId} on deactivation`
-        );
-      }
-    } catch (workerError) {
-      // Log but don't fail the deactivation process
-      logger.error(`[Subscription] Failed to remove workers from shop ${shopId}:`, workerError);
+    const removedWorkers = await workerQueries.removeAllByShop(shopId, client);
+    if (removedWorkers.length > 0) {
+      logger.info(
+        `[Subscription] SECURITY: Removed ${removedWorkers.length} workers from shop ${shopId} on deactivation`
+      );
     }
 
     logger.warn(`[Subscription] Shop ${shopId} deactivated`);

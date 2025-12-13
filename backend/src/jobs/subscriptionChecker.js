@@ -92,7 +92,7 @@ export function startExpirationChecker() {
         } catch (error) {
           retries++;
           if (retries <= MAX_RETRIES) {
-            logger.warn(`Expiration check failed, retrying in ${RETRY_DELAY_MS / 1000 / 60} minutes (${retries}/${MAX_RETRIES}):`, error.message);
+            logger.warn(`Expiration check failed, retrying in ${RETRY_DELAY_MS / 1000 / 60} minutes (${retries}/${MAX_RETRIES}):`, error);
             await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
           } else {
             logger.error(`Expiration check failed after ${MAX_RETRIES} retries:`, error);
