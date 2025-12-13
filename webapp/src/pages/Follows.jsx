@@ -57,9 +57,7 @@ export default function Follows() {
       if (signal?.aborted) return { status: 'aborted' };
 
       if (subsError) {
-        if (import.meta.env.DEV) {
-          console.error('[Follows] Error loading subscriptions:', subsError);
-        }
+        console.error('[Follows] Error loading subscriptions:', subsError);
         return { status: 'error', error: subsError || 'Failed to load subscriptions' };
       }
 
@@ -92,16 +90,14 @@ export default function Follows() {
         if (signal?.aborted) return { status: 'aborted' };
 
         if (followsError) {
-          if (import.meta.env.DEV) {
-            console.error('[Follows] Error loading follows:', followsError);
-          }
+          console.error('[Follows] Error loading follows:', followsError);
+          // Return partial error - subscriptions loaded successfully but follows failed
+          return { status: 'partial_error', error: followsError };
         }
 
-        if (!followsError) {
-          const list = Array.isArray(followsResponse?.data) ? followsResponse.data : [];
-          setFollows(list);
-          useStore.getState().setHasFollows(list.length > 0);
-        }
+        const list = Array.isArray(followsResponse?.data) ? followsResponse.data : [];
+        setFollows(list);
+        useStore.getState().setHasFollows(list.length > 0);
       }
 
       return { status: 'success' };
@@ -207,9 +203,7 @@ export default function Follows() {
       toast.success(t('subscriptions.unsubscribeSuccess'));
       triggerHaptic('success');
     } catch (err) {
-      if (import.meta.env.DEV) {
-        console.error('[Follows] Unsubscribe failed:', err);
-      }
+      console.error('[Follows] Unsubscribe failed:', err);
       toast.error(t('subscriptions.unsubscribeError'));
     } finally {
       setConfirmUnsubscribe(null);
@@ -341,7 +335,10 @@ export default function Follows() {
             retryControllerRef.current.abort();
           }
           retryControllerRef.current = new AbortController();
-          loadFollows(retryControllerRef.current.signal);
+          loadFollows(retryControllerRef.current.signal).catch((err) => {
+            console.error('[Follows] Failed to reload after success:', err);
+            toast.error(t('follows.loadError'));
+          });
         }}
       />
 

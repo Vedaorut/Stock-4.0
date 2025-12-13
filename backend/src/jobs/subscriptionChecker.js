@@ -19,6 +19,7 @@ const LOCK_REMINDER_SEND = 123456790;
 
 let expirationCheckInterval = null;
 let reminderInterval = null;
+let reminderInitialTimeout = null; // BUG-FIX: Store setTimeout ID for cleanup
 let isCheckInProgress = false;
 
 // BUG-FIX: Retry configuration for failed checks
@@ -140,7 +141,8 @@ export function startReminderSender() {
   const msUntil10AM = next10AM.getTime() - now.getTime();
 
   // Schedule first run at 10:00 AM
-  setTimeout(() => {
+  // BUG-FIX: Store timeout ID for proper cleanup in stopSubscriptionJobs()
+  reminderInitialTimeout = setTimeout(() => {
     sendExpirationReminders().catch((err) => logger.error('Reminder send failed:', err));
 
     // Then run daily at 10:00 AM
@@ -172,6 +174,13 @@ export function stopSubscriptionJobs() {
     clearInterval(expirationCheckInterval);
     expirationCheckInterval = null;
     logger.info('Expiration checker stopped');
+  }
+
+  // BUG-FIX: Clear initial setTimeout to prevent memory leak and orphaned callbacks
+  if (reminderInitialTimeout) {
+    clearTimeout(reminderInitialTimeout);
+    reminderInitialTimeout = null;
+    logger.info('Reminder initial timeout cleared');
   }
 
   if (reminderInterval) {

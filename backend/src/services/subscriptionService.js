@@ -29,8 +29,8 @@ function addDays(date, days) {
  *
  * @param {Date} periodStart - Start of current subscription period
  * @param {Date} periodEnd - End of current subscription period
- * @param {number} currentTierPrice - Price of current tier per month
- * @param {number} targetTierPrice - Price of target tier per month
+ * @param {number} basicPrice - Price of current (basic) tier per month
+ * @param {number} proPrice - Price of target (pro) tier per month
  * @returns {number} Prorated upgrade cost
  */
 function calculateUpgradeAmount(periodStart, periodEnd, basicPrice, proPrice) {
@@ -263,9 +263,10 @@ async function activateFreeTrial(shopId, userId) {
     );
 
     if (alreadyUsedTrial || userHasUsedTrial) {
-      // Persist flag if historical trial usage detected but flag missing (outside transaction)
+      // Persist flag if historical trial usage detected but flag missing
+      // BUG-FIX: Use client.query instead of pool.query to stay within transaction
       if (!userHasUsedTrial) {
-        await pool.query(
+        await client.query(
           `UPDATE users SET has_used_trial = true, updated_at = NOW() WHERE id = $1`,
           [userId]
         );
@@ -302,7 +303,7 @@ async function activateFreeTrial(shopId, userId) {
 
     return { shopId, trialEndsAt: trialEnd };
   } catch (error) {
-    await client.query('ROLLBACK').catch(() => {});
+    await client.query('ROLLBACK').catch((err) => logger.error('[Subscription] Rollback failed:', err));
     throw error;
   } finally {
     client.release();

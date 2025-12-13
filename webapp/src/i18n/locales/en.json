@@ -508,6 +508,7 @@
     "modeError": "Failed to switch mode",
     "deleteError": "Failed to delete subscription",
     "searchError": "Search error",
+    "loadError": "Failed to load follows",
     "notFound": "No shops found",
     "createShopFirst": "Create a shop first",
     "addError": "Failed to add subscription",
