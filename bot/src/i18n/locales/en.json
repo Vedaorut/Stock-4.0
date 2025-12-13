@@ -498,7 +498,11 @@
     "renewSubscription": "Renew subscription ({tier})",
     "exitTrial": "Pay to continue",
     "languageChanged": "Language changed",
-    "trialInfo": "Free trial until {date}"
+    "trialInfo": "Free trial until {date}",
+    "subscription": "Subscription • {tier} • {days} d.",
+    "subscriptionTrial": "Trial • {days} d.",
+    "subscriptionGrace": "Grace • {tier} • {days} d.",
+    "subscriptionExpired": "Subscription expired"
   },
   "errors": {
     "shopRequired": "Please create a shop first",

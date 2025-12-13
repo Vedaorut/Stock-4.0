@@ -6,7 +6,7 @@ import * as smartMessage from '../utils/smartMessage.js';
 
 /**
  * Get shop info for settings context
- * @returns {Object} { hasShop, isTrial, tier, trialEndsAt, role }
+ * @returns {Object} { hasShop, isTrial, tier, trialEndsAt, nextPaymentDue, subscriptionStatus, role }
  */
 async function getShopContext(ctx) {
   const role = ctx.session?.role || null;
@@ -27,6 +27,8 @@ async function getShopContext(ctx) {
         isTrial: shop.is_trial || false,
         tier: shop.tier || 'pro',
         trialEndsAt: shop.trial_ends_at,
+        nextPaymentDue: shop.next_payment_due,
+        subscriptionStatus: shop.subscription_status,
         role,
       };
     }

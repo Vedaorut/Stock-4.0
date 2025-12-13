@@ -498,7 +498,11 @@
     "renewSubscription": "Продлить подписку ({tier})",
     "exitTrial": "Оплатить для продолжения",
     "languageChanged": "Язык изменён",
-    "trialInfo": "У вас бесплатный trial до {date}"
+    "trialInfo": "У вас бесплатный trial до {date}",
+    "subscription": "Подписка • {tier} • {days} дн.",
+    "subscriptionTrial": "Trial • {days} дн.",
+    "subscriptionGrace": "Grace • {tier} • {days} дн.",
+    "subscriptionExpired": "Подписка истекла"
   },
   "errors": {
     "shopRequired": "Сначала создайте магазин",
