@@ -99,6 +99,13 @@
       "buyerMessage": "Вы переключитесь в режим покупок.",
       "error": "Не удалось переключить режим"
     },
+    "subscription": {
+      "trial": "Пробный",
+      "daysLeft": "дн.",
+      "gracePeriod": "Льготный период",
+      "expired": "Истекла",
+      "active": "Активна"
+    },
     "inviteLink": "Пригласительная ссылка",
     "inviteLinkDescription": "Поделитесь с покупателями",
     "inviteLinkLabel": "Ссылка на магазин",

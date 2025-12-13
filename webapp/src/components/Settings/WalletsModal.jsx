@@ -64,8 +64,11 @@ function WalletCard({ wallet, onRemove, onEdit, isEditing, onStartEdit, onCancel
       onCancelEdit();
       triggerHaptic('success');
     } catch (error) {
-      if (import.meta.env.DEV) {
-        console.error('Failed to save wallet edit:', error);
+      console.error('Failed to save wallet edit:', error);
+      triggerHaptic('error');
+      // Show error via Telegram popup
+      if (window.Telegram?.WebApp?.showAlert) {
+        window.Telegram.WebApp.showAlert(t('settings.wallets.saveError') || 'Failed to save wallet');
       }
     } finally {
       setSaving(false);

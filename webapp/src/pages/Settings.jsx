@@ -34,7 +34,41 @@ const SELLER_ONLY_ITEMS = [
   'invite-link',
 ];
 
-const getSettingsSections = (t, lang, viewMode) => {
+// Helper function to format subscription value for display
+const formatSubscriptionValue = (shop, t) => {
+  if (!shop) return null;
+
+  const tier = (shop.tier || 'pro').toUpperCase();
+
+  // Trial
+  if (shop.is_trial && shop.trial_ends_at) {
+    const days = Math.max(0, Math.ceil((new Date(shop.trial_ends_at) - new Date()) / (1000 * 60 * 60 * 24)));
+    return `${t('settings.subscription.trial')} • ${days} ${t('settings.subscription.daysLeft')}`;
+  }
+
+  // Grace period
+  if (shop.subscription_status === 'grace_period') {
+    return `${tier} • ${t('settings.subscription.gracePeriod')}`;
+  }
+
+  // Inactive
+  if (shop.subscription_status === 'inactive') {
+    return `${tier} • ${t('settings.subscription.expired')}`;
+  }
+
+  // Active with days left
+  if (shop.next_payment_due) {
+    const days = Math.max(0, Math.ceil((new Date(shop.next_payment_due) - new Date()) / (1000 * 60 * 60 * 24)));
+    if (days > 0) {
+      return `${tier} • ${days} ${t('settings.subscription.daysLeft')}`;
+    }
+  }
+
+  // Active (no date)
+  return `${tier} • ${t('settings.subscription.active')}`;
+};
+
+const getSettingsSections = (t, lang, viewMode, shop) => {
   const languageNames = { ru: 'Russian', en: 'English' };
 
   const allSections = [
@@ -201,6 +235,7 @@ const getSettingsSections = (t, lang, viewMode) => {
               />
             </svg>
           ),
+          value: formatSubscriptionValue(shop, t),
         },
         {
           id: 'language',
@@ -254,6 +289,7 @@ export default function Settings() {
   const { user, triggerHaptic } = useTelegram();
   const { t, lang } = useTranslation();
   const viewMode = useStore((state) => state.viewMode);
+  const myShop = useStore((state) => state.myShop);
   const [showWallets, setShowWallets] = useState(false);
   const [showLanguage, setShowLanguage] = useState(false);
   const [showProducts, setShowProducts] = useState(false);
@@ -268,7 +304,7 @@ export default function Settings() {
   const [showShopOrders, setShowShopOrders] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
 
-  const settingsSections = useMemo(() => getSettingsSections(t, lang, viewMode), [t, lang, viewMode]);
+  const settingsSections = useMemo(() => getSettingsSections(t, lang, viewMode, myShop), [t, lang, viewMode, myShop]);
 
   const handleSettingClick = (itemId) => {
     triggerHaptic('light');

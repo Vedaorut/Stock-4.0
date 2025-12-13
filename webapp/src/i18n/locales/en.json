@@ -99,6 +99,13 @@
       "buyerMessage": "You will switch to shopping mode.",
       "error": "Failed to switch mode"
     },
+    "subscription": {
+      "trial": "Trial",
+      "daysLeft": "days",
+      "gracePeriod": "Grace period",
+      "expired": "Expired",
+      "active": "Active"
+    },
     "inviteLink": "Invite Link",
     "inviteLinkDescription": "Share with buyers",
     "inviteLinkLabel": "Shop link",
