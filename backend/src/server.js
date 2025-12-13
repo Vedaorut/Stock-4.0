@@ -498,7 +498,7 @@ app.use('/api/ai', aiRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/feedback', feedbackRoutes);
 app.use('/api/admin', adminRoutes); // Admin panel endpoints
-app.use('/webhooks', webhookRoutes); // Crypto payment webhooks
+app.use('/api/webhooks', webhookRoutes); // Crypto payment webhooks
 app.use('/api/internal', internalRoutes); // Internal API for bot-backend communication
 
 // Debug routes (development only - protected by authentication)
@@ -515,7 +515,7 @@ app.get('*', (req, res, next) => {
   // Skip API routes, webhooks, and file requests (with extensions)
   if (
     req.path.startsWith('/api') ||
-    req.path.startsWith('/webhooks') ||
+    req.path.startsWith('/api/webhooks') ||
     req.path.includes('.') ||
     req.path === '/health'
   ) {

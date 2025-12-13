@@ -42,7 +42,7 @@ export const validateOrigin = (req, res, next) => {
   }
 
   // Skip for webhook endpoints (external services don't send Origin)
-  if (req.path.startsWith('/webhooks/')) {
+  if (req.path.startsWith('/api/webhooks/')) {
     return next();
   }
 
