@@ -145,7 +145,10 @@ export const shopCreationLimiter = createRateLimiter(
   RATE_LIMITS.SHOP_CREATION.WINDOW_MS,
   RATE_LIMITS.SHOP_CREATION.MAX_REQUESTS,
   'Too many shop creation requests. Please try again in an hour.',
-  { prefix: 'shop-create' }
+  {
+    prefix: 'shop-create',
+    keyGenerator: (req) => req.user?.id?.toString() || req.ip
+  }
 );
 
 /**

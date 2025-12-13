@@ -123,11 +123,12 @@ export const shopController = {
             await client.query('BEGIN');
 
             // Verify subscription exists and belongs to user
+            // FIX: Use resolvedSubscriptionId (not subscriptionId) - critical bug fix
             const subscriptionCheck = await client.query(
               `SELECT id, tier, status, user_id, shop_id
                FROM shop_subscriptions
                WHERE id = $1`,
-              [subscriptionId]
+              [resolvedSubscriptionId]
             );
 
             if (subscriptionCheck.rows.length === 0) {
@@ -172,18 +173,19 @@ export const shopController = {
             const shop = shopResult.rows[0];
 
             // Link subscription to shop
+            // FIX: Use resolvedSubscriptionId (not subscriptionId)
             await client.query(
               `UPDATE shop_subscriptions
                SET shop_id = $1
                WHERE id = $2`,
-              [shop.id, subscriptionId]
+              [shop.id, resolvedSubscriptionId]
             );
 
             await client.query('COMMIT');
 
             logger.info('[ShopController] Shop created and linked to subscription:', {
               shopId: shop.id,
-              subscriptionId,
+              subscriptionId: resolvedSubscriptionId,
               userId: req.user.id,
               inviteCode: shop.invite_code,
             });
