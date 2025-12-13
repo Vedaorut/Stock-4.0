@@ -16,6 +16,11 @@ import { useToastStore } from './hooks/useToast';
 import './styles/globals.css';
 import { useApi } from './hooks/useApi';
 
+// DEBUG: Expose store for console access
+if (import.meta.env.VITE_DEMO_MODE === 'true') {
+  window.useStore = useStore;
+}
+
 // Lazy load pages for code splitting
 const SubscriptionsPage = lazy(() => import('./pages/Subscriptions'));
 const CatalogPage = lazy(() => import('./pages/Catalog'));
@@ -101,6 +106,25 @@ function App() {
 
       tg.setHeaderColor('#181818');
       tg.setBackgroundColor('#181818');
+    }
+
+    // DEMO MODE: Auto-login
+    if (import.meta.env.VITE_DEMO_MODE === 'true') {
+      console.log('[App] Demo mode active - injecting mock user');
+      useStore.getState().setUser({
+        id: 12345678,
+        first_name: 'Demo',
+        last_name: 'User',
+        username: 'demouser',
+        language_code: 'en',
+        selected_role: 'buyer'
+      });
+      useStore.getState().setToken('demo-token-123');
+      useStore.getState().setMyShops([{
+        id: 'shop_1',
+        name: 'Demo Shop',
+        description: 'A demo shop'
+      }]);
     }
   }, []);
 
@@ -216,8 +240,8 @@ function App() {
     );
   }
 
-  // Show error state if authentication failed
-  if (error) {
+  // Show error state if authentication failed (skip in demo mode)
+  if (error && import.meta.env.VITE_DEMO_MODE !== 'true') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#181818] p-4">
         <div className="text-center max-w-md">
@@ -233,48 +257,85 @@ function App() {
   }
 
   return (
-      <div className="min-h-[100dvh] bg-[#181818] flex flex-col overflow-hidden">
-        <div
-          className="fixed inset-0 z-0 pointer-events-none"
-          style={{
-            background: `radial-gradient(circle at 50% 20%, rgba(255, 107, 0, 0.03), transparent 60%)`,
-            opacity: 0.6,
-          }}
-        />
+    <div className="min-h-[100dvh] bg-[#181818] flex flex-col overflow-hidden">
+      <div
+        className="fixed inset-0 z-0 pointer-events-none"
+        style={{
+          background: `radial-gradient(circle at 50% 20%, rgba(255, 107, 0, 0.03), transparent 60%)`,
+          opacity: 0.6,
+        }}
+      />
 
 
-        <div
-          className="flex-1 min-h-0 overflow-y-auto bg-[#181818] [-webkit-overflow-scrolling:touch]"
-          data-platform={platform}
-        >
-          <Suspense fallback={<PageLoader />}>
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={followDetailId ? `follow-${followDetailId}` : activeTab}
-                initial="initial"
-                animate="enter"
-                exit="exit"
-                variants={pageVariants}
-                transition={pageTransition}
-              >
-                {renderPage()}
-              </motion.div>
-            </AnimatePresence>
-          </Suspense>
-        </div>
-
-        <div className="relative z-20">
-          <TabBarPortal />
-          {/* CartButton shown globally but only visible on catalog tab */}
-          {activeTab === 'catalog' && !followDetailId && (
-            <CartButton onClick={() => setCartOpen(true)} />
-          )}
-          <CartSheet />
-          <PaymentFlowManager />
-          <ToastContainer toasts={toasts} removeToast={removeToast} />
-          <OfflineBanner />
-        </div>
+      <div
+        className="flex-1 min-h-0 overflow-y-auto bg-[#181818] [-webkit-overflow-scrolling:touch]"
+        data-platform={platform}
+      >
+        <Suspense fallback={<PageLoader />}>
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={followDetailId ? `follow-${followDetailId}` : activeTab}
+              initial="initial"
+              animate="enter"
+              exit="exit"
+              variants={pageVariants}
+              transition={pageTransition}
+            >
+              {renderPage()}
+            </motion.div>
+          </AnimatePresence>
+        </Suspense>
       </div>
+
+      <div className="relative z-20">
+        <TabBarPortal />
+        {/* CartButton shown globally but only visible on catalog tab */}
+        {activeTab === 'catalog' && !followDetailId && (
+          <CartButton onClick={() => setCartOpen(true)} />
+        )}
+        <CartSheet />
+        <PaymentFlowManager />
+        <ToastContainer toasts={toasts} removeToast={removeToast} />
+        <OfflineBanner />
+
+        {/* Global Debug Trigger (Demo Mode Only) */}
+        {import.meta.env.VITE_DEMO_MODE === 'true' && (
+          <button
+            onClick={() => {
+              useStore.setState({
+                currentOrder: {
+                  id: 'DEMO-1234',
+                  total_price: 99.99,
+                  crypto_amount: 0.05,
+                  currency: 'USD',
+                  items: [{ name: 'Demo Product', price: 99.99, quantity: 1 }]
+                },
+                selectedCrypto: 'BTC',
+                paymentStep: 'success',
+                pendingOrders: [{
+                  id: 'DEMO-1234',
+                  txHash: 'a1b2c3d4e5f67890abcdef1234567890',
+                  total_price: 99.99,
+                  status: 'paid'
+                }]
+              });
+            }}
+            // High z-index and explicit pointer-events
+            className="fixed top-4 right-4 bg-red-500 text-white font-bold p-3 rounded-full shadow-lg border-2 border-white/20 active:scale-90 transition-transform"
+            style={{
+              zIndex: 9999,
+              minWidth: '44px',
+              minHeight: '44px',
+              touchAction: 'manipulation',
+              cursor: 'pointer',
+              pointerEvents: 'auto'
+            }}
+          >
+            TEST PAY
+          </button>
+        )}
+      </div>
+    </div>
   );
 }
 

@@ -210,10 +210,12 @@ export function useApi() {
           // DEMO MODE INTERCEPTION
           if (IS_DEMO_MODE) {
             // eslint-disable-next-line no-console
-            console.log(`[DemoMode] Intercepting ${method} ${endpoint}`);
+            console.log(`[DemoMode] Intercepting ${method} ${endpoint}`, config.params);
             const apiMethod = mockApi[method.toLowerCase()];
             if (apiMethod) {
-              return await apiMethod(endpoint, data);
+              // Append params to endpoint for mock matching
+              const urlWithParams = config.params ? `${endpoint}${serializeParams(config.params)}` : endpoint;
+              return await apiMethod(urlWithParams, data);
             }
             return { error: 'Method not implemented in mock' };
           }

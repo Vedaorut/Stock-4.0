@@ -71,7 +71,7 @@ export default function OrderStatusModal() {
 
           {/* Modal - Converted to Bottom Sheet */}
           <motion.div
-            className="fixed inset-x-0 z-50 flex flex-col"
+            className="fixed inset-x-0 bottom-0 z-50 flex flex-col"
             style={{
               maxHeight: getSheetMaxHeight(platform, ios ? -24 : 32),
             }}
