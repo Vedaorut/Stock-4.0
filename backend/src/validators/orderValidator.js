@@ -93,7 +93,8 @@ export const validateProductsForOrder = async (cartItems, client) => {
     throw new ValidationError('This shop is currently not accepting orders');
   }
 
-  if (shop.subscription_status === 'inactive') {
+  // BUG-FIX: 'pending' status should also block orders
+  if (shop.subscription_status === 'inactive' || shop.subscription_status === 'pending') {
     throw new ValidationError('This shop is currently not accepting orders');
   }
 

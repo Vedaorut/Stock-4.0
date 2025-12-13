@@ -399,10 +399,11 @@ export const requireActiveShop = async (req, res, next) => {
       }
     }
 
-    // Check if shop is deactivated (subscription_status = 'inactive')
+    // Check if shop is deactivated (subscription_status = 'inactive' or 'pending')
+    // BUG-FIX: 'pending' status should also block shop operations
     const status = shop.subscription_status;
 
-    if (status === 'inactive') {
+    if (status === 'inactive' || status === 'pending') {
       logger.warn('[requireActiveShop] Blocked access to inactive shop', {
         shopId: shop.id,
         shopName: shop.name,

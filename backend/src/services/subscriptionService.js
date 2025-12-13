@@ -91,6 +91,9 @@ async function checkExpiredSubscriptions() {
 
     logger.info('[Subscription] Checking for expired subscriptions...');
 
+    // BUG-FIX: Wrap all UPDATEs in transaction for atomicity
+    await client.query('BEGIN');
+
     // BATCH 1: Active subscriptions expired → Start grace period
     // Single UPDATE with RETURNING instead of N+1 loop
     // FIX H1: Use make_interval instead of string interpolation to prevent SQL injection
@@ -116,13 +119,14 @@ async function checkExpiredSubscriptions() {
     // BATCH 2: Grace period expired → Deactivate
     // Single UPDATE instead of N+1 loop
     // P1-005: Cast to timestamptz for explicit UTC comparison
+    // BUG-FIX: Handle NULL grace_period_until (should also be deactivated)
     const deactivatedResult = await client.query(
       `UPDATE shops
        SET is_active = false,
            subscription_status = 'inactive',
            updated_at = timezone('UTC', NOW())
        WHERE subscription_status = 'grace_period'
-       AND grace_period_until < $1::timestamptz
+       AND (grace_period_until IS NULL OR grace_period_until < $1::timestamptz)
        RETURNING id, name`,
       [nowUTC]
     );
@@ -131,18 +135,14 @@ async function checkExpiredSubscriptions() {
 
     // SECURITY: Remove all workers from deactivated shops
     // Workers should not have access after shop deactivation
+    // BUG-FIX: Worker removal is now part of transaction - errors will cause rollback
     for (const shop of deactivatedResult.rows) {
       logger.error(`[Subscription] Shop ${shop.id} (${shop.name}) deactivated after grace period expiry`);
-      try {
-        const removedWorkers = await workerQueries.removeAllByShop(shop.id, client);
-        if (removedWorkers.length > 0) {
-          logger.info(
-            `[Subscription] SECURITY: Removed ${removedWorkers.length} workers from shop ${shop.id} on deactivation`
-          );
-        }
-      } catch (workerError) {
-        // Log but don't fail the deactivation process
-        logger.error(`[Subscription] Failed to remove workers from shop ${shop.id}:`, workerError);
+      const removedWorkers = await workerQueries.removeAllByShop(shop.id, client);
+      if (removedWorkers.length > 0) {
+        logger.info(
+          `[Subscription] SECURITY: Removed ${removedWorkers.length} workers from shop ${shop.id} on deactivation`
+        );
       }
     }
 
@@ -159,12 +159,21 @@ async function checkExpiredSubscriptions() {
 
     const expired = expiredSubsResult.rowCount || 0;
 
+    // BUG-FIX: Commit transaction
+    await client.query('COMMIT');
+
     logger.info(
       `[Subscription] Check complete: ${expired} subscriptions expired, ${gracePeriod} in grace period, ${deactivated} deactivated`
     );
 
     return { expired, gracePeriod, deactivated };
   } catch (error) {
+    // BUG-FIX: Rollback transaction on any error
+    try {
+      await client.query('ROLLBACK');
+    } catch (rollbackError) {
+      logger.error('[Subscription] Rollback error:', rollbackError);
+    }
     logger.error('[Subscription] Error checking expired subscriptions:', error);
     throw error;
   } finally {
@@ -328,13 +337,16 @@ async function checkExpiredTrials() {
     // After grace period, shop will be deactivated until subscription is paid
     // FIX H1: Use make_interval instead of string interpolation to prevent SQL injection
     // P1-005: Cast to timestamptz for explicit UTC comparison
+    // BUG-FIX: Add idempotency check - don't re-process already-expired trials
     const result = await client.query(
       `UPDATE shops
        SET is_trial = false,
            subscription_status = 'grace_period',
            grace_period_until = $1::timestamptz + make_interval(days => $2),
            updated_at = timezone('UTC', NOW())
-       WHERE is_trial = true AND trial_ends_at < $1::timestamptz
+       WHERE is_trial = true
+       AND trial_ends_at < $1::timestamptz
+       AND subscription_status NOT IN ('grace_period', 'inactive')
        RETURNING id, name, grace_period_until`,
       [nowUTC, GRACE_PERIOD_DAYS]
     );

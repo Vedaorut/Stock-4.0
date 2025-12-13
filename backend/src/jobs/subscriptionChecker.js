@@ -20,6 +20,10 @@ const LOCK_REMINDER_SEND = 123456790;
 let expirationCheckInterval = null;
 let reminderInterval = null;
 
+// BUG-FIX: Retry configuration for failed checks
+const MAX_RETRIES = 3;
+const RETRY_DELAY_MS = 5 * 60 * 1000; // 5 minutes
+
 /**
  * SUB-BUG13 FIX: Execute callback with transaction-level advisory lock
  * Uses pg_try_advisory_xact_lock which auto-releases on transaction end
@@ -76,13 +80,24 @@ export function startExpirationChecker() {
   checkExpiredSubscriptions().catch((err) => logger.error('Initial expiration check failed:', err));
 
   // Schedule hourly checks
+  // BUG-FIX: Added retry mechanism - 3 retries with 5 minute delay before giving up
   expirationCheckInterval = setInterval(
     async () => {
-      try {
-        logger.info('Running hourly expiration check...');
-        await checkExpiredSubscriptions();
-      } catch (error) {
-        logger.error('Expiration check failed:', error);
+      let retries = 0;
+      while (retries <= MAX_RETRIES) {
+        try {
+          logger.info(`Running hourly expiration check${retries > 0 ? ` (retry ${retries}/${MAX_RETRIES})` : ''}...`);
+          await checkExpiredSubscriptions();
+          break; // Success - exit retry loop
+        } catch (error) {
+          retries++;
+          if (retries <= MAX_RETRIES) {
+            logger.warn(`Expiration check failed, retrying in ${RETRY_DELAY_MS / 1000 / 60} minutes (${retries}/${MAX_RETRIES}):`, error.message);
+            await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
+          } else {
+            logger.error(`Expiration check failed after ${MAX_RETRIES} retries:`, error);
+          }
+        }
       }
     },
     60 * 60 * 1000
