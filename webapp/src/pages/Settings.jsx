@@ -1,4 +1,4 @@
-import { useState, useMemo, lazy, Suspense } from 'react';
+import { useState, useMemo, lazy, Suspense, Component } from 'react';
 import { motion } from 'framer-motion'; // Used in JSX
 import Header from '../components/Layout/Header';
 import { useTelegram } from '../hooks/useTelegram';
@@ -6,20 +6,61 @@ import { useTranslation } from '../i18n/useTranslation';
 import { useStore } from '../store/useStore';
 import InteractiveListItem from '../components/common/InteractiveListItem';
 
-// Lazy load modals - only load when user opens them
-const WalletsModalLazy = lazy(() => import('../components/Settings/WalletsModal'));
-const LanguageModalLazy = lazy(() => import('../components/Settings/LanguageModal'));
-const ProductsModalLazy = lazy(() => import('../components/Settings/ProductsModal'));
-const SubscriptionModalLazy = lazy(() => import('../components/Settings/SubscriptionModal'));
-const WorkspaceModalLazy = lazy(() => import('../components/Settings/WorkspaceModal'));
-const FollowsModalLazy = lazy(() => import('../components/Settings/FollowsModal'));
-const AnalyticsModalLazy = lazy(() => import('../components/Settings/AnalyticsModal'));
-const MigrationModalLazy = lazy(() => import('../components/Settings/MigrationModal'));
-const InviteLinkModalLazy = lazy(() => import('../components/Settings/InviteLinkModal'));
+// Retry wrapper for lazy imports - handles chunk load failures
+const lazyWithRetry = (importFn, retries = 2) => {
+  return lazy(() =>
+    importFn().catch((error) => {
+      // Retry on chunk load failure
+      if (retries > 0 && (error.name === 'ChunkLoadError' || error.message?.includes('Loading chunk'))) {
+        console.warn(`[LazyLoad] Retrying import, ${retries} attempts left`);
+        return new Promise((resolve) => setTimeout(resolve, 500)).then(() =>
+          lazyWithRetry(importFn, retries - 1)()
+        );
+      }
+      throw error;
+    })
+  );
+};
 
-const MyOrdersModalLazy = lazy(() => import('../components/Settings/MyOrdersModal'));
-const ShopOrdersModalLazy = lazy(() => import('../components/Settings/ShopOrdersModal'));
-const FeedbackModalLazy = lazy(() => import('../components/Settings/FeedbackModal'));
+// Error boundary for lazy-loaded modals - prevents full page crash
+class ModalErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error('[ModalErrorBoundary] Modal failed to load:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      // Silently fail - modal just won't open, but page won't crash
+      // User can try again by clicking the setting again
+      return null;
+    }
+    return this.props.children;
+  }
+}
+
+// Lazy load modals with retry logic for network failures
+const WalletsModalLazy = lazyWithRetry(() => import('../components/Settings/WalletsModal'));
+const LanguageModalLazy = lazyWithRetry(() => import('../components/Settings/LanguageModal'));
+const ProductsModalLazy = lazyWithRetry(() => import('../components/Settings/ProductsModal'));
+const SubscriptionModalLazy = lazyWithRetry(() => import('../components/Settings/SubscriptionModal'));
+const WorkspaceModalLazy = lazyWithRetry(() => import('../components/Settings/WorkspaceModal'));
+const FollowsModalLazy = lazyWithRetry(() => import('../components/Settings/FollowsModal'));
+const AnalyticsModalLazy = lazyWithRetry(() => import('../components/Settings/AnalyticsModal'));
+const MigrationModalLazy = lazyWithRetry(() => import('../components/Settings/MigrationModal'));
+const InviteLinkModalLazy = lazyWithRetry(() => import('../components/Settings/InviteLinkModal'));
+
+const MyOrdersModalLazy = lazyWithRetry(() => import('../components/Settings/MyOrdersModal'));
+const ShopOrdersModalLazy = lazyWithRetry(() => import('../components/Settings/ShopOrdersModal'));
+const FeedbackModalLazy = lazyWithRetry(() => import('../components/Settings/FeedbackModal'));
 
 // Seller-only item IDs (hidden in buyer mode)
 const SELLER_ONLY_ITEMS = [
@@ -465,42 +506,44 @@ export default function Settings() {
         </div>
       )}
 
-      {/* Modals - wrapped in Suspense for lazy loading */}
-      <Suspense fallback={null}>
-        {showAnalytics && (
-          <AnalyticsModalLazy isOpen={showAnalytics} onClose={() => setShowAnalytics(false)} />
-        )}
-        {showProducts && (
-          <ProductsModalLazy isOpen={showProducts} onClose={() => setShowProducts(false)} />
-        )}
-        {showSubscription && (
-          <SubscriptionModalLazy isOpen={showSubscription} onClose={() => setShowSubscription(false)} />
-        )}
-        {showWorkspace && (
-          <WorkspaceModalLazy isOpen={showWorkspace} onClose={() => setShowWorkspace(false)} />
-        )}
-        {showFollows && <FollowsModalLazy isOpen={showFollows} onClose={() => setShowFollows(false)} />}
-        {showWallets && <WalletsModalLazy isOpen={showWallets} onClose={() => setShowWallets(false)} />}
-        {showLanguage && (
-          <LanguageModalLazy isOpen={showLanguage} onClose={() => setShowLanguage(false)} />
-        )}
-        {showMigration && (
-          <MigrationModalLazy isOpen={showMigration} onClose={() => setShowMigration(false)} />
-        )}
-        {showInviteLink && (
-          <InviteLinkModalLazy isOpen={showInviteLink} onClose={() => setShowInviteLink(false)} />
-        )}
+      {/* Modals - wrapped in ErrorBoundary + Suspense for lazy loading */}
+      <ModalErrorBoundary>
+        <Suspense fallback={null}>
+          {showAnalytics && (
+            <AnalyticsModalLazy isOpen={showAnalytics} onClose={() => setShowAnalytics(false)} />
+          )}
+          {showProducts && (
+            <ProductsModalLazy isOpen={showProducts} onClose={() => setShowProducts(false)} />
+          )}
+          {showSubscription && (
+            <SubscriptionModalLazy isOpen={showSubscription} onClose={() => setShowSubscription(false)} />
+          )}
+          {showWorkspace && (
+            <WorkspaceModalLazy isOpen={showWorkspace} onClose={() => setShowWorkspace(false)} />
+          )}
+          {showFollows && <FollowsModalLazy isOpen={showFollows} onClose={() => setShowFollows(false)} />}
+          {showWallets && <WalletsModalLazy isOpen={showWallets} onClose={() => setShowWallets(false)} />}
+          {showLanguage && (
+            <LanguageModalLazy isOpen={showLanguage} onClose={() => setShowLanguage(false)} />
+          )}
+          {showMigration && (
+            <MigrationModalLazy isOpen={showMigration} onClose={() => setShowMigration(false)} />
+          )}
+          {showInviteLink && (
+            <InviteLinkModalLazy isOpen={showInviteLink} onClose={() => setShowInviteLink(false)} />
+          )}
 
-        {showMyOrders && (
-          <MyOrdersModalLazy isOpen={showMyOrders} onClose={() => setShowMyOrders(false)} />
-        )}
-        {showShopOrders && (
-          <ShopOrdersModalLazy isOpen={showShopOrders} onClose={() => setShowShopOrders(false)} />
-        )}
-        {showFeedback && (
-          <FeedbackModalLazy isOpen={showFeedback} onClose={() => setShowFeedback(false)} />
-        )}
-      </Suspense>
+          {showMyOrders && (
+            <MyOrdersModalLazy isOpen={showMyOrders} onClose={() => setShowMyOrders(false)} />
+          )}
+          {showShopOrders && (
+            <ShopOrdersModalLazy isOpen={showShopOrders} onClose={() => setShowShopOrders(false)} />
+          )}
+          {showFeedback && (
+            <FeedbackModalLazy isOpen={showFeedback} onClose={() => setShowFeedback(false)} />
+          )}
+        </Suspense>
+      </ModalErrorBoundary>
     </div>
   );
 }
