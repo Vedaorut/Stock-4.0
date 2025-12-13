@@ -19,6 +19,7 @@ const LOCK_REMINDER_SEND = 123456790;
 
 let expirationCheckInterval = null;
 let reminderInterval = null;
+let isCheckInProgress = false;
 
 // BUG-FIX: Retry configuration for failed checks
 const MAX_RETRIES = 3;
@@ -81,23 +82,34 @@ export function startExpirationChecker() {
 
   // Schedule hourly checks
   // BUG-FIX: Added retry mechanism - 3 retries with 5 minute delay before giving up
+  // BUG-FIX: Added overlapping protection to prevent concurrent runs
   expirationCheckInterval = setInterval(
     async () => {
-      let retries = 0;
-      while (retries <= MAX_RETRIES) {
-        try {
-          logger.info(`Running hourly expiration check${retries > 0 ? ` (retry ${retries}/${MAX_RETRIES})` : ''}...`);
-          await checkExpiredSubscriptions();
-          break; // Success - exit retry loop
-        } catch (error) {
-          retries++;
-          if (retries <= MAX_RETRIES) {
-            logger.warn(`Expiration check failed, retrying in ${RETRY_DELAY_MS / 1000 / 60} minutes (${retries}/${MAX_RETRIES}):`, error);
-            await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
-          } else {
-            logger.error(`Expiration check failed after ${MAX_RETRIES} retries:`, error);
+      if (isCheckInProgress) {
+        logger.warn('Previous expiration check still in progress, skipping');
+        return;
+      }
+      isCheckInProgress = true;
+      try {
+        let retries = 0;
+        while (retries <= MAX_RETRIES) {
+          try {
+            logger.info(`Running hourly expiration check${retries > 0 ? ` (retry ${retries}/${MAX_RETRIES})` : ''}...`);
+            await checkExpiredSubscriptions();
+            break; // Success - exit retry loop
+          } catch (error) {
+            retries++;
+            if (retries <= MAX_RETRIES) {
+              logger.warn(`Expiration check failed, retrying in ${RETRY_DELAY_MS / 1000 / 60} minutes (${retries}/${MAX_RETRIES}):`, error);
+              await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
+            } else {
+              logger.error(`[CRITICAL] Expiration check failed after ${MAX_RETRIES} retries - subscription checks may not be working:`, error);
+              // Future: add monitoring/alerting hook here
+            }
           }
         }
+      } finally {
+        isCheckInProgress = false;
       }
     },
     60 * 60 * 1000
@@ -234,8 +246,8 @@ async function sendExpirationReminders() {
     const result = await withAdvisoryLock(LOCK_REMINDER_SEND, async () => {
       // Check if bot instance is available
       if (!global.botInstance) {
-        logger.warn('[SubscriptionChecker] Bot instance not available, skipping reminders');
-        return { sent: 0, failed: 0 };
+        logger.error('[CRITICAL] Bot instance not available - users will NOT receive subscription reminders');
+        return { sent: 0, failed: 0, botUnavailable: true };
       }
 
       const serviceResult = await subscriptionService.sendExpirationReminders(global.botInstance);

@@ -542,7 +542,9 @@
     "alreadyExists": "You already follow this shop",
     "limitReached": "Follow limit reached for your subscription",
     "startMonitoring": "Start Monitoring",
-    "openCatalog": "Open Catalog"
+    "openCatalog": "Open Catalog",
+    "trackPricesDesc": "Track prices & stock",
+    "browseProducts": "Browse products"
   },
   "myOrders": {
     "title": "My Orders",

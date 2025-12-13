@@ -69,7 +69,7 @@ export default function Follows() {
       let shop = myShop;
 
       if (!shop) {
-        const { data: shopsResponse, error: shopsError } = await get('/shops/my', { signal });
+        const { data: shopsResponse, error: _shopsError } = await get('/shops/my', { signal });
 
         if (signal?.aborted) return { status: 'aborted' };
 
@@ -90,6 +90,12 @@ export default function Follows() {
         });
 
         if (signal?.aborted) return { status: 'aborted' };
+
+        if (followsError) {
+          if (import.meta.env.DEV) {
+            console.error('[Follows] Error loading follows:', followsError);
+          }
+        }
 
         if (!followsError) {
           const list = Array.isArray(followsResponse?.data) ? followsResponse.data : [];
@@ -200,7 +206,10 @@ export default function Follows() {
       );
       toast.success(t('subscriptions.unsubscribeSuccess'));
       triggerHaptic('success');
-    } catch {
+    } catch (err) {
+      if (import.meta.env.DEV) {
+        console.error('[Follows] Unsubscribe failed:', err);
+      }
       toast.error(t('subscriptions.unsubscribeError'));
     } finally {
       setConfirmUnsubscribe(null);
@@ -296,6 +305,7 @@ export default function Follows() {
                   key={item.key}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
                   transition={{ delay: index * 0.05, type: "spring", stiffness: 300, damping: 25 }}
                 >
                   {item.type === 'follow' ? (
@@ -327,8 +337,11 @@ export default function Follows() {
         preselectedShop={preselectedShop}
         onSuccess={() => {
           setPreselectedShop(null);
-          const controller = new AbortController();
-          loadFollows(controller.signal);
+          if (retryControllerRef.current) {
+            retryControllerRef.current.abort();
+          }
+          retryControllerRef.current = new AbortController();
+          loadFollows(retryControllerRef.current.signal);
         }}
       />
 

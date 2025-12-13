@@ -2,7 +2,7 @@
  * Subscription Service
  *
  * Handles recurring monthly subscriptions for shops:
- * - Basic tier and PRO tier (see config/subscriptionPricing.js for pricing)
+ * - PRO tier ($25/month) and MAX tier ($35/month)
  * - Grace period: 2 days after expiration
  * - Auto-deactivation after grace period
  */
@@ -25,12 +25,12 @@ function addDays(date, days) {
 }
 
 /**
- * Calculate prorated upgrade amount from basic to pro tier
+ * Calculate prorated upgrade amount from current tier to target tier
  *
  * @param {Date} periodStart - Start of current subscription period
  * @param {Date} periodEnd - End of current subscription period
- * @param {number} basicPrice - Price of basic tier per month
- * @param {number} proPrice - Price of pro tier per month
+ * @param {number} currentTierPrice - Price of current tier per month
+ * @param {number} targetTierPrice - Price of target tier per month
  * @returns {number} Prorated upgrade cost
  */
 function calculateUpgradeAmount(periodStart, periodEnd, basicPrice, proPrice) {
@@ -232,10 +232,9 @@ async function deactivateShop(shopId, client = null) {
  */
 async function activateFreeTrial(shopId, userId) {
   const client = await pool.connect();
-  let transactionStarted = false;
+
   try {
     await client.query('BEGIN');
-    transactionStarted = true;
 
     const userResult = await client.query(
       `SELECT has_used_trial FROM users WHERE id = $1 FOR UPDATE`,
@@ -264,12 +263,9 @@ async function activateFreeTrial(shopId, userId) {
     );
 
     if (alreadyUsedTrial || userHasUsedTrial) {
-      await client.query('ROLLBACK');
-      transactionStarted = false;
-
-      // Persist flag if historical trial usage detected but flag missing
+      // Persist flag if historical trial usage detected but flag missing (outside transaction)
       if (!userHasUsedTrial) {
-        await client.query(
+        await pool.query(
           `UPDATE users SET has_used_trial = true, updated_at = NOW() WHERE id = $1`,
           [userId]
         );
@@ -302,14 +298,11 @@ async function activateFreeTrial(shopId, userId) {
     );
 
     await client.query('COMMIT');
-    transactionStarted = false;
     logger.info(`[Subscription] Free trial activated for shop ${shopId} until ${trialEnd.toISOString()}`);
 
     return { shopId, trialEndsAt: trialEnd };
   } catch (error) {
-    if (transactionStarted) {
-      await client.query('ROLLBACK');
-    }
+    await client.query('ROLLBACK').catch(() => {});
     throw error;
   } finally {
     client.release();
@@ -386,17 +379,16 @@ async function activatePromoSubscription(shopId, userId, promoCode, targetTier =
       'SELECT id, tier, owner_id FROM shops WHERE id = $1 FOR UPDATE',
       [shopId]
     );
+
     if (shopRes.rows.length === 0) {
       throw new Error('Shop not found');
     }
 
-    // Verify that userId owns this shop
     if (shopRes.rows[0].owner_id !== userId) {
       throw new Error('User does not own this shop');
     }
 
     const now = new Date();
-    // For permanent subscriptions, period_end is NULL (never expires)
     const periodEnd = isPermanent ? null : addDays(now, SUBSCRIPTION_PERIOD_DAYS);
     const promoTx = `promo-${shopId}-${Date.now()}`;
 
@@ -414,9 +406,8 @@ async function activatePromoSubscription(shopId, userId, promoCode, targetTier =
       [userId, shopId, targetTier, promoTx, now, periodEnd]
     );
 
-    // FIX BUG-SUB-005: Handle NULL period_end (permanent promo)
-    // If permanent (period_end is NULL), set next_payment_due far in future instead of NULL
-    const nextPayment = periodEnd || addDays(now, 365 * 100); // 100 years for permanent
+    // If permanent (period_end is NULL), set next_payment_due far in future
+    const nextPayment = periodEnd || addDays(now, 365 * 100);
 
     const updatedShop = await client.query(
       `UPDATE shops
@@ -435,11 +426,9 @@ async function activatePromoSubscription(shopId, userId, promoCode, targetTier =
     await client.query('COMMIT');
     return updatedShop.rows[0];
   } catch (error) {
-    try {
-      await client.query('ROLLBACK');
-    } catch (rollbackError) {
+    await client.query('ROLLBACK').catch((rollbackError) => {
       logger.error('[Subscription] Promo rollback error:', rollbackError);
-    }
+    });
     throw error;
   } finally {
     client.release();

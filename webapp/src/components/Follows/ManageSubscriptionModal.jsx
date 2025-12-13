@@ -1,5 +1,4 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { Fragment } from 'react';
 import {
     BuildingStorefrontIcon,
     EyeIcon,
@@ -12,12 +11,10 @@ import { useTranslation } from '../../i18n/useTranslation';
 export default function ManageSubscriptionModal({ isOpen, onClose, subscription, onStartMonitoring, onOpenCatalog, onUnsubscribe }) {
     const { t } = useTranslation();
 
-    if (!isOpen || !subscription) return null;
-
     return (
         <AnimatePresence>
-            {isOpen && (
-                <Fragment>
+            {isOpen && subscription && (
+                <>
                     {/* Backdrop */}
                     <motion.div
                         initial={{ opacity: 0 }}
@@ -86,7 +83,7 @@ export default function ManageSubscriptionModal({ isOpen, onClose, subscription,
                                                     {t('follows.startMonitoring')}
                                                 </h3>
                                                 <p className="text-white/80 text-sm font-medium">
-                                                    Track prices & stock
+                                                    {t('follows.trackPricesDesc')}
                                                 </p>
                                             </div>
                                         </div>
@@ -111,7 +108,7 @@ export default function ManageSubscriptionModal({ isOpen, onClose, subscription,
                                                     {t('follows.openCatalog')}
                                                 </h3>
                                                 <p className="text-white/50 text-sm">
-                                                    Browse products
+                                                    {t('follows.browseProducts')}
                                                 </p>
                                             </div>
                                         </div>
@@ -130,7 +127,7 @@ export default function ManageSubscriptionModal({ isOpen, onClose, subscription,
                             </div>
                         </div>
                     </motion.div>
-                </Fragment>
+                </>
             )}
         </AnimatePresence>
     );

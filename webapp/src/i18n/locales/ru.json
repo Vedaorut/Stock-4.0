@@ -542,7 +542,9 @@
     "alreadyExists": "Вы уже отслеживаете этот магазин",
     "limitReached": "Достигнут лимит подписок для вашего тарифа",
     "startMonitoring": "Начать мониторинг",
-    "openCatalog": "Открыть каталог"
+    "openCatalog": "Открыть каталог",
+    "trackPricesDesc": "Отслеживание цен и наличия",
+    "browseProducts": "Просмотр товаров"
   },
   "myOrders": {
     "title": "Мои заказы",
