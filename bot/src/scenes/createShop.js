@@ -171,9 +171,20 @@ const createShop = async (ctx, shopName, lang = ctx.lang || ctx.session?.languag
       payload.trial = true;
     }
 
-    // Add subscriptionId if present (paid subscription flow)
+    // Add subscriptionId if present (paid subscription flow - explicit ID)
     if (subscriptionId) {
       payload.subscriptionId = subscriptionId;
+    }
+
+    // Add paidSubscription flag if coming from payment notification
+    // This tells backend to find active subscription with null shop_id
+    const paidSubscription = ctx.wizard.state.paidSubscription;
+    if (paidSubscription) {
+      payload.paidSubscription = true;
+      logger.info('createShop passing paidSubscription flag to backend', {
+        userId: ctx.from.id,
+        tier,
+      });
     }
 
     // Add promo code if present (promo code flow)

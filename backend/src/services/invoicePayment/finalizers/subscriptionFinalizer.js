@@ -241,95 +241,82 @@ export async function finalizeSubscriptionPayment(client, { subscription, invoic
     );
   } else {
     // =========================================================================
-    // REGULAR PATH: No shop - auto-create to avoid money loss
+    // REGULAR PATH: No shop - activate subscription WITHOUT auto-creating shop
+    // User will be prompted to create shop via wizard (better UX)
     // =========================================================================
 
-    // Fetch user data for shop name generation
-    const userResult = await client.query('SELECT telegram_id, username FROM users WHERE id = $1', [
-      subscription.user_id,
-    ]);
-    const user = userResult.rows[0];
-    if (!user) {
-      return {
-        ok: false,
-        state: 'failed',
-        code: 'USER_NOT_FOUND',
-        message: 'User not found for subscription',
-      };
-    }
-
-    // =========================================================================
-    // RACE CONDITION FIX: Check if user already has ANY shop
-    // Another concurrent payment might have created a shop already
-    // INV-P2-2 FIX: Add FOR UPDATE to prevent TOCTOU race condition
-    // SUB-BUG3 FIX: Remove is_active=true to catch ALL shops (including inactive/newly created)
-    // =========================================================================
+    // Check if user already has ANY shop that we can link to
     const existingShopResult = await client.query(
       `SELECT id, name, is_active FROM shops WHERE owner_id = $1 ORDER BY created_at DESC LIMIT 1 FOR UPDATE`,
       [subscription.user_id]
     );
 
-    let newShop;
     if (existingShopResult.rows.length > 0) {
-      // Use existing shop instead of creating duplicate
-      newShop = existingShopResult.rows[0];
-      logger.info(`[SubscriptionPayment] Using existing shop: ${newShop.id} for user ${subscription.user_id} (was_active: ${newShop.is_active})`);
+      // Use existing shop
+      const existingShop = existingShopResult.rows[0];
+      logger.info(`[SubscriptionPayment] Linking existing shop ${existingShop.id} to subscription ${subscription.id}`);
 
-      // SUB-BUG3 FIX: Reactivate shop if it was inactive
-      if (!newShop.is_active) {
-        logger.info(`[SubscriptionPayment] Reactivating inactive shop ${newShop.id}`);
-      }
-    } else {
-      // Create new shop only if none exists
-      const shopName = `Shop_${user.username || user.telegram_id}_${Date.now()}`;
-      const shopResult = await client.query(
-        `INSERT INTO shops (name, owner_id, tier, subscription_status, registration_paid, is_active)
-           VALUES ($1, $2, $3, 'active', true, true)
-           RETURNING id, name`,
-        [shopName, subscription.user_id, subscription.tier]
+      // Update subscription with shop reference
+      await client.query(
+        `UPDATE shop_subscriptions
+            SET shop_id = $1,
+                status = 'active',
+                period_start = $2,
+                period_end = $3,
+                tx_hash = COALESCE($5, tx_hash),
+                currency = $6,
+                amount = COALESCE($7, amount)
+          WHERE id = $4`,
+        [
+          existingShop.id,
+          periodStart,
+          periodEnd,
+          subscription.id,
+          verification.txHash,
+          invoice.currency,
+          invoice.expected_amount,
+        ]
       );
-      newShop = shopResult.rows[0];
-      logger.info(`[SubscriptionPayment] Created new shop: ${newShop.id} for user ${subscription.user_id}`);
+
+      // Update shop's subscription status
+      await client.query(
+        `UPDATE shops
+         SET tier = $1,
+             subscription_status = 'active',
+             next_payment_due = $2,
+             grace_period_until = NULL,
+             registration_paid = true,
+             is_active = true,
+             is_trial = false,
+             trial_ends_at = NULL,
+             updated_at = NOW()
+         WHERE id = $3`,
+        [subscription.tier, periodEnd, existingShop.id]
+      );
+    } else {
+      // NO SHOP EXISTS - just activate subscription, let user create shop via wizard
+      // This triggers notification with "Setup Shop" button
+      logger.info(`[SubscriptionPayment] No shop for user ${subscription.user_id}, activating subscription without shop. User will create via wizard.`);
+
+      await client.query(
+        `UPDATE shop_subscriptions
+            SET status = 'active',
+                period_start = $1,
+                period_end = $2,
+                tx_hash = COALESCE($4, tx_hash),
+                currency = $5,
+                amount = COALESCE($6, amount)
+          WHERE id = $3`,
+        [
+          periodStart,
+          periodEnd,
+          subscription.id,
+          verification.txHash,
+          invoice.currency,
+          invoice.expected_amount,
+        ]
+      );
     }
-
-    // Update subscription with the shop reference
-    await client.query(
-      `UPDATE shop_subscriptions
-          SET shop_id = $1,
-              status = 'active',
-              period_start = $2,
-              period_end = $3,
-              tx_hash = COALESCE($5, tx_hash),
-              currency = $6,
-              amount = COALESCE($7, amount)
-        WHERE id = $4`,
-      [
-        newShop.id,
-        periodStart,
-        periodEnd,
-        subscription.id,
-        verification.txHash,
-        invoice.currency,
-        invoice.expected_amount,
-      ]
-    );
-
-    // Update shop's subscription status and next payment due
-    // SUB-BUG3 FIX: Also reactivate shop if it was inactive
-    await client.query(
-      `UPDATE shops
-       SET tier = $1,
-           subscription_status = 'active',
-           next_payment_due = $2,
-           grace_period_until = NULL,
-           registration_paid = true,
-           is_active = true,
-           is_trial = false,
-           trial_ends_at = NULL,
-           updated_at = NOW()
-       WHERE id = $3`,
-      [subscription.tier, periodEnd, newShop.id]
-    );
   }
 
   // =========================================================================

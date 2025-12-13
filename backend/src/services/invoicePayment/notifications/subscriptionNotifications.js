@@ -59,78 +59,113 @@ export async function notifySubscriptionActivated(subscriptionId, options = {}) 
 
   try {
     const subscription = await subscriptionQueries.findShopSubscriptionById(subscriptionId);
-    if (!subscription || !subscription.shop_id) {
+    if (!subscription) {
+      logger.warn('[InvoicePayment] Subscription not found for notification', { subscriptionId });
       return;
     }
 
-    const shop = await shopQueries.findById(subscription.shop_id);
-    const owner = shop ? await userQueries.findById(shop.owner_id) : null;
+    // For NEW subscriptions, shop_id may be null - find user directly from subscription
+    let owner;
+    let shop = null;
 
-    if (owner?.telegram_id && global.botInstance) {
-      const lang = owner.language || DEFAULT_LANGUAGE;
-      const tierEmoji = subscription.tier === 'max' ? '👑' : '⭐';
-      const tierLabel = (subscription.tier || 'pro').toUpperCase();
-      const dateLocale = lang === 'en' ? 'en-US' : 'ru-RU';
-      const nextDue = subscription.period_end
-        ? new Date(subscription.period_end).toLocaleDateString(dateLocale, {
-            day: 'numeric',
-            month: 'short',
-            year: 'numeric',
-          })
-        : null;
+    if (subscription.shop_id) {
+      // Has shop - get owner via shop
+      shop = await shopQueries.findById(subscription.shop_id);
+      owner = shop ? await userQueries.findById(shop.owner_id) : null;
+    } else {
+      // No shop yet (new subscription) - get user directly from subscription
+      owner = await userQueries.findById(subscription.user_id);
+    }
 
-      // Check if this is a NEW subscription (needs shop setup) or RENEWAL
-      const isNewSubscription = purpose === 'subscription_new';
+    if (!owner?.telegram_id || !global.botInstance) {
+      logger.warn('[InvoicePayment] Cannot send notification - no telegram_id or bot instance', {
+        subscriptionId,
+        hasOwner: !!owner,
+        hasTelegramId: !!owner?.telegram_id,
+        hasBotInstance: !!global.botInstance,
+      });
+      return;
+    }
 
-      let message;
-      let keyboard;
+    const lang = owner.language || DEFAULT_LANGUAGE;
+    const tierEmoji = subscription.tier === 'max' ? '👑' : '⭐';
+    const tierLabel = (subscription.tier || 'pro').toUpperCase();
+    const dateLocale = lang === 'en' ? 'en-US' : 'ru-RU';
+    const nextDue = subscription.period_end
+      ? new Date(subscription.period_end).toLocaleDateString(dateLocale, {
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric',
+        })
+      : null;
 
-      if (isNewSubscription) {
-        // NEW SUBSCRIPTION: Show setup prompt with button to configure shop
-        message = `${tierEmoji} <b>${t('subscription.new.title', {}, lang)}</b>
+    // Check if this is a NEW subscription (needs shop setup) or RENEWAL
+    const isNewSubscription = purpose === 'subscription_new';
+    // Also treat as "new" if no shop exists yet
+    const needsShopSetup = isNewSubscription || !subscription.shop_id;
+
+    let message;
+    let keyboard;
+
+    if (needsShopSetup) {
+      // NEW SUBSCRIPTION or NO SHOP: Show setup prompt with button to create shop
+      message = `${tierEmoji} <b>${t('subscription.new.title', {}, lang)}</b>
 
 ${t('subscription.new.thankYou', { tier: tierLabel }, lang)}
 ${nextDue ? t('subscription.new.validUntil', { date: nextDue }, lang) : ''}
 
 ${t('subscription.new.nextStep', {}, lang)}`;
 
-        keyboard = {
-          inline_keyboard: [
-            [{ text: t('subscription.new.setupShopButton', {}, lang), callback_data: `start_create_shop:${subscription.tier || 'pro'}` }],
-          ],
-        };
-      } else {
-        // RENEWAL / UPGRADE: Show confirmation with date extended
-        message = `${tierEmoji} <b>${t('subscription.renewed.title', {}, lang)}</b>
+      keyboard = {
+        inline_keyboard: [
+          [{ text: t('subscription.new.setupShopButton', {}, lang), callback_data: `start_create_shop:${subscription.tier || 'pro'}` }],
+        ],
+      };
 
-<b>${shop.name}</b>
+      logger.info('[InvoicePayment] Sending NEW subscription notification with shop setup button', {
+        subscriptionId,
+        userId: owner.id,
+        telegramId: owner.telegram_id,
+        tier: subscription.tier,
+        hasShop: !!subscription.shop_id,
+      });
+    } else {
+      // RENEWAL / UPGRADE: Show confirmation with date extended
+      message = `${tierEmoji} <b>${t('subscription.renewed.title', {}, lang)}</b>
+
+<b>${shop?.name || 'Shop'}</b>
 ${t('subscription.renewed.tier', { tier: tierLabel }, lang)}
 ${nextDue ? t('subscription.renewed.extendedUntil', { date: nextDue }, lang) : ''}`;
 
-        keyboard = {
-          inline_keyboard: [[{ text: t('subscription.activated.goToMenu', {}, lang), callback_data: 'back_to_main' }]],
-        };
-      }
+      keyboard = {
+        inline_keyboard: [[{ text: t('subscription.activated.goToMenu', {}, lang), callback_data: 'back_to_main' }]],
+      };
 
-      const result = await sendNotificationWithRetry(
-        async () => {
-          await global.botInstance.telegram.sendMessage(owner.telegram_id, message.trim(), {
-            parse_mode: 'HTML',
-            reply_markup: keyboard,
-          });
-        },
-        { type: 'subscription_activated', subscriptionId, ownerTelegramId: owner.telegram_id, purpose }
-      );
+      logger.info('[InvoicePayment] Sending RENEWAL subscription notification', {
+        subscriptionId,
+        shopId: subscription.shop_id,
+        shopName: shop?.name,
+      });
+    }
 
-      if (!result.success) {
-        logger.error('[InvoicePayment] Failed to notify subscription activation after retries', {
-          subscriptionId,
-          ownerTelegramId: owner.telegram_id,
-          error: result.error?.message,
+    const result = await sendNotificationWithRetry(
+      async () => {
+        await global.botInstance.telegram.sendMessage(owner.telegram_id, message.trim(), {
+          parse_mode: 'HTML',
+          reply_markup: keyboard,
         });
-      }
+      },
+      { type: 'subscription_activated', subscriptionId, ownerTelegramId: owner.telegram_id, purpose }
+    );
+
+    if (!result.success) {
+      logger.error('[InvoicePayment] Failed to notify subscription activation after retries', {
+        subscriptionId,
+        ownerTelegramId: owner.telegram_id,
+        error: result.error?.message,
+      });
     }
   } catch (error) {
-    logger.error('[InvoicePayment] Subscription notification error', { error: error.message });
+    logger.error('[InvoicePayment] Subscription notification error', { error: error.message, stack: error.stack });
   }
 }

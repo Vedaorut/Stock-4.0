@@ -614,6 +614,7 @@ const handleBackToMain = async (ctx) => {
 
 /**
  * Handle start create shop (from subscription pending notification)
+ * This is triggered after user pays for subscription but hasn't created shop yet
  */
 const handleStartCreateShop = async (ctx) => {
   try {
@@ -637,11 +638,17 @@ const handleStartCreateShop = async (ctx) => {
       logger.error('Failed to save role:', error);
     }
 
-    // Enter create shop scene directly with the paid tier
-    logger.info(`User ${ctx.from.id} entering create shop scene from subscription notification`, {
+    // Enter create shop scene with paidSubscription flag
+    // This tells createShop.js to find and link existing subscription with null shop_id
+    logger.info(`User ${ctx.from.id} entering create shop scene from paid subscription notification`, {
       tier,
+      paidSubscription: true,
     });
-    await ctx.scene.enter('createShop', { tier });
+
+    await ctx.scene.enter('createShop', {
+      tier,
+      paidSubscription: true, // Flag: user already paid, link existing subscription
+    });
   } catch (error) {
     logger.error('Error in start create shop handler:', error);
     const lang = getLangSafe(ctx);

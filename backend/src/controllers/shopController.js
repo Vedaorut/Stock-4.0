@@ -75,8 +75,41 @@ export const shopController = {
         throw new ConflictError('Shop name already taken. Try another one');
       }
 
+      // Handle paid subscription flow (from "Setup Shop" button after payment)
+      // When paidSubscription=true, find active subscription with null shop_id
+      let resolvedSubscriptionId = subscriptionId;
+      if (!resolvedSubscriptionId && req.body.paidSubscription === true) {
+        const { getClient } = await import('../config/database.js');
+        const client = await getClient();
+        try {
+          // Find active subscription without shop for this user
+          const subscriptionSearch = await client.query(
+            `SELECT id, tier FROM shop_subscriptions
+             WHERE user_id = $1 AND status = 'active' AND shop_id IS NULL
+             ORDER BY created_at DESC LIMIT 1`,
+            [req.user.id]
+          );
+
+          if (subscriptionSearch.rows.length > 0) {
+            resolvedSubscriptionId = subscriptionSearch.rows[0].id;
+            logger.info('[ShopController] Found active subscription for paidSubscription flow', {
+              userId: req.user.id,
+              subscriptionId: resolvedSubscriptionId,
+              tier: subscriptionSearch.rows[0].tier,
+            });
+          } else {
+            logger.warn('[ShopController] paidSubscription=true but no active subscription found', {
+              userId: req.user.id,
+            });
+            // Continue without subscription - user may create via trial/promo instead
+          }
+        } finally {
+          client.release();
+        }
+      }
+
       // Handle subscription-based creation
-      if (subscriptionId) {
+      if (resolvedSubscriptionId) {
         const { getClient } = await import('../config/database.js');
 
         // BUG-SHOP-005 FIX: Retry on invite code collision
@@ -110,10 +143,11 @@ export const shopController = {
               throw new UnauthorizedError('Subscription belongs to another user');
             }
 
-            // Verify subscription is paid
-            if (subscription.status !== 'paid') {
+            // Verify subscription is active (paid and activated)
+            // Note: status='active' is set by subscriptionFinalizer after payment confirmation
+            if (subscription.status !== 'active' && subscription.status !== 'paid') {
               await client.query('ROLLBACK');
-              throw new ValidationError(`Subscription not paid yet (status: ${subscription.status})`);
+              throw new ValidationError(`Subscription not activated yet (status: ${subscription.status})`);
             }
 
             // Verify subscription not already linked
