@@ -354,6 +354,8 @@ async function verifyAndProcessPaymentSafe(payment) {
          WHERE id = $1`,
         [paymentId]
       );
+      // Alert admin about verification failure
+      alertPaymentVerificationFailed(orderId, paymentId, 'Transaction not found after maximum retries');
       logger.warn(`[PaymentWorker] Payment ${paymentId} failed: TX never found after ${checkCount} checks`);
       return;
     }
@@ -553,12 +555,21 @@ async function confirmOrderPayment(orderId, paymentId, verificationResult) {
     await client.query('COMMIT');
 
     // Broadcast WebSocket event for real-time UI update
-    const { broadcast } = await import('../utils/websocket.js');
-    broadcast('order_status', {
-      orderId,
-      status: 'paid',
-      shopId: order.shop_id,
-    });
+    try {
+      const { broadcast } = await import('../utils/websocket.js');
+      broadcast('order_status', {
+        orderId,
+        status: 'paid',
+        shopId: order.shop_id,
+      });
+    } catch (wsError) {
+      logger.error('[PaymentWorker] WebSocket broadcast failed - user UI may not update', {
+        orderId,
+        shopId: order.shop_id,
+        error: wsError.message,
+      });
+      // Non-critical: payment is confirmed, user can refresh
+    }
 
     const requestId = `worker-${orderId}-${Date.now()}`;
 

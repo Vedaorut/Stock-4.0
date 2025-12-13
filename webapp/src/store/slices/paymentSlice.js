@@ -590,32 +590,31 @@ export const createPaymentSlice = (set, get) => ({
   updateOrderStatus: (orderId, status) => {
     const normalizedId = typeof orderId === 'string' ? parseInt(orderId, 10) : orderId;
     const terminalStatuses = ['paid', 'confirmed', 'completed', 'failed', 'cancelled', 'expired'];
+    const isTerminal = terminalStatuses.includes(status);
 
-    set((state) => ({
-      orders: state.orders?.map((order) => {
-        const orderIdNum = typeof order.id === 'string' ? parseInt(order.id, 10) : order.id;
-        return orderIdNum === normalizedId ? { ...order, status } : order;
-      }),
-      currentOrder: (() => {
-        if (!state.currentOrder) return null;
-        const currentIdNum = typeof state.currentOrder.id === 'string'
-          ? parseInt(state.currentOrder.id, 10)
-          : state.currentOrder.id;
-        return currentIdNum === normalizedId
+    // Helper to normalize and compare order IDs
+    const matchesId = (order) => {
+      const orderIdNum = typeof order.id === 'string' ? parseInt(order.id, 10) : order.id;
+      return orderIdNum === normalizedId;
+    };
+
+    // Helper to update order status
+    const updateStatus = (order) => (matchesId(order) ? { ...order, status } : order);
+
+    set((state) => {
+      const currentOrderMatches = state.currentOrder && matchesId(state.currentOrder);
+
+      return {
+        orders: state.orders?.map(updateStatus),
+        currentOrder: currentOrderMatches
           ? { ...state.currentOrder, status }
-          : state.currentOrder;
-      })(),
-      // FIX: Remove from pendingOrders if terminal status, otherwise update
-      pendingOrders: terminalStatuses.includes(status)
-        ? state.pendingOrders?.filter((order) => {
-            const orderIdNum = typeof order.id === 'string' ? parseInt(order.id, 10) : order.id;
-            return orderIdNum !== normalizedId;
-          })
-        : state.pendingOrders?.map((order) => {
-            const orderIdNum = typeof order.id === 'string' ? parseInt(order.id, 10) : order.id;
-            return orderIdNum === normalizedId ? { ...order, status } : order;
-          }),
-    }));
+          : state.currentOrder,
+        // Remove from pendingOrders if terminal status, otherwise update
+        pendingOrders: isTerminal
+          ? state.pendingOrders?.filter((order) => !matchesId(order))
+          : state.pendingOrders?.map(updateStatus),
+      };
+    });
   },
 
   // Resume payment for a pending order (when user clicks badge)
