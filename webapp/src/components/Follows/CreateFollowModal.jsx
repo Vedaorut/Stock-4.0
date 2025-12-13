@@ -13,7 +13,7 @@ const STEPS = {
   MARKUP: 'markup',
 };
 
-export default function CreateFollowModal({ isOpen, onClose, myShopId, onSuccess }) {
+export default function CreateFollowModal({ isOpen, onClose, myShopId, onSuccess, preselectedShop }) {
   const { get, post } = useApi();
   const { triggerHaptic } = useTelegram();
   const { t } = useTranslation();
@@ -36,10 +36,17 @@ export default function CreateFollowModal({ isOpen, onClose, myShopId, onSuccess
   // Reset state when modal opens/closes
   useEffect(() => {
     if (isOpen) {
-      setStep(STEPS.SEARCH);
       setSearchQuery('');
       setSearchResults([]);
-      setSelectedShop(null);
+
+      if (preselectedShop) {
+        setSelectedShop(preselectedShop);
+        setStep(STEPS.MODE);
+      } else {
+        setSelectedShop(null);
+        setStep(STEPS.SEARCH);
+      }
+
       setMode('monitor');
       setMarkupType('percentage');
       setMarkupPercentage(25);
@@ -389,17 +396,15 @@ export default function CreateFollowModal({ isOpen, onClose, myShopId, onSuccess
                       <div className="flex bg-black/30 p-0.5 rounded-lg border border-white/5">
                         <button
                           onClick={() => setMarkupType('percentage')}
-                          className={`px-6 py-2 rounded-md text-sm font-bold transition-all ${
-                            markupType === 'percentage' ? 'bg-[#FF6B00] text-white' : 'text-white/40'
-                          }`}
+                          className={`px-6 py-2 rounded-md text-sm font-bold transition-all ${markupType === 'percentage' ? 'bg-[#FF6B00] text-white' : 'text-white/40'
+                            }`}
                         >
                           %
                         </button>
                         <button
                           onClick={() => setMarkupType('fixed')}
-                          className={`px-6 py-2 rounded-md text-sm font-bold transition-all ${
-                            markupType === 'fixed' ? 'bg-[#FF6B00] text-white' : 'text-white/40'
-                          }`}
+                          className={`px-6 py-2 rounded-md text-sm font-bold transition-all ${markupType === 'fixed' ? 'bg-[#FF6B00] text-white' : 'text-white/40'
+                            }`}
                         >
                           $
                         </button>

@@ -540,7 +540,9 @@
     "followCreated": "Follow created successfully!",
     "circularError": "Cannot follow your own shop",
     "alreadyExists": "You already follow this shop",
-    "limitReached": "Follow limit reached for your subscription"
+    "limitReached": "Follow limit reached for your subscription",
+    "startMonitoring": "Start Monitoring",
+    "openCatalog": "Open Catalog"
   },
   "myOrders": {
     "title": "My Orders",

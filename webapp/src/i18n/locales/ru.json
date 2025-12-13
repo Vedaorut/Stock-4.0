@@ -540,7 +540,9 @@
     "followCreated": "Follow успешно создан!",
     "circularError": "Нельзя отслеживать свой магазин",
     "alreadyExists": "Вы уже отслеживаете этот магазин",
-    "limitReached": "Достигнут лимит follows для вашей подписки"
+    "limitReached": "Достигнут лимит подписок для вашего тарифа",
+    "startMonitoring": "Начать мониторинг",
+    "openCatalog": "Открыть каталог"
   },
   "myOrders": {
     "title": "Мои заказы",
