@@ -11,6 +11,7 @@ import {
 import logger from '../../../utils/logger.js';
 import { t, DEFAULT_LANGUAGE } from '../../../i18n/index.js';
 import { sleep } from '../../../utils/helpers.js';
+import telegramService from '../../telegram.js';
 
 const MAX_NOTIFICATION_RETRIES = 3;
 const RETRY_DELAYS = [1000, 3000, 9000]; // exponential backoff
@@ -77,12 +78,11 @@ export async function notifySubscriptionActivated(subscriptionId, options = {}) 
       owner = await userQueries.findById(subscription.user_id);
     }
 
-    if (!owner?.telegram_id || !global.botInstance) {
-      logger.warn('[InvoicePayment] Cannot send notification - no telegram_id or bot instance', {
+    if (!owner?.telegram_id) {
+      logger.warn('[InvoicePayment] Cannot send notification - no telegram_id', {
         subscriptionId,
         hasOwner: !!owner,
         hasTelegramId: !!owner?.telegram_id,
-        hasBotInstance: !!global.botInstance,
       });
       return;
     }
@@ -150,7 +150,7 @@ ${nextDue ? t('subscription.renewed.extendedUntil', { date: nextDue }, lang) : '
 
     const result = await sendNotificationWithRetry(
       async () => {
-        await global.botInstance.telegram.sendMessage(owner.telegram_id, message.trim(), {
+        await telegramService.sendMessage(owner.telegram_id, message.trim(), {
           parse_mode: 'HTML',
           reply_markup: keyboard,
         });
