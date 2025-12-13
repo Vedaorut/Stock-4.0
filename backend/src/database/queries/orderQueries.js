@@ -45,9 +45,14 @@ export const orderQueries = {
   // Find orders by buyer ID
   // P0-DB-3 FIX: Enforce MAX_LIMIT
   // Returns payment verification info for "My Orders" UI
-  findByBuyerId: async (buyerId, limit = 50, offset = 0) => {
+  findByBuyerId: async (buyerId, options = {}) => {
+    const { limit = 50, offset = 0, statuses } = options;
     const MAX_LIMIT = 1000;
     const safeLimit = Math.min(limit, MAX_LIMIT);
+
+    // Default: show only active/completed orders, exclude cancelled/expired
+    const defaultStatuses = ['pending', 'paid', 'confirmed', 'completed', 'delivered', 'shipped'];
+    const statusFilter = statuses && statuses.length > 0 ? statuses : defaultStatuses;
 
     const result = await query(
       `SELECT o.*,
@@ -60,9 +65,10 @@ export const orderQueries = {
        LEFT JOIN shops s ON o.shop_id = s.id
        LEFT JOIN payments pay ON pay.order_id = o.id
        WHERE o.buyer_id = $1
+         AND o.status = ANY($2::text[])
        ORDER BY o.created_at DESC
-       LIMIT $2 OFFSET $3`,
-      [buyerId, safeLimit, offset]
+       LIMIT $3 OFFSET $4`,
+      [buyerId, statusFilter, safeLimit, offset]
     );
     return result.rows;
   },

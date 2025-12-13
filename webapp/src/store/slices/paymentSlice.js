@@ -589,6 +589,8 @@ export const createPaymentSlice = (set, get) => ({
   // FIX BUG-WEBAPP-003: Normalize orderId to ensure consistent comparison
   updateOrderStatus: (orderId, status) => {
     const normalizedId = typeof orderId === 'string' ? parseInt(orderId, 10) : orderId;
+    const terminalStatuses = ['paid', 'confirmed', 'completed', 'failed', 'cancelled', 'expired'];
+
     set((state) => ({
       orders: state.orders?.map((order) => {
         const orderIdNum = typeof order.id === 'string' ? parseInt(order.id, 10) : order.id;
@@ -603,11 +605,16 @@ export const createPaymentSlice = (set, get) => ({
           ? { ...state.currentOrder, status }
           : state.currentOrder;
       })(),
-      // P1-3 FIX: Also update pendingOrders for real-time status sync
-      pendingOrders: state.pendingOrders?.map((order) => {
-        const orderIdNum = typeof order.id === 'string' ? parseInt(order.id, 10) : order.id;
-        return orderIdNum === normalizedId ? { ...order, status } : order;
-      }),
+      // FIX: Remove from pendingOrders if terminal status, otherwise update
+      pendingOrders: terminalStatuses.includes(status)
+        ? state.pendingOrders?.filter((order) => {
+            const orderIdNum = typeof order.id === 'string' ? parseInt(order.id, 10) : order.id;
+            return orderIdNum !== normalizedId;
+          })
+        : state.pendingOrders?.map((order) => {
+            const orderIdNum = typeof order.id === 'string' ? parseInt(order.id, 10) : order.id;
+            return orderIdNum === normalizedId ? { ...order, status } : order;
+          }),
     }));
   },
 

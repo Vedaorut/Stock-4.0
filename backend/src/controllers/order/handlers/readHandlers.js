@@ -115,7 +115,12 @@ export const getMyOrders = asyncHandler(async (req, res) => {
       });
     }
   } else {
-    orders = await orderQueries.findByBuyerId(req.user.id, limit, offset);
+    // Buyer orders
+    orders = await orderQueries.findByBuyerId(req.user.id, {
+      limit,
+      offset,
+      statuses: statusFilter.length > 0 ? statusFilter : undefined,
+    });
   }
 
   return res.json({

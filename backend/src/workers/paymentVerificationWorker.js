@@ -245,10 +245,13 @@ async function verifyAndProcessPaymentSafe(payment) {
     error: result.error
   });
 
-  // Update confirmations (simple query, no transaction needed)
+  // Update confirmations and check_count (simple query, no transaction needed)
   await query(
-    `UPDATE payments 
-     SET blockchain_confirmations = $1, last_checked_at = NOW(), updated_at = NOW()
+    `UPDATE payments
+     SET blockchain_confirmations = $1,
+         last_checked_at = NOW(),
+         check_count = COALESCE(check_count, 0) + 1,
+         updated_at = NOW()
      WHERE id = $2`,
     [result.confirmations || 0, paymentId]
   );
@@ -331,15 +334,38 @@ async function verifyAndProcessPaymentSafe(payment) {
   }
 
   if (result.resultStatus === blockchainVerificationService.VERIFICATION_STATUS.TX_NOT_FOUND) {
-    // Transaction not found - may appear later (for recently sent transactions)
-    // Keep pending for retry
+    const MAX_TX_NOT_FOUND_CHECKS = 50; // ~8-25 hours depending on currency
+
+    // Check current count
+    const countResult = await query(
+      `SELECT check_count FROM payments WHERE id = $1`,
+      [paymentId]
+    );
+    const checkCount = countResult.rows[0]?.check_count || 0;
+
+    if (checkCount >= MAX_TX_NOT_FOUND_CHECKS) {
+      // Mark as failed - transaction never found
+      await query(
+        `UPDATE payments
+         SET status = 'failed',
+             verification_status = 'tx_not_found',
+             verification_error = 'Transaction not found after maximum retries',
+             updated_at = NOW()
+         WHERE id = $1`,
+        [paymentId]
+      );
+      logger.warn(`[PaymentWorker] Payment ${paymentId} failed: TX never found after ${checkCount} checks`);
+      return;
+    }
+
+    // Continue retry
     await query(
       `UPDATE payments
        SET status = 'pending', last_checked_at = NOW(), updated_at = NOW()
        WHERE id = $1`,
       [paymentId]
     );
-    logger.debug(`[PaymentWorker] Payment ${paymentId} not found yet (will retry)`);
+    logger.debug(`[PaymentWorker] Payment ${paymentId} not found yet (check ${checkCount + 1}/${MAX_TX_NOT_FOUND_CHECKS})`);
     return;
   }
 
@@ -525,6 +551,14 @@ async function confirmOrderPayment(orderId, paymentId, verificationResult) {
     );
 
     await client.query('COMMIT');
+
+    // Broadcast WebSocket event for real-time UI update
+    const { broadcast } = await import('../utils/websocket.js');
+    broadcast('order_status', {
+      orderId,
+      status: 'paid',
+      shopId: order.shop_id,
+    });
 
     const requestId = `worker-${orderId}-${Date.now()}`;
 

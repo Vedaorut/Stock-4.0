@@ -86,6 +86,26 @@ export const useStore = create(
         cart: state.cart, // Fix: Persist cart across page refresh
         viewMode: state.viewMode, // Persist view mode (buyer/seller)
       }),
+      onRehydrateStorage: () => (state) => {
+        if (state?.pendingOrders?.length) {
+          const now = new Date();
+          const validOrders = state.pendingOrders.filter((order) => {
+            // Keep orders without expiresAt (legacy) but only if < 24 hours old
+            if (!order.expiresAt) {
+              if (!order.submittedAt) return false; // No dates = stale, remove
+              const submittedAt = new Date(order.submittedAt);
+              return now - submittedAt < 24 * 60 * 60 * 1000; // < 24 hours
+            }
+            return new Date(order.expiresAt) > now;
+          });
+          if (validOrders.length !== state.pendingOrders.length) {
+            // Use setTimeout to avoid state update during hydration
+            setTimeout(() => {
+              useStore.setState({ pendingOrders: validOrders });
+            }, 0);
+          }
+        }
+      },
     }
   )
 );

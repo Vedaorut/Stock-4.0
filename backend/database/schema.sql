@@ -313,9 +313,10 @@ CREATE TABLE payments (
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
     -- Direct crypto verification fields (migration 043)
-    verification_status VARCHAR(20) DEFAULT 'pending' CHECK (verification_status IN ('pending', 'verifying', 'confirmed', 'failed', 'expired', 'late_confirmed')),
+    verification_status VARCHAR(20) DEFAULT 'pending' CHECK (verification_status IN ('pending', 'verifying', 'confirmed', 'failed', 'expired', 'late_confirmed', 'tx_not_found')),
     last_checked_at TIMESTAMP,
     blockchain_confirmations INTEGER DEFAULT 0,
+    check_count INTEGER DEFAULT 0,
     verification_error VARCHAR(255),
     recipient_address VARCHAR(255),
     expected_crypto_amount DECIMAL(20, 8),
@@ -341,6 +342,7 @@ COMMENT ON COLUMN payments.expected_crypto_amount IS 'Expected crypto amount for
 COMMENT ON COLUMN payments.reviewed_at IS 'When admin reviewed the late payment';
 COMMENT ON COLUMN payments.reviewed_by IS 'Admin user who reviewed the payment';
 COMMENT ON COLUMN payments.review_notes IS 'Admin notes about the review decision';
+COMMENT ON COLUMN payments.check_count IS 'Number of blockchain verification attempts';
 
 CREATE INDEX idx_payments_pending_verification
 ON payments(status, created_at) WHERE status = 'pending' AND subscription_id IS NULL;
