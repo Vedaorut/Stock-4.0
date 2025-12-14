@@ -57,6 +57,11 @@ const parseDeepLink = (text) => {
     }
   }
 
+  // Create shop deep link from WebApp
+  if (payload === 'create_shop') {
+    return { type: 'create_shop' };
+  }
+
   // New format: any valid invite code (alphanumeric with underscore/hyphen, 3-50 chars)
   const inviteCodePattern = /^[a-zA-Z0-9_-]{3,50}$/;
   if (inviteCodePattern.test(payload)) {
@@ -247,6 +252,14 @@ export const handleStart = async (ctx) => {
           // handleShopInvite redirected to buyer menu, stop here
           return;
         }
+      }
+
+      // Handle create_shop deep link from WebApp
+      if (pendingDeepLink.type === 'create_shop') {
+        logger.info(`User ${ctx.from.id} starting shop creation from WebApp deep link`);
+        ctx.session.role = 'seller';
+        await ctx.scene.enter('chooseTier');
+        return;
       }
     }
 

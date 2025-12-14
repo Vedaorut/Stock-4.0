@@ -5,6 +5,7 @@ import { useTelegram } from '../../../hooks/useTelegram';
 import { useApi } from '../../../hooks/useApi';
 import { useBackButton } from '../../../hooks/useBackButton';
 import { useTranslation } from '../../../i18n/useTranslation';
+import { openTelegramLink } from '../../../utils/telegram';
 
 // Sub-components
 import ProductForm from './ProductForm';
@@ -432,7 +433,9 @@ export default function ProductsModal({ isOpen, onClose }) {
   };
 
   const handleCreateShop = () => {
-    alert(t('products.createShopBot'));
+    // Navigate to bot to create shop
+    const botUsername = import.meta.env.VITE_BOT_USERNAME || 'saveropus_bot';
+    openTelegramLink(`https://t.me/${botUsername}?start=create_shop`);
   };
 
   // Error state
