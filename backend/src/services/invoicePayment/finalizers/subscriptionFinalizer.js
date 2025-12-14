@@ -23,6 +23,30 @@ import { SUBSCRIPTION_PERIOD_DAYS } from '../../../config/subscriptionPricing.js
 import logger from '../../../utils/logger.js';
 import { workerQueries } from '../../../models/workerQueries.js';
 
+// TX hash validation patterns by currency
+const TX_HASH_PATTERNS = {
+  BTC: /^[a-fA-F0-9]{64}$/,
+  LTC: /^[a-fA-F0-9]{64}$/,
+  ETH: /^0x[a-fA-F0-9]{64}$/,
+  USDT: /^[a-fA-F0-9]{64}$/,  // TRC20 format
+};
+
+/**
+ * Validate transaction hash format for the given currency
+ * @param {string} txHash - Transaction hash to validate
+ * @param {string} currency - Currency code (BTC, LTC, ETH, USDT)
+ * @returns {boolean} True if valid
+ */
+function isValidTxHash(txHash, currency) {
+  if (!txHash || typeof txHash !== 'string') {return false;}
+  const pattern = TX_HASH_PATTERNS[currency?.toUpperCase()];
+  if (!pattern) {
+    // Unknown currency - accept any hex string 32-128 chars
+    return /^(0x)?[a-fA-F0-9]{32,128}$/.test(txHash);
+  }
+  return pattern.test(txHash);
+}
+
 /**
  * Finalizes a subscription payment after successful verification.
  *
@@ -74,6 +98,24 @@ import { workerQueries } from '../../../models/workerQueries.js';
  */
 export async function finalizeSubscriptionPayment(client, { subscription, invoice, verification, payment, mode = 'subscription' }) {
   const isUpgrade = mode === 'upgrade';
+
+  // =========================================================================
+  // SECURITY: Validate txHash format before storing in DB
+  // =========================================================================
+  if (verification.txHash && !isValidTxHash(verification.txHash, invoice.currency)) {
+    logger.warn('[SubscriptionPayment] SECURITY: Invalid txHash format rejected', {
+      subscriptionId: subscription.id,
+      currency: invoice.currency,
+      txHashLength: verification.txHash?.length,
+      txHashPrefix: verification.txHash?.substring(0, 10),
+    });
+    return {
+      ok: false,
+      state: 'failed',
+      code: 'INVALID_TX_HASH',
+      message: 'Transaction hash format is invalid for the payment currency',
+    };
+  }
 
   // =========================================================================
   // IDEMPOTENCY CHECK: Upgrade already completed

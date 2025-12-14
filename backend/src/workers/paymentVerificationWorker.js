@@ -33,6 +33,7 @@ const STUCK_PAYMENT_TIMEOUT_MINUTES = 5; // Recovery timeout for stuck 'processi
 const RECOVERY_INTERVAL = 5 * 60 * 1000; // Run recovery every 5 minutes
 
 let workerInterval = null;
+let isProcessing = false; // Guard against overlapping executions
 let recoveryInterval = null;
 
 /**
@@ -62,12 +63,19 @@ export function startPaymentVerificationWorker() {
     logger.error('[PaymentWorker] Initial recovery failed:', err);
   });
 
-  // Schedule recurring checks
+  // Schedule recurring checks with overlap protection
   workerInterval = setInterval(async () => {
+    if (isProcessing) {
+      logger.debug('[PaymentWorker] Skipping - previous run still in progress');
+      return;
+    }
+    isProcessing = true;
     try {
       await processPendingPayments();
     } catch (error) {
       logger.error('[PaymentWorker] Unhandled error:', error);
+    } finally {
+      isProcessing = false;
     }
   }, POLL_INTERVAL);
 
@@ -788,8 +796,9 @@ async function notifyLatePaymentReceived(orderId, paymentId, invoiceAgeSeconds) 
          seller.username as seller_username,
          s.name as shop_name
        FROM orders o
-       JOIN products p ON o.product_id = p.id
-       JOIN shops s ON p.shop_id = s.id
+       JOIN order_items oi ON o.id = oi.order_id
+       JOIN products p ON oi.product_id = p.id
+       JOIN shops s ON o.shop_id = s.id
        JOIN users seller ON s.owner_id = seller.id
        LEFT JOIN users buyer ON o.buyer_id = buyer.id
        LEFT JOIN payments pay ON pay.order_id = o.id AND pay.id = $2
