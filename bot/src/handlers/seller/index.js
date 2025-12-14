@@ -504,6 +504,29 @@ export const setupSellerHandlers = (bot) => {
   // Create shop action
   bot.action('seller:create_shop', handleCreateShop);
 
+  // Handle shop creation from payment notification (after subscription payment)
+  // Backend sends callback_data: 'start_create_shop:pro' or 'start_create_shop:max'
+  bot.action(/^start_create_shop:(.+)$/, async (ctx) => {
+    try {
+      const tier = ctx.match[1]; // 'pro' or 'max'
+      await ctx.answerCbQuery();
+
+      logger.info('Starting shop creation from payment notification', {
+        userId: ctx.from.id,
+        tier,
+      });
+
+      // Enter createShop scene with tier and paidSubscription flag
+      await ctx.scene.enter('createShop', {
+        tier,
+        paidSubscription: true,
+      });
+    } catch (error) {
+      logger.error('Error in start_create_shop handler:', error);
+      await ctx.reply(t('general.actionFailed', {}, getLangSafe(ctx)));
+    }
+  });
+
   // Add product action
   bot.action('seller:add_product', handleAddProduct);
 
