@@ -101,8 +101,11 @@ export async function finalizeSubscriptionPayment(client, { subscription, invoic
 
   // =========================================================================
   // SECURITY: Validate txHash format before storing in DB
+  // CrystalPay uses internal IDs (format: crystalpay_<id>) - skip validation for them
   // =========================================================================
-  if (verification.txHash && !isValidTxHash(verification.txHash, invoice.currency)) {
+  const isCrystalPay = invoice.chain === 'CRYSTALPAY' || verification.txHash?.startsWith('crystalpay_');
+
+  if (verification.txHash && !isCrystalPay && !isValidTxHash(verification.txHash, invoice.currency)) {
     logger.warn('[SubscriptionPayment] SECURITY: Invalid txHash format rejected', {
       subscriptionId: subscription.id,
       currency: invoice.currency,
