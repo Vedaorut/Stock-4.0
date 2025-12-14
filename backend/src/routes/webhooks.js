@@ -71,18 +71,19 @@ router.post('/crystalpay', webhookLimiter, async (req, res) => {
       return res.status(404).json({ error: 'Invoice not found' });
     }
 
-    if (invoice.expires_at && new Date(invoice.expires_at) < new Date()) {
-      logger.warn('[Webhook] CrystalPay: Invoice expired', {
-        invoiceId: invoice.id,
-        crystalPayId: payload.id,
-        expiresAt: invoice.expires_at,
-      });
-      await client.query('COMMIT');
-      return res.status(400).json({ error: 'Invoice expired' });
-    }
-
     // 4. Only process 'payed' state
     if (payload.state !== 'payed') {
+      // For non-payment states, check expiration
+      if (invoice.expires_at && new Date(invoice.expires_at) < new Date()) {
+        logger.warn('[Webhook] CrystalPay: Invoice expired (non-payment state)', {
+          invoiceId: invoice.id,
+          crystalPayId: payload.id,
+          state: payload.state,
+          expiresAt: invoice.expires_at,
+        });
+        await client.query('COMMIT');
+        return res.status(400).json({ error: 'Invoice expired' });
+      }
       logger.info('[Webhook] CrystalPay: Non-payment state', { state: payload.state });
       await client.query('COMMIT');
       return res.json({ status: 'skipped', state: payload.state });

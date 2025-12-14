@@ -18,6 +18,8 @@
 
 import { getClient, query } from '../config/database.js';
 import * as blockchainVerificationService from '../services/blockchainVerificationService.js';
+import * as crystalPayService from '../services/crystalPayService.js';
+import { processSubscriptionPayment } from '../services/invoicePayment/index.js';
 import telegramService from '../services/telegram.js';
 import logger from '../utils/logger.js';
 import { alertPaymentVerificationFailed, alertStockDeductionFailed, alertLatePaymentReceived } from '../utils/alerts.js';
@@ -31,6 +33,11 @@ const MAX_AGE_HOURS = 72;
 const BATCH_SIZE = 50;
 const STUCK_PAYMENT_TIMEOUT_MINUTES = 5; // Recovery timeout for stuck 'processing' payments
 const RECOVERY_INTERVAL = 5 * 60 * 1000; // Run recovery every 5 minutes
+
+// CrystalPay subscription polling settings
+const CRYSTALPAY_POLL_BATCH_SIZE = 10; // Max invoices per poll cycle
+const CRYSTALPAY_POLL_DELAY_MS = 200; // 200ms between API calls (5 req/sec max)
+const CRYSTALPAY_POLL_INTERVAL_SEC = 30; // Check each invoice every 30 seconds
 
 let workerInterval = null;
 let isProcessing = false; // Guard against overlapping executions
@@ -52,10 +59,16 @@ export function startPaymentVerificationWorker() {
   logger.info(`  - Max payment age: ${MAX_AGE_HOURS} hours`);
   logger.info(`  - Batch size: ${BATCH_SIZE} payments`);
   logger.info(`  - Stuck payment recovery: every ${RECOVERY_INTERVAL / 60000} minutes`);
+  logger.info(`  - CrystalPay subscription polling: enabled (batch=${CRYSTALPAY_POLL_BATCH_SIZE}, delay=${CRYSTALPAY_POLL_DELAY_MS}ms)`);
 
   // Run immediately on start
   processPendingPayments().catch((err) => {
     logger.error('[PaymentWorker] Initial run failed:', err);
+  });
+
+  // Run CrystalPay subscription polling immediately
+  processPendingCrystalPaySubscriptions().catch((err) => {
+    logger.error('[PaymentWorker] Initial CrystalPay poll failed:', err);
   });
 
   // Run recovery for stuck payments immediately and periodically
@@ -71,7 +84,11 @@ export function startPaymentVerificationWorker() {
     }
     isProcessing = true;
     try {
-      await processPendingPayments();
+      // Run both payment types in parallel
+      await Promise.all([
+        processPendingPayments(),
+        processPendingCrystalPaySubscriptions(),
+      ]);
     } catch (error) {
       logger.error('[PaymentWorker] Unhandled error:', error);
     } finally {
@@ -222,6 +239,158 @@ async function processPendingPayments() {
   } finally {
     client.release();
   }
+}
+
+/**
+ * Process pending CrystalPay subscription invoices
+ *
+ * Polls CrystalPay API for subscription payments that may have been missed by webhooks
+ * (e.g., if Cloudflare tunnel URL changed). This is a backup mechanism - webhooks are still
+ * the primary payment confirmation method.
+ *
+ * Uses Atomic Claim Pattern similar to processPendingPayments.
+ */
+async function processPendingCrystalPaySubscriptions() {
+  const client = await getClient();
+
+  try {
+    await client.query('BEGIN');
+
+    // Atomically claim invoices for processing
+    // Query: pending CrystalPay invoices for subscriptions that haven't been checked recently
+    const invoiceResult = await client.query(
+      `UPDATE invoices
+       SET last_checked_at = NOW(), updated_at = NOW()
+       FROM (
+         SELECT i.id
+         FROM invoices i
+         WHERE i.chain = 'CRYSTALPAY'
+           AND i.status = 'pending'
+           AND i.subscription_id IS NOT NULL
+           AND i.expires_at > NOW()
+           AND i.created_at > NOW() - make_interval(hours => $1)
+           AND (i.last_checked_at IS NULL OR i.last_checked_at < NOW() - make_interval(secs => $2))
+         ORDER BY i.created_at ASC
+         LIMIT $3
+         FOR UPDATE OF i SKIP LOCKED
+       ) selected
+       WHERE invoices.id = selected.id
+       RETURNING invoices.id, invoices.subscription_id, invoices.crystalpay_id,
+                 invoices.expected_amount, invoices.currency`,
+      [MAX_AGE_HOURS, CRYSTALPAY_POLL_INTERVAL_SEC, CRYSTALPAY_POLL_BATCH_SIZE]
+    );
+
+    await client.query('COMMIT');
+
+    const pendingInvoices = invoiceResult.rows;
+
+    if (pendingInvoices.length === 0) {
+      return;
+    }
+
+    logger.info(`[PaymentWorker] Processing ${pendingInvoices.length} pending CrystalPay subscription invoices`);
+
+    // Process each invoice OUTSIDE transaction
+    for (const invoice of pendingInvoices) {
+      try {
+        await processCrystalPayInvoice(invoice);
+        // Respect rate limits: 200ms delay = max 5 requests/second
+        await sleep(CRYSTALPAY_POLL_DELAY_MS);
+      } catch (error) {
+        // Log error but don't crash - continue with next invoice
+        metricsCollector.recordWorkerError('crystalpay_poll', error);
+        logger.error(`[PaymentWorker] Error processing CrystalPay invoice ${invoice.id}:`, {
+          error: error.message,
+          subscriptionId: invoice.subscription_id,
+        });
+      }
+    }
+  } catch (error) {
+    await client.query('ROLLBACK').catch((rollbackErr) => {
+      logger.error('[PaymentWorker] CrystalPay poll ROLLBACK failed:', rollbackErr);
+    });
+    logger.error('[PaymentWorker] CrystalPay subscription poll failed:', error);
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Process a single CrystalPay subscription invoice
+ *
+ * @param {Object} invoice - Invoice row from database
+ */
+async function processCrystalPayInvoice(invoice) {
+  const { id: invoiceId, subscription_id: subscriptionId, crystalpay_id: crystalpayId } = invoice;
+
+  if (!crystalpayId) {
+    logger.warn(`[PaymentWorker] Invoice ${invoiceId} has no crystalpay_id, skipping`);
+    return;
+  }
+
+  logger.debug(`[PaymentWorker] Checking CrystalPay invoice ${invoiceId}`, {
+    subscriptionId,
+    crystalpayId: crystalpayId.substring(0, 20) + '...',
+  });
+
+  // Call CrystalPay API to get invoice status
+  let invoiceInfo;
+  try {
+    invoiceInfo = await crystalPayService.getInvoiceInfo(crystalpayId);
+  } catch (apiError) {
+    // API error - will be retried on next poll cycle
+    logger.warn(`[PaymentWorker] CrystalPay API error for invoice ${invoiceId}:`, {
+      error: apiError.message,
+    });
+    return;
+  }
+
+  const state = invoiceInfo.state;
+  logger.debug(`[PaymentWorker] CrystalPay invoice ${invoiceId} state: ${state}`);
+
+  // Handle different states
+  if (crystalPayService.isPaymentSuccessful(state)) {
+    // Payment confirmed - process subscription payment
+    logger.info(`[PaymentWorker] CrystalPay invoice ${invoiceId} is PAID, processing subscription...`);
+
+    try {
+      const result = await processSubscriptionPayment({
+        subscriptionId,
+        invoiceId,
+        webhookVerified: true, // Trust the poll result as we verified via API
+      });
+
+      if (result.ok) {
+        logger.info(`[PaymentWorker] Subscription ${subscriptionId} activated via polling`, {
+          invoiceId,
+          state: result.state,
+        });
+      } else {
+        logger.warn(`[PaymentWorker] Subscription payment processing returned not ok`, {
+          subscriptionId,
+          invoiceId,
+          result,
+        });
+      }
+    } catch (processError) {
+      logger.error(`[PaymentWorker] Failed to process subscription payment`, {
+        subscriptionId,
+        invoiceId,
+        error: processError.message,
+      });
+    }
+  } else if (crystalPayService.isPaymentFailed(state)) {
+    // Payment failed or unavailable - mark invoice as expired/cancelled
+    logger.info(`[PaymentWorker] CrystalPay invoice ${invoiceId} failed with state: ${state}`);
+
+    await query(
+      `UPDATE invoices
+       SET status = 'cancelled', updated_at = NOW()
+       WHERE id = $1 AND status = 'pending'`,
+      [invoiceId]
+    );
+  }
+  // For pending states (created, notpayed, processing) - do nothing, will check again next cycle
 }
 
 /**
