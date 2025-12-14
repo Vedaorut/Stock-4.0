@@ -100,6 +100,8 @@ async function checkExpiredSubscriptions() {
     // This fixes data source inconsistency between shops.subscription_status
     // and shop_subscriptions.status
     // =========================================================================
+    // ISSUE-3 FIX: Exclude admin-blocked shops from consistency check
+    // admin_deactivated IS NOT TRUE handles NULL and false safely
     const inconsistentResult = await client.query(
       `UPDATE shops
        SET subscription_status = 'pending',
@@ -108,6 +110,7 @@ async function checkExpiredSubscriptions() {
        WHERE subscription_status = 'active'
        AND is_trial = false
        AND registration_paid = false
+       AND admin_deactivated IS NOT TRUE
        AND NOT EXISTS (
          SELECT 1 FROM shop_subscriptions ss
          WHERE ss.shop_id = shops.id

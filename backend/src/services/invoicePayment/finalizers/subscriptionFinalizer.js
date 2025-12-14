@@ -125,6 +125,25 @@ export async function finalizeSubscriptionPayment(client, { subscription, invoic
       };
     }
 
+    // ISSUE-1 FIX: Check admin_deactivated before upgrade
+    const upgradeShopCheck = await client.query(
+      'SELECT admin_deactivated FROM shops WHERE id = $1',
+      [subscription.shop_id]
+    );
+    if (upgradeShopCheck.rows[0]?.admin_deactivated === true) {
+      logger.warn('[SubscriptionPayment] ISSUE-1 FIX: Upgrade rejected - shop admin deactivated', {
+        shopId: subscription.shop_id,
+        subscriptionId: subscription.id,
+      });
+      await markInvoicePaid(client, invoice.id, verification.txHash);
+      return {
+        ok: false,
+        state: 'rejected',
+        code: 'SHOP_ADMIN_DEACTIVATED',
+        message: 'Shop was forcibly deactivated by admin. Upgrade payment received but not applied. Contact support.',
+      };
+    }
+
     // Update shop to MAX tier (upgrade is always to MAX)
     // Also clear trial flags in case upgrading from trial
     await client.query(
@@ -289,14 +308,32 @@ export async function finalizeSubscriptionPayment(client, { subscription, invoic
     // =========================================================================
 
     // Check if user already has ANY shop that we can link to
+    // ISSUE-2 FIX: Include admin_deactivated in SELECT
     const existingShopResult = await client.query(
-      `SELECT id, name, is_active FROM shops WHERE owner_id = $1 ORDER BY created_at DESC LIMIT 1 FOR UPDATE`,
+      `SELECT id, name, is_active, admin_deactivated FROM shops WHERE owner_id = $1 ORDER BY created_at DESC LIMIT 1 FOR UPDATE`,
       [subscription.user_id]
     );
 
     if (existingShopResult.rows.length > 0) {
       // Use existing shop
       const existingShop = existingShopResult.rows[0];
+
+      // ISSUE-2 FIX: Check admin_deactivated before linking
+      if (existingShop.admin_deactivated === true) {
+        logger.warn('[SubscriptionPayment] ISSUE-2 FIX: Linking rejected - existing shop admin deactivated', {
+          shopId: existingShop.id,
+          subscriptionId: subscription.id,
+          userId: subscription.user_id,
+        });
+        await markInvoicePaid(client, invoice.id, verification.txHash);
+        return {
+          ok: false,
+          state: 'rejected',
+          code: 'SHOP_ADMIN_DEACTIVATED',
+          message: 'Your existing shop was forcibly deactivated by admin. Payment received but subscription not linked. Contact support.',
+        };
+      }
+
       logger.info(`[SubscriptionPayment] Linking existing shop ${existingShop.id} to subscription ${subscription.id}`);
 
       // Update subscription with shop reference
