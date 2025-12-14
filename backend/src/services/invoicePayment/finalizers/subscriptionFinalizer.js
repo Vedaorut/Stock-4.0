@@ -258,8 +258,16 @@ export async function finalizeSubscriptionPayment(client, { subscription, invoic
           );
         }
       } catch (workerError) {
-        logger.error(`[SubscriptionPayment] Failed to remove workers on downgrade for shop ${subscription.shop_id}:`, workerError);
+        // CRITICAL #2 FIX: Log with SECURITY tag and structured data for alerting
+        logger.error('[SubscriptionPayment] SECURITY: Failed to remove workers on downgrade', {
+          shopId: subscription.shop_id,
+          subscriptionId: subscription.id,
+          tier: subscription.tier,
+          error: workerError.message,
+          stack: workerError.stack,
+        });
         // Don't fail the payment - workers will still be blocked by tier check in auth middleware
+        // But this needs manual review - workers may have unauthorized access until middleware blocks them
       }
     }
 

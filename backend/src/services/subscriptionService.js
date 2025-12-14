@@ -205,12 +205,20 @@ async function checkExpiredSubscriptions() {
     return { expired, gracePeriod, deactivated, inconsistentFixed };
   } catch (error) {
     // BUG-FIX: Rollback transaction on any error
+    // HIGH #8 FIX: Improve rollback error logging with correlation
     try {
       await client.query('ROLLBACK');
     } catch (rollbackError) {
-      logger.error('[Subscription] Rollback error:', rollbackError);
+      logger.error('[Subscription] Rollback failed after original error', {
+        originalError: error.message,
+        rollbackError: rollbackError.message,
+        stack: rollbackError.stack,
+      });
     }
-    logger.error('[Subscription] Error checking expired subscriptions:', error);
+    logger.error('[Subscription] Error checking expired subscriptions', {
+      error: error.message,
+      stack: error.stack,
+    });
     throw error;
   } finally {
     client.release();

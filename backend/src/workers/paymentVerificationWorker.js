@@ -118,7 +118,13 @@ async function recoverStuckPayments() {
       });
     }
   } catch (error) {
-    logger.error('[PaymentWorker] Failed to recover stuck payments:', error);
+    // HIGH #6 FIX: Add structured logging and re-throw for visibility
+    logger.error('[PaymentWorker] Failed to recover stuck payments', {
+      error: error.message,
+      stack: error.stack,
+    });
+    // Don't throw - this is called from interval, throwing would crash the worker
+    // But ensure this is visible in monitoring
   }
 }
 
@@ -297,8 +303,14 @@ async function verifyAndProcessPaymentSafe(payment) {
         alertLatePaymentReceived(orderId, paymentId, invoiceAge);
 
         // Notify buyer and seller about late payment
+        // HIGH #5 FIX: Add structured logging for late payment notification failures
         notifyLatePaymentReceived(orderId, paymentId, invoiceAge).catch(err => {
-          logger.error('[PaymentWorker] Late payment notification error:', err);
+          logger.error('[PaymentWorker] CRITICAL: Late payment notification failed - manual review required', {
+            orderId,
+            paymentId,
+            invoiceAgeMinutes: Math.round(invoiceAge / 60),
+            error: err.message,
+          });
         });
 
         logger.warn(`[PaymentWorker] Late payment detected`, {
@@ -555,6 +567,7 @@ async function confirmOrderPayment(orderId, paymentId, verificationResult) {
     await client.query('COMMIT');
 
     // Broadcast WebSocket event for real-time UI update
+    // HIGH #4 FIX: Add structured logging for WebSocket failures
     try {
       const { broadcast } = await import('../utils/websocket.js');
       broadcast('order_status', {
@@ -566,9 +579,12 @@ async function confirmOrderPayment(orderId, paymentId, verificationResult) {
       logger.error('[PaymentWorker] WebSocket broadcast failed - user UI may not update', {
         orderId,
         shopId: order.shop_id,
+        paymentId,
         error: wsError.message,
+        stack: wsError.stack,
       });
       // Non-critical: payment is confirmed, user can refresh
+      // TODO: Consider adding metric tracking: metricsCollector.recordWebsocketFailure()
     }
 
     const requestId = `worker-${orderId}-${Date.now()}`;
@@ -599,8 +615,15 @@ async function confirmOrderPayment(orderId, paymentId, verificationResult) {
     });
 
     // 5. Notify seller (async, outside transaction)
+    // CRITICAL #3 FIX: Add structured logging for notification failures
     notifySellerPaymentReceived(orderId).catch(err => {
-      logger.error('[PaymentWorker] Notification error:', err);
+      logger.error('[PaymentWorker] Seller notification failed - seller may miss payment', {
+        orderId,
+        paymentId,
+        error: err.message,
+        code: err.code,
+      });
+      // TODO: Queue for retry or alert admin about missed notification
     });
 
   } catch (error) {

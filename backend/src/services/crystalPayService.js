@@ -118,7 +118,7 @@ export async function createInvoice({ amount, method, description, extra, lifeti
  * @param {string} invoiceId - CrystalPay invoice ID
  * @returns {Promise<{id: string, state: string, amount: string, method: string}>}
  */
-export async function getInvoiceInfo(invoiceId) {
+export async function getInvoiceInfo(invoiceId, retries = 2) {
   const config = getConfig();
   validateConfig(config);
 
@@ -144,6 +144,17 @@ export async function getInvoiceInfo(invoiceId) {
     };
 
   } catch (error) {
+    // HIGH #7 FIX: Retry on network errors
+    const isNetworkError = error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT' || error.code === 'ENOTFOUND';
+    if (retries > 0 && isNetworkError) {
+      logger.warn('[CrystalPay] Retrying getInvoiceInfo after network error', {
+        invoiceId,
+        errorCode: error.code,
+        retriesLeft: retries,
+      });
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1s before retry
+      return getInvoiceInfo(invoiceId, retries - 1);
+    }
     logger.error('[CrystalPay] Get invoice info error', { invoiceId, error: error.message });
     throw error;
   }
@@ -187,8 +198,14 @@ export function verifySignature(payload) {
       Buffer.from(payload.signature, 'hex'),
       Buffer.from(expectedSignature, 'hex')
     );
-  } catch {
-    // If signatures have different lengths, they don't match
+  } catch (error) {
+    // CRITICAL #1 FIX: Log the actual error for debugging
+    // Could be: different lengths, invalid hex, Buffer allocation failure
+    logger.warn('[CrystalPay] Signature comparison failed', {
+      errorMessage: error.message,
+      signatureLength: payload.signature?.length,
+      expectedLength: expectedSignature?.length,
+    });
     isValid = false;
   }
 
