@@ -19,6 +19,12 @@ const debounceMiddleware = async (ctx, next) => {
     return next();
   }
 
+  // LOG ALL CALLBACK QUERIES for debugging
+  logger.info('[Debounce] Callback received', {
+    userId: ctx.from?.id,
+    action: ctx.callbackQuery.data,
+  });
+
   // Initialize session if needed
   if (!ctx.session) {
     ctx.session = {};
@@ -30,7 +36,7 @@ const debounceMiddleware = async (ctx, next) => {
   const timeSinceLastAction = now - lastActionTime;
 
   if (timeSinceLastAction < DEBOUNCE_MS) {
-    logger.debug('Action debounced (too fast)', {
+    logger.warn('[Debounce] Action BLOCKED (too fast)', {
       userId: ctx.from?.id,
       timeSinceLastAction,
       action: ctx.callbackQuery.data,
