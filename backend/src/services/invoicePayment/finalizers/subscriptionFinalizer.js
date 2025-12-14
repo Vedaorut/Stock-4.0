@@ -144,7 +144,12 @@ export async function finalizeSubscriptionPayment(client, { subscription, invoic
   // NEW PAYMENT = NEW PERIOD (always start from NOW for subscription payments)
   // =========================================================================
   const now = new Date();
-  const currentPeriodEnd = subscription.period_end ? new Date(subscription.period_end) : null;
+  // BUG FIX: For pending subscriptions, period_end is just a preview (set at creation)
+  // Only use it for period extension if subscription was ALREADY ACTIVE (renewal scenario)
+  // This prevents 30+30=60 days bug when activating new subscription
+  const currentPeriodEnd = subscription.status === 'active' && subscription.period_end
+    ? new Date(subscription.period_end)
+    : null;
   const periodStart = currentPeriodEnd && currentPeriodEnd > now ? currentPeriodEnd : now;
   if (currentPeriodEnd && currentPeriodEnd > now) {
     logger.info('[SubscriptionPayment] Aligning new period start to current end to prevent overlap', {
