@@ -178,13 +178,56 @@ export async function finalizeSubscriptionPayment(client, { subscription, invoic
   // (Handles both regular renewal AND trial-to-paid conversion)
   // =========================================================================
   if (subscription.shop_id) {
-    // SECURITY: Check for tier downgrade (MAX -> PRO) and remove workers
-    // Workers are only allowed on MAX tier, so they must be removed on downgrade
+    // BUG-002 FIX: Check if shop was forcibly deactivated by admin
+    // If admin_deactivated = true, reject payment reactivation
     const shopResult = await client.query(
-      'SELECT tier FROM shops WHERE id = $1',
+      'SELECT tier, is_active, subscription_status, admin_deactivated FROM shops WHERE id = $1',
       [subscription.shop_id]
     );
-    const currentTier = shopResult.rows[0]?.tier;
+
+    if (shopResult.rows.length === 0) {
+      return {
+        ok: false,
+        state: 'failed',
+        code: 'SHOP_NOT_FOUND',
+        message: `Shop ${subscription.shop_id} not found`,
+      };
+    }
+
+    const shop = shopResult.rows[0];
+
+    // BUG-002 FIX: Reject if admin forcibly deactivated this shop
+    // Late payments after grace period are OK to reactivate, but admin blocks are permanent
+    // NOTE: admin_deactivated column is optional - if not present, this check is skipped
+    if (shop.admin_deactivated === true) {
+      logger.warn('[SubscriptionPayment] BUG-002 FIX: Payment rejected - shop was forcibly deactivated by admin', {
+        shopId: subscription.shop_id,
+        subscriptionId: subscription.id,
+      });
+
+      // Mark invoice as paid (money received) but don't activate
+      await markInvoicePaid(client, invoice.id, verification.txHash);
+
+      return {
+        ok: false,
+        state: 'rejected',
+        code: 'SHOP_ADMIN_DEACTIVATED',
+        message: 'Shop was forcibly deactivated by admin. Payment received but subscription not activated. Contact support.',
+      };
+    }
+
+    const currentTier = shop.tier;
+
+    // Log if reactivating after grace period expiry
+    if (shop.subscription_status === 'inactive' && shop.is_active === false) {
+      logger.info('[SubscriptionPayment] BUG-002 FIX: Reactivating shop after grace period expiry', {
+        shopId: subscription.shop_id,
+        previousStatus: shop.subscription_status,
+      });
+    }
+
+    // SECURITY: Check for tier downgrade (MAX -> PRO) and remove workers
+    // Workers are only allowed on MAX tier, so they must be removed on downgrade
 
     if (currentTier === 'max' && subscription.tier === 'pro') {
       logger.info(`[SubscriptionPayment] SECURITY: Tier downgrade detected (MAX -> PRO) for shop ${subscription.shop_id}`);

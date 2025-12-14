@@ -94,6 +94,39 @@ async function checkExpiredSubscriptions() {
     // BUG-FIX: Wrap all UPDATEs in transaction for atomicity
     await client.query('BEGIN');
 
+    // =========================================================================
+    // BUG-001 FIX: BATCH 0 - Fix inconsistent shops
+    // Deactivate shops that claim to be 'active' but have no active subscription
+    // This fixes data source inconsistency between shops.subscription_status
+    // and shop_subscriptions.status
+    // =========================================================================
+    const inconsistentResult = await client.query(
+      `UPDATE shops
+       SET subscription_status = 'pending',
+           is_active = false,
+           updated_at = timezone('UTC', NOW())
+       WHERE subscription_status = 'active'
+       AND is_trial = false
+       AND registration_paid = false
+       AND NOT EXISTS (
+         SELECT 1 FROM shop_subscriptions ss
+         WHERE ss.shop_id = shops.id
+         AND ss.status = 'active'
+         AND (ss.period_end IS NULL OR ss.period_end > NOW())
+       )
+       RETURNING id, name`
+    );
+
+    const inconsistentFixed = inconsistentResult.rowCount || 0;
+    if (inconsistentFixed > 0) {
+      for (const shop of inconsistentResult.rows) {
+        logger.warn(
+          `[Subscription] BUG-001 FIX: Shop ${shop.id} (${shop.name}) was marked active without valid subscription - deactivated`
+        );
+      }
+      logger.info(`[Subscription] BUG-001 FIX: Fixed ${inconsistentFixed} inconsistent shops`);
+    }
+
     // BATCH 1: Active subscriptions expired → Start grace period
     // Single UPDATE with RETURNING instead of N+1 loop
     // FIX H1: Use make_interval instead of string interpolation to prevent SQL injection
@@ -163,10 +196,10 @@ async function checkExpiredSubscriptions() {
     await client.query('COMMIT');
 
     logger.info(
-      `[Subscription] Check complete: ${expired} subscriptions expired, ${gracePeriod} in grace period, ${deactivated} deactivated`
+      `[Subscription] Check complete: ${expired} subscriptions expired, ${gracePeriod} in grace period, ${deactivated} deactivated, ${inconsistentFixed} inconsistent fixed`
     );
 
-    return { expired, gracePeriod, deactivated };
+    return { expired, gracePeriod, deactivated, inconsistentFixed };
   } catch (error) {
     // BUG-FIX: Rollback transaction on any error
     try {
@@ -313,6 +346,8 @@ async function activateFreeTrial(shopId, userId) {
 /**
  * Check for expired trials and transition to grace period
  *
+ * BUG-005 FIX: Now wrapped in transaction for atomicity
+ *
  * @returns {Promise<{transitioned: number}>}
  */
 async function checkExpiredTrials() {
@@ -320,6 +355,9 @@ async function checkExpiredTrials() {
   try {
     // P1-005: Use explicit UTC timestamp to prevent timezone drift
     const nowUTC = new Date().toISOString();
+
+    // BUG-005 FIX: Wrap in transaction for atomicity
+    await client.query('BEGIN');
 
     // BATCH UPDATE: Expire all trials in single query instead of N+1 loop
     // Keep tier as PRO but mark trial expired - shop enters grace period
@@ -351,8 +389,17 @@ async function checkExpiredTrials() {
       logger.info(`[Trial] ${transitioned} trials expired and transitioned to grace period`);
     }
 
+    // BUG-005 FIX: Commit transaction
+    await client.query('COMMIT');
+
     return { transitioned };
   } catch (error) {
+    // BUG-005 FIX: Rollback on error
+    try {
+      await client.query('ROLLBACK');
+    } catch (rollbackError) {
+      logger.error('[SubscriptionService] checkExpiredTrials rollback error:', rollbackError);
+    }
     logger.error('[SubscriptionService] checkExpiredTrials error:', error);
     throw error;
   } finally {

@@ -7,8 +7,7 @@
 
 import logger from '../utils/logger.js';
 import * as crystalPayService from './crystalPayService.js';
-import { invoiceQueries } from '../database/queries/index.js';
-import { query } from '../config/database.js';
+import { query, pool } from '../config/database.js';
 import { SUBSCRIPTION_PRICES } from '../config/subscriptionPricing.js';
 import { INVOICE_PURPOSES } from '../constants/invoice.js';
 import { INVOICE_EXPIRY_SECONDS } from '../config/payments.js';
@@ -138,6 +137,9 @@ export async function findActiveInvoiceForSubscription(subscriptionId, purpose =
 /**
  * Create CrystalPay invoice for subscription payment
  *
+ * BUG-003 FIX: Uses FOR UPDATE lock and checks for existing pending invoice
+ * to prevent duplicate invoices from concurrent requests.
+ *
  * @param {Object} params
  * @param {number} params.subscriptionId - Subscription ID
  * @param {string} params.purpose - Payment purpose (subscription_new, subscription_renewal, subscription_upgrade)
@@ -151,27 +153,96 @@ export async function createCrystalPayInvoice({ subscriptionId, purpose, amountU
     throw new Error(`Invalid payment method: ${method}`);
   }
 
-  // 1. Create our internal invoice record first
-  const invoice = await invoiceQueries.createForCrystalPay({
-    subscriptionId,
-    purpose,
-    currency: 'USD',
-    amount: amountUsd,
-  });
+  const client = await pool.connect();
 
   try {
+    await client.query('BEGIN');
+
+    // BUG-003 FIX: Lock subscription row to serialize concurrent requests
+    const lockResult = await client.query(
+      'SELECT id FROM shop_subscriptions WHERE id = $1 FOR UPDATE',
+      [subscriptionId]
+    );
+
+    if (lockResult.rows.length === 0) {
+      throw new Error(`Subscription ${subscriptionId} not found`);
+    }
+
+    // BUG-003 FIX: Check for existing pending invoice with same purpose
+    const existingInvoice = await client.query(
+      `SELECT i.*, i.crystalpay_id
+       FROM invoices i
+       WHERE i.subscription_id = $1
+       AND i.purpose = $2
+       AND i.status = 'pending'
+       AND i.expires_at > timezone('utc', NOW())
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [subscriptionId, purpose]
+    );
+
+    // If pending invoice exists and has CrystalPay ID, return it (idempotent)
+    if (existingInvoice.rows.length > 0 && existingInvoice.rows[0].crystalpay_id) {
+      const existing = existingInvoice.rows[0];
+      await client.query('COMMIT');
+
+      logger.info('[SubscriptionInvoice] Returning existing pending invoice (race condition prevented)', {
+        subscriptionId,
+        invoiceId: existing.id,
+        crystalPayId: existing.crystalpay_id,
+        purpose,
+      });
+
+      // Fetch payment URL from CrystalPay
+      const crystalInfo = await crystalPayService.getInvoiceInfo(existing.crystalpay_id);
+
+      return {
+        invoiceId: existing.id,
+        paymentUrl: crystalInfo.url,
+        crystalPayId: existing.crystalpay_id,
+        amount: existing.expected_amount,
+        method,
+        reused: true, // Flag to indicate this was an existing invoice
+      };
+    }
+
+    // 1. Create our internal invoice record (within transaction)
+    const invoiceResult = await client.query(
+      `INSERT INTO invoices (subscription_id, chain, address, address_index,
+       expected_amount, currency, expires_at, status, purpose)
+       VALUES ($1, 'CRYSTALPAY', NULL, NULL, $2, $3, NOW() + make_interval(secs => $5), 'pending', $4)
+       RETURNING *`,
+      [subscriptionId, amountUsd, 'USD', purpose, INVOICE_EXPIRY_SECONDS]
+    );
+    const invoice = invoiceResult.rows[0];
+
     // 2. Create CrystalPay invoice
     // CrystalPay lifetime is in SECONDS (see crystalPayService.js docs)
-    const crystalInvoice = await crystalPayService.createInvoice({
-      amount: amountUsd,
-      method,
-      description: `Subscription #${subscriptionId} - ${purpose}`,
-      extra: String(invoice.id), // Link back to our invoice
-      lifetime: INVOICE_EXPIRY_SECONDS
-    });
+    let crystalInvoice;
+    try {
+      crystalInvoice = await crystalPayService.createInvoice({
+        amount: amountUsd,
+        method,
+        description: `Subscription #${subscriptionId} - ${purpose}`,
+        extra: String(invoice.id), // Link back to our invoice
+        lifetime: INVOICE_EXPIRY_SECONDS
+      });
+    } catch (crystalError) {
+      // Mark invoice as failed before rollback
+      await client.query(
+        'UPDATE invoices SET status = $2 WHERE id = $1',
+        [invoice.id, 'failed']
+      );
+      throw crystalError;
+    }
 
     // 3. Update our invoice with CrystalPay ID
-    await invoiceQueries.setCrystalPayId(invoice.id, crystalInvoice.id);
+    await client.query(
+      'UPDATE invoices SET crystalpay_id = $2 WHERE id = $1',
+      [invoice.id, crystalInvoice.id]
+    );
+
+    await client.query('COMMIT');
 
     logger.info('[SubscriptionInvoice] CrystalPay invoice created', {
       invoiceId: invoice.id,
@@ -189,22 +260,20 @@ export async function createCrystalPayInvoice({ subscriptionId, purpose, amountU
     };
 
   } catch (error) {
-    // P0-3 FIX: Actually mark invoice as failed (not just log)
     try {
-      await invoiceQueries.updateStatus(invoice.id, 'failed');
-      logger.info('[SubscriptionInvoice] Marked invoice as failed', { invoiceId: invoice.id });
-    } catch (updateError) {
-      logger.error('[SubscriptionInvoice] Failed to mark invoice as failed', {
-        invoiceId: invoice.id,
-        error: updateError.message
-      });
+      await client.query('ROLLBACK');
+    } catch (rollbackError) {
+      logger.error('[SubscriptionInvoice] Rollback error:', rollbackError);
     }
 
     logger.error('[SubscriptionInvoice] CrystalPay invoice creation failed', {
-      invoiceId: invoice.id,
+      subscriptionId,
+      purpose,
       error: error.message
     });
     throw error;
+  } finally {
+    client.release();
   }
 }
 
