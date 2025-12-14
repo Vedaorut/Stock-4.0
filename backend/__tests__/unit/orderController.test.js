@@ -44,6 +44,10 @@ jest.unstable_mockModule('../../src/database/queries/index.js', () => ({
     findByShopAndUser: jest.fn(),
     getWorkerShops: jest.fn(),
   },
+  productQueries: {
+    findById: jest.fn(),
+    list: jest.fn(),
+  },
 }));
 
 jest.unstable_mockModule('../../src/services/telegram.js', () => ({
@@ -546,7 +550,7 @@ describe('Order Controller', () => {
   // LTC: 64 hex chars
   // USDT_TRC20: 64 hex chars
   const VALID_BTC_TX_HASH = 'a'.repeat(64);  // 64 hex chars for BTC
-  const VALID_ETH_TX_HASH = '0x' + 'b'.repeat(64);  // 66 chars (0x + 64)
+  const _VALID_ETH_TX_HASH = '0x' + 'b'.repeat(64);  // 66 chars (0x + 64)
 
   describe('submitPayment', () => {
     describe('Happy Path', () => {

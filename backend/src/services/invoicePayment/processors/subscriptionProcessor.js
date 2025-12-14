@@ -269,6 +269,27 @@ export async function processSubscriptionPayment({
       mode: effectiveMode,
     });
 
+    // Handle finalizer errors - most should rollback, but some need commit
+    if (!finalizeResult.ok) {
+      // SHOP_ADMIN_DEACTIVATED: money received, invoice marked paid, just reject activation
+      // This MUST be committed to persist the invoice paid status
+      if (finalizeResult.code === 'SHOP_ADMIN_DEACTIVATED') {
+        await client.query('COMMIT');
+        logger.info(
+          `[InvoicePayment] Committed rejected payment (admin deactivated) for subscription ${subscriptionId}`
+        );
+      } else {
+        // Other errors (INVALID_TX_HASH, SHOP_NOT_FOUND, etc): rollback all changes
+        // This prevents orphan payment records without corresponding invoice/subscription updates
+        await client.query('ROLLBACK');
+        logger.warn(`[InvoicePayment] Rolled back failed payment for subscription ${subscriptionId}`, {
+          code: finalizeResult.code,
+          state: finalizeResult.state,
+        });
+      }
+      return finalizeResult;
+    }
+
     await client.query('COMMIT');
     logger.info(
       `[InvoicePayment] Phase 2: Transaction committed successfully for invoice ${invoice.id}.`
