@@ -12,6 +12,7 @@ import logger from '../../../utils/logger.js';
 import { t, DEFAULT_LANGUAGE } from '../../../i18n/index.js';
 import { sleep } from '../../../utils/helpers.js';
 import telegramService from '../../telegram.js';
+import { alertCritical } from '../../../utils/alerts.js';
 
 const MAX_NOTIFICATION_RETRIES = 3;
 const RETRY_DELAYS = [1000, 3000, 9000]; // exponential backoff
@@ -164,6 +165,19 @@ ${nextDue ? t('subscription.renewed.extendedUntil', { date: nextDue }, lang) : '
         ownerTelegramId: owner.telegram_id,
         error: result.error?.message,
       });
+
+      // CRITICAL: Alert admin - user paid but didn't receive notification with shop creation button
+      alertCritical(
+        '🚨 Subscription notification FAILED',
+        `User paid for subscription but notification failed!\n\n` +
+        `Subscription ID: ${subscriptionId}\n` +
+        `Telegram ID: ${owner.telegram_id}\n` +
+        `Tier: ${subscription.tier}\n` +
+        `Has Shop: ${!!subscription.shop_id}\n` +
+        `Error: ${result.error?.message || 'Unknown'}\n\n` +
+        `ACTION REQUIRED: Manually send shop creation link to user`,
+        `sub_notif_fail_${subscriptionId}`
+      );
     }
   } catch (error) {
     logger.error('[InvoicePayment] Subscription notification error', { error: error.message, stack: error.stack });
