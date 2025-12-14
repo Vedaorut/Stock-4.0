@@ -63,7 +63,8 @@
     "sections": {
       "management": "MANAGEMENT",
       "purchases": "PURCHASES",
-      "settings": "SETTINGS"
+      "settings": "SETTINGS",
+      "admin": "ADMINISTRATION"
     },
     "items": {
       "products": "Products",
@@ -90,7 +91,9 @@
       "switchToSeller": "Switch to seller",
       "switchToBuyer": "Switch to buyer",
       "switchToSellerDesc": "Shop management",
-      "switchToBuyerDesc": "Shopping mode"
+      "switchToBuyerDesc": "Shopping mode",
+      "adminPanel": "Admin Panel",
+      "adminPanelDesc": "Platform statistics"
     },
     "switchMode": {
       "becomeSeller": "Become a seller?",
@@ -659,5 +662,20 @@
       "question": "Question",
       "other": "Other"
     }
+  },
+  "admin": {
+    "title": "Admin Panel",
+    "users": "Users",
+    "shops": "Shops",
+    "orders": "Orders",
+    "subscriptions": "Subscriptions",
+    "revenue": "Revenue",
+    "total": "Total",
+    "today": "Today",
+    "week": "This Week",
+    "month": "This Month",
+    "active": "Active",
+    "loading": "Loading statistics...",
+    "error": "Failed to load"
   }
 }

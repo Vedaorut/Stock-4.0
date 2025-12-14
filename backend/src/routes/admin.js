@@ -11,12 +11,16 @@ import {
   approvePayment,
   rejectPayment,
 } from '../controllers/admin/paymentReviewController.js';
+import { getStats } from '../controllers/admin/statsController.js';
 
 const router = Router();
 
 // All admin routes require authentication and admin role
 router.use(authenticate);
 router.use(requireAdmin);
+
+// Stats endpoint
+router.get('/stats', getStats);
 
 // Payment review endpoints
 router.get('/payments/needs-review', getNeedsReviewPayments);

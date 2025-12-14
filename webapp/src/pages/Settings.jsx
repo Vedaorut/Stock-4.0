@@ -61,6 +61,7 @@ const InviteLinkModalLazy = lazyWithRetry(() => import('../components/Settings/I
 const MyOrdersModalLazy = lazyWithRetry(() => import('../components/Settings/MyOrdersModal'));
 const ShopOrdersModalLazy = lazyWithRetry(() => import('../components/Settings/ShopOrdersModal'));
 const FeedbackModalLazy = lazyWithRetry(() => import('../components/Settings/FeedbackModal'));
+const AdminPanelModalLazy = lazyWithRetry(() => import('../components/Settings/AdminPanelModal'));
 
 // Seller-only item IDs (hidden in buyer mode)
 const SELLER_ONLY_ITEMS = [
@@ -74,6 +75,9 @@ const SELLER_ONLY_ITEMS = [
   'shop-orders',
   'invite-link',
 ];
+
+// Admin-only item IDs (only visible for is_admin users)
+const ADMIN_ONLY_ITEMS = ['admin-panel'];
 
 // Helper function to format subscription value for display
 const formatSubscriptionValue = (shop, t) => {
@@ -109,7 +113,7 @@ const formatSubscriptionValue = (shop, t) => {
   return `${tier} • ${t('settings.subscription.active')}`;
 };
 
-const getSettingsSections = (t, lang, viewMode, shop) => {
+const getSettingsSections = (t, lang, viewMode, shop, isAdmin) => {
   const languageNames = { ru: 'Russian', en: 'English' };
 
   const allSections = [
@@ -313,12 +317,36 @@ const getSettingsSections = (t, lang, viewMode, shop) => {
     },
   ];
 
+  // Add admin section if user is admin
+  if (isAdmin) {
+    allSections.push({
+      title: t('settings.sections.admin'),
+      items: [
+        {
+          id: 'admin-panel',
+          label: t('settings.items.adminPanel'),
+          description: t('settings.items.adminPanelDesc'),
+          icon: (
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+              />
+            </svg>
+          ),
+        },
+      ],
+    });
+  }
+
   // In buyer mode, filter out seller-only items
   if (viewMode === 'buyer') {
     return allSections
       .map((section) => ({
         ...section,
-        items: section.items.filter((item) => !SELLER_ONLY_ITEMS.includes(item.id)),
+        items: section.items.filter((item) => !SELLER_ONLY_ITEMS.includes(item.id) && !ADMIN_ONLY_ITEMS.includes(item.id)),
       }))
       .filter((section) => section.items.length > 0); // Remove empty sections
   }
@@ -327,10 +355,11 @@ const getSettingsSections = (t, lang, viewMode, shop) => {
 };
 
 export default function Settings() {
-  const { user, triggerHaptic } = useTelegram();
+  const { user: telegramUser, triggerHaptic } = useTelegram();
   const { t, lang } = useTranslation();
   const viewMode = useStore((state) => state.viewMode);
   const myShop = useStore((state) => state.myShop);
+  const storeUser = useStore((state) => state.user);
   const [showWallets, setShowWallets] = useState(false);
   const [showLanguage, setShowLanguage] = useState(false);
   const [showProducts, setShowProducts] = useState(false);
@@ -340,12 +369,14 @@ export default function Settings() {
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [showMigration, setShowMigration] = useState(false);
   const [showInviteLink, setShowInviteLink] = useState(false);
+  const [showAdminPanel, setShowAdminPanel] = useState(false);
 
   const [showMyOrders, setShowMyOrders] = useState(false);
   const [showShopOrders, setShowShopOrders] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
 
-  const settingsSections = useMemo(() => getSettingsSections(t, lang, viewMode, myShop), [t, lang, viewMode, myShop]);
+  const isAdmin = storeUser?.is_admin === true;
+  const settingsSections = useMemo(() => getSettingsSections(t, lang, viewMode, myShop, isAdmin), [t, lang, viewMode, myShop, isAdmin]);
 
   const handleSettingClick = (itemId) => {
     triggerHaptic('light');
@@ -388,6 +419,9 @@ export default function Settings() {
       case 'feedback':
         setShowFeedback(true);
         break;
+      case 'admin-panel':
+        setShowAdminPanel(true);
+        break;
       default:
         break;
     }
@@ -405,31 +439,31 @@ export default function Settings() {
 
       <div className="px-4 py-6">
         {/* User Card */}
-        {user && (
+        {telegramUser && (
           <motion.div
             className="glass-card rounded-2xl p-6 mb-6"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
           >
             <div className="flex items-center gap-4">
-              {user.photo_url ? (
+              {telegramUser.photo_url ? (
                 <div className="w-16 h-16 rounded-full overflow-hidden bg-dark-elevated">
                   <img
-                    src={user.photo_url}
-                    alt={user.first_name}
+                    src={telegramUser.photo_url}
+                    alt={telegramUser.first_name}
                     className="w-full h-full object-cover"
                   />
                 </div>
               ) : (
                 <div className="w-16 h-16 rounded-full bg-orange-primary flex items-center justify-center text-white text-2xl font-bold">
-                  {user.first_name?.[0] || 'U'}
+                  {telegramUser.first_name?.[0] || 'U'}
                 </div>
               )}
               <div className="flex-1">
                 <h2 className="text-xl font-bold text-white mb-1">
-                  {user.first_name} {user.last_name}
+                  {telegramUser.first_name} {telegramUser.last_name}
                 </h2>
-                {user.username && <p className="text-sm text-gray-400">@{user.username}</p>}
+                {telegramUser.username && <p className="text-sm text-gray-400">@{telegramUser.username}</p>}
               </div>
             </div>
           </motion.div>
@@ -541,6 +575,9 @@ export default function Settings() {
           )}
           {showFeedback && (
             <FeedbackModalLazy isOpen={showFeedback} onClose={() => setShowFeedback(false)} />
+          )}
+          {showAdminPanel && (
+            <AdminPanelModalLazy isOpen={showAdminPanel} onClose={() => setShowAdminPanel(false)} />
           )}
         </Suspense>
       </ModalErrorBoundary>

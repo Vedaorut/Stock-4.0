@@ -2,6 +2,7 @@ import { shopQueries } from '../database/queries/index.js';
 import { dbErrorHandler, asyncHandler } from '../middleware/errorHandler.js';
 import { NotFoundError, UnauthorizedError, ValidationError, ConflictError, PaymentRequiredError } from '../utils/errors.js';
 import logger from '../utils/logger.js';
+import { query } from '../config/database.js';
 import { activatePromoSubscription } from '../services/subscriptionService.js';
 import { validateAddress } from '../utils/addressValidation.js';
 import * as promoCodeQueries from '../../database/queries/promoCodeQueries.js';
@@ -539,6 +540,13 @@ export const shopController = {
     try {
       const shops = await shopQueries.findByOwnerId(req.user.id, { includeInactive: true });
 
+      // Get user's is_admin status
+      const userResult = await query(
+        'SELECT is_admin FROM users WHERE id = $1',
+        [req.user.id]
+      );
+      const isAdmin = userResult.rows[0]?.is_admin || false;
+
       // Add availableCryptos for each shop (owner can see which cryptos are configured)
       const shopsWithCryptos = shops.map((shop) => {
         const availableCryptos = [];
@@ -552,6 +560,7 @@ export const shopController = {
       return res.status(200).json({
         success: true,
         data: shopsWithCryptos,
+        is_admin: isAdmin,
       });
     } catch (error) {
       if (error.code) {

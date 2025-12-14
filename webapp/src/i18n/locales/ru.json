@@ -63,7 +63,8 @@
     "sections": {
       "management": "УПРАВЛЕНИЕ",
       "purchases": "ПОКУПКИ",
-      "settings": "НАСТРОЙКИ"
+      "settings": "НАСТРОЙКИ",
+      "admin": "АДМИНИСТРИРОВАНИЕ"
     },
     "items": {
       "products": "Товары",
@@ -90,7 +91,9 @@
       "switchToSeller": "Переключить на продавца",
       "switchToBuyer": "Переключить на покупателя",
       "switchToSellerDesc": "Управление магазином",
-      "switchToBuyerDesc": "Режим покупок"
+      "switchToBuyerDesc": "Режим покупок",
+      "adminPanel": "Админ-панель",
+      "adminPanelDesc": "Статистика платформы"
     },
     "switchMode": {
       "becomeSeller": "Стать продавцом?",
@@ -659,5 +662,20 @@
       "question": "Вопрос",
       "other": "Другое"
     }
+  },
+  "admin": {
+    "title": "Админ-панель",
+    "users": "Пользователи",
+    "shops": "Магазины",
+    "orders": "Заказы",
+    "subscriptions": "Подписки",
+    "revenue": "Доход",
+    "total": "Всего",
+    "today": "Сегодня",
+    "week": "За неделю",
+    "month": "За месяц",
+    "active": "Активных",
+    "loading": "Загрузка статистики...",
+    "error": "Ошибка загрузки"
   }
 }
