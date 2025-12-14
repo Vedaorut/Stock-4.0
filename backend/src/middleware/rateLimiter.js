@@ -147,7 +147,17 @@ export const shopCreationLimiter = createRateLimiter(
   'Too many shop creation requests. Please try again in an hour.',
   {
     prefix: 'shop-create',
-    keyGenerator: (req) => req.user?.id?.toString() || req.ip
+    keyGenerator: (req) => {
+      if (!req.user?.id) {
+        logger.warn('[RateLimiter] shop-create: Missing user ID, falling back to IP', {
+          ip: req.ip,
+          path: req.path,
+          method: req.method,
+        });
+        return req.ip;
+      }
+      return req.user.id.toString();
+    }
   }
 );
 
