@@ -13,6 +13,10 @@ jest.unstable_mockModule('../../database/queries/index.js', () => ({
     create: jest.fn(),
     update: jest.fn(),
   },
+  workerQueries: {
+    findByShopAndUser: jest.fn(),
+    getWorkerShops: jest.fn(),
+  },
 }));
 
 jest.unstable_mockModule('../../models/shopFollowQueries.js', () => ({

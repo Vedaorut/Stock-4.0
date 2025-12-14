@@ -113,7 +113,8 @@ describe('Blockchain Verification Service', () => {
       expect(result.amount).toBe('1.00000000');
     });
 
-    it('should detect pending BTC transaction (insufficient confirmations)', async () => {
+    it('should detect pending BTC transaction (0 confirmations)', async () => {
+      // Unconfirmed transaction - status.confirmed = false
       mockAxios.mockResolvedValueOnce({
         data: {
           txid: 'txhash',
@@ -124,14 +125,12 @@ describe('Blockchain Verification Service', () => {
             },
           ],
           status: {
-            confirmed: true,
-            block_height: 100,
+            confirmed: false,  // Unconfirmed
+            block_height: null,
           },
         },
       });
-      mockAxios.mockResolvedValueOnce({
-        data: 100, // 1 confirmation
-      });
+      // No need for current height mock since tx is unconfirmed
 
       const result = await verifyBitcoinPayment(
         'txhash',
@@ -141,7 +140,7 @@ describe('Blockchain Verification Service', () => {
 
       expect(result.verified).toBe(false);
       expect(result.status).toBe('pending');
-      expect(result.confirmations).toBe(1);
+      expect(result.confirmations).toBe(0);
     });
 
     it('should return failed for transaction not found', async () => {

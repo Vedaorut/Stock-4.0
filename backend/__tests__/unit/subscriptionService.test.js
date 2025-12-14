@@ -44,6 +44,7 @@ jest.unstable_mockModule('../../src/utils/logger.js', () => ({
 jest.unstable_mockModule('../../src/config/subscriptionPricing.js', () => ({
   SUBSCRIPTION_PRICES: { basic: 25, pro: 35 },
   SUBSCRIPTION_PRICES_YEARLY: { basic: 250, pro: 350 },
+  SUBSCRIPTION_TIERS: ['pro', 'max'],
   SUBSCRIPTION_PERIOD_DAYS: 30,
   GRACE_PERIOD_DAYS: 2,
   TRIAL_PERIOD_DAYS: 7,

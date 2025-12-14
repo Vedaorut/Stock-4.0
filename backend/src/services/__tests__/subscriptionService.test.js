@@ -23,6 +23,8 @@ const mockPool = {
 
 jest.unstable_mockModule('../../config/database.js', () => ({
   pool: mockPool,
+  query: mockPool.query,
+  getClient: () => Promise.resolve(mockClient),
 }));
 
 // Mock logger

@@ -267,7 +267,8 @@ async function processPendingCrystalPaySubscriptions() {
          WHERE i.chain = 'CRYSTALPAY'
            AND i.status = 'pending'
            AND i.subscription_id IS NOT NULL
-           AND i.expires_at > NOW()
+           -- NOTE: Don't check i.expires_at here - CrystalPay gives 72h, our expires_at is only 1h
+           -- We trust CrystalPay API to tell us if invoice is still valid
            AND i.created_at > NOW() - make_interval(hours => $1)
            AND (i.last_checked_at IS NULL OR i.last_checked_at < NOW() - make_interval(secs => $2))
          ORDER BY i.created_at ASC

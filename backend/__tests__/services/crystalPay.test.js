@@ -167,7 +167,7 @@ describe('CrystalPay Service', () => {
           id: 'crystal_invoice_123',
           url: 'https://pay.crystalpay.io/crystal_invoice_123',
           amount: '100.00',
-          currency: 'RUB',
+          currency: 'USD',
         },
       };
 
@@ -185,7 +185,7 @@ describe('CrystalPay Service', () => {
         id: 'crystal_invoice_123',
         url: 'https://pay.crystalpay.io/crystal_invoice_123',
         amount: '100.00',
-        currency: 'RUB',
+        currency: 'USD',
       });
 
       // Verify API was called correctly
@@ -197,7 +197,7 @@ describe('CrystalPay Service', () => {
           amount: '100',
           type: 'purchase',
           lifetime: 3600,
-          currency: 'RUB',
+          currency: 'USD',
           required_method: 'BITCOIN',
           description: 'Test payment',
           extra: 'order_123',
@@ -278,7 +278,7 @@ describe('CrystalPay Service', () => {
           id: 'crystal_invoice_123',
           url: 'https://pay.crystalpay.io/crystal_invoice_123',
           amount: '100.00',
-          currency: 'RUB',
+          currency: 'USD',
         },
       };
 
@@ -305,7 +305,7 @@ describe('CrystalPay Service', () => {
           id: 'crystal_invoice_123',
           url: 'https://pay.crystalpay.io/crystal_invoice_123',
           amount: '100.00',
-          currency: 'RUB',
+          currency: 'USD',
         },
       };
 
@@ -335,7 +335,7 @@ describe('CrystalPay Service', () => {
           id: 'crystal_invoice_123',
           state: 'payed',
           amount: '100.00',
-          currency: 'RUB',
+          currency: 'USD',
           method: 'BITCOIN',
           created_at: '2024-01-15T10:00:00Z',
           expired_at: '2024-01-15T11:00:00Z',
@@ -350,7 +350,7 @@ describe('CrystalPay Service', () => {
         id: 'crystal_invoice_123',
         state: 'payed',
         amount: '100.00',
-        currency: 'RUB',
+        currency: 'USD',
         method: 'BITCOIN',
         createdAt: '2024-01-15T10:00:00Z',
         expiredAt: '2024-01-15T11:00:00Z',
@@ -513,7 +513,7 @@ describe('CrystalPay Service', () => {
           id: 'crystal_invoice_123',
           url: 'https://pay.crystalpay.io/crystal_invoice_123',
           amount: '99.99',
-          currency: 'RUB',
+          currency: 'USD',
         },
       };
 
@@ -540,7 +540,7 @@ describe('CrystalPay Service', () => {
           id: 'crystal_invoice_123',
           url: 'https://pay.crystalpay.io/crystal_invoice_123',
           amount: '100.00',
-          currency: 'RUB',
+          currency: 'USD',
         },
       };
 
