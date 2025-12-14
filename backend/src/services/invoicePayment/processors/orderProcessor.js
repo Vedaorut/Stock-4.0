@@ -39,6 +39,33 @@ import { alertStockDeductionFailed } from '../../../utils/alerts.js';
 import { productQueries } from '../../../database/queries/index.js';
 
 /**
+ * TX hash validation patterns by cryptocurrency
+ * Validates format before sending to blockchain API (saves unnecessary API calls)
+ */
+const TX_HASH_PATTERNS = {
+  BTC: /^[a-fA-F0-9]{64}$/,
+  LTC: /^[a-fA-F0-9]{64}$/,
+  ETH: /^0x[a-fA-F0-9]{64}$/,
+  USDT: /^[a-fA-F0-9]{64}$/,  // TRC20
+};
+
+/**
+ * Validate transaction hash format for given currency
+ * @param {string} txHash - Transaction hash to validate
+ * @param {string} currency - Cryptocurrency (BTC, LTC, ETH, USDT)
+ * @returns {boolean} True if valid format
+ */
+function isValidTxHash(txHash, currency) {
+  if (!txHash || typeof txHash !== 'string') {return false;}
+  const pattern = TX_HASH_PATTERNS[currency?.toUpperCase()];
+  if (!pattern) {
+    // Fallback for unknown currencies - generic hex pattern
+    return /^(0x)?[a-fA-F0-9]{32,128}$/.test(txHash);
+  }
+  return pattern.test(txHash);
+}
+
+/**
  * Process crypto payment for an order using invoice as single source of truth.
  *
  * @param {Object} params - Payment parameters
@@ -170,6 +197,22 @@ export async function processOrderPayment({
       state: 'failed',
       code: 'NO_TX_HASH',
       message: 'Transaction hash required for verification.',
+    };
+  }
+
+  // 1.7.1. Validate txHash format before calling blockchain API
+  if (!isValidTxHash(verifyTxHash, payment.currency)) {
+    logger.warn('[InvoicePayment] Invalid txHash format rejected', {
+      orderId,
+      currency: payment.currency,
+      txHashLength: verifyTxHash?.length,
+      txHashPreview: verifyTxHash?.substring(0, 10) + '...',
+    });
+    return {
+      ok: false,
+      state: 'failed',
+      code: 'INVALID_TX_HASH',
+      message: 'Transaction hash format is invalid for the payment currency.',
     };
   }
 
