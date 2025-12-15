@@ -14,7 +14,7 @@ import { ToastContainer } from './components/common/Toast';
 import OfflineBanner from './components/common/OfflineBanner';
 import { useToastStore, useToast } from './hooks/useToast';
 import './styles/globals.css';
-import { useApi } from './hooks/useApi';
+import { useApi, invalidateCache } from './hooks/useApi';
 
 // DEBUG: Expose store for console access
 if (import.meta.env.VITE_DEMO_MODE === 'true') {
@@ -140,6 +140,8 @@ function App() {
               if (import.meta.env.DEV) {
                 console.log('[DeepLink] Subscribed to shop:', shop.name);
               }
+              // Invalidate subscriptions cache to refresh UI
+              invalidateCache('/users');
               // Show success notification only for new subscriptions
               if (subscribeResponse?.isNew) {
                 toast.success(`Вы подписались на магазин "${shop.name}"`);
@@ -149,6 +151,8 @@ function App() {
               if (import.meta.env.DEV) {
                 console.log('[DeepLink] Already subscribed to shop:', shop.name);
               }
+              // Invalidate cache anyway to ensure UI is up-to-date
+              invalidateCache('/users');
             } else {
               // Subscription failed - log but continue to show shop
               console.warn('[DeepLink] Subscription failed:', subscribeError);
