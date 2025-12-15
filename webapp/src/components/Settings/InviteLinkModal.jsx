@@ -39,7 +39,10 @@ export default function InviteLinkModal({ isOpen, onClose }) {
 
   // Bot username from config or fallback
   const botUsername = import.meta.env.VITE_BOT_USERNAME || 'saveropus_bot';
-  const inviteLink = myShop ? `t.me/${botUsername}?start=shop_${myShop.id}` : '';
+  // Mini App deep link format - opens webapp directly without bot interaction
+  // Prefer invite_code for prettier links, fallback to legacy shop_ID format
+  const invitePayload = myShop?.invite_code || (myShop ? `shop_${myShop.id}` : '');
+  const inviteLink = invitePayload ? `t.me/${botUsername}/app?startapp=${invitePayload}` : '';
 
   const handleCopy = async () => {
     if (!inviteLink) return;

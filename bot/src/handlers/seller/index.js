@@ -488,7 +488,7 @@ const handleInviteLink = async (ctx) => {
     const title = t('inviteLink.title', {}, lang);
     const description = t('inviteLink.description', {}, lang);
     const copyHint = t('inviteLink.copyHint', {}, lang);
-    const link = `https://t.me/${botUsername}?start=${invitePayload}`;
+    const link = `https://t.me/${botUsername}/app?startapp=${invitePayload}`;
 
     const message = `${title}\n\n${description}\n\n${copyHint}\n<code>${link}</code>`;
 

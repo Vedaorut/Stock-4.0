@@ -237,7 +237,7 @@ const createShop = async (ctx, shopName, lang = ctx.lang || ctx.session?.languag
     }
     // Prefer invite_code for prettier links, fallback to legacy shop_ID format
     const invitePayload = shop.invite_code || `shop_${shop.id}`;
-    const inviteLink = `https://t.me/${botUsername}?start=${invitePayload}`;
+    const inviteLink = `https://t.me/${botUsername}/app?startapp=${invitePayload}`;
 
     // Enter shopOnboarding with shop data
     // FIX: Store state in session because ctx.scene.state is unreliable between WizardScenes

@@ -72,6 +72,8 @@ export function initTelegramApp() {
       version: tg.version,
       isExpanded: tg.isExpanded,
       performanceClass,
+      // Deep link parameter from Mini App URL (t.me/bot/app?startapp=XXX)
+      startParam: tg.initDataUnsafe?.start_param || null,
     };
   } catch (error) {
     if (import.meta.env.DEV) {

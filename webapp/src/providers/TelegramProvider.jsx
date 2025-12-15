@@ -260,6 +260,7 @@ export function TelegramProvider({ children }) {
       tg: telegramData?.tg,
       platform: telegramData?.platform,
       version: telegramData?.version,
+      startParam: telegramData?.startParam, // Deep link parameter (t.me/bot/app?startapp=XXX)
       isReady,
       isValidating,
       error,

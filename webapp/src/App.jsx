@@ -12,7 +12,7 @@ import CartButton from './components/Cart/CartButton';
 import PaymentFlowManager from './components/Payment/PaymentFlowManager';
 import { ToastContainer } from './components/common/Toast';
 import OfflineBanner from './components/common/OfflineBanner';
-import { useToastStore } from './hooks/useToast';
+import { useToastStore, useToast } from './hooks/useToast';
 import './styles/globals.css';
 import { useApi } from './hooks/useApi';
 
@@ -48,12 +48,15 @@ function App() {
   const hasFollows = useStore((state) => state.hasFollows);
   const isI18nReady = useStore((state) => state.isI18nReady);
   const setCartOpen = useStore((state) => state.setCartOpen);
-  const { user, isReady, isValidating, error } = useTelegram();
+  const { user, isReady, isValidating, error, startParam } = useTelegram();
   const { isConnected } = useWebSocket();
   const platform = usePlatform();
   const { toasts, removeToast } = useToastStore();
+  const toast = useToast();
   const { get } = useApi();
   const [followsChecked, setFollowsChecked] = useState(false);
+  const [deepLinkProcessed, setDeepLinkProcessed] = useState(false);
+  const [writeAccessRequested, setWriteAccessRequested] = useState(false);
 
   // Initialize i18n - use language from backend (synced with bot)
   useEffect(() => {
@@ -86,6 +89,141 @@ function App() {
       }
     }
   }, [isReady, user]);
+
+  // Handle deep link (startapp parameter) - navigate to specific shop
+  // Format: ?startapp=shop_123 or ?startapp=INVITE_CODE
+  useEffect(() => {
+    if (!isReady || !token || deepLinkProcessed) return;
+
+    // startParam comes from TelegramProvider context (tg.initDataUnsafe.start_param)
+    if (!startParam) {
+      setDeepLinkProcessed(true);
+      return;
+    }
+
+    const controller = new AbortController();
+
+    const handleDeepLink = async () => {
+      try {
+        let shop = null;
+
+        // Parse startParam: either "shop_123" format or invite_code
+        if (startParam.startsWith('shop_')) {
+          // Legacy format: shop_123
+          const shopId = startParam.replace('shop_', '');
+          const { data: shopResponse } = await get(`/shops/${shopId}`, {
+            signal: controller.signal,
+          });
+          if (controller.signal.aborted) return;
+          shop = shopResponse?.data;
+        } else {
+          // Invite code format: use dedicated endpoint GET /shops/invite/:code
+          const { data: shopResponse } = await get(`/shops/invite/${startParam}`, {
+            signal: controller.signal,
+          });
+          if (controller.signal.aborted) return;
+          shop = shopResponse?.data;
+        }
+
+        if (shop) {
+          // Set current shop and navigate to catalog
+          useStore.getState().setCurrentShop(shop);
+          useStore.getState().setActiveTab('catalog');
+
+          if (import.meta.env.DEV) {
+            console.log('[DeepLink] Navigated to shop:', shop.name);
+          }
+        } else {
+          // Shop not found (404) or invalid response
+          toast.error('Магазин не найден. Ссылка может быть недействительной.');
+          console.warn('[DeepLink] Shop not found for:', startParam);
+        }
+      } catch (err) {
+        if (err.name === 'AbortError' || err.code === 'ERR_CANCELED') return;
+
+        // Handle specific HTTP errors with user-friendly messages
+        if (err.response) {
+          const status = err.response.status;
+          if (status === 404) {
+            toast.error('Магазин не найден. Ссылка может быть недействительной.');
+          } else if (status === 403) {
+            toast.error('Этот магазин заблокирован или приватный.');
+          } else if (status >= 500) {
+            toast.error('Ошибка сервера. Попробуйте позже.');
+          } else {
+            toast.error('Не удалось загрузить магазин. Проверьте соединение.');
+          }
+        } else if (err.message?.includes('Network Error')) {
+          toast.error('Нет интернет соединения. Попробуйте позже.');
+        } else {
+          toast.error('Не удалось открыть ссылку на магазин.');
+        }
+
+        console.error('[DeepLink] Error processing deep link:', err);
+      } finally {
+        if (!controller.signal.aborted) {
+          setDeepLinkProcessed(true);
+        }
+      }
+    };
+
+    handleDeepLink();
+
+    return () => controller.abort();
+  }, [isReady, token, startParam, deepLinkProcessed, get, toast]);
+
+  // Request write access after deep link navigation (for push notifications)
+  // Shows native Telegram popup asking for permission to send messages
+  useEffect(() => {
+    if (!deepLinkProcessed || writeAccessRequested) return;
+
+    // startParam comes from TelegramProvider context
+    // Only request if we came from a deep link (shop link)
+    if (!startParam) return;
+
+    // Check if it's a shop deep link
+    // - Legacy format: shop_123 (starts with 'shop_')
+    // - Invite code format: alphanumeric only (no underscores or special chars)
+    const isShopDeepLink = startParam.startsWith('shop_') ||
+      /^[a-zA-Z0-9]+$/.test(startParam);
+
+    if (!isShopDeepLink) return;
+
+    const tg = window.Telegram?.WebApp;
+
+    // Small delay to ensure shop page is rendered first
+    const timeout = setTimeout(() => {
+      try {
+        if (!tg) {
+          console.warn('[WriteAccess] Telegram WebApp SDK not available');
+          setWriteAccessRequested(true);
+          return;
+        }
+
+        if (!tg.requestWriteAccess) {
+          console.warn('[WriteAccess] requestWriteAccess not supported');
+          setWriteAccessRequested(true);
+          return;
+        }
+
+        tg.requestWriteAccess((allowed) => {
+          if (import.meta.env.DEV) {
+            console.log('[WriteAccess]', allowed ? 'Granted' : 'Declined');
+          }
+          // Note: If user declines, we don't show any blocking UI
+          // The bot simply won't be able to send push notifications
+        });
+
+        setWriteAccessRequested(true);
+      } catch (error) {
+        console.error('[WriteAccess] Failed to request write access:', error);
+        // Mark as requested to avoid infinite retry loop
+        setWriteAccessRequested(true);
+      }
+    }, 500);
+
+    return () => clearTimeout(timeout);
+  }, [startParam, deepLinkProcessed, writeAccessRequested]);
 
   // Initialize Telegram WebApp
   useEffect(() => {

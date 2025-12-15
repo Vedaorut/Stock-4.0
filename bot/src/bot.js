@@ -229,6 +229,58 @@ bot.use((ctx, next) => {
 bot.start(handleStart);
 bot.command('health', handleHealthCommand); // P1-BOT-015: Health check
 
+// Handle WriteAccessAllowed service message
+// Covers: Mini App requestWriteAccess(), attachment menu, and other permission grants
+bot.on('write_access_allowed', async (ctx) => {
+  try {
+    const userId = ctx.from?.id;
+    const writeAccessAllowed = ctx.message?.write_access_allowed;
+
+    // Validate required fields
+    if (!userId) {
+      logger.warn('[WriteAccess] Missing user ID in write_access_allowed event', {
+        message: ctx.message,
+      });
+      return;
+    }
+
+    if (!writeAccessAllowed) {
+      logger.error('[WriteAccess] Missing write_access_allowed data', {
+        userId,
+        messageId: ctx.message?.message_id,
+      });
+      return;
+    }
+
+    if (writeAccessAllowed.from_request) {
+      // User granted permission via requestWriteAccess() in Mini App
+      logger.info('[WriteAccess] User granted via Mini App', {
+        userId,
+        fromRequest: writeAccessAllowed.from_request,
+        webAppName: writeAccessAllowed.web_app_name,
+      });
+    } else if (writeAccessAllowed.from_attachment_menu) {
+      // User granted permission via attachment menu
+      logger.info('[WriteAccess] User granted via attachment menu', {
+        userId,
+        fromAttachmentMenu: writeAccessAllowed.from_attachment_menu,
+      });
+    } else {
+      // Other cases (e.g., adding bot to attachment menu)
+      logger.info('[WriteAccess] WriteAccessAllowed received (other case)', {
+        userId,
+        writeAccessAllowed,
+      });
+    }
+  } catch (error) {
+    logger.error('[WriteAccess] Critical error in write_access_allowed handler', {
+      userId: ctx.from?.id,
+      error: error.message,
+      stack: error.stack,
+    });
+  }
+});
+
 // Register handlers
 setupSettingsHandlers(bot);
 setupSellerHandlers(bot);
