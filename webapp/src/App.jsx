@@ -53,7 +53,7 @@ function App() {
   const platform = usePlatform();
   const { toasts, removeToast } = useToastStore();
   const toast = useToast();
-  const { get } = useApi();
+  const { get, post } = useApi();
   const [followsChecked, setFollowsChecked] = useState(false);
   const [deepLinkProcessed, setDeepLinkProcessed] = useState(false);
   const [writeAccessRequested, setWriteAccessRequested] = useState(false);
@@ -126,6 +126,40 @@ function App() {
         }
 
         if (shop) {
+          // Subscribe to shop FIRST (handles already subscribed gracefully)
+          try {
+            const { data: subscribeResponse, error: subscribeError } = await post(
+              `/shops/${shop.id}/subscribe`,
+              {},
+              { signal: controller.signal }
+            );
+
+            if (controller.signal.aborted) return;
+
+            if (!subscribeError) {
+              if (import.meta.env.DEV) {
+                console.log('[DeepLink] Subscribed to shop:', shop.name);
+              }
+              // Show success notification only for new subscriptions
+              if (subscribeResponse?.isNew) {
+                toast.success(`Вы подписались на магазин "${shop.name}"`);
+              }
+            } else if (subscribeError.response?.status === 409) {
+              // Already subscribed - this is OK, continue silently
+              if (import.meta.env.DEV) {
+                console.log('[DeepLink] Already subscribed to shop:', shop.name);
+              }
+            } else {
+              // Subscription failed - log but continue to show shop
+              console.warn('[DeepLink] Subscription failed:', subscribeError);
+            }
+          } catch (subscribeErr) {
+            // Subscription error - log but continue to show shop
+            if (subscribeErr.name !== 'AbortError' && subscribeErr.code !== 'ERR_CANCELED') {
+              console.warn('[DeepLink] Subscription error:', subscribeErr);
+            }
+          }
+
           // Set current shop and navigate to catalog
           useStore.getState().setCurrentShop(shop);
           useStore.getState().setActiveTab('catalog');
@@ -170,7 +204,7 @@ function App() {
     handleDeepLink();
 
     return () => controller.abort();
-  }, [isReady, token, startParam, deepLinkProcessed, get, toast]);
+  }, [isReady, token, startParam, deepLinkProcessed, get, post, toast]);
 
   // Request write access after deep link navigation (for push notifications)
   // Shows native Telegram popup asking for permission to send messages
