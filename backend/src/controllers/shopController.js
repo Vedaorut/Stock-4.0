@@ -125,8 +125,9 @@ export const shopController = {
 
             // Verify subscription exists and belongs to user
             // FIX: Use resolvedSubscriptionId (not subscriptionId) - critical bug fix
+            // FIX: Include period_end to set next_payment_due on shop
             const subscriptionCheck = await client.query(
-              `SELECT id, tier, status, user_id, shop_id
+              `SELECT id, tier, status, user_id, shop_id, period_end
                FROM shop_subscriptions
                WHERE id = $1`,
               [resolvedSubscriptionId]
@@ -162,13 +163,13 @@ export const shopController = {
             const existingCodes = await shopQueries.getAllInviteCodes();
             const inviteCode = generateInviteCode(name.trim(), existingCodes);
 
-            // Create shop
+            // Create shop with next_payment_due from subscription.period_end
             const shopResult = await client.query(
               `INSERT INTO shops
-               (owner_id, name, description, logo, tier, subscription_status, is_active, registration_paid, invite_code)
-               VALUES ($1, $2, $3, $4, $5, 'active', true, true, $6)
+               (owner_id, name, description, logo, tier, subscription_status, is_active, registration_paid, invite_code, next_payment_due)
+               VALUES ($1, $2, $3, $4, $5, 'active', true, true, $6, $7)
                RETURNING *`,
-              [req.user.id, name.trim(), description, logo, subscription.tier, inviteCode]
+              [req.user.id, name.trim(), description, logo, subscription.tier, inviteCode, subscription.period_end]
             );
 
             const shop = shopResult.rows[0];

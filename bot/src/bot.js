@@ -6,6 +6,7 @@ import logger from './utils/logger.js';
 import { reply as cleanReply } from './utils/cleanReply.js';
 import { logWebAppConfig } from './utils/webappUrl.js';
 import { t } from './i18n/index.js';
+import { authApi } from './utils/api.js';
 
 // Middleware
 import authMiddleware from './middleware/auth.js';
@@ -103,6 +104,16 @@ const stage = new Scenes.Stage([
 // Configure session middleware with Redis store
 bot.use(createRedisSession(redis));
 
+// CRITICAL: These middleware must run BEFORE stage.middleware()
+// Otherwise scene handlers block them from seeing callbacks
+bot.use(analyticsMiddleware); // P1-BOT-012: Track ALL requests
+bot.use(createUserRateLimitMiddleware(redis)); // P1-BOT-014: Rate limit ALL requests
+bot.use(debounceMiddleware); // Log and debounce ALL callbacks
+bot.use(authMiddleware); // Authenticate ALL requests
+bot.use(sessionRecoveryMiddleware); // Recover session for ALL requests
+bot.use(i18nMiddleware()); // i18n for ALL requests
+bot.use(errorMiddleware); // Error handling for ALL requests
+
 // P1 FIX: Wrap answerCbQuery to prevent unhandled rejection on timeout
 // Telegram callback queries expire after ~30s, but users may click buttons later
 // This middleware silently catches timeout errors instead of crashing
@@ -150,6 +161,53 @@ bot.use((ctx, next) => {
   return next();
 });
 
+// CRITICAL: Handle priority callbacks GLOBALLY, even when user is in a scene
+// These are callbacks from backend notifications that can arrive while user is in a scene
+// This middleware runs BEFORE stage.middleware(), so we reset __scenes to prevent
+// scene step handlers from swallowing these callbacks
+const PRIORITY_CALLBACKS = ['start_create_shop', 'order:deliver:', 'back_to_main'];
+
+bot.use(async (ctx, next) => {
+  const callbackData = ctx.callbackQuery?.data;
+
+  if (!callbackData) {
+    return next();
+  }
+
+  // Check if this is a priority callback that needs scene bypass
+  const isPriorityCallback = PRIORITY_CALLBACKS.some((prefix) => callbackData.startsWith(prefix));
+
+  if (isPriorityCallback && ctx.session?.__scenes?.current) {
+    logger.info('[GlobalCallback] Priority callback intercepted, resetting scene state', {
+      userId: ctx.from?.id,
+      callbackData,
+      previousScene: ctx.session.__scenes.current,
+    });
+
+    // Reset scene state BEFORE stage.middleware() sees it
+    ctx.session.__scenes = {};
+  }
+
+  // Special handling for start_create_shop
+  if (callbackData.startsWith('start_create_shop')) {
+    const [, tierFromCallback] = callbackData.split(':');
+    ctx.session.pendingCreateShop = {
+      tier: tierFromCallback || 'pro',
+      paidSubscription: true,
+    };
+    ctx.session.role = 'seller';
+
+    // Save role to backend (non-blocking)
+    if (ctx.session.token) {
+      authApi.updateRole('seller', ctx.session.token).catch((err) => {
+        logger.error('[GlobalCallback] Failed to save role:', err.message);
+      });
+    }
+  }
+
+  return next();
+});
+
 bot.use(stage.middleware());
 
 // Session state logging middleware (for debugging)
@@ -166,22 +224,6 @@ bot.use((ctx, next) => {
   }
   return next();
 });
-
-// Apply middleware
-bot.use(analyticsMiddleware); // P1-BOT-012: Track usage
-bot.use(createUserRateLimitMiddleware(redis)); // P1-BOT-014: Redis-based rate limiting (30 req/min)
-bot.use(debounceMiddleware); // Prevent rapid clicks
-
-// CRITICAL: Auth MUST run BEFORE sessionRecovery
-// authMiddleware creates token if missing
-// sessionRecoveryMiddleware then uses token to restore shopId
-bot.use(authMiddleware); // FIRST: Authenticate user (creates token if needed)
-bot.use(sessionRecoveryMiddleware); // THEN: Recover shopId using valid token
-bot.use(i18nMiddleware()); // i18n: adds ctx.t() and ctx.lang
-
-// Error handling
-
-bot.use(errorMiddleware);
 
 // Register commands
 bot.start(handleStart);
@@ -254,36 +296,72 @@ bot.catch((err, ctx) => {
 // Export bot instance and redis for backend integration
 export { bot, redis };
 
+// 409 Conflict prevention: retry delays (2s, 5s, 10s)
+const LAUNCH_RETRY_DELAYS = [2000, 5000, 10000];
+const MAX_LAUNCH_RETRIES = 3;
+
 // Launch function (can be called from backend or standalone)
 export async function startBot() {
+  // Log WebApp configuration before launch
+  logWebAppConfig();
+
+  // Set bot commands for menu
   try {
-    // Log WebApp configuration before launch
-    logWebAppConfig();
-
-    // Set bot commands for menu
-    try {
-      await bot.telegram.setMyCommands([
-        { command: 'start', description: t('general.mainMenu') },
-      ]);
-      logger.info('Bot commands configured');
-    } catch (cmdError) {
-      logger.warn('Failed to set bot commands:', cmdError.message);
-    }
-
-    // Menu Button is configured by dev.sh (web_app) or production deploy script
-    // Bot does NOT override it to preserve WebApp link
-
-    // Launch bot (this starts polling and won't return in polling mode)
-    await bot.launch({
-      dropPendingUpdates: true,
-    });
-
-    logger.info(`Bot started successfully in ${config.nodeEnv} mode`);
-    logger.info(`Backend URL: ${config.backendUrl}`);
-  } catch (error) {
-    logger.error('Failed to launch bot:', error);
-    throw error;
+    await bot.telegram.setMyCommands([
+      { command: 'start', description: t('general.mainMenu') },
+    ]);
+    logger.info('Bot commands configured');
+  } catch (cmdError) {
+    logger.warn('Failed to set bot commands:', cmdError.message);
   }
+
+  // 409 CONFLICT FIX: Clear any existing webhook/polling before starting
+  // This ensures clean state after PM2 restart
+  try {
+    await bot.telegram.deleteWebhook({ drop_pending_updates: true });
+    logger.info('Cleared webhook state before launch');
+  } catch (webhookErr) {
+    logger.warn('Failed to clear webhook:', webhookErr.message);
+  }
+
+  // Launch with retry mechanism for 409 Conflict
+  let lastError;
+  for (let attempt = 0; attempt <= MAX_LAUNCH_RETRIES; attempt++) {
+    try {
+      if (attempt > 0) {
+        const delay = LAUNCH_RETRY_DELAYS[attempt - 1] || 10000;
+        logger.info(`Retrying bot launch in ${delay}ms (attempt ${attempt}/${MAX_LAUNCH_RETRIES})`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+
+      // Launch bot (this starts polling and won't return in polling mode)
+      await bot.launch({
+        dropPendingUpdates: true,
+      });
+
+      logger.info(`Bot started successfully in ${config.nodeEnv} mode`);
+      logger.info(`Backend URL: ${config.backendUrl}`);
+      return; // Success - exit function
+    } catch (error) {
+      lastError = error;
+
+      // Check if it's 409 Conflict error - worth retrying
+      if (error.message?.includes('409') || error.response?.error_code === 409) {
+        logger.warn(`Bot launch 409 Conflict (attempt ${attempt + 1}/${MAX_LAUNCH_RETRIES + 1})`, {
+          error: error.message,
+        });
+        continue; // Retry
+      }
+
+      // Other errors - don't retry
+      logger.error('Failed to launch bot (non-retryable):', error);
+      throw error;
+    }
+  }
+
+  // All retries exhausted
+  logger.error('Failed to launch bot after all retries:', lastError);
+  throw lastError;
 }
 
 // Auto-start when run directly (not imported)

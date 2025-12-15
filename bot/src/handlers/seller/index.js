@@ -170,12 +170,20 @@ const formatSubscriptionStatus = (ctx, data) => {
   const dateSource =
     data.nextPaymentDue || data.periodEnd || data.currentSubscription?.period_end || null;
 
+  // Check for lifetime subscription: no dateSource or date > 10 years in future
+  const isLifetime = !dateSource ||
+    (dateSource && new Date(dateSource) > new Date(Date.now() + 10 * 365 * 24 * 60 * 60 * 1000));
+
   // Calculate days remaining (use '—' as fallback for null)
   const rawDays = calculateDaysRemaining(dateSource);
   const daysRemaining = rawDays !== null ? rawDays : '—';
 
   // Use detailed messages based on tier (PRO or MAX)
   if (tier === 'pro') {
+    // Use lifetime template if applicable
+    if (isLifetime && status === 'active') {
+      return t('seller.subscriptionProInfoLifetime', { status }, lang);
+    }
     return t(
       'seller.subscriptionProInfo',
       {
@@ -188,6 +196,10 @@ const formatSubscriptionStatus = (ctx, data) => {
   }
 
   if (tier === 'max') {
+    // Use lifetime template if applicable
+    if (isLifetime && status === 'active') {
+      return t('seller.subscriptionMaxInfoLifetime', { status }, lang);
+    }
     return t(
       'seller.subscriptionMaxInfo',
       {

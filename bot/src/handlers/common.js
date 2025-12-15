@@ -615,39 +615,42 @@ const handleBackToMain = async (ctx) => {
 /**
  * Handle start create shop (from subscription pending notification)
  * This is triggered after user pays for subscription but hasn't created shop yet
+ * NOTE: GlobalCallback middleware in bot.js has already:
+ *   - Reset __scenes to exit any current scene
+ *   - Set pendingCreateShop in session with tier and paidSubscription flag
+ *   - Set seller role and saved to backend
  */
 const handleStartCreateShop = async (ctx) => {
   try {
     await ctx.answerCbQuery();
 
-    // Extract tier from callback data (format: start_create_shop:{tier}) with safe fallback
-    const callbackData = ctx.callbackQuery?.data || '';
-    const [, tierFromCallback] = callbackData.split(':');
-    const tier = tierFromCallback || 'pro';
+    // Get tier from session (set by GlobalCallback middleware) or fallback to callback data
+    const pending = ctx.session.pendingCreateShop;
+    let tier = pending?.tier;
+    let paidSubscription = pending?.paidSubscription || false;
 
-    // Set seller role
-    ctx.session.role = 'seller';
-
-    // Save role to database
-    try {
-      if (ctx.session.token) {
-        await authApi.updateRole('seller', ctx.session.token);
-        logger.info(`Saved seller role for user ${ctx.from.id} (from create shop button)`);
-      }
-    } catch (error) {
-      logger.error('Failed to save role:', error);
+    // Fallback: extract from callback data if not in session
+    if (!tier) {
+      const callbackData = ctx.callbackQuery?.data || '';
+      const [, tierFromCallback] = callbackData.split(':');
+      tier = tierFromCallback || 'pro';
+      paidSubscription = true;
     }
+
+    // Clear pendingCreateShop flag
+    delete ctx.session.pendingCreateShop;
 
     // Enter create shop scene with paidSubscription flag
     // This tells createShop.js to find and link existing subscription with null shop_id
     logger.info(`User ${ctx.from.id} entering create shop scene from paid subscription notification`, {
       tier,
-      paidSubscription: true,
+      paidSubscription,
+      fromPending: !!pending,
     });
 
     await ctx.scene.enter('createShop', {
       tier,
-      paidSubscription: true, // Flag: user already paid, link existing subscription
+      paidSubscription,
     });
   } catch (error) {
     logger.error('Error in start create shop handler:', error);

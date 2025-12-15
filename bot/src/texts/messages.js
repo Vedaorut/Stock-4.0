@@ -374,6 +374,12 @@ const buildMessages = () => ({
     subscriptionProInfo: (data, lang = 'ru') => {
       const statusLabel =
         data.status === 'active' ? t('formatters.statusActive', {}, lang) : t('formatters.statusInactive', {}, lang);
+      // Check for lifetime subscription: no renewDate or date > 10 years in future
+      const isLifetime = !data.renewDate ||
+        (data.renewDate && new Date(data.renewDate) > new Date(Date.now() + 10 * 365 * 24 * 60 * 60 * 1000));
+      if (isLifetime && data.status === 'active') {
+        return t('seller.subscriptionProInfoLifetime', { status: statusLabel }, lang);
+      }
       const renewDate = data.renewDate
         ? new Date(data.renewDate).toLocaleDateString(lang === 'ru' ? 'ru-RU' : 'en-US')
         : '-';
@@ -382,6 +388,12 @@ const buildMessages = () => ({
     subscriptionMaxInfo: (data, lang = 'ru') => {
       const statusLabel =
         data.status === 'active' ? t('formatters.statusActive', {}, lang) : t('formatters.statusInactive', {}, lang);
+      // Check for lifetime subscription: no renewDate or date > 10 years in future
+      const isLifetime = !data.renewDate ||
+        (data.renewDate && new Date(data.renewDate) > new Date(Date.now() + 10 * 365 * 24 * 60 * 60 * 1000));
+      if (isLifetime && data.status === 'active') {
+        return t('seller.subscriptionMaxInfoLifetime', { status: statusLabel }, lang);
+      }
       const renewDate = data.renewDate
         ? new Date(data.renewDate).toLocaleDateString(lang === 'ru' ? 'ru-RU' : 'en-US')
         : '-';
@@ -553,8 +565,15 @@ const buildMessages = () => ({
     sendHashPrompt: (lang = 'ru') => t('subscription.sendHashPrompt', {}, lang),
     hashInvalid: (lang = 'ru') => t('subscription.hashInvalid', {}, lang),
     verifying: (lang = 'ru') => t('subscription.verifying', {}, lang),
-    verificationSuccess: (tier, date, id, lang = 'ru') =>
-      t('subscription.verificationSuccess', { tier: safe(tier), date: safe(date), id: safe(id) }, lang),
+    verificationSuccess: (tier, date, id, lang = 'ru') => {
+      // Check for lifetime: no date or date > 10 years in future
+      const isLifetime = !date ||
+        (date && new Date(date) > new Date(Date.now() + 10 * 365 * 24 * 60 * 60 * 1000));
+      if (isLifetime) {
+        return t('subscription.verificationSuccessLifetime', { tier: safe(tier), id: safe(id) }, lang);
+      }
+      return t('subscription.verificationSuccess', { tier: safe(tier), date: safe(date), id: safe(id) }, lang);
+    },
     proBenefits: (lang = 'ru') => t('subscription.proBenefits', {}, lang),
     duplicateTx: (lang = 'ru') => t('subscription.duplicateTx', {}, lang),
     verificationFailed: (lang = 'ru') => t('subscription.verificationFailed', {}, lang),

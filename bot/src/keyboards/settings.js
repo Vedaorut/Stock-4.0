@@ -25,6 +25,10 @@ const getSubscriptionButtonText = (options, lang) => {
 
   // Trial user
   if (options.isTrial) {
+    // If trialEndsAt is missing, show trial without days count
+    if (!options.trialEndsAt) {
+      return t('settings.subscriptionTrialActive', { tier: tierLabel }, lang);
+    }
     const days = getDaysRemaining(options.trialEndsAt);
     if (days > 0) {
       return t('settings.subscriptionTrial', { days }, lang);
@@ -32,8 +36,18 @@ const getSubscriptionButtonText = (options, lang) => {
     return t('settings.subscriptionExpired', {}, lang);
   }
 
+  // Pending subscription (paid but shop not yet created, or awaiting payment)
+  // Show "pending" message instead of "expired"
+  if (options.subscriptionStatus === 'pending') {
+    return t('settings.subscriptionPending', { tier: tierLabel }, lang);
+  }
+
   // Grace period
   if (options.subscriptionStatus === 'grace_period') {
+    // If nextPaymentDue is missing, show grace without days count
+    if (!options.nextPaymentDue) {
+      return t('settings.subscriptionGraceActive', { tier: tierLabel }, lang);
+    }
     const days = getDaysRemaining(options.nextPaymentDue);
     if (days > 0) {
       return t('settings.subscriptionGrace', { tier: tierLabel, days }, lang);
@@ -43,14 +57,29 @@ const getSubscriptionButtonText = (options, lang) => {
 
   // Active subscription
   if (options.subscriptionStatus === 'active') {
+    // Lifetime subscription: period_end is null (passed as nextPaymentDue)
+    // or date is more than 10 years in the future
+    if (!options.nextPaymentDue) {
+      return t('settings.subscriptionLifetime', { tier: tierLabel }, lang);
+    }
     const days = getDaysRemaining(options.nextPaymentDue);
+    // More than 10 years = lifetime
+    if (days > 3650) {
+      return t('settings.subscriptionLifetime', { tier: tierLabel }, lang);
+    }
     if (days > 0) {
       return t('settings.subscription', { tier: tierLabel, days }, lang);
     }
+    // Payment overdue but still marked as active - show expired
     return t('settings.subscriptionExpired', {}, lang);
   }
 
-  // Expired or unknown status
+  // Inactive subscription
+  if (options.subscriptionStatus === 'inactive') {
+    return t('settings.subscriptionInactive', { tier: tierLabel }, lang);
+  }
+
+  // Expired or cancelled status
   if (options.subscriptionStatus === 'expired' || options.subscriptionStatus === 'cancelled') {
     return t('settings.subscriptionExpired', {}, lang);
   }

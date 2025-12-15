@@ -108,7 +108,8 @@
       "remaining": "{days} days (until {date})",
       "gracePeriod": "Grace period",
       "expired": "Expired",
-      "active": "Active"
+      "active": "Active",
+      "lifetime": "Lifetime subscription"
     },
     "inviteLink": "Invite Link",
     "inviteLinkDescription": "Share with buyers",
@@ -331,6 +332,7 @@
     "title": "Subscription",
     "activePlan": "Active plan",
     "daysLeft": "days left",
+    "lifetime": "Lifetime",
     "paymentHistory": "Payment history",
     "upgradeToPro": "Upgrade to PRO",
     "select": "Select",

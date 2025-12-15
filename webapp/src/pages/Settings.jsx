@@ -87,6 +87,14 @@ const formatExpirationDate = (date, lang) => {
   return d.toLocaleDateString(locale, { day: 'numeric', month: 'long' });
 };
 
+// Helper function to check if subscription is lifetime (>10 years in future)
+const isLifetimeSubscription = (nextPaymentDue) => {
+  if (!nextPaymentDue) return false;
+  const tenYearsFromNow = new Date();
+  tenYearsFromNow.setFullYear(tenYearsFromNow.getFullYear() + 10);
+  return new Date(nextPaymentDue) > tenYearsFromNow;
+};
+
 // Helper function to format subscription value for display
 // Returns { text, warning } where warning is 'none' | 'yellow' | 'red' | 'expired'
 const formatSubscriptionValue = (shop, t, lang) => {
@@ -118,6 +126,14 @@ const formatSubscriptionValue = (shop, t, lang) => {
     return {
       text: `${tier} • ${t('settings.subscription.expired')}`,
       warning: 'expired',
+    };
+  }
+
+  // Lifetime subscription (next_payment_due > 10 years in future)
+  if (isLifetimeSubscription(shop.next_payment_due)) {
+    return {
+      text: `${tier} • ${t('settings.subscription.lifetime')}`,
+      warning: 'none',
     };
   }
 

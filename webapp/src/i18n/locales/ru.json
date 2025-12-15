@@ -108,7 +108,8 @@
       "remaining": "{days} дн. (до {date})",
       "gracePeriod": "Льготный период",
       "expired": "Истекла",
-      "active": "Активна"
+      "active": "Активна",
+      "lifetime": "Вечная подписка"
     },
     "inviteLink": "Пригласительная ссылка",
     "inviteLinkDescription": "Поделитесь с покупателями",
@@ -331,6 +332,7 @@
     "title": "Подписка",
     "activePlan": "Активный план",
     "daysLeft": "дн.",
+    "lifetime": "Вечная",
     "paymentHistory": "История платежей",
     "upgradeToPro": "Перейти на PRO",
     "select": "Выбрать",

@@ -549,6 +549,21 @@ ${formatted}`,
     logger.error('Error in handleInput:', error);
     const langErr = ctx.lang || ctx.session?.language || 'ru';
     const { seller: sellerMsgs } = getMessages(langErr);
+
+    // Check for 409 conflict (wallet already used by another shop)
+    const status = error.response?.status || error.status;
+    if (status === 409) {
+      await smartMessage.send(ctx, {
+        text: t('seller.walletsAlreadyUsed', {}, langErr),
+        keyboard: Markup.inlineKeyboard([
+          [Markup.button.callback(t('buttons.backToWallets', {}, langErr), 'wallet:back')],
+          [Markup.button.callback(t('buttons.backToTools', {}, langErr), 'seller:tools')],
+        ]),
+      });
+      return; // Stay in scene, let user try another address
+    }
+
+    // Generic error - exit scene
     await smartMessage.send(ctx, {
       text: sellerMsgs.walletsLoadError(langErr),
       keyboard: successButtons(langErr),

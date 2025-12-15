@@ -239,9 +239,25 @@ export default function SubscriptionModal({ isOpen, onClose }) {
   }
 
   const currentTier = status?.tier || 'pro';
-  const daysLeft = status?.expiresAt
-    ? Math.max(0, Math.ceil((new Date(status.expiresAt) - new Date()) / (1000 * 60 * 60 * 24)))
-    : null;
+
+  // Check for lifetime subscription (period_end is null or > 10 years in future)
+  const isLifetime = (() => {
+    // If period_end is null (from currentSubscription), it's lifetime
+    if (status?.currentSubscription?.period_end === null) return true;
+    // If expiresAt is more than 10 years in future, it's lifetime
+    if (status?.expiresAt) {
+      const tenYearsFromNow = new Date();
+      tenYearsFromNow.setFullYear(tenYearsFromNow.getFullYear() + 10);
+      return new Date(status.expiresAt) > tenYearsFromNow;
+    }
+    return false;
+  })();
+
+  const daysLeft = isLifetime
+    ? null
+    : status?.expiresAt
+      ? Math.max(0, Math.ceil((new Date(status.expiresAt) - new Date()) / (1000 * 60 * 60 * 24)))
+      : null;
 
   return (
     <AnimatePresence>
@@ -285,7 +301,9 @@ export default function SubscriptionModal({ isOpen, onClose }) {
                     <div className={`w-2 h-2 rounded-full ${status?.isActive ? 'bg-green-500' : 'bg-red-500'}`} />
                     <div>
                       <span className="text-white font-semibold">{currentTier.toUpperCase()}</span>
-                      {daysLeft !== null && (
+                      {isLifetime ? (
+                        <span className="text-green-400 text-xs ml-2">• {t('subscription.lifetime')}</span>
+                      ) : daysLeft !== null && (
                         <span className="text-gray-500 text-xs ml-2">• {daysLeft}{t('subscription.daysLeft')}</span>
                       )}
                     </div>
