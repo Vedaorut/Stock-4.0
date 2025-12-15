@@ -46,6 +46,34 @@ export const shopSubscriberController = {
       isNew,
     });
 
+    // Send welcome message to user if this is a new subscription
+    if (isNew && req.user.telegram_id) {
+      // Fire-and-forget: send welcome message via internal API
+      const INTERNAL_SECRET = process.env.INTERNAL_SECRET;
+      const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:3000';
+      const lang = req.user.language || 'ru';
+
+      fetch(`${BACKEND_URL}/api/internal/notify-subscription`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Internal-Secret': INTERNAL_SECRET,
+        },
+        body: JSON.stringify({
+          userId: req.user.telegram_id,
+          shopId,
+          shopName: shop.name,
+          lang,
+        }),
+      }).catch((error) => {
+        logger.error('[ShopSubscriber] Failed to send welcome message', {
+          userId,
+          shopId,
+          error: error.message,
+        });
+      });
+    }
+
     return res.status(isNew ? 201 : 200).json({
       success: true,
       data: {

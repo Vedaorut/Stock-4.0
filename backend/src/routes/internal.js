@@ -618,4 +618,123 @@ router.post('/admin/recover-subscription/:subscriptionId', verifyInternalSecret,
   }
 });
 
+/**
+ * POST /internal/notify-subscription
+ * Send welcome message to user after subscribing via webapp deep link
+ *
+ * Body: { userId: number, shopId: number, shopName: string, lang?: string }
+ * Headers: { x-internal-secret: string }
+ */
+router.post('/notify-subscription', verifyInternalSecret, async (req, res) => {
+  const { userId, shopId, shopName, lang = 'ru' } = req.body;
+
+  if (!userId || !shopId || !shopName) {
+    return res.status(400).json({
+      success: false,
+      error: 'Missing required fields: userId, shopId, shopName',
+    });
+  }
+
+  try {
+    const WEBAPP_URL = process.env.WEBAPP_URL || 'https://sellstatus.com';
+
+    // Welcome message text
+    const message = lang === 'ru'
+      ? `🎉 Вы подписались на магазин "${shopName}"!\n\n` +
+        `📱 Открывайте каталог через кнопку ниже и следите за новинками.\n\n` +
+        `Вы будете получать уведомления о новых товарах и акциях.`
+      : `🎉 You subscribed to "${shopName}" shop!\n\n` +
+        `📱 Open the catalog using the button below and follow new arrivals.\n\n` +
+        `You will receive notifications about new products and promotions.`;
+
+    // Buyer keyboard (simplified, no Telegraf)
+    const keyboard = {
+      inline_keyboard: [
+        [
+          {
+            text: lang === 'ru' ? '📱 Открыть каталог' : '📱 Open Catalog',
+            web_app: { url: WEBAPP_URL },
+          },
+        ],
+        [
+          {
+            text: lang === 'ru' ? '🔍 Найти магазин' : '🔍 Find Shop',
+            callback_data: 'buyer:search',
+          },
+        ],
+        [
+          {
+            text: lang === 'ru' ? '📦 Мои подписки' : '📦 My Subscriptions',
+            callback_data: 'buyer:subscriptions',
+          },
+        ],
+        [
+          {
+            text: lang === 'ru' ? '🛍 Мои заказы' : '🛍 My Orders',
+            callback_data: 'buyer:orders',
+          },
+        ],
+        [
+          {
+            text: lang === 'ru' ? '⚙️ Настройки' : '⚙️ Settings',
+            callback_data: 'settings',
+          },
+        ],
+      ],
+    };
+
+    // Send message via Telegram Bot API
+    const telegramApiUrl = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
+    const response = await fetch(telegramApiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: userId,
+        text: message,
+        parse_mode: 'HTML',
+        reply_markup: keyboard,
+      }),
+    });
+
+    const result = await response.json();
+
+    if (!result.ok) {
+      logger.error('[NotifySubscription] Telegram API error', {
+        userId,
+        shopId,
+        error: result,
+      });
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to send Telegram message',
+        details: result,
+      });
+    }
+
+    logger.info('[NotifySubscription] Welcome message sent', {
+      userId,
+      shopId,
+      shopName,
+    });
+
+    return res.json({
+      success: true,
+      message: 'Welcome message sent successfully',
+    });
+  } catch (error) {
+    logger.error('[NotifySubscription] Error sending welcome message', {
+      userId,
+      shopId,
+      error: error.message,
+      stack: error.stack,
+    });
+
+    return res.status(500).json({
+      success: false,
+      error: 'Internal server error',
+      message: error.message,
+    });
+  }
+});
+
 export default router;
