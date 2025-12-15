@@ -247,7 +247,11 @@
     "searchEmpty": "Nothing found",
     "searchEmptyDesc": "Try changing your search query",
     "searchMinChars": "Enter at least 2 characters",
-    "followsLoadError": "Failed to load follows"
+    "followsLoadError": "Failed to load follows",
+    "buyerInfo": {
+      "title": "Your subscriptions",
+      "description": "Here are the shops you're subscribed to. Tap a shop to view its products and place an order."
+    }
   },
   "shop": {
     "products": "products",

@@ -451,9 +451,33 @@ export default function Subscriptions() {
             <p className="text-white/50 text-sm max-w-[240px] leading-relaxed">{t('subscriptions.emptyDesc')}</p>
           </div>
         ) : (
-          // Show subscriptions to shops (same for both modes)
-          <div className="space-y-4">
-            {buyerSubscriptions.map((sub, index) => (
+          <>
+            {/* Info message for buyers */}
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mb-6 p-4 bg-gradient-to-r from-orange-500/10 to-purple-500/10 border border-orange-500/20 rounded-2xl backdrop-blur-sm"
+            >
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-xl bg-orange-500/20 flex items-center justify-center flex-shrink-0">
+                  <svg className="w-5 h-5 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <h4 className="text-sm font-semibold text-white mb-1">
+                    {t('subscriptions.buyerInfo.title')}
+                  </h4>
+                  <p className="text-xs text-gray-400 leading-relaxed">
+                    {t('subscriptions.buyerInfo.description')}
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+
+            {/* Show subscriptions to shops (same for both modes) */}
+            <div className="space-y-4">
+              {buyerSubscriptions.map((sub, index) => (
               <motion.div
                 key={sub.id}
                 onClick={() => handleBuyerSubscriptionClick(sub)}
@@ -505,7 +529,8 @@ export default function Subscriptions() {
                 </div>
               </motion.div>
             ))}
-          </div>
+            </div>
+          </>
         )}
       </div>
 
