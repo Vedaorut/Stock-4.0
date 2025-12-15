@@ -1,9 +1,10 @@
-import { useState, useMemo, lazy, Suspense, Component } from 'react';
+import { useState, useMemo, useEffect, useCallback, lazy, Suspense, Component } from 'react';
 import { motion } from 'framer-motion'; // Used in JSX
 import Header from '../components/Layout/Header';
 import { useTelegram } from '../hooks/useTelegram';
 import { useTranslation } from '../i18n/useTranslation';
 import { useStore } from '../store/useStore';
+import { useApi } from '../hooks/useApi';
 import InteractiveListItem from '../components/common/InteractiveListItem';
 
 // Retry wrapper for lazy imports - handles chunk load failures
@@ -79,8 +80,16 @@ const SELLER_ONLY_ITEMS = [
 // Admin-only item IDs (only visible for is_admin users)
 const ADMIN_ONLY_ITEMS = ['admin-panel'];
 
+// Format date for display (e.g., "15 февраля" or "February 15")
+const formatExpirationDate = (date, lang) => {
+  const d = new Date(date);
+  const locale = lang === 'ru' ? 'ru-RU' : 'en-US';
+  return d.toLocaleDateString(locale, { day: 'numeric', month: 'long' });
+};
+
 // Helper function to format subscription value for display
-const formatSubscriptionValue = (shop, t) => {
+// Returns { text, warning } where warning is 'none' | 'yellow' | 'red' | 'expired'
+const formatSubscriptionValue = (shop, t, lang) => {
   if (!shop) return null;
 
   const tier = (shop.tier || 'pro').toUpperCase();
@@ -88,29 +97,48 @@ const formatSubscriptionValue = (shop, t) => {
   // Trial
   if (shop.is_trial && shop.trial_ends_at) {
     const days = Math.max(0, Math.ceil((new Date(shop.trial_ends_at) - new Date()) / (1000 * 60 * 60 * 24)));
-    return `${t('settings.subscription.trial')} • ${days} ${t('settings.subscription.daysLeft')}`;
+    const dateStr = formatExpirationDate(shop.trial_ends_at, lang);
+    const warning = days <= 3 ? 'red' : days <= 7 ? 'yellow' : 'none';
+    return {
+      text: `${t('settings.subscription.trial')} • ${t('settings.subscription.remaining', { days, date: dateStr })}`,
+      warning,
+    };
   }
 
   // Grace period
   if (shop.subscription_status === 'grace_period') {
-    return `${tier} • ${t('settings.subscription.gracePeriod')}`;
+    return {
+      text: `${tier} • ${t('settings.subscription.gracePeriod')}`,
+      warning: 'red',
+    };
   }
 
   // Inactive
   if (shop.subscription_status === 'inactive') {
-    return `${tier} • ${t('settings.subscription.expired')}`;
+    return {
+      text: `${tier} • ${t('settings.subscription.expired')}`,
+      warning: 'expired',
+    };
   }
 
   // Active with days left
   if (shop.next_payment_due) {
     const days = Math.max(0, Math.ceil((new Date(shop.next_payment_due) - new Date()) / (1000 * 60 * 60 * 24)));
     if (days > 0) {
-      return `${tier} • ${days} ${t('settings.subscription.daysLeft')}`;
+      const dateStr = formatExpirationDate(shop.next_payment_due, lang);
+      const warning = days <= 3 ? 'red' : days <= 7 ? 'yellow' : 'none';
+      return {
+        text: `${tier} • ${t('settings.subscription.remaining', { days, date: dateStr })}`,
+        warning,
+      };
     }
   }
 
   // Active (no date)
-  return `${tier} • ${t('settings.subscription.active')}`;
+  return {
+    text: `${tier} • ${t('settings.subscription.active')}`,
+    warning: 'none',
+  };
 };
 
 const getSettingsSections = (t, lang, viewMode, shop, isAdmin) => {
@@ -280,7 +308,7 @@ const getSettingsSections = (t, lang, viewMode, shop, isAdmin) => {
               />
             </svg>
           ),
-          value: formatSubscriptionValue(shop, t),
+          value: formatSubscriptionValue(shop, t, lang),
         },
         {
           id: 'language',
@@ -357,9 +385,12 @@ const getSettingsSections = (t, lang, viewMode, shop, isAdmin) => {
 export default function Settings() {
   const { user: telegramUser, triggerHaptic } = useTelegram();
   const { t, lang } = useTranslation();
+  const { get } = useApi();
   const viewMode = useStore((state) => state.viewMode);
   const myShop = useStore((state) => state.myShop);
   const storeUser = useStore((state) => state.user);
+  const myShopHasWallets = useStore((state) => state.myShopHasWallets);
+  const setMyShopHasWallets = useStore((state) => state.setMyShopHasWallets);
   const [showWallets, setShowWallets] = useState(false);
   const [showLanguage, setShowLanguage] = useState(false);
   const [showProducts, setShowProducts] = useState(false);
@@ -377,6 +408,55 @@ export default function Settings() {
 
   const isAdmin = storeUser?.is_admin === true;
   const settingsSections = useMemo(() => getSettingsSections(t, lang, viewMode, myShop, isAdmin), [t, lang, viewMode, myShop, isAdmin]);
+
+  // Check wallet status for seller tip
+  const checkWalletStatus = useCallback(async (signal) => {
+    if (!myShop?.id || viewMode !== 'seller') {
+      return;
+    }
+
+    try {
+      const { data: walletsResponse, error } = await get(`/shops/${myShop.id}/wallets`, { signal });
+
+      if (signal?.aborted) return;
+
+      if (error) {
+        // On error, don't show tip (fail silently)
+        return;
+      }
+
+      const wallets = walletsResponse?.data || walletsResponse || {};
+      const hasAnyWallet = !!(
+        wallets.wallet_btc ||
+        wallets.wallet_eth ||
+        wallets.wallet_usdt ||
+        wallets.wallet_ltc
+      );
+
+      setMyShopHasWallets(hasAnyWallet);
+    } catch {
+      // Silent failure
+    }
+  }, [myShop?.id, viewMode, get, setMyShopHasWallets]);
+
+  // Load wallet status on mount for seller mode
+  useEffect(() => {
+    if (viewMode !== 'seller' || !myShop?.id || myShopHasWallets !== null) {
+      return;
+    }
+
+    const controller = new AbortController();
+    checkWalletStatus(controller.signal);
+
+    return () => controller.abort();
+  }, [viewMode, myShop?.id, myShopHasWallets, checkWalletStatus]);
+
+  // Refresh wallet status when wallets modal closes
+  const handleWalletsClose = useCallback(() => {
+    setShowWallets(false);
+    // Reset wallet status to trigger re-check
+    setMyShopHasWallets(null);
+  }, [setMyShopHasWallets]);
 
   const handleSettingClick = (itemId) => {
     triggerHaptic('light');
@@ -469,6 +549,47 @@ export default function Settings() {
           </motion.div>
         )}
 
+        {/* Wallet Warning Tip - Priority for sellers without wallets */}
+        {viewMode === 'seller' && myShop && myShopHasWallets === false && (
+          <motion.div
+            className="mb-6 p-4 rounded-2xl border border-orange-primary/30"
+            style={{
+              background: 'linear-gradient(135deg, rgba(255, 107, 0, 0.15) 0%, rgba(255, 107, 0, 0.05) 100%)',
+            }}
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-orange-primary/20 flex items-center justify-center flex-shrink-0">
+                <svg className="w-5 h-5 text-orange-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <p className="text-white font-medium text-sm mb-2">
+                  {t('settings.walletTip.title')}
+                </p>
+                <p className="text-gray-400 text-xs mb-3">
+                  {t('settings.walletTip.description')}
+                </p>
+                <motion.button
+                  onClick={() => {
+                    triggerHaptic('light');
+                    setShowWallets(true);
+                  }}
+                  className="px-4 py-2 rounded-xl text-sm font-medium text-white"
+                  style={{
+                    background: 'linear-gradient(135deg, #FF6B00 0%, #FF8533 100%)',
+                  }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  {t('settings.walletTip.addButton')}
+                </motion.button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
         {/* Settings Sections */}
         <div className="space-y-6">
           {settingsSections.map((section, sectionIndex) => (
@@ -516,7 +637,23 @@ export default function Settings() {
                           </span>
                         )}
                       </div>
-                      {item.value && <span className="text-gray-300 text-sm">{item.value}</span>}
+                      {item.value && (
+                        <span
+                          className={`text-sm ${
+                            typeof item.value === 'object'
+                              ? item.value.warning === 'red'
+                                ? 'text-red-400'
+                                : item.value.warning === 'yellow'
+                                  ? 'text-yellow-400'
+                                  : item.value.warning === 'expired'
+                                    ? 'text-red-500'
+                                    : 'text-gray-300'
+                              : 'text-gray-300'
+                          }`}
+                        >
+                          {typeof item.value === 'object' ? item.value.text : item.value}
+                        </span>
+                      )}
                     </InteractiveListItem>
                   );
                 })}
@@ -556,7 +693,7 @@ export default function Settings() {
             <WorkspaceModalLazy isOpen={showWorkspace} onClose={() => setShowWorkspace(false)} />
           )}
           {showFollows && <FollowsModalLazy isOpen={showFollows} onClose={() => setShowFollows(false)} />}
-          {showWallets && <WalletsModalLazy isOpen={showWallets} onClose={() => setShowWallets(false)} />}
+          {showWallets && <WalletsModalLazy isOpen={showWallets} onClose={handleWalletsClose} />}
           {showLanguage && (
             <LanguageModalLazy isOpen={showLanguage} onClose={() => setShowLanguage(false)} />
           )}

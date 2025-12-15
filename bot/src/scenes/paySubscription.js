@@ -102,20 +102,28 @@ const paySubscriptionScene = new Scenes.WizardScene(
       const statusResponse = await subscriptionApi.getStatus(shopId, token);
       const shopName = ctx.session.shopName || t('general.shopFallbackName', {}, lang);
 
+      // Get current tier to prevent downgrade
+      const currentTier = statusResponse.currentSubscription?.tier || statusResponse.latestSubscription?.tier;
+      const isMaxUser = currentTier === 'max';
+
       const message = [
         subMessages.chooseTierIntro(lang),
         subMessages.tierDescriptionPro(lang),
         subMessages.tierDescriptionMax(lang),
       ].join('\n\n');
 
+      // Build tier buttons - Max users can only renew Max (no downgrade)
+      const tierButtons = [];
+      if (!isMaxUser) {
+        tierButtons.push([Markup.button.callback(t('buttons.tierPro', {}, lang), 'subscription:tier:pro')]);
+      }
+      tierButtons.push([Markup.button.callback(t('buttons.tierMax', {}, lang), 'subscription:tier:max')]);
+      tierButtons.push([Markup.button.callback(t('buttons.cancel', {}, lang), 'seller:menu')]);
+
       await cleanReplyHTML(
         ctx,
         message,
-        Markup.inlineKeyboard([
-          [Markup.button.callback(t('buttons.tierPro', {}, lang), 'subscription:tier:pro')],
-          [Markup.button.callback(t('buttons.tierMax', {}, lang), 'subscription:tier:max')],
-          [Markup.button.callback(t('buttons.cancel', {}, lang), 'seller:menu')],
-        ])
+        Markup.inlineKeyboard(tierButtons)
       );
 
       // Save shop info and subscription ID for next steps

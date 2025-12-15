@@ -105,6 +105,7 @@
     "subscription": {
       "trial": "Пробный",
       "daysLeft": "дн.",
+      "remaining": "{days} дн. (до {date})",
       "gracePeriod": "Льготный период",
       "expired": "Истекла",
       "active": "Активна"
@@ -114,6 +115,11 @@
     "inviteLinkLabel": "Ссылка на магазин",
     "inviteLinkCopied": "Ссылка скопирована!",
     "inviteLinkHint": "Поделитесь ссылкой в канале. Пользователи автоматически подпишутся на ваш магазин.",
+    "walletTip": {
+      "title": "Добавьте кошельки",
+      "description": "Без платёжных кошельков клиенты не смогут оплатить заказы",
+      "addButton": "Добавить"
+    },
     "workerModeDisabled": "Режим работника отключен",
     "nowWorkingIn": "Вы теперь работаете в \"{name}\"",
     "shopSelectionError": "Ошибка при выборе магазина"
@@ -335,6 +341,7 @@
     "switchToPro": "Перейти на PRO",
     "goToBotMax": "Для перехода на MAX перейдите в бота",
     "goToBotChange": "Для смены плана перейдите в бота",
+    "yourTierIsHigher": "У вас тариф выше",
     "features": {
       "unlimited": "Безлимит товаров",
       "analytics": "Расширенная аналитика",

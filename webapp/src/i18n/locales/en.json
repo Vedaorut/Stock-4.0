@@ -105,6 +105,7 @@
     "subscription": {
       "trial": "Trial",
       "daysLeft": "days",
+      "remaining": "{days} days (until {date})",
       "gracePeriod": "Grace period",
       "expired": "Expired",
       "active": "Active"
@@ -114,6 +115,11 @@
     "inviteLinkLabel": "Shop link",
     "inviteLinkCopied": "Link copied!",
     "inviteLinkHint": "Share this link in your channel. Users will automatically subscribe to your shop.",
+    "walletTip": {
+      "title": "Add wallets",
+      "description": "Without payment wallets, customers won't be able to pay for orders",
+      "addButton": "Add"
+    },
     "workerModeDisabled": "Worker mode disabled",
     "nowWorkingIn": "You are now working in \"{name}\"",
     "shopSelectionError": "Failed to select shop"
@@ -335,6 +341,7 @@
     "switchToPro": "Switch to PRO",
     "goToBotMax": "To upgrade to MAX, go to the bot",
     "goToBotChange": "To change your plan, go to the bot",
+    "yourTierIsHigher": "You have a higher tier",
     "features": {
       "unlimited": "Unlimited Products",
       "analytics": "Advanced Analytics",

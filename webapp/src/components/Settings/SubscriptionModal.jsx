@@ -7,12 +7,14 @@ import { useBackButton } from '../../hooks/useBackButton';
 import { useTranslation } from '../../i18n/useTranslation';
 
 // Compact Plan Card
-function PlanCard({ name, price, features, isActive, onSelect, delay = 0, t }) {
+function PlanCard({ name, price, features, isActive, onSelect, delay = 0, t, currentTier }) {
   const { triggerHaptic } = useTelegram();
   const shouldReduceMotion = useReducedMotion();
   const isMax = name === 'max';
   const isPro = name === 'pro';
   const isPremiumTier = isMax || isPro;
+  // Disable Pro selection when user has Max tier (prevent downgrade)
+  const isDowngrade = isPro && currentTier === 'max';
 
   return (
     <motion.div
@@ -117,7 +119,15 @@ function PlanCard({ name, price, features, isActive, onSelect, delay = 0, t }) {
         </ul>
 
         {/* Action */}
-        {!isActive ? (
+        {isActive ? (
+          <div className="w-full py-2.5 rounded-xl text-xs font-bold text-center text-green-400 bg-green-500/10 border border-green-500/20">
+            {t('subscription.activePlan')}
+          </div>
+        ) : isDowngrade ? (
+          <div className="w-full py-2.5 rounded-xl text-xs font-bold text-center text-gray-500 bg-white/5 border border-white/10">
+            {t('subscription.yourTierIsHigher')}
+          </div>
+        ) : (
           <motion.button
             onClick={() => {
               triggerHaptic('medium');
@@ -133,10 +143,6 @@ function PlanCard({ name, price, features, isActive, onSelect, delay = 0, t }) {
           >
             {isMax ? t('subscription.switchToMax') : isPro ? t('subscription.switchToPro') : t('subscription.select')}
           </motion.button>
-        ) : (
-          <div className="w-full py-2.5 rounded-xl text-xs font-bold text-center text-green-400 bg-green-500/10 border border-green-500/20">
-            {t('subscription.activePlan')}
-          </div>
         )}
       </div>
     </motion.div>
@@ -303,6 +309,7 @@ export default function SubscriptionModal({ isOpen, onClose }) {
                       onSelect={() => handleSelectPlan('pro')}
                       delay={0}
                       t={t}
+                      currentTier={currentTier}
                     />
                   )}
                   {pricing?.max && (
@@ -314,6 +321,7 @@ export default function SubscriptionModal({ isOpen, onClose }) {
                       onSelect={() => handleSelectPlan('max')}
                       delay={0.1}
                       t={t}
+                      currentTier={currentTier}
                     />
                   )}
                 </div>

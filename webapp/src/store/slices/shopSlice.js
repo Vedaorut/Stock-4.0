@@ -28,6 +28,10 @@ export const createShopSlice = (set, get) => ({
     myShop: shops[0] || null  // First shop = primary (backward compatibility)
   }),
 
+  // Wallet status for seller tip (null = not loaded, true/false = has wallets)
+  myShopHasWallets: null,
+  setMyShopHasWallets: (hasWallets) => set({ myShopHasWallets: hasWallets }),
+
   // Helper to check if shop belongs to current user
   isOwnShop: (shopId) => get().myShops.some(s => s.id === shopId),
 
