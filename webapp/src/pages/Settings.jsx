@@ -62,7 +62,7 @@ const InviteLinkModalLazy = lazyWithRetry(() => import('../components/Settings/I
 const MyOrdersModalLazy = lazyWithRetry(() => import('../components/Settings/MyOrdersModal'));
 const ShopOrdersModalLazy = lazyWithRetry(() => import('../components/Settings/ShopOrdersModal'));
 const FeedbackModalLazy = lazyWithRetry(() => import('../components/Settings/FeedbackModal'));
-const AdminPanelModalLazy = lazyWithRetry(() => import('../components/Settings/AdminPanelModal'));
+const AdminPanelModalLazy = lazyWithRetry(() => import('../components/Settings/AdminPanelV2'));
 
 // Seller-only item IDs (hidden in buyer mode)
 const SELLER_ONLY_ITEMS = [
