@@ -107,7 +107,7 @@ async function expireOldOrders() {
        WHERE status = 'pending'
          AND created_at < NOW() - INTERVAL '7 days'
        RETURNING id, status`,
-      ['expired']
+      ['cancelled']
     );
 
     if (result.rowCount > 0) {
