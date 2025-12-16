@@ -10,6 +10,7 @@ import ShopDetailModal from './ShopDetailModal';
 
 // Tab configuration
 const TABS = [
+  { id: 'overview', label: 'Overview' },
   { id: 'users', label: 'Users' },
   { id: 'shops', label: 'Shops' },
   { id: 'activity', label: 'Activity' },
@@ -230,7 +231,7 @@ function ShopRow({ shop, onClick }) {
 
         {/* Revenue */}
         <div className="text-right flex-shrink-0">
-          <p className="text-sm font-bold text-green-400">{formatUSD(shop.revenue || 0)}</p>
+          <p className="text-sm font-bold text-green-400">{formatUSD(shop.total_revenue || 0)}</p>
           <p className="text-[10px] text-gray-500">{formatDate(shop.created_at)}</p>
         </div>
 
@@ -417,6 +418,204 @@ function FilterChips({ options, selected, onChange }) {
   );
 }
 
+// Overview Tab Component
+function OverviewTab({ stats, loading }) {
+  if (loading) {
+    return (
+      <div className="space-y-4 mt-4">
+        {[...Array(8)].map((_, i) => (
+          <div key={i} className="glass-card rounded-xl p-4 h-24 animate-pulse" />
+        ))}
+      </div>
+    );
+  }
+
+  if (!stats) {
+    return (
+      <div className="glass-card rounded-xl p-8 text-center mt-4">
+        <p className="text-gray-400">No statistics available</p>
+      </div>
+    );
+  }
+
+  const StatCard = ({ title, value, subtitle, icon, color = 'orange' }) => {
+    const colors = {
+      orange: 'from-orange-500/30 to-orange-500/10 text-orange-400',
+      blue: 'from-blue-500/30 to-blue-500/10 text-blue-400',
+      purple: 'from-purple-500/30 to-purple-500/10 text-purple-400',
+      green: 'from-green-500/30 to-green-500/10 text-green-400',
+    };
+
+    return (
+      <motion.div
+        className="glass-card rounded-xl p-4 border border-white/10"
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+      >
+        <div className="flex items-start justify-between">
+          <div className="flex-1">
+            <p className="text-xs text-gray-500 font-medium uppercase tracking-wide mb-1">{title}</p>
+            <p className="text-2xl font-bold text-white mb-1">{value}</p>
+            {subtitle && <p className="text-xs text-gray-400">{subtitle}</p>}
+          </div>
+          <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${colors[color]} flex items-center justify-center flex-shrink-0`}>
+            {icon}
+          </div>
+        </div>
+      </motion.div>
+    );
+  };
+
+  return (
+    <div className="space-y-4 mt-4">
+      {/* Users Stats */}
+      <div>
+        <h3 className="text-xs font-semibold text-gray-400 mb-2 px-1 uppercase tracking-wider">Users</h3>
+        <div className="grid grid-cols-2 gap-3">
+          <StatCard
+            title="Total Users"
+            value={stats.users.total}
+            subtitle={`${stats.users.month} this month`}
+            color="blue"
+            icon={
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+              </svg>
+            }
+          />
+          <StatCard
+            title="New Today"
+            value={stats.users.today}
+            subtitle={`${stats.users.week} this week`}
+            color="green"
+            icon={
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+              </svg>
+            }
+          />
+        </div>
+      </div>
+
+      {/* Shops Stats */}
+      <div>
+        <h3 className="text-xs font-semibold text-gray-400 mb-2 px-1 uppercase tracking-wider">Shops</h3>
+        <div className="grid grid-cols-2 gap-3">
+          <StatCard
+            title="Total Shops"
+            value={stats.shops.total}
+            subtitle={`${stats.shops.active} active`}
+            color="purple"
+            icon={
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
+            }
+          />
+          <StatCard
+            title="New Today"
+            value={stats.shops.today}
+            subtitle="created shops"
+            color="orange"
+            icon={
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
+              </svg>
+            }
+          />
+        </div>
+      </div>
+
+      {/* Orders Stats */}
+      <div>
+        <h3 className="text-xs font-semibold text-gray-400 mb-2 px-1 uppercase tracking-wider">Orders</h3>
+        <div className="grid grid-cols-2 gap-3">
+          <StatCard
+            title="Total Orders"
+            value={stats.orders.total}
+            subtitle={`${stats.orders.week} this week`}
+            color="blue"
+            icon={
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+              </svg>
+            }
+          />
+          <StatCard
+            title="Today"
+            value={stats.orders.today}
+            subtitle="new orders"
+            color="green"
+            icon={
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            }
+          />
+        </div>
+      </div>
+
+      {/* Subscriptions Stats */}
+      <div>
+        <h3 className="text-xs font-semibold text-gray-400 mb-2 px-1 uppercase tracking-wider">Subscriptions</h3>
+        <div className="grid grid-cols-2 gap-3">
+          <StatCard
+            title="Active Subscriptions"
+            value={stats.subscriptions.active}
+            subtitle={`${stats.subscriptions.total} total`}
+            color="purple"
+            icon={
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+              </svg>
+            }
+          />
+          <StatCard
+            title="Pro / Max"
+            value={`${stats.subscriptions.pro} / ${stats.subscriptions.max}`}
+            subtitle="tier distribution"
+            color="orange"
+            icon={
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+              </svg>
+            }
+          />
+        </div>
+      </div>
+
+      {/* Revenue Stats */}
+      <div>
+        <h3 className="text-xs font-semibold text-gray-400 mb-2 px-1 uppercase tracking-wider">Revenue</h3>
+        <div className="grid grid-cols-2 gap-3">
+          <StatCard
+            title="Today"
+            value={`$${stats.revenue.today.toFixed(2)}`}
+            subtitle={`$${stats.revenue.week.toFixed(2)} this week`}
+            color="green"
+            icon={
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            }
+          />
+          <StatCard
+            title="This Month"
+            value={`$${stats.revenue.month.toFixed(2)}`}
+            subtitle="subscription revenue"
+            color="purple"
+            icon={
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+              </svg>
+            }
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Tab Bar Component
 function TabBar({ tabs, activeTab, onChange }) {
   const { triggerHaptic } = useTelegram();
@@ -460,7 +659,7 @@ export default function AdminPanelV2({ isOpen, onClose }) {
   const { triggerHaptic } = useTelegram();
 
   // Tab state
-  const [activeTab, setActiveTab] = useState('users');
+  const [activeTab, setActiveTab] = useState('overview');
 
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
@@ -483,6 +682,10 @@ export default function AdminPanelV2({ isOpen, onClose }) {
   // Modal states for detail views
   const [selectedUserId, setSelectedUserId] = useState(null);
   const [selectedShopId, setSelectedShopId] = useState(null);
+
+  // Stats state for overview tab
+  const [stats, setStats] = useState(null);
+  const [statsLoading, setStatsLoading] = useState(false);
 
   // Refs
   const loadMoreRef = useRef(null);
@@ -617,18 +820,45 @@ export default function AdminPanelV2({ isOpen, onClose }) {
     [get, currentData.items]
   );
 
+  // Fetch stats for overview tab
+  const fetchStats = useCallback(async () => {
+    try {
+      setStatsLoading(true);
+      const { data, error } = await get('/admin/stats');
+      if (error) {
+        console.error('Failed to fetch stats:', error);
+        return;
+      }
+      if (data?.success && data?.data) {
+        setStats(data.data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch stats:', err);
+    } finally {
+      setStatsLoading(false);
+    }
+  }, [get]);
+
   // Initial load and refresh
   useEffect(() => {
     if (!isOpen) return;
 
-    setLoading(true);
-    fetchData(activeTab, 1, debouncedSearch, currentFilter).finally(() => {
-      setLoading(false);
-    });
+    if (activeTab === 'overview') {
+      fetchStats();
+    } else {
+      setLoading(true);
+      fetchData(activeTab, 1, debouncedSearch, currentFilter).finally(() => {
+        setLoading(false);
+      });
+    }
 
     // Auto-refresh every 30s
     const intervalId = setInterval(() => {
-      fetchData(activeTab, 1, debouncedSearch, currentFilter);
+      if (activeTab === 'overview') {
+        fetchStats();
+      } else {
+        fetchData(activeTab, 1, debouncedSearch, currentFilter);
+      }
     }, 30000);
 
     return () => {
@@ -637,7 +867,7 @@ export default function AdminPanelV2({ isOpen, onClose }) {
         abortControllerRef.current.abort();
       }
     };
-  }, [isOpen, activeTab, debouncedSearch, currentFilter, fetchData]);
+  }, [isOpen, activeTab, debouncedSearch, currentFilter, fetchData, fetchStats]);
 
   // Reset page on filter/search change
   useEffect(() => {
@@ -764,47 +994,57 @@ export default function AdminPanelV2({ isOpen, onClose }) {
               {/* Tab Bar */}
               <TabBar tabs={TABS} activeTab={activeTab} onChange={handleTabChange} />
 
-              {/* Search Bar */}
-              <SearchBar
-                value={searchQuery}
-                onChange={setSearchQuery}
-                placeholder={searchPlaceholder}
-              />
-
-              {/* Filter Chips */}
-              <FilterChips
-                options={filterOptions}
-                selected={currentFilter}
-                onChange={handleFilterChange}
-              />
-
-              {/* Results count */}
-              {!loading && currentData.items.length > 0 && (
-                <motion.p
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="text-xs text-gray-500"
-                >
-                  Showing {currentData.items.length} of {currentData.total} results
-                </motion.p>
+              {/* Overview Tab */}
+              {activeTab === 'overview' && (
+                <OverviewTab stats={stats} loading={statsLoading} />
               )}
 
-              {/* Loading skeletons */}
-              {loading && currentData.items.length === 0 && (
-                <div className="space-y-3">
-                  {[...Array(8)].map((_, i) => (
-                    <SkeletonRow key={i} />
-                  ))}
-                </div>
+              {/* Search Bar and Filters - only for non-overview tabs */}
+              {activeTab !== 'overview' && (
+                <>
+                  {/* Search Bar */}
+                  <SearchBar
+                    value={searchQuery}
+                    onChange={setSearchQuery}
+                    placeholder={searchPlaceholder}
+                  />
+
+                  {/* Filter Chips */}
+                  <FilterChips
+                    options={filterOptions}
+                    selected={currentFilter}
+                    onChange={handleFilterChange}
+                  />
+
+                  {/* Results count */}
+                  {!loading && currentData.items.length > 0 && (
+                    <motion.p
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="text-xs text-gray-500"
+                    >
+                      Showing {currentData.items.length} of {currentData.total} results
+                    </motion.p>
+                  )}
+
+                  {/* Loading skeletons */}
+                  {loading && currentData.items.length === 0 && (
+                    <div className="space-y-3">
+                      {[...Array(8)].map((_, i) => (
+                        <SkeletonRow key={i} />
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Empty state */}
+                  {!loading && currentData.items.length === 0 && (
+                    <EmptyState type={activeTab} />
+                  )}
+                </>
               )}
 
-              {/* Empty state */}
-              {!loading && currentData.items.length === 0 && (
-                <EmptyState type={activeTab} />
-              )}
-
-              {/* Data list */}
-              {currentData.items.length > 0 && (
+              {/* Data list - only for non-overview tabs */}
+              {activeTab !== 'overview' && currentData.items.length > 0 && (
                 <div className="space-y-3">
                   {activeTab === 'users' &&
                     currentData.items.map((user, index) => (
@@ -844,8 +1084,8 @@ export default function AdminPanelV2({ isOpen, onClose }) {
                 </div>
               )}
 
-              {/* Load more trigger */}
-              {currentData.hasMore && (
+              {/* Load more trigger - only for non-overview tabs */}
+              {activeTab !== 'overview' && currentData.hasMore && (
                 <div ref={loadMoreRef} className="py-4 flex justify-center">
                   {loadingMore && (
                     <div className="flex items-center gap-2 text-gray-500 text-sm">
@@ -857,7 +1097,7 @@ export default function AdminPanelV2({ isOpen, onClose }) {
               )}
 
               {/* Auto-refresh indicator */}
-              {!loading && currentData.items.length > 0 && (
+              {((activeTab === 'overview' && stats) || (activeTab !== 'overview' && !loading && currentData.items.length > 0)) && (
                 <motion.p
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
