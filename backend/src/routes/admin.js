@@ -13,7 +13,15 @@ import {
 } from '../controllers/admin/paymentReviewController.js';
 import { getStats } from '../controllers/admin/statsController.js';
 import { getUsers, getUserDetail } from '../controllers/admin/usersController.js';
-import { getShops, getShopDetail } from '../controllers/admin/shopsController.js';
+import {
+  getShops,
+  getShopDetail,
+  changeTier,
+  suspendShop,
+  activateShop,
+  grantLifetimeSubscription,
+  extendSubscription
+} from '../controllers/admin/shopsController.js';
 import { getActivityLogs } from '../controllers/admin/activityController.js';
 
 const router = Router();
@@ -37,6 +45,11 @@ router.get('/users/:userId', getUserDetail);
 // Shops management endpoints
 router.get('/shops', getShops);
 router.get('/shops/:shopId', getShopDetail);
+router.post('/shops/:shopId/change-tier', changeTier);
+router.post('/shops/:shopId/suspend', suspendShop);
+router.post('/shops/:shopId/activate', activateShop);
+router.post('/shops/:shopId/grant-lifetime', grantLifetimeSubscription);
+router.post('/shops/:shopId/extend-subscription', extendSubscription);
 
 // Activity audit log endpoints
 router.get('/activity', getActivityLogs);

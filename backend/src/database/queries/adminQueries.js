@@ -427,6 +427,113 @@ export const adminQueries = {
       logger.error('[AdminQueries] Failed to log action:', error);
       throw error;
     }
+  },
+
+  // ============================================
+  // SHOP OPERATIONS
+  // ============================================
+
+  /**
+   * Change shop tier (Pro ↔ Max)
+   * @param {number} shopId - Shop ID
+   * @param {string} newTier - New tier (pro/max)
+   * @returns {Promise<Object>} Updated shop
+   */
+  changeTier: async (shopId, newTier) => {
+    const queryText = `
+      UPDATE shops
+      SET tier = $1, updated_at = NOW()
+      WHERE id = $2
+      RETURNING *
+    `;
+
+    const result = await query(queryText, [newTier, shopId]);
+    return result.rows[0];
+  },
+
+  /**
+   * Suspend shop (set is_active = false)
+   * @param {number} shopId - Shop ID
+   * @returns {Promise<Object>} Updated shop
+   */
+  suspendShop: async (shopId) => {
+    const queryText = `
+      UPDATE shops
+      SET is_active = false, updated_at = NOW()
+      WHERE id = $1
+      RETURNING *
+    `;
+
+    const result = await query(queryText, [shopId]);
+    return result.rows[0];
+  },
+
+  /**
+   * Activate shop (set is_active = true)
+   * @param {number} shopId - Shop ID
+   * @returns {Promise<Object>} Updated shop
+   */
+  activateShop: async (shopId) => {
+    const queryText = `
+      UPDATE shops
+      SET is_active = true, updated_at = NOW()
+      WHERE id = $1
+      RETURNING *
+    `;
+
+    const result = await query(queryText, [shopId]);
+    return result.rows[0];
+  },
+
+  /**
+   * Grant lifetime subscription (set next_payment_due to 20 years in future)
+   * @param {number} shopId - Shop ID
+   * @param {string} tier - Tier (pro/max)
+   * @returns {Promise<Object>} Updated shop
+   */
+  grantLifetimeSubscription: async (shopId, tier) => {
+    const queryText = `
+      UPDATE shops
+      SET
+        tier = $1,
+        is_trial = false,
+        subscription_status = 'active',
+        next_payment_due = NOW() + INTERVAL '20 years',
+        updated_at = NOW()
+      WHERE id = $2
+      RETURNING *
+    `;
+
+    const result = await query(queryText, [tier, shopId]);
+    return result.rows[0];
+  },
+
+  /**
+   * Extend subscription by N days
+   * @param {number} shopId - Shop ID
+   * @param {number} days - Number of days to extend
+   * @returns {Promise<Object>} Updated shop
+   */
+  extendSubscription: async (shopId, days) => {
+    const queryText = `
+      UPDATE shops
+      SET
+        next_payment_due = COALESCE(
+          CASE
+            WHEN next_payment_due > NOW() THEN next_payment_due + ($1 || ' days')::INTERVAL
+            ELSE NOW() + ($1 || ' days')::INTERVAL
+          END,
+          NOW() + ($1 || ' days')::INTERVAL
+        ),
+        subscription_status = 'active',
+        is_trial = false,
+        updated_at = NOW()
+      WHERE id = $2
+      RETURNING *
+    `;
+
+    const result = await query(queryText, [days, shopId]);
+    return result.rows[0];
   }
 };
 

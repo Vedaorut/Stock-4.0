@@ -164,14 +164,439 @@ function LoadingSkeleton() {
   );
 }
 
+// Base Modal Wrapper
+function ActionModal({ title, children, onClose }) {
+  return (
+    <motion.div
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+    >
+      {/* Backdrop */}
+      <motion.div
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        onClick={onClose}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+      />
+      {/* Modal */}
+      <motion.div
+        className="relative bg-dark-bg/95 backdrop-blur-xl border border-white/10 rounded-2xl p-6 w-full max-w-md shadow-xl"
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 20 }}
+        transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+      >
+        <h3 className="text-lg font-bold text-white mb-4">{title}</h3>
+        {children}
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// Change Tier Modal
+function ChangeTierModal({ currentTier, loading, onConfirm, onClose }) {
+  const [tier, setTier] = useState(currentTier === 'pro' ? 'max' : 'pro');
+  const [reason, setReason] = useState('');
+  const [notes, setNotes] = useState('');
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    onConfirm(tier, reason || undefined, notes || undefined);
+  };
+
+  return (
+    <ActionModal title="Change Subscription Tier" onClose={onClose}>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Tier Selection */}
+        <div className="space-y-2">
+          <label className="text-white/60 text-sm">Select Tier</label>
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => setTier('pro')}
+              className={`flex-1 py-3 px-4 rounded-xl text-sm font-medium border transition-colors ${
+                tier === 'pro'
+                  ? 'bg-blue-500/30 border-blue-500/50 text-blue-400'
+                  : 'bg-white/5 border-white/10 text-white/60 hover:bg-white/10'
+              }`}
+            >
+              PRO
+            </button>
+            <button
+              type="button"
+              onClick={() => setTier('max')}
+              className={`flex-1 py-3 px-4 rounded-xl text-sm font-medium border transition-colors ${
+                tier === 'max'
+                  ? 'bg-purple-500/30 border-purple-500/50 text-purple-400'
+                  : 'bg-white/5 border-white/10 text-white/60 hover:bg-white/10'
+              }`}
+            >
+              MAX
+            </button>
+          </div>
+        </div>
+
+        {/* Reason */}
+        <div className="space-y-2">
+          <label className="text-white/60 text-sm">Reason (optional)</label>
+          <textarea
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="Why is the tier being changed?"
+            className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-white text-sm placeholder-white/30 resize-none focus:outline-none focus:border-white/30"
+            rows={2}
+          />
+        </div>
+
+        {/* Notes */}
+        <div className="space-y-2">
+          <label className="text-white/60 text-sm">Internal Notes (optional)</label>
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Additional notes for admin logs"
+            className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-white text-sm placeholder-white/30 resize-none focus:outline-none focus:border-white/30"
+            rows={2}
+          />
+        </div>
+
+        {/* Actions */}
+        <div className="flex gap-3 pt-2">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={loading}
+            className="flex-1 py-3 px-4 rounded-xl text-sm font-medium text-white/60 bg-white/5 border border-white/10 hover:bg-white/10 transition-colors disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={loading}
+            className="flex-1 py-3 px-4 rounded-xl text-sm font-medium text-white bg-blue-500 hover:bg-blue-600 transition-colors disabled:opacity-50"
+          >
+            {loading ? 'Changing...' : 'Change Tier'}
+          </button>
+        </div>
+      </form>
+    </ActionModal>
+  );
+}
+
+// Suspend Shop Modal
+function SuspendShopModal({ loading, onConfirm, onClose }) {
+  const [reason, setReason] = useState('');
+  const [notes, setNotes] = useState('');
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!reason.trim()) {
+      alert('Please provide a reason for suspension');
+      return;
+    }
+    onConfirm(reason.trim(), notes || undefined);
+  };
+
+  return (
+    <ActionModal title="Suspend Shop" onClose={onClose}>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3">
+          <p className="text-red-400 text-sm">
+            Warning: This will immediately suspend the shop and prevent all operations.
+          </p>
+        </div>
+
+        {/* Reason (Required) */}
+        <div className="space-y-2">
+          <label className="text-white/60 text-sm">Reason <span className="text-red-400">*</span></label>
+          <textarea
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="Why is this shop being suspended?"
+            className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-white text-sm placeholder-white/30 resize-none focus:outline-none focus:border-white/30"
+            rows={3}
+            required
+          />
+        </div>
+
+        {/* Notes */}
+        <div className="space-y-2">
+          <label className="text-white/60 text-sm">Internal Notes (optional)</label>
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Additional notes for admin logs"
+            className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-white text-sm placeholder-white/30 resize-none focus:outline-none focus:border-white/30"
+            rows={2}
+          />
+        </div>
+
+        {/* Actions */}
+        <div className="flex gap-3 pt-2">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={loading}
+            className="flex-1 py-3 px-4 rounded-xl text-sm font-medium text-white/60 bg-white/5 border border-white/10 hover:bg-white/10 transition-colors disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={loading || !reason.trim()}
+            className="flex-1 py-3 px-4 rounded-xl text-sm font-medium text-white bg-red-500 hover:bg-red-600 transition-colors disabled:opacity-50"
+          >
+            {loading ? 'Suspending...' : 'Suspend Shop'}
+          </button>
+        </div>
+      </form>
+    </ActionModal>
+  );
+}
+
+// Activate Shop Modal
+function ActivateShopModal({ loading, onConfirm, onClose }) {
+  const [notes, setNotes] = useState('');
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    onConfirm(notes || undefined);
+  };
+
+  return (
+    <ActionModal title="Activate Shop" onClose={onClose}>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-3">
+          <p className="text-green-400 text-sm">
+            This will reactivate the shop and allow normal operations.
+          </p>
+        </div>
+
+        {/* Notes */}
+        <div className="space-y-2">
+          <label className="text-white/60 text-sm">Internal Notes (optional)</label>
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Additional notes for admin logs"
+            className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-white text-sm placeholder-white/30 resize-none focus:outline-none focus:border-white/30"
+            rows={2}
+          />
+        </div>
+
+        {/* Actions */}
+        <div className="flex gap-3 pt-2">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={loading}
+            className="flex-1 py-3 px-4 rounded-xl text-sm font-medium text-white/60 bg-white/5 border border-white/10 hover:bg-white/10 transition-colors disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={loading}
+            className="flex-1 py-3 px-4 rounded-xl text-sm font-medium text-white bg-green-500 hover:bg-green-600 transition-colors disabled:opacity-50"
+          >
+            {loading ? 'Activating...' : 'Activate Shop'}
+          </button>
+        </div>
+      </form>
+    </ActionModal>
+  );
+}
+
+// Grant Lifetime Modal
+function GrantLifetimeModal({ loading, onConfirm, onClose }) {
+  const [tier, setTier] = useState('max');
+  const [notes, setNotes] = useState('');
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    onConfirm(tier, notes || undefined);
+  };
+
+  return (
+    <ActionModal title="Grant Lifetime Subscription" onClose={onClose}>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="bg-purple-500/10 border border-purple-500/20 rounded-xl p-3">
+          <p className="text-purple-400 text-sm">
+            This will grant a permanent lifetime subscription to this shop.
+          </p>
+        </div>
+
+        {/* Tier Selection */}
+        <div className="space-y-2">
+          <label className="text-white/60 text-sm">Select Tier</label>
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => setTier('pro')}
+              className={`flex-1 py-3 px-4 rounded-xl text-sm font-medium border transition-colors ${
+                tier === 'pro'
+                  ? 'bg-blue-500/30 border-blue-500/50 text-blue-400'
+                  : 'bg-white/5 border-white/10 text-white/60 hover:bg-white/10'
+              }`}
+            >
+              PRO Lifetime
+            </button>
+            <button
+              type="button"
+              onClick={() => setTier('max')}
+              className={`flex-1 py-3 px-4 rounded-xl text-sm font-medium border transition-colors ${
+                tier === 'max'
+                  ? 'bg-purple-500/30 border-purple-500/50 text-purple-400'
+                  : 'bg-white/5 border-white/10 text-white/60 hover:bg-white/10'
+              }`}
+            >
+              MAX Lifetime
+            </button>
+          </div>
+        </div>
+
+        {/* Notes */}
+        <div className="space-y-2">
+          <label className="text-white/60 text-sm">Internal Notes (optional)</label>
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Why is lifetime being granted?"
+            className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-white text-sm placeholder-white/30 resize-none focus:outline-none focus:border-white/30"
+            rows={2}
+          />
+        </div>
+
+        {/* Actions */}
+        <div className="flex gap-3 pt-2">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={loading}
+            className="flex-1 py-3 px-4 rounded-xl text-sm font-medium text-white/60 bg-white/5 border border-white/10 hover:bg-white/10 transition-colors disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={loading}
+            className="flex-1 py-3 px-4 rounded-xl text-sm font-medium text-white bg-purple-500 hover:bg-purple-600 transition-colors disabled:opacity-50"
+          >
+            {loading ? 'Granting...' : 'Grant Lifetime'}
+          </button>
+        </div>
+      </form>
+    </ActionModal>
+  );
+}
+
+// Extend Subscription Modal
+function ExtendSubscriptionModal({ loading, onConfirm, onClose }) {
+  const [days, setDays] = useState(30);
+  const [notes, setNotes] = useState('');
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    const daysNum = parseInt(days, 10);
+    if (isNaN(daysNum) || daysNum < 1 || daysNum > 3650) {
+      alert('Please enter a valid number of days (1-3650)');
+      return;
+    }
+    onConfirm(daysNum, notes || undefined);
+  };
+
+  return (
+    <ActionModal title="Extend Subscription" onClose={onClose}>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="bg-orange-500/10 border border-orange-500/20 rounded-xl p-3">
+          <p className="text-orange-400 text-sm">
+            This will extend the current subscription period by the specified number of days.
+          </p>
+        </div>
+
+        {/* Days Input */}
+        <div className="space-y-2">
+          <label className="text-white/60 text-sm">Number of Days</label>
+          <input
+            type="number"
+            value={days}
+            onChange={(e) => setDays(e.target.value)}
+            min={1}
+            max={3650}
+            className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-white text-sm placeholder-white/30 focus:outline-none focus:border-white/30"
+          />
+          <div className="flex gap-2">
+            {[7, 14, 30, 90, 365].map((d) => (
+              <button
+                key={d}
+                type="button"
+                onClick={() => setDays(d)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                  days === d
+                    ? 'bg-orange-500/30 border-orange-500/50 text-orange-400'
+                    : 'bg-white/5 border-white/10 text-white/60 hover:bg-white/10'
+                }`}
+              >
+                {d}d
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Notes */}
+        <div className="space-y-2">
+          <label className="text-white/60 text-sm">Internal Notes (optional)</label>
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Why is subscription being extended?"
+            className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-white text-sm placeholder-white/30 resize-none focus:outline-none focus:border-white/30"
+            rows={2}
+          />
+        </div>
+
+        {/* Actions */}
+        <div className="flex gap-3 pt-2">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={loading}
+            className="flex-1 py-3 px-4 rounded-xl text-sm font-medium text-white/60 bg-white/5 border border-white/10 hover:bg-white/10 transition-colors disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={loading}
+            className="flex-1 py-3 px-4 rounded-xl text-sm font-medium text-white bg-orange-500 hover:bg-orange-600 transition-colors disabled:opacity-50"
+          >
+            {loading ? 'Extending...' : `Extend by ${days} days`}
+          </button>
+        </div>
+      </form>
+    </ActionModal>
+  );
+}
+
 // Main Component
 export default function ShopDetailModal({ isOpen, shopId, onClose, onNavigateToUser }) {
-  const { get } = useApi();
+  const { get, post } = useApi();
   const { triggerHaptic } = useTelegram();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [shopData, setShopData] = useState(null);
   const abortControllerRef = useRef(null);
+
+  // Admin action modal states
+  const [showChangeTier, setShowChangeTier] = useState(false);
+  const [showSuspend, setShowSuspend] = useState(false);
+  const [showActivate, setShowActivate] = useState(false);
+  const [showGrantLifetime, setShowGrantLifetime] = useState(false);
+  const [showExtend, setShowExtend] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
 
   const handleClose = useCallback(() => {
     triggerHaptic('light');
@@ -259,11 +684,116 @@ export default function ShopDetailModal({ isOpen, shopId, onClose, onNavigateToU
       .finally(() => setLoading(false));
   }, [triggerHaptic, fetchShopData]);
 
+  // Refresh shop data
+  const refreshShopData = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
+
+    fetchShopData(abortControllerRef.current.signal).then((result) => {
+      if (result?.status === 'error') {
+        setError(result.error);
+      }
+    });
+  }, [fetchShopData]);
+
   // Handle owner click - navigate to UserDetailModal
   const handleOwnerClick = () => {
     if (onNavigateToUser && shopData?.owner_id) {
       triggerHaptic('light');
       onNavigateToUser(shopData.owner_id);
+    }
+  };
+
+  // Admin action handlers
+  const handleChangeTier = async (tier, reason, notes) => {
+    triggerHaptic('light');
+    setActionLoading(true);
+    try {
+      const { data, error: apiError } = await post(`/admin/shops/${shopId}/change-tier`, { tier, reason, notes });
+      if (apiError || !data?.success) {
+        alert('Failed to change tier: ' + (apiError || 'Unknown error'));
+        return;
+      }
+      refreshShopData();
+      setShowChangeTier(false);
+    } catch (err) {
+      alert('Failed to change tier: ' + (err.message || 'Unknown error'));
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleSuspend = async (reason, notes) => {
+    triggerHaptic('light');
+    setActionLoading(true);
+    try {
+      const { data, error: apiError } = await post(`/admin/shops/${shopId}/suspend`, { reason, notes });
+      if (apiError || !data?.success) {
+        alert('Failed to suspend shop: ' + (apiError || 'Unknown error'));
+        return;
+      }
+      refreshShopData();
+      setShowSuspend(false);
+    } catch (err) {
+      alert('Failed to suspend shop: ' + (err.message || 'Unknown error'));
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleActivate = async (notes) => {
+    triggerHaptic('light');
+    setActionLoading(true);
+    try {
+      const { data, error: apiError } = await post(`/admin/shops/${shopId}/activate`, { notes });
+      if (apiError || !data?.success) {
+        alert('Failed to activate shop: ' + (apiError || 'Unknown error'));
+        return;
+      }
+      refreshShopData();
+      setShowActivate(false);
+    } catch (err) {
+      alert('Failed to activate shop: ' + (err.message || 'Unknown error'));
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleGrantLifetime = async (tier, notes) => {
+    triggerHaptic('light');
+    setActionLoading(true);
+    try {
+      const { data, error: apiError } = await post(`/admin/shops/${shopId}/grant-lifetime`, { tier, notes });
+      if (apiError || !data?.success) {
+        alert('Failed to grant lifetime: ' + (apiError || 'Unknown error'));
+        return;
+      }
+      refreshShopData();
+      setShowGrantLifetime(false);
+    } catch (err) {
+      alert('Failed to grant lifetime: ' + (err.message || 'Unknown error'));
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleExtendSubscription = async (days, notes) => {
+    triggerHaptic('light');
+    setActionLoading(true);
+    try {
+      const { data, error: apiError } = await post(`/admin/shops/${shopId}/extend-subscription`, { days, notes });
+      if (apiError || !data?.success) {
+        alert('Failed to extend subscription: ' + (apiError || 'Unknown error'));
+        return;
+      }
+      refreshShopData();
+      setShowExtend(false);
+    } catch (err) {
+      alert('Failed to extend subscription: ' + (err.message || 'Unknown error'));
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -440,6 +970,66 @@ export default function ShopDetailModal({ isOpen, shopId, onClose, onNavigateToU
                   />
                 </motion.div>
 
+                {/* Admin Actions Section */}
+                <motion.div
+                  className="bg-white/5 backdrop-blur-md border border-white/10 rounded-xl p-4"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.18 }}
+                >
+                  <h3 className="text-white font-bold text-sm mb-4 flex items-center gap-2">
+                    <span className="w-1 h-4 bg-orange-500 rounded-full"></span>
+                    Admin Actions
+                  </h3>
+                  <div className="grid grid-cols-2 gap-3">
+                    {/* Change Tier Button */}
+                    <motion.button
+                      onClick={() => { triggerHaptic('light'); setShowChangeTier(true); }}
+                      className="px-4 py-3 rounded-xl text-sm font-medium text-white bg-blue-500/20 border border-blue-500/30 hover:bg-blue-500/30 transition-colors"
+                      whileTap={{ scale: 0.95 }}
+                    >
+                      Change Tier
+                    </motion.button>
+
+                    {/* Suspend/Activate Button */}
+                    {shopData.is_active !== false ? (
+                      <motion.button
+                        onClick={() => { triggerHaptic('light'); setShowSuspend(true); }}
+                        className="px-4 py-3 rounded-xl text-sm font-medium text-white bg-red-500/20 border border-red-500/30 hover:bg-red-500/30 transition-colors"
+                        whileTap={{ scale: 0.95 }}
+                      >
+                        Suspend Shop
+                      </motion.button>
+                    ) : (
+                      <motion.button
+                        onClick={() => { triggerHaptic('light'); setShowActivate(true); }}
+                        className="px-4 py-3 rounded-xl text-sm font-medium text-white bg-green-500/20 border border-green-500/30 hover:bg-green-500/30 transition-colors"
+                        whileTap={{ scale: 0.95 }}
+                      >
+                        Activate Shop
+                      </motion.button>
+                    )}
+
+                    {/* Grant Lifetime Button */}
+                    <motion.button
+                      onClick={() => { triggerHaptic('light'); setShowGrantLifetime(true); }}
+                      className="px-4 py-3 rounded-xl text-sm font-medium text-white bg-purple-500/20 border border-purple-500/30 hover:bg-purple-500/30 transition-colors"
+                      whileTap={{ scale: 0.95 }}
+                    >
+                      Grant Lifetime
+                    </motion.button>
+
+                    {/* Extend Subscription Button */}
+                    <motion.button
+                      onClick={() => { triggerHaptic('light'); setShowExtend(true); }}
+                      className="px-4 py-3 rounded-xl text-sm font-medium text-white bg-orange-500/20 border border-orange-500/30 hover:bg-orange-500/30 transition-colors"
+                      whileTap={{ scale: 0.95 }}
+                    >
+                      Extend Subscription
+                    </motion.button>
+                  </div>
+                </motion.div>
+
                 {/* Products Section */}
                 {shopData.products && shopData.products.length > 0 && (
                   <motion.div
@@ -509,6 +1099,62 @@ export default function ShopDetailModal({ isOpen, shopId, onClose, onNavigateToU
           </div>
         </motion.div>
       )}
+
+      {/* Change Tier Modal */}
+      <AnimatePresence>
+        {showChangeTier && (
+          <ChangeTierModal
+            currentTier={shopData?.tier?.toLowerCase() || 'free'}
+            loading={actionLoading}
+            onConfirm={handleChangeTier}
+            onClose={() => setShowChangeTier(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Suspend Shop Modal */}
+      <AnimatePresence>
+        {showSuspend && (
+          <SuspendShopModal
+            loading={actionLoading}
+            onConfirm={handleSuspend}
+            onClose={() => setShowSuspend(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Activate Shop Modal */}
+      <AnimatePresence>
+        {showActivate && (
+          <ActivateShopModal
+            loading={actionLoading}
+            onConfirm={handleActivate}
+            onClose={() => setShowActivate(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Grant Lifetime Modal */}
+      <AnimatePresence>
+        {showGrantLifetime && (
+          <GrantLifetimeModal
+            loading={actionLoading}
+            onConfirm={handleGrantLifetime}
+            onClose={() => setShowGrantLifetime(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Extend Subscription Modal */}
+      <AnimatePresence>
+        {showExtend && (
+          <ExtendSubscriptionModal
+            loading={actionLoading}
+            onConfirm={handleExtendSubscription}
+            onClose={() => setShowExtend(false)}
+          />
+        )}
+      </AnimatePresence>
     </AnimatePresence>
   );
 }

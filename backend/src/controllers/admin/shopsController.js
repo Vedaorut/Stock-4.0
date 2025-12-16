@@ -107,7 +107,270 @@ export async function getShopDetail(req, res) {
   }
 }
 
+/**
+ * Change shop tier
+ * POST /api/admin/shops/:shopId/change-tier
+ */
+export async function changeTier(req, res) {
+  try {
+    const { shopId } = req.params;
+    const { tier, reason, notes } = req.body;
+
+    if (!tier || !['pro', 'max'].includes(tier)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid tier. Must be "pro" or "max"'
+      });
+    }
+
+    const shop = await adminQueries.changeTier(parseInt(shopId, 10), tier);
+
+    if (!shop) {
+      return res.status(404).json({
+        success: false,
+        error: 'Shop not found'
+      });
+    }
+
+    // Log action (non-blocking)
+    adminQueries.logAction({
+      adminId: req.user?.id,
+      action: 'change_tier',
+      targetType: 'shop',
+      targetId: parseInt(shopId, 10),
+      reason: reason || null,
+      notes: notes || null,
+      metadata: { oldTier: shop.tier, newTier: tier },
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent']
+    }).catch(err => {
+      logger.error('[AdminShops] Failed to log change_tier action:', err);
+    });
+
+    res.json({
+      success: true,
+      data: shop
+    });
+  } catch (error) {
+    logger.error('[AdminShops] Failed to change tier:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to change shop tier'
+    });
+  }
+}
+
+/**
+ * Suspend shop
+ * POST /api/admin/shops/:shopId/suspend
+ */
+export async function suspendShop(req, res) {
+  try {
+    const { shopId } = req.params;
+    const { reason, notes } = req.body;
+
+    if (!reason) {
+      return res.status(400).json({
+        success: false,
+        error: 'Reason is required for suspending a shop'
+      });
+    }
+
+    const shop = await adminQueries.suspendShop(parseInt(shopId, 10));
+
+    if (!shop) {
+      return res.status(404).json({
+        success: false,
+        error: 'Shop not found'
+      });
+    }
+
+    // Log action (non-blocking)
+    adminQueries.logAction({
+      adminId: req.user?.id,
+      action: 'suspend_shop',
+      targetType: 'shop',
+      targetId: parseInt(shopId, 10),
+      reason,
+      notes: notes || null,
+      metadata: { shopName: shop.name },
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent']
+    }).catch(err => {
+      logger.error('[AdminShops] Failed to log suspend_shop action:', err);
+    });
+
+    res.json({
+      success: true,
+      data: shop
+    });
+  } catch (error) {
+    logger.error('[AdminShops] Failed to suspend shop:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to suspend shop'
+    });
+  }
+}
+
+/**
+ * Activate shop
+ * POST /api/admin/shops/:shopId/activate
+ */
+export async function activateShop(req, res) {
+  try {
+    const { shopId } = req.params;
+    const { notes } = req.body;
+
+    const shop = await adminQueries.activateShop(parseInt(shopId, 10));
+
+    if (!shop) {
+      return res.status(404).json({
+        success: false,
+        error: 'Shop not found'
+      });
+    }
+
+    // Log action (non-blocking)
+    adminQueries.logAction({
+      adminId: req.user?.id,
+      action: 'activate_shop',
+      targetType: 'shop',
+      targetId: parseInt(shopId, 10),
+      reason: null,
+      notes: notes || null,
+      metadata: { shopName: shop.name },
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent']
+    }).catch(err => {
+      logger.error('[AdminShops] Failed to log activate_shop action:', err);
+    });
+
+    res.json({
+      success: true,
+      data: shop
+    });
+  } catch (error) {
+    logger.error('[AdminShops] Failed to activate shop:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to activate shop'
+    });
+  }
+}
+
+/**
+ * Grant lifetime subscription
+ * POST /api/admin/shops/:shopId/grant-lifetime
+ */
+export async function grantLifetimeSubscription(req, res) {
+  try {
+    const { shopId } = req.params;
+    const { tier, notes } = req.body;
+
+    if (!tier || !['pro', 'max'].includes(tier)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid tier. Must be "pro" or "max"'
+      });
+    }
+
+    const shop = await adminQueries.grantLifetimeSubscription(parseInt(shopId, 10), tier);
+
+    if (!shop) {
+      return res.status(404).json({
+        success: false,
+        error: 'Shop not found'
+      });
+    }
+
+    // Log action (non-blocking)
+    adminQueries.logAction({
+      adminId: req.user?.id,
+      action: 'grant_lifetime',
+      targetType: 'shop',
+      targetId: parseInt(shopId, 10),
+      reason: null,
+      notes: notes || null,
+      metadata: { tier, shopName: shop.name },
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent']
+    }).catch(err => {
+      logger.error('[AdminShops] Failed to log grant_lifetime action:', err);
+    });
+
+    res.json({
+      success: true,
+      data: shop
+    });
+  } catch (error) {
+    logger.error('[AdminShops] Failed to grant lifetime subscription:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to grant lifetime subscription'
+    });
+  }
+}
+
+/**
+ * Extend subscription
+ * POST /api/admin/shops/:shopId/extend-subscription
+ */
+export async function extendSubscription(req, res) {
+  try {
+    const { shopId } = req.params;
+    const { days, notes } = req.body;
+
+    if (!days || days <= 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid days. Must be a positive number'
+      });
+    }
+
+    const shop = await adminQueries.extendSubscription(parseInt(shopId, 10), parseInt(days, 10));
+
+    if (!shop) {
+      return res.status(404).json({
+        success: false,
+        error: 'Shop not found'
+      });
+    }
+
+    // Log action (non-blocking)
+    adminQueries.logAction({
+      adminId: req.user?.id,
+      action: 'extend_subscription',
+      targetType: 'shop',
+      targetId: parseInt(shopId, 10),
+      reason: null,
+      notes: notes || null,
+      metadata: { days: parseInt(days, 10), shopName: shop.name },
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent']
+    }).catch(err => {
+      logger.error('[AdminShops] Failed to log extend_subscription action:', err);
+    });
+
+    res.json({
+      success: true,
+      data: shop
+    });
+  } catch (error) {
+    logger.error('[AdminShops] Failed to extend subscription:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to extend subscription'
+    });
+  }
+}
+
 export default {
   getShops,
-  getShopDetail
+  getShopDetail,
+  changeTier,
+  suspendShop,
+  activateShop,
+  grantLifetimeSubscription,
+  extendSubscription
 };
