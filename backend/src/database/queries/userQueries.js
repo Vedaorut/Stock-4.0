@@ -7,7 +7,7 @@ export const userQueries = {
   // Find user by Telegram ID
   findByTelegramId: async (telegramId) => {
     const result = await query(
-      'SELECT id, telegram_id, username, first_name, last_name, selected_role, language, created_at, updated_at FROM users WHERE telegram_id = $1',
+      'SELECT id, telegram_id, username, first_name, last_name, selected_role, language, is_admin, created_at, updated_at FROM users WHERE telegram_id = $1',
       [telegramId]
     );
     return result.rows[0];
@@ -20,7 +20,7 @@ export const userQueries = {
     }
 
     const result = await query(
-      `SELECT id, telegram_id, username, first_name, last_name, selected_role, language, created_at, updated_at FROM users WHERE LOWER(username) = LOWER($1) LIMIT 1`,
+      `SELECT id, telegram_id, username, first_name, last_name, selected_role, language, is_admin, created_at, updated_at FROM users WHERE LOWER(username) = LOWER($1) LIMIT 1`,
       [username]
     );
     return result.rows[0];
@@ -29,7 +29,7 @@ export const userQueries = {
   // Find user by ID
   findById: async (id) => {
     const result = await query(
-      'SELECT id, telegram_id, username, first_name, last_name, selected_role, language, created_at, updated_at FROM users WHERE id = $1',
+      'SELECT id, telegram_id, username, first_name, last_name, selected_role, language, is_admin, created_at, updated_at FROM users WHERE id = $1',
       [id]
     );
     return result.rows[0];
@@ -46,7 +46,7 @@ export const userQueries = {
     const result = await query(
       `INSERT INTO users (telegram_id, username, first_name, last_name)
        VALUES ($1, $2, $3, $4)
-       RETURNING id, telegram_id, username, first_name, last_name, selected_role, created_at, updated_at`,
+       RETURNING id, telegram_id, username, first_name, last_name, selected_role, is_admin, created_at, updated_at`,
       [telegramId, username, firstName, lastName]
     );
     return result.rows[0];
@@ -66,7 +66,7 @@ export const userQueries = {
            last_name = COALESCE($4, last_name),
            updated_at = NOW()
        WHERE id = $1
-       RETURNING id, telegram_id, username, first_name, last_name, selected_role, language, created_at, updated_at`,
+       RETURNING id, telegram_id, username, first_name, last_name, selected_role, language, is_admin, created_at, updated_at`,
       [id, username, firstName, lastName]
     );
     return result.rows[0];
@@ -79,7 +79,7 @@ export const userQueries = {
        SET selected_role = $2,
            updated_at = NOW()
        WHERE id = $1
-       RETURNING id, telegram_id, username, first_name, last_name, selected_role, language, created_at, updated_at`,
+       RETURNING id, telegram_id, username, first_name, last_name, selected_role, language, is_admin, created_at, updated_at`,
       [userId, role]
     );
     return result.rows[0];
@@ -92,7 +92,7 @@ export const userQueries = {
        SET language = $2,
            updated_at = NOW()
        WHERE id = $1
-       RETURNING id, telegram_id, username, first_name, last_name, selected_role, language, created_at, updated_at`,
+       RETURNING id, telegram_id, username, first_name, last_name, selected_role, language, is_admin, created_at, updated_at`,
       [userId, language]
     );
     return result.rows[0];
@@ -114,7 +114,7 @@ export const userQueries = {
        SET onboarding_completed = true,
            updated_at = NOW()
        WHERE id = $1
-       RETURNING id, telegram_id, username, first_name, last_name, selected_role, language, onboarding_completed, created_at, updated_at`,
+       RETURNING id, telegram_id, username, first_name, last_name, selected_role, language, is_admin, onboarding_completed, created_at, updated_at`,
       [userId]
     );
     return result.rows[0];
