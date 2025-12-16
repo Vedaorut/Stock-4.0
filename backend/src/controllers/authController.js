@@ -465,6 +465,7 @@ export const authController = {
           last_name: user.last_name,
           selected_role: user.selected_role,
           language: user.language || null,
+          is_admin: user.is_admin || false,
           created_at: user.created_at,
         },
       });
