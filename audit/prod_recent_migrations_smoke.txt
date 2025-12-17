@@ -1,0 +1,9 @@
+           item           | present 
+--------------------------+---------
+ users.is_admin           | t
+ shops.admin_deactivated  | t
+ payments.check_count     | t
+ invoices.last_checked_at | t
+ admin_action_logs table  | t
+(5 rows)
+

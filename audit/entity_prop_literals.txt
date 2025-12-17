@@ -1,0 +1,73 @@
+backend/src/services/invoicePayment/finalizers/orderFinalizer.js:210:  if (payment?.id && payment.status !== 'confirmed') {
+backend/src/controllers/shopFollow/handlers/readHandlers.js:131:    if (follow.mode === 'monitor') {
+backend/src/controllers/shopFollow/handlers/readHandlers.js:160:    const globalMarkupType = follow.markup_type || 'percentage';
+backend/src/services/productSyncService.js:211:    if (follow.mode !== 'resell') {
+backend/src/services/productSyncService.js:249:    const markupType = follow.markup_type || 'percentage';
+backend/src/services/productSyncService.js:322:    const markupType = follow.markup_type || 'percentage';
+backend/src/services/productSyncService.js:402:    if (follow.mode !== 'resell') {
+backend/src/services/productSyncService.js:481:          const markupType = existingSync?.custom_markup_type || follow.markup_type || 'percentage';
+backend/src/controllers/shopFollow/handlers/deleteHandlers.js:45:      if (follow.mode === 'resell') {
+backend/src/services/invoicePayment/finalizers/subscriptionFinalizer.js:66: * @param {string} options.subscription.tier - Subscription tier ('pro' or 'max')
+backend/src/services/invoicePayment/finalizers/subscriptionFinalizer.js:106:  const isCrystalPay = invoice.chain === 'CRYSTALPAY' || verification.txHash?.startsWith('crystalpay_');
+backend/src/services/invoicePayment/finalizers/subscriptionFinalizer.js:126:  if (isUpgrade && subscription.tier === 'max') {
+backend/src/services/invoicePayment/finalizers/subscriptionFinalizer.js:128:    if (payment?.id && payment.status !== 'confirmed') {
+backend/src/services/invoicePayment/finalizers/subscriptionFinalizer.js:150:  const currentPeriodEnd = subscription.status === 'active' && subscription.period_end
+backend/src/services/invoicePayment/finalizers/subscriptionFinalizer.js:238:    if (payment?.id && payment.status !== 'confirmed') {
+backend/src/services/invoicePayment/finalizers/subscriptionFinalizer.js:301:    if (currentTier === 'max' && subscription.tier === 'pro') {
+backend/src/services/invoicePayment/finalizers/subscriptionFinalizer.js:465:  if (payment?.id && payment.status !== 'confirmed') {
+backend/src/services/invoicePayment/processors/subscriptionProcessor.js:121:  const isCrystalPay = invoice.chain === 'CRYSTALPAY';
+backend/src/services/invoicePayment/processors/subscriptionProcessor.js:128:    // 2. invoice.status='paid' - Already processed by webhook previously
+backend/src/services/invoicePayment/notifications/subscriptionNotifications.js:92:    const tierEmoji = subscription.tier === 'max' ? '👑' : '⭐';
+backend/src/services/invoicePayment/notifications/subscriptionNotifications.js:93:    const tierLabel = (subscription.tier || 'pro').toUpperCase();
+backend/src/services/invoicePayment/notifications/subscriptionNotifications.js:122:          [{ text: t('subscription.new.setupShopButton', {}, lang), callback_data: `start_create_shop:${subscription.tier || 'pro'}` }],
+backend/src/controllers/shopFollow/handlers/updateHandlers.js:297:    if (follow.mode !== 'resell') {
+backend/src/controllers/shopFollow/handlers/updateHandlers.js:391:    const globalMarkupType = follow.markup_type || 'percentage';
+backend/src/routes/debug.js:190:      statusIsPending: invoice.status === 'pending',
+backend/src/routes/debug.js:191:      statusIsPaid: invoice.status === 'paid',
+backend/src/routes/debug.js:192:      statusIsExpired: invoice.status === 'expired',
+backend/src/routes/debug.js:201:        invoice.status === 'pending' &&
+backend/src/controllers/shopFollow/helpers.js:40:  const markupType = follow.markup_type || 'percentage';
+backend/src/controllers/shopFollow/helpers.js:41:  const markupPercentage = follow.mode === 'resell' && markupType === 'percentage'
+backend/src/controllers/shopFollow/helpers.js:43:  const markupFixed = follow.mode === 'resell' && markupType === 'fixed'
+bot/src/utils/minimalist.js:341:    const markupType = follow.markup_type || 'percentage';
+bot/src/utils/minimalist.js:345:    const mode = follow.mode === 'resell' ? t('formatters.modeResell', {}, lang) : t('formatters.modeMonitor', {}, lang);
+bot/src/utils/minimalist.js:348:    if (follow.mode === 'resell') {
+bot/src/utils/minimalist.js:368:  const markupType = follow.markup_type || 'percentage';
+bot/src/utils/minimalist.js:377:  const isResell = follow.mode === 'resell';
+backend/src/controllers/authController.js:100:            language: user.language || null, // FIX: Don't default to 'ru' - let bot show language selection
+backend/src/controllers/authController.js:372:            language: user.language || null, // FIX: Don't default to 'ru' - let bot show language selection
+backend/src/routes/payments.js:181:    if (invoice.crystalpay_id && invoice.status === 'pending' && invoiceAge > MIN_AGE_FOR_FALLBACK) {
+backend/src/routes/payments.js:237:      if (invoice.status === 'paid' || invoice.status === 'confirmed') {
+backend/src/routes/payments.js:239:      } else if (invoice.status === 'expired' || invoice.status === 'cancelled') {
+webapp/src/pages/FollowDetail.jsx:291:        if (follow.mode === 'monitor') {
+bot/src/scenes/markOrdersCompleted.js:44:    const activeOrders = orders.filter((order) => order.status === 'confirmed');
+bot/src/handlers/seller/follows.js:29:  const isResell = follow.mode === 'resell';
+bot/src/handlers/seller/follows.js:30:  const markupType = follow.markup_type || 'percentage';
+bot/src/handlers/seller/follows.js:366:    const isResell = follow.mode === 'resell';
+bot/src/handlers/seller/follows.js:486:    const newMode = follow.mode === 'monitor' ? 'resell' : 'monitor';
+bot/src/handlers/seller/orders.js:67:      order.status === 'confirmed'
+bot/src/scenes/markOrdersShipped.js:42:    const activeOrders = orders.filter((order) => order.status === 'confirmed');
+bot/src/texts/messages.js:686:          follow.mode === 'resell' ? t('formatters.modeResell', {}, lang) : t('formatters.modeMonitor', {}, lang);
+bot/src/texts/messages.js:691:        const markupText = follow.mode === 'resell' ? `, +${markup}` : '';
+bot/src/texts/messages.js:711:      const status = safe(order.status || 'processing');
+bot/src/i18n/formatters.js:119:        follow.mode === 'resell'
+bot/src/i18n/formatters.js:126:      const markupText = follow.mode === 'resell' ? `, +${markup}` : '';
+bot/src/i18n/formatters.js:157:    const status = safe(order.status || 'processing');
+webapp/src/mocks/handlers/follows.js:102:    if (follow.mode === 'monitor') {
+webapp/src/mocks/handlers/follows.js:105:    } else if (follow.mode === 'resell') {
+webapp/src/App.jsx:84:      const mode = user.selected_role === 'seller' ? 'seller' : 'buyer';
+backend/src/controllers/shopSubscriberController.js:54:      const lang = req.user.language || 'ru';
+backend/src/validators/orderValidator.js:197:    if (order.status !== 'pending') {
+backend/src/workers/paymentVerificationWorker.js:640:    if (!order || order.status !== 'pending') {
+backend/src/workers/paymentVerificationWorker.js:651:      } else if (order.status === 'confirmed') {
+webapp/src/components/Follows/FollowCard.jsx:8:  const modeLabel = follow.mode === 'monitor' ? t('follows.monitorMode') : t('follows.resellMode');
+webapp/src/components/Follows/FollowCard.jsx:9:  const ModeIcon = follow.mode === 'monitor' ? EyeIcon : ArrowPathIcon;
+webapp/src/components/Follows/FollowCard.jsx:37:                follow.mode === 'monitor' 
+webapp/src/components/Follows/FollowCard.jsx:46:              {follow.mode === 'resell' && (follow.markup_percentage || follow.markup_fixed) && (
+webapp/src/components/Follows/FollowCard.jsx:49:                    {follow.markup_type === 'fixed'
+backend/src/controllers/order/handlers/paymentHandlers.js:157:  if (order.status === 'confirmed') {
+backend/src/controllers/order/handlers/paymentHandlers.js:163:  if (order.status !== 'pending') {
+backend/src/controllers/order/handlers/paymentHandlers.js:485:  if (order.status === 'confirmed') {
+backend/src/controllers/shopController.js:151:            if (subscription.status !== 'active' && subscription.status !== 'paid') {
+webapp/src/components/Settings/UserDetailModal.jsx:120:  const status = order.status || 'pending';
+webapp/src/components/Settings/ShopDetailModal.jsx:96:  const status = order.status || 'pending';

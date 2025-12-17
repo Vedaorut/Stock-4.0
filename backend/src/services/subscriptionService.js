@@ -421,6 +421,9 @@ async function checkExpiredTrials() {
 async function activatePromoSubscription(shopId, userId, promoCode, targetTier = 'pro', isPermanent = false) {
   const client = await pool.connect();
 
+  // Map tier for shops table (constraint: pro | max, no 'basic')
+  const shopTier = targetTier === 'basic' ? 'pro' : targetTier;
+
   try {
     await client.query('BEGIN');
 
@@ -479,7 +482,7 @@ async function activatePromoSubscription(shopId, userId, promoCode, targetTier =
            updated_at = NOW()
        WHERE id = $1
        RETURNING *`,
-      [shopId, targetTier, nextPayment]
+      [shopId, shopTier, nextPayment]  // Use shopTier (mapped for shops constraint)
     );
 
     await client.query('COMMIT');

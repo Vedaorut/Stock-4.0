@@ -1,0 +1,11 @@
+   table_name   | column_name |          data_type          
+----------------+-------------+-----------------------------
+ invoices       | expires_at  | timestamp without time zone
+ payments       | check_count | integer
+ products       | is_active   | boolean
+ promo_codes    | expires_at  | timestamp without time zone
+ promo_codes    | is_active   | boolean
+ refresh_tokens | expires_at  | timestamp with time zone
+ shops          | is_active   | boolean
+(7 rows)
+

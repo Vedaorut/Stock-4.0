@@ -1,0 +1,1320 @@
+[
+  {
+    "table": "shops",
+    "column": "tier",
+    "value": "PRO",
+    "allowed": [
+      "max",
+      "pro"
+    ],
+    "path": "webapp/src/store/__tests__/useStore.test.js",
+    "line": 780,
+    "code": "const mockShop = { id: 100, name: 'My Shop', tier: 'PRO' };",
+    "severity": "P2"
+  },
+  {
+    "table": "shops",
+    "column": "tier",
+    "value": "BASIC",
+    "allowed": [
+      "max",
+      "pro"
+    ],
+    "path": "webapp/src/store/__tests__/useStore.test.js",
+    "line": 781,
+    "code": "const mockShop2 = { id: 200, name: 'Second Shop', tier: 'BASIC' };",
+    "severity": "P2"
+  },
+  {
+    "table": "shops",
+    "column": "tier",
+    "value": "PRO",
+    "allowed": [
+      "max",
+      "pro"
+    ],
+    "path": "webapp/src/store/__tests__/useStore.test.js",
+    "line": 1367,
+    "code": "const mockShop = { id: 100, name: 'Employer Shop', tier: 'PRO' };",
+    "severity": "P2"
+  },
+  {
+    "table": "shops",
+    "column": "tier",
+    "value": "BASIC",
+    "allowed": [
+      "max",
+      "pro"
+    ],
+    "path": "webapp/src/store/__tests__/useStore.test.js",
+    "line": 1368,
+    "code": "const myShop = { id: 200, name: 'My Shop', tier: 'BASIC' };",
+    "severity": "P2"
+  },
+  {
+    "table": "payments",
+    "column": "status",
+    "value": "active",
+    "allowed": [
+      "confirmed",
+      "failed",
+      "needs_review",
+      "pending",
+      "processing"
+    ],
+    "path": "backend/src/services/invoicePayment/finalizers/subscriptionFinalizer.js",
+    "line": 92,
+    "code": "*   subscription: { id: 1, shop_id: 10, user_id: 5, tier: 'pro', status: 'active' },",
+    "severity": "P2"
+  },
+  {
+    "table": "payments",
+    "column": "status",
+    "value": "active",
+    "allowed": [
+      "confirmed",
+      "failed",
+      "needs_review",
+      "pending",
+      "processing"
+    ],
+    "path": "backend/src/services/invoicePayment/finalizers/subscriptionFinalizer.js",
+    "line": 150,
+    "code": "const currentPeriodEnd = subscription.status === 'active' && subscription.period_end",
+    "severity": "P1"
+  },
+  {
+    "table": "payments",
+    "column": "status",
+    "value": "active",
+    "allowed": [
+      "confirmed",
+      "failed",
+      "needs_review",
+      "pending",
+      "processing"
+    ],
+    "path": "backend/src/services/invoicePayment/finalizers/subscriptionFinalizer.js",
+    "line": 217,
+    "code": "SET status = 'active',",
+    "severity": "P0"
+  },
+  {
+    "table": "payments",
+    "column": "status",
+    "value": "active",
+    "allowed": [
+      "confirmed",
+      "failed",
+      "needs_review",
+      "pending",
+      "processing"
+    ],
+    "path": "backend/src/services/invoicePayment/finalizers/subscriptionFinalizer.js",
+    "line": 345,
+    "code": "SET status = 'active',",
+    "severity": "P0"
+  },
+  {
+    "table": "payments",
+    "column": "status",
+    "value": "active",
+    "allowed": [
+      "confirmed",
+      "failed",
+      "needs_review",
+      "pending",
+      "processing"
+    ],
+    "path": "backend/src/services/invoicePayment/finalizers/subscriptionFinalizer.js",
+    "line": 401,
+    "code": "status = 'active',",
+    "severity": "P2"
+  },
+  {
+    "table": "payments",
+    "column": "status",
+    "value": "active",
+    "allowed": [
+      "confirmed",
+      "failed",
+      "needs_review",
+      "pending",
+      "processing"
+    ],
+    "path": "backend/src/services/invoicePayment/finalizers/subscriptionFinalizer.js",
+    "line": 441,
+    "code": "SET status = 'active',",
+    "severity": "P0"
+  },
+  {
+    "table": "invoices",
+    "column": "status",
+    "value": "confirmed",
+    "allowed": [
+      "cancelled",
+      "expired",
+      "paid",
+      "pending"
+    ],
+    "path": "backend/src/services/subscriptionInvoiceService.js",
+    "line": 50,
+    "code": "status IN ('paid', 'confirmed')",
+    "severity": "P1"
+  },
+  {
+    "table": "payments",
+    "column": "status",
+    "value": "paid",
+    "allowed": [
+      "confirmed",
+      "failed",
+      "needs_review",
+      "pending",
+      "processing"
+    ],
+    "path": "backend/src/services/invoicePayment/processors/orderProcessor.js",
+    "line": 137,
+    "code": "if (preliminaryInvoice.status === 'paid') {",
+    "severity": "P1"
+  },
+  {
+    "table": "payments",
+    "column": "status",
+    "value": "paid",
+    "allowed": [
+      "confirmed",
+      "failed",
+      "needs_review",
+      "pending",
+      "processing"
+    ],
+    "path": "backend/src/services/invoicePayment/processors/orderProcessor.js",
+    "line": 422,
+    "code": "SET status = 'paid',",
+    "severity": "P0"
+  },
+  {
+    "table": "payments",
+    "column": "status",
+    "value": "paid",
+    "allowed": [
+      "confirmed",
+      "failed",
+      "needs_review",
+      "pending",
+      "processing"
+    ],
+    "path": "backend/src/services/invoicePayment/processors/orderProcessor.js",
+    "line": 453,
+    "code": "status: 'paid',",
+    "severity": "P2"
+  },
+  {
+    "table": "payments",
+    "column": "status",
+    "value": "cancelled",
+    "allowed": [
+      "confirmed",
+      "failed",
+      "needs_review",
+      "pending",
+      "processing"
+    ],
+    "path": "backend/src/workers/paymentVerificationWorker.js",
+    "line": 389,
+    "code": "SET status = 'cancelled', updated_at = NOW()",
+    "severity": "P0"
+  },
+  {
+    "table": "payments",
+    "column": "status",
+    "value": "paid",
+    "allowed": [
+      "confirmed",
+      "failed",
+      "needs_review",
+      "pending",
+      "processing"
+    ],
+    "path": "backend/src/workers/paymentVerificationWorker.js",
+    "line": 755,
+    "code": "status: 'paid',",
+    "severity": "P2"
+  },
+  {
+    "table": "shops",
+    "column": "tier",
+    "value": "basic",
+    "allowed": [
+      "max",
+      "pro"
+    ],
+    "path": "backend/src/services/__tests__/subscriptionService.test.js",
+    "line": 880,
+    "code": ".mockResolvedValueOnce({ rows: [{ id: 1, tier: 'basic', owner_id: 123 }] }) // shop FOR UPDATE",
+    "severity": "P2"
+  },
+  {
+    "table": "payments",
+    "column": "status",
+    "value": "paid",
+    "allowed": [
+      "confirmed",
+      "failed",
+      "needs_review",
+      "pending",
+      "processing"
+    ],
+    "path": "backend/src/routes/payments.js",
+    "line": 203,
+    "code": "status = 'paid';",
+    "severity": "P2"
+  },
+  {
+    "table": "payments",
+    "column": "status",
+    "value": "paid_pending_activation",
+    "allowed": [
+      "confirmed",
+      "failed",
+      "needs_review",
+      "pending",
+      "processing"
+    ],
+    "path": "backend/src/routes/payments.js",
+    "line": 219,
+    "code": "status = 'paid_pending_activation';",
+    "severity": "P2"
+  },
+  {
+    "table": "payments",
+    "column": "status",
+    "value": "paid",
+    "allowed": [
+      "confirmed",
+      "failed",
+      "needs_review",
+      "pending",
+      "processing"
+    ],
+    "path": "backend/src/routes/payments.js",
+    "line": 223,
+    "code": "status = 'paid';",
+    "severity": "P2"
+  },
+  {
+    "table": "payments",
+    "column": "status",
+    "value": "paid",
+    "allowed": [
+      "confirmed",
+      "failed",
+      "needs_review",
+      "pending",
+      "processing"
+    ],
+    "path": "backend/src/routes/payments.js",
+    "line": 237,
+    "code": "if (invoice.status === 'paid' || invoice.status === 'confirmed') {",
+    "severity": "P1"
+  },
+  {
+    "table": "payments",
+    "column": "status",
+    "value": "paid",
+    "allowed": [
+      "confirmed",
+      "failed",
+      "needs_review",
+      "pending",
+      "processing"
+    ],
+    "path": "backend/src/routes/payments.js",
+    "line": 238,
+    "code": "status = 'paid';",
+    "severity": "P2"
+  },
+  {
+    "table": "payments",
+    "column": "status",
+    "value": "expired",
+    "allowed": [
+      "confirmed",
+      "failed",
+      "needs_review",
+      "pending",
+      "processing"
+    ],
+    "path": "backend/src/routes/payments.js",
+    "line": 239,
+    "code": "} else if (invoice.status === 'expired' || invoice.status === 'cancelled') {",
+    "severity": "P1"
+  },
+  {
+    "table": "payments",
+    "column": "status",
+    "value": "cancelled",
+    "allowed": [
+      "confirmed",
+      "failed",
+      "needs_review",
+      "pending",
+      "processing"
+    ],
+    "path": "backend/src/routes/payments.js",
+    "line": 239,
+    "code": "} else if (invoice.status === 'expired' || invoice.status === 'cancelled') {",
+    "severity": "P1"
+  },
+  {
+    "table": "payments",
+    "column": "status",
+    "value": "expired",
+    "allowed": [
+      "confirmed",
+      "failed",
+      "needs_review",
+      "pending",
+      "processing"
+    ],
+    "path": "backend/src/routes/payments.js",
+    "line": 240,
+    "code": "status = 'expired';",
+    "severity": "P2"
+  },
+  {
+    "table": "shop_follows",
+    "column": "mode",
+    "value": "observe",
+    "allowed": [
+      "monitor",
+      "resell"
+    ],
+    "path": "backend/src/services/__tests__/productSyncService.test.js",
+    "line": 220,
+    "code": "const nonResellFollow = { ...mockFollow, mode: 'observe' };",
+    "severity": "P2"
+  },
+  {
+    "table": "shop_follows",
+    "column": "mode",
+    "value": "observe",
+    "allowed": [
+      "monitor",
+      "resell"
+    ],
+    "path": "backend/src/services/__tests__/productSyncService.test.js",
+    "line": 611,
+    "code": "const observeFollow = { ...mockFollow, mode: 'observe' };",
+    "severity": "P2"
+  },
+  {
+    "table": "shop_follows",
+    "column": "status",
+    "value": "error",
+    "allowed": [
+      "active",
+      "cancelled",
+      "paused"
+    ],
+    "path": "webapp/src/pages/FollowDetail.jsx",
+    "line": 69,
+    "code": "if (!followDetailId) return { status: 'error', error: 'No follow ID' };",
+    "severity": "P2"
+  },
+  {
+    "table": "shop_follows",
+    "column": "status",
+    "value": "aborted",
+    "allowed": [
+      "active",
+      "cancelled",
+      "paused"
+    ],
+    "path": "webapp/src/pages/FollowDetail.jsx",
+    "line": 76,
+    "code": "if (signal?.aborted) return { status: 'aborted' };",
+    "severity": "P2"
+  },
+  {
+    "table": "shop_follows",
+    "column": "status",
+    "value": "aborted",
+    "allowed": [
+      "active",
+      "cancelled",
+      "paused"
+    ],
+    "path": "webapp/src/pages/FollowDetail.jsx",
+    "line": 86,
+    "code": "return { status: 'aborted' };",
+    "severity": "P2"
+  },
+  {
+    "table": "shop_follows",
+    "column": "status",
+    "value": "error",
+    "allowed": [
+      "active",
+      "cancelled",
+      "paused"
+    ],
+    "path": "webapp/src/pages/FollowDetail.jsx",
+    "line": 93,
+    "code": "return { status: 'error', error: 'Failed to load subscription' };",
+    "severity": "P2"
+  },
+  {
+    "table": "shop_follows",
+    "column": "status",
+    "value": "success",
+    "allowed": [
+      "active",
+      "cancelled",
+      "paused"
+    ],
+    "path": "webapp/src/pages/FollowDetail.jsx",
+    "line": 98,
+    "code": "return { status: 'success' };",
+    "severity": "P2"
+  },
+  {
+    "table": "shop_follows",
+    "column": "status",
+    "value": "aborted",
+    "allowed": [
+      "active",
+      "cancelled",
+      "paused"
+    ],
+    "path": "webapp/src/pages/FollowDetail.jsx",
+    "line": 177,
+    "code": "if (result?.status === 'aborted') return;",
+    "severity": "P1"
+  },
+  {
+    "table": "shop_follows",
+    "column": "status",
+    "value": "error",
+    "allowed": [
+      "active",
+      "cancelled",
+      "paused"
+    ],
+    "path": "webapp/src/pages/FollowDetail.jsx",
+    "line": 178,
+    "code": "if (result?.status === 'error') {",
+    "severity": "P1"
+  },
+  {
+    "table": "shop_follows",
+    "column": "status",
+    "value": "success",
+    "allowed": [
+      "active",
+      "cancelled",
+      "paused"
+    ],
+    "path": "webapp/src/pages/FollowDetail.jsx",
+    "line": 181,
+    "code": "} else if (result?.status === 'success') {",
+    "severity": "P1"
+  },
+  {
+    "table": "shop_follows",
+    "column": "status",
+    "value": "error",
+    "allowed": [
+      "active",
+      "cancelled",
+      "paused"
+    ],
+    "path": "webapp/src/pages/FollowDetail.jsx",
+    "line": 258,
+    "code": "if (!controller.signal.aborted && result?.status === 'error') {",
+    "severity": "P1"
+  },
+  {
+    "table": "shop_follows",
+    "column": "status",
+    "value": "success",
+    "allowed": [
+      "active",
+      "cancelled",
+      "paused"
+    ],
+    "path": "webapp/src/pages/FollowDetail.jsx",
+    "line": 261,
+    "code": "} else if (!controller.signal.aborted && result?.status === 'success') {",
+    "severity": "P1"
+  },
+  {
+    "table": "shop_follows",
+    "column": "status",
+    "value": "aborted",
+    "allowed": [
+      "active",
+      "cancelled",
+      "paused"
+    ],
+    "path": "webapp/src/pages/Follows.jsx",
+    "line": 57,
+    "code": "if (signal?.aborted) return { status: 'aborted' };",
+    "severity": "P2"
+  },
+  {
+    "table": "shop_follows",
+    "column": "status",
+    "value": "error",
+    "allowed": [
+      "active",
+      "cancelled",
+      "paused"
+    ],
+    "path": "webapp/src/pages/Follows.jsx",
+    "line": 61,
+    "code": "return { status: 'error', error: subsError || 'Failed to load subscriptions' };",
+    "severity": "P2"
+  },
+  {
+    "table": "shop_follows",
+    "column": "status",
+    "value": "aborted",
+    "allowed": [
+      "active",
+      "cancelled",
+      "paused"
+    ],
+    "path": "webapp/src/pages/Follows.jsx",
+    "line": 72,
+    "code": "if (signal?.aborted) return { status: 'aborted' };",
+    "severity": "P2"
+  },
+  {
+    "table": "shop_follows",
+    "column": "status",
+    "value": "success",
+    "allowed": [
+      "active",
+      "cancelled",
+      "paused"
+    ],
+    "path": "webapp/src/pages/Follows.jsx",
+    "line": 77,
+    "code": "return { status: 'success' };",
+    "severity": "P2"
+  },
+  {
+    "table": "shop_follows",
+    "column": "status",
+    "value": "aborted",
+    "allowed": [
+      "active",
+      "cancelled",
+      "paused"
+    ],
+    "path": "webapp/src/pages/Follows.jsx",
+    "line": 90,
+    "code": "if (signal?.aborted) return { status: 'aborted' };",
+    "severity": "P2"
+  },
+  {
+    "table": "shop_follows",
+    "column": "status",
+    "value": "partial_error",
+    "allowed": [
+      "active",
+      "cancelled",
+      "paused"
+    ],
+    "path": "webapp/src/pages/Follows.jsx",
+    "line": 95,
+    "code": "return { status: 'partial_error', error: followsError };",
+    "severity": "P2"
+  },
+  {
+    "table": "shop_follows",
+    "column": "status",
+    "value": "success",
+    "allowed": [
+      "active",
+      "cancelled",
+      "paused"
+    ],
+    "path": "webapp/src/pages/Follows.jsx",
+    "line": 103,
+    "code": "return { status: 'success' };",
+    "severity": "P2"
+  },
+  {
+    "table": "shop_follows",
+    "column": "status",
+    "value": "error",
+    "allowed": [
+      "active",
+      "cancelled",
+      "paused"
+    ],
+    "path": "webapp/src/pages/Follows.jsx",
+    "line": 124,
+    "code": "if (!controller.signal.aborted && result?.status === 'error') {",
+    "severity": "P1"
+  },
+  {
+    "table": "shop_follows",
+    "column": "status",
+    "value": "error",
+    "allowed": [
+      "active",
+      "cancelled",
+      "paused"
+    ],
+    "path": "webapp/src/pages/Follows.jsx",
+    "line": 222,
+    "code": "if (result?.status === 'error') {",
+    "severity": "P1"
+  },
+  {
+    "table": "shop_follows",
+    "column": "mode",
+    "value": "string",
+    "allowed": [
+      "monitor",
+      "resell"
+    ],
+    "path": "backend/src/controllers/shopFollow/handlers/createHandlers.js",
+    "line": 23,
+    "code": "const normalizedMode = typeof mode === 'string' ? mode.trim().toLowerCase() : '';",
+    "severity": "P1"
+  },
+  {
+    "table": "shop_follows",
+    "column": "mode",
+    "value": "string",
+    "allowed": [
+      "monitor",
+      "resell"
+    ],
+    "path": "backend/src/controllers/shopFollow/handlers/updateHandlers.js",
+    "line": 84,
+    "code": "const modeRaw = typeof req.body.mode === 'string' ? req.body.mode.trim().toLowerCase() : '';",
+    "severity": "P1"
+  },
+  {
+    "table": "shops",
+    "column": "tier",
+    "value": "all",
+    "allowed": [
+      "max",
+      "pro"
+    ],
+    "path": "backend/src/controllers/admin/shopsController.js",
+    "line": 16,
+    "code": "const { page = 1, limit = 50, search = '', tier = 'all', status = 'all' } = req.query;",
+    "severity": "P2"
+  },
+  {
+    "table": "payments",
+    "column": "status",
+    "value": "cancelled",
+    "allowed": [
+      "confirmed",
+      "failed",
+      "needs_review",
+      "pending",
+      "processing"
+    ],
+    "path": "backend/src/controllers/admin/paymentReviewController.js",
+    "line": 229,
+    "code": "SET status = 'cancelled',",
+    "severity": "P0"
+  },
+  {
+    "table": "shop_follows",
+    "column": "mode",
+    "value": ", ",
+    "allowed": [
+      "monitor",
+      "resell"
+    ],
+    "path": "bot/src/scenes/createFollow.js",
+    "line": 282,
+    "code": "const mode = ctx.callbackQuery.data.replace('mode:', '');",
+    "severity": "P2"
+  },
+  {
+    "table": "orders",
+    "column": "status",
+    "value": "paid,confirmed",
+    "allowed": [
+      "cancelled",
+      "confirmed",
+      "delivered",
+      "pending",
+      "shipped"
+    ],
+    "path": "bot/src/handlers/seller/orders.js",
+    "line": 60,
+    "code": "const result = await orderApi.getShopOrders(shopId, token, { status: 'paid,confirmed' });",
+    "severity": "P2"
+  },
+  {
+    "table": "orders",
+    "column": "status",
+    "value": "paid,completed,confirmed,shipped,delivered",
+    "allowed": [
+      "cancelled",
+      "confirmed",
+      "delivered",
+      "pending",
+      "shipped"
+    ],
+    "path": "bot/src/handlers/seller/orders.js",
+    "line": 221,
+    "code": "status: 'paid,completed,confirmed,shipped,delivered',",
+    "severity": "P2"
+  },
+  {
+    "table": "payments",
+    "column": "status",
+    "value": "active",
+    "allowed": [
+      "confirmed",
+      "failed",
+      "needs_review",
+      "pending",
+      "processing"
+    ],
+    "path": "backend/src/controllers/shopController.js",
+    "line": 150,
+    "code": "// Note: status='active' is set by subscriptionFinalizer after payment confirmation",
+    "severity": "P2"
+  },
+  {
+    "table": "shop_follows",
+    "column": "mode",
+    "value": "upgrade",
+    "allowed": [
+      "monitor",
+      "resell"
+    ],
+    "path": "backend/src/controllers/subscription/handlers/upgradeHandlers.js",
+    "line": 127,
+    "code": "mode: 'upgrade',",
+    "severity": "P2"
+  },
+  {
+    "table": "shop_follows",
+    "column": "mode",
+    "value": "buyer",
+    "allowed": [
+      "monitor",
+      "resell"
+    ],
+    "path": "webapp/src/App.jsx",
+    "line": 87,
+    "code": "if (mode === 'buyer') {",
+    "severity": "P1"
+  },
+  {
+    "table": "shop_follows",
+    "column": "mode",
+    "value": "wait",
+    "allowed": [
+      "monitor",
+      "resell"
+    ],
+    "path": "webapp/src/App.jsx",
+    "line": 451,
+    "code": "<AnimatePresence mode=\"wait\">",
+    "severity": "P2"
+  },
+  {
+    "table": "shop_follows",
+    "column": "mode",
+    "value": "min",
+    "allowed": [
+      "monitor",
+      "resell"
+    ],
+    "path": "webapp/src/hooks/useKeyboardViewport.js",
+    "line": 52,
+    "code": "return mode === 'min' ? Math.min(...values) : Math.max(...values);",
+    "severity": "P1"
+  },
+  {
+    "table": "payments",
+    "column": "status",
+    "value": "already_confirmed",
+    "allowed": [
+      "confirmed",
+      "failed",
+      "needs_review",
+      "pending",
+      "processing"
+    ],
+    "path": "backend/src/controllers/order/handlers/paymentHandlers.js",
+    "line": 160,
+    "code": "data: { status: 'already_confirmed', orderId: parseInt(id) },",
+    "severity": "P2"
+  },
+  {
+    "table": "payments",
+    "column": "status",
+    "value": "fulfilled",
+    "allowed": [
+      "confirmed",
+      "failed",
+      "needs_review",
+      "pending",
+      "processing"
+    ],
+    "path": "backend/src/controllers/order/handlers/paymentHandlers.js",
+    "line": 397,
+    "code": "if (result.status === 'fulfilled') {",
+    "severity": "P1"
+  },
+  {
+    "table": "payments",
+    "column": "status",
+    "value": "awaiting_payment",
+    "allowed": [
+      "confirmed",
+      "failed",
+      "needs_review",
+      "pending",
+      "processing"
+    ],
+    "path": "backend/src/controllers/order/handlers/paymentHandlers.js",
+    "line": 495,
+    "code": "data: { status: 'awaiting_payment', orderId: parseInt(id) },",
+    "severity": "P2"
+  },
+  {
+    "table": "shops",
+    "column": "tier",
+    "value": "FREE",
+    "allowed": [
+      "max",
+      "pro"
+    ],
+    "path": "webapp/src/mocks/handlers/shops.js",
+    "line": 64,
+    "code": "tier: 'FREE',",
+    "severity": "P2"
+  },
+  {
+    "table": "processed_webhooks",
+    "column": "source",
+    "value": "ErrorBoundary",
+    "allowed": [
+      "blockcypher",
+      "crystalpay",
+      "etherscan",
+      "trongrid"
+    ],
+    "path": "webapp/src/components/ErrorBoundary.jsx",
+    "line": 34,
+    "code": "source: 'ErrorBoundary',",
+    "severity": "P2"
+  },
+  {
+    "table": "shop_follows",
+    "column": "mode",
+    "value": "wait",
+    "allowed": [
+      "monitor",
+      "resell"
+    ],
+    "path": "webapp/src/components/Follows/CreateFollowModal.jsx",
+    "line": 248,
+    "code": "<AnimatePresence mode=\"wait\">",
+    "severity": "P2"
+  },
+  {
+    "table": "shop_follows",
+    "column": "mode",
+    "value": "wait",
+    "allowed": [
+      "monitor",
+      "resell"
+    ],
+    "path": "webapp/src/components/Layout/TabBar.jsx",
+    "line": 639,
+    "code": "<AnimatePresence mode=\"wait\">",
+    "severity": "P2"
+  },
+  {
+    "table": "shop_follows",
+    "column": "mode",
+    "value": "popLayout",
+    "allowed": [
+      "monitor",
+      "resell"
+    ],
+    "path": "webapp/src/components/Cart/CartSheet.jsx",
+    "line": 232,
+    "code": "<AnimatePresence initial={false} mode=\"popLayout\">",
+    "severity": "P2"
+  },
+  {
+    "table": "shop_follows",
+    "column": "status",
+    "value": "aborted",
+    "allowed": [
+      "active",
+      "cancelled",
+      "paused"
+    ],
+    "path": "webapp/src/components/Settings/FollowsModal.jsx",
+    "line": 53,
+    "code": "if (signal?.aborted) return { status: 'aborted' };",
+    "severity": "P2"
+  },
+  {
+    "table": "shop_follows",
+    "column": "status",
+    "value": "success",
+    "allowed": [
+      "active",
+      "cancelled",
+      "paused"
+    ],
+    "path": "webapp/src/components/Settings/FollowsModal.jsx",
+    "line": 68,
+    "code": "return { status: 'success' };",
+    "severity": "P2"
+  },
+  {
+    "table": "shop_follows",
+    "column": "status",
+    "value": "aborted",
+    "allowed": [
+      "active",
+      "cancelled",
+      "paused"
+    ],
+    "path": "webapp/src/components/Settings/FollowsModal.jsx",
+    "line": 83,
+    "code": "if (signal?.aborted) return { status: 'aborted' };",
+    "severity": "P2"
+  },
+  {
+    "table": "shop_follows",
+    "column": "status",
+    "value": "success",
+    "allowed": [
+      "active",
+      "cancelled",
+      "paused"
+    ],
+    "path": "webapp/src/components/Settings/FollowsModal.jsx",
+    "line": 134,
+    "code": "return { status: 'success' };",
+    "severity": "P2"
+  },
+  {
+    "table": "shop_follows",
+    "column": "status",
+    "value": "aborted",
+    "allowed": [
+      "active",
+      "cancelled",
+      "paused"
+    ],
+    "path": "webapp/src/components/Settings/FollowsModal.jsx",
+    "line": 136,
+    "code": "if (signal?.aborted) return { status: 'aborted' };",
+    "severity": "P2"
+  },
+  {
+    "table": "shop_follows",
+    "column": "status",
+    "value": "error",
+    "allowed": [
+      "active",
+      "cancelled",
+      "paused"
+    ],
+    "path": "webapp/src/components/Settings/FollowsModal.jsx",
+    "line": 144,
+    "code": "return { status: 'error', error: error.message };",
+    "severity": "P2"
+  },
+  {
+    "table": "shop_follows",
+    "column": "status",
+    "value": "error",
+    "allowed": [
+      "active",
+      "cancelled",
+      "paused"
+    ],
+    "path": "webapp/src/components/Settings/FollowsModal.jsx",
+    "line": 162,
+    "code": "if (!controller.signal.aborted && result?.status === 'error') {",
+    "severity": "P1"
+  },
+  {
+    "table": "shop_follows",
+    "column": "mode",
+    "value": "wait",
+    "allowed": [
+      "monitor",
+      "resell"
+    ],
+    "path": "webapp/src/components/Settings/FollowsModal.jsx",
+    "line": 432,
+    "code": "<AnimatePresence mode=\"wait\">",
+    "severity": "P2"
+  },
+  {
+    "table": "orders",
+    "column": "status",
+    "value": "aborted",
+    "allowed": [
+      "cancelled",
+      "confirmed",
+      "delivered",
+      "pending",
+      "shipped"
+    ],
+    "path": "webapp/src/components/Settings/OrdersModal.jsx",
+    "line": 149,
+    "code": "if (signal?.aborted) return { status: 'aborted' };",
+    "severity": "P2"
+  },
+  {
+    "table": "orders",
+    "column": "status",
+    "value": "error",
+    "allowed": [
+      "cancelled",
+      "confirmed",
+      "delivered",
+      "pending",
+      "shipped"
+    ],
+    "path": "webapp/src/components/Settings/OrdersModal.jsx",
+    "line": 153,
+    "code": "return { status: 'error' };",
+    "severity": "P2"
+  },
+  {
+    "table": "orders",
+    "column": "status",
+    "value": "error",
+    "allowed": [
+      "cancelled",
+      "confirmed",
+      "delivered",
+      "pending",
+      "shipped"
+    ],
+    "path": "webapp/src/components/Settings/OrdersModal.jsx",
+    "line": 165,
+    "code": "return { status: 'error' };",
+    "severity": "P2"
+  },
+  {
+    "table": "orders",
+    "column": "status",
+    "value": "success",
+    "allowed": [
+      "cancelled",
+      "confirmed",
+      "delivered",
+      "pending",
+      "shipped"
+    ],
+    "path": "webapp/src/components/Settings/OrdersModal.jsx",
+    "line": 168,
+    "code": "return { status: 'success' };",
+    "severity": "P2"
+  },
+  {
+    "table": "orders",
+    "column": "status",
+    "value": "error",
+    "allowed": [
+      "cancelled",
+      "confirmed",
+      "delivered",
+      "pending",
+      "shipped"
+    ],
+    "path": "webapp/src/components/Settings/OrdersModal.jsx",
+    "line": 187,
+    "code": "if (!controller.signal.aborted && result?.status === 'error') {",
+    "severity": "P1"
+  },
+  {
+    "table": "orders",
+    "column": "status",
+    "value": "aborted",
+    "allowed": [
+      "cancelled",
+      "confirmed",
+      "delivered",
+      "pending",
+      "shipped"
+    ],
+    "path": "webapp/src/components/Settings/OrdersModal.jsx",
+    "line": 216,
+    "code": "if (result?.status === 'aborted') return;",
+    "severity": "P1"
+  },
+  {
+    "table": "orders",
+    "column": "status",
+    "value": "aborted",
+    "allowed": [
+      "cancelled",
+      "confirmed",
+      "delivered",
+      "pending",
+      "shipped"
+    ],
+    "path": "webapp/src/components/Settings/MyOrdersModal.jsx",
+    "line": 239,
+    "code": "if (signal?.aborted) return { status: 'aborted' };",
+    "severity": "P2"
+  },
+  {
+    "table": "orders",
+    "column": "status",
+    "value": "error",
+    "allowed": [
+      "cancelled",
+      "confirmed",
+      "delivered",
+      "pending",
+      "shipped"
+    ],
+    "path": "webapp/src/components/Settings/MyOrdersModal.jsx",
+    "line": 242,
+    "code": "return { status: 'error' };",
+    "severity": "P2"
+  },
+  {
+    "table": "orders",
+    "column": "status",
+    "value": "success",
+    "allowed": [
+      "cancelled",
+      "confirmed",
+      "delivered",
+      "pending",
+      "shipped"
+    ],
+    "path": "webapp/src/components/Settings/MyOrdersModal.jsx",
+    "line": 246,
+    "code": "return { status: 'success' };",
+    "severity": "P2"
+  },
+  {
+    "table": "shop_follows",
+    "column": "mode",
+    "value": "wait",
+    "allowed": [
+      "monitor",
+      "resell"
+    ],
+    "path": "webapp/src/components/common/Toast.jsx",
+    "line": 113,
+    "code": "<AnimatePresence mode=\"wait\">",
+    "severity": "P2"
+  },
+  {
+    "table": "shop_follows",
+    "column": "mode",
+    "value": "wait",
+    "allowed": [
+      "monitor",
+      "resell"
+    ],
+    "path": "webapp/src/components/Settings/WorkerModeModal.jsx",
+    "line": 377,
+    "code": "<AnimatePresence mode=\"wait\">",
+    "severity": "P2"
+  },
+  {
+    "table": "shop_follows",
+    "column": "mode",
+    "value": "wait",
+    "allowed": [
+      "monitor",
+      "resell"
+    ],
+    "path": "webapp/src/components/Settings/WorkspaceModal.jsx",
+    "line": 564,
+    "code": "<AnimatePresence mode=\"wait\">",
+    "severity": "P2"
+  },
+  {
+    "table": "shops",
+    "column": "tier",
+    "value": " + (apiError || ",
+    "allowed": [
+      "max",
+      "pro"
+    ],
+    "path": "webapp/src/components/Settings/ShopDetailModal.jsx",
+    "line": 716,
+    "code": "alert('Failed to change tier: ' + (apiError || 'Unknown error'));",
+    "severity": "P2"
+  },
+  {
+    "table": "shops",
+    "column": "tier",
+    "value": " + (err.message || ",
+    "allowed": [
+      "max",
+      "pro"
+    ],
+    "path": "webapp/src/components/Settings/ShopDetailModal.jsx",
+    "line": 722,
+    "code": "alert('Failed to change tier: ' + (err.message || 'Unknown error'));",
+    "severity": "P2"
+  },
+  {
+    "table": "shops",
+    "column": "tier",
+    "value": "free",
+    "allowed": [
+      "max",
+      "pro"
+    ],
+    "path": "webapp/src/components/Settings/ShopDetailModal.jsx",
+    "line": 881,
+    "code": "{tier !== 'free' && (",
+    "severity": "P1"
+  },
+  {
+    "table": "shop_follows",
+    "column": "mode",
+    "value": "wait",
+    "allowed": [
+      "monitor",
+      "resell"
+    ],
+    "path": "webapp/src/components/Settings/Migration/MigrationModal.jsx",
+    "line": 102,
+    "code": "<AnimatePresence mode=\"wait\">",
+    "severity": "P2"
+  },
+  {
+    "table": "shop_follows",
+    "column": "mode",
+    "value": "wait",
+    "allowed": [
+      "monitor",
+      "resell"
+    ],
+    "path": "webapp/src/components/Settings/Migration/MigrationForm.jsx",
+    "line": 72,
+    "code": "<AnimatePresence mode=\"wait\">",
+    "severity": "P2"
+  }
+]

@@ -416,10 +416,10 @@ export async function processOrderPayment({
       [orderId]
     );
 
-    // 2.8. Update order status to 'paid'
+    // 2.8. Update order status to 'confirmed' (DB constraint: pending, confirmed, shipped, delivered, cancelled)
     await client.query(
       `UPDATE orders
-       SET status = 'paid',
+       SET status = 'confirmed',
            paid_at = NOW(),
            updated_at = NOW()
        WHERE id = $1`,
@@ -448,9 +448,10 @@ export async function processOrderPayment({
     // =========================================================================
 
     // Emit WebSocket event for real-time UI updates
+    // Note: WS uses 'confirmed' to match DB, webapp normalizes to 'paid' for UI
     broadcast('order_status', {
       orderId: order.id,
-      status: 'paid',
+      status: 'confirmed',
       shopId: order.shop_id,
     });
 
@@ -461,8 +462,8 @@ export async function processOrderPayment({
 
     return {
       ok: true,
-      state: 'paid',
-      message: 'Payment verified and order paid',
+      state: 'confirmed',  // DB status (webapp normalizes to 'paid' for UI)
+      message: 'Payment verified and order confirmed',
       confirmations: verificationResult.confirmations,
       amount: verificationResult.amount,
     };

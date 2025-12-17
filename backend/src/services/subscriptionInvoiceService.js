@@ -47,7 +47,7 @@ export async function findActiveInvoiceForSubscription(subscriptionId, purpose =
        AND (
         (status = 'pending' AND expires_at > timezone('utc', NOW()))
          OR
-         status IN ('paid', 'confirmed')
+         status = 'paid'  -- invoices constraint: pending, paid, expired, cancelled (no 'confirmed')
        )
        ORDER BY created_at DESC
        LIMIT 1`,

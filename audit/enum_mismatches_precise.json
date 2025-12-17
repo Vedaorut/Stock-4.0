@@ -1,0 +1,43 @@
+[
+  {
+    "table": "invoices",
+    "column": "status",
+    "value": "confirmed",
+    "allowed": [
+      "cancelled",
+      "expired",
+      "paid",
+      "pending"
+    ],
+    "path": "backend/src/routes/payments.js",
+    "line": 237,
+    "code": "if (invoice.status === 'paid' || invoice.status === 'confirmed') {",
+    "severity": "P1"
+  },
+  {
+    "table": "shop_follows",
+    "column": "mode",
+    "value": "percentage",
+    "allowed": [
+      "monitor",
+      "resell"
+    ],
+    "path": "backend/src/controllers/shopFollow/helpers.js",
+    "line": 41,
+    "code": "const markupPercentage = follow.mode === 'resell' && markupType === 'percentage'",
+    "severity": "P1"
+  },
+  {
+    "table": "shop_follows",
+    "column": "mode",
+    "value": "fixed",
+    "allowed": [
+      "monitor",
+      "resell"
+    ],
+    "path": "backend/src/controllers/shopFollow/helpers.js",
+    "line": 43,
+    "code": "const markupFixed = follow.mode === 'resell' && markupType === 'fixed'",
+    "severity": "P1"
+  }
+]

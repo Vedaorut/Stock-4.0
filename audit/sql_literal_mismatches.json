@@ -1,0 +1,33 @@
+[
+  {
+    "table": "orders",
+    "column": "status",
+    "value": "paid",
+    "allowed": [
+      "cancelled",
+      "confirmed",
+      "delivered",
+      "pending",
+      "shipped"
+    ],
+    "path": "backend/src/services/invoicePayment/processors/orderProcessor.js",
+    "line": 422,
+    "anchor": "UPDATE orders",
+    "severity": "P0"
+  },
+  {
+    "table": "invoices",
+    "column": "status",
+    "value": "confirmed",
+    "allowed": [
+      "cancelled",
+      "expired",
+      "paid",
+      "pending"
+    ],
+    "path": "backend/src/services/subscriptionInvoiceService.js",
+    "line": 50,
+    "anchor": "FROM invoices",
+    "severity": "P1"
+  }
+]

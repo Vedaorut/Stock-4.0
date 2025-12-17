@@ -324,10 +324,12 @@ export const shopController = {
         }
 
         // Promo code determines the tier
-        effectiveTier = promoValidation.tier;
+        // Map to valid shops.tier (constraint: pro | max, no 'basic')
+        effectiveTier = promoValidation.tier === 'basic' ? 'pro' : promoValidation.tier;
         logger.info('[ShopController] Promo code validated, tier from promo:', {
           promoCode: normalizedPromo,
-          promoTier: effectiveTier,
+          promoTier: promoValidation.tier,
+          mappedTier: effectiveTier,
           requestedTier: tier,
         });
       } else if (wantsMax) {

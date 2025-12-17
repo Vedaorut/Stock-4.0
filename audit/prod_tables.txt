@@ -1,0 +1,26 @@
+                 List of relations
+ Schema |        Name        | Type  |    Owner    
+--------+--------------------+-------+-------------
+ public | admin_action_logs  | table | statusstock
+ public | ai_usage_log       | table | statusstock
+ public | ai_user_settings   | table | statusstock
+ public | channel_migrations | table | statusstock
+ public | invoices           | table | statusstock
+ public | order_items        | table | statusstock
+ public | orders             | table | statusstock
+ public | payments           | table | statusstock
+ public | processed_webhooks | table | statusstock
+ public | products           | table | statusstock
+ public | promo_activations  | table | statusstock
+ public | promo_codes        | table | statusstock
+ public | refresh_tokens     | table | statusstock
+ public | shop_follows       | table | statusstock
+ public | shop_subscribers   | table | statusstock
+ public | shop_subscriptions | table | statusstock
+ public | shop_workers       | table | statusstock
+ public | shops              | table | statusstock
+ public | subscriptions      | table | postgres
+ public | synced_products    | table | statusstock
+ public | users              | table | statusstock
+(21 rows)
+

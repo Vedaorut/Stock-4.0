@@ -1,0 +1,5 @@
+ schema_migrations | sequelize_meta | knex_migrations 
+-------------------+----------------+-----------------
+                   |                | 
+(1 row)
+

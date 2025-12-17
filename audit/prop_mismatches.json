@@ -1,0 +1,17 @@
+[
+  {
+    "table": "invoices",
+    "column": "status",
+    "value": "confirmed",
+    "allowed": [
+      "cancelled",
+      "expired",
+      "paid",
+      "pending"
+    ],
+    "path": "backend/src/routes/payments.js",
+    "line": 237,
+    "severity": "P1",
+    "code": "if (invoice.status === 'paid' || invoice.status === 'confirmed') {"
+  }
+]

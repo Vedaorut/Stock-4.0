@@ -1,0 +1,26 @@
+      field       | tier | cnt 
+------------------+------+-----
+ promo_codes.tier | max  |   1
+(1 row)
+
+          field          | tier | cnt 
+-------------------------+------+-----
+ shop_subscriptions.tier | max  |   8
+ shop_subscriptions.tier | pro  |   1
+(2 rows)
+
+     field     |  status   | cnt 
+---------------+-----------+-----
+ orders.status | cancelled |  28
+ orders.status | confirmed |   5
+ orders.status | delivered |   2
+ orders.status | pending   |   1
+ orders.status | shipped   |   1
+(5 rows)
+
+      field      | status  | cnt 
+-----------------+---------+-----
+ invoices.status | expired |   4
+ invoices.status | paid    |   1
+(2 rows)
+

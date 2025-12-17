@@ -1,0 +1,101 @@
+backend/src/services/invoicePayment/finalizers/orderFinalizer.js:66:  const expiresAt = new Date(invoice.expires_at);
+backend/src/services/subscriptionService.js:627:    isActive: shop.is_active,
+backend/src/services/subscriptionService.js:764:         s.is_active as shop_is_active,
+backend/src/services/subscriptionService.js:802:         s.is_active,
+backend/src/services/productSyncService.js:28:     LEFT JOIN products p ON p.shop_id = s.id AND p.is_active = true
+backend/src/services/productSyncService.js:490:            isActive: product.is_active,
+backend/src/services/invoicePayment/finalizers/subscriptionFinalizer.js:291:    if (shop.subscription_status === 'inactive' && shop.is_active === false) {
+backend/src/services/invoicePayment/utils/invoiceGuards.js:18: * @param {string|Date} invoice.expires_at - Invoice expiration timestamp
+backend/src/services/invoicePayment/utils/invoiceGuards.js:30:  const expired = isExpiredUtc(invoice.expires_at);
+backend/src/services/subscriptionInvoiceService.js:101:            expiresAt: inv.expires_at,
+backend/src/services/subscriptionInvoiceService.js:120:      expiresAt: invoice.expires_at,
+backend/src/services/subscriptionInvoiceService.js:178:       AND i.expires_at > timezone('utc', NOW())
+backend/src/services/invoicePayment/processors/subscriptionProcessor.js:111:  if (new Date(invoice.expires_at) < new Date()) {
+backend/src/services/__tests__/blockchainVerificationService.test.js:49:      expect(result.verified).toBe(false);
+backend/src/services/__tests__/blockchainVerificationService.test.js:58:      expect(result.verified).toBe(false);
+backend/src/services/__tests__/blockchainVerificationService.test.js:71:      expect(result.verified).toBe(false);
+backend/src/services/__tests__/blockchainVerificationService.test.js:110:      expect(result.verified).toBe(true);
+backend/src/services/__tests__/blockchainVerificationService.test.js:141:      expect(result.verified).toBe(false);
+backend/src/services/__tests__/blockchainVerificationService.test.js:157:      expect(result.verified).toBe(false);
+backend/src/services/__tests__/blockchainVerificationService.test.js:182:      expect(result.verified).toBe(false);
+backend/src/services/__tests__/blockchainVerificationService.test.js:207:      expect(result.verified).toBe(false);
+backend/src/services/__tests__/blockchainVerificationService.test.js:238:      expect(result.verified).toBe(true);
+backend/src/services/__tests__/blockchainVerificationService.test.js:270:      expect(result.verified).toBe(true);
+backend/src/services/__tests__/blockchainVerificationService.test.js:296:      expect(result.verified).toBe(false);
+backend/src/services/__tests__/blockchainVerificationService.test.js:342:      expect(result.verified).toBe(true);
+backend/src/services/__tests__/blockchainVerificationService.test.js:382:      expect(result.verified).toBe(false);
+backend/src/services/__tests__/blockchainVerificationService.test.js:418:      expect(result.verified).toBe(false);
+backend/src/services/__tests__/blockchainVerificationService.test.js:436:      expect(result.verified).toBe(false);
+backend/src/services/__tests__/blockchainVerificationService.test.js:450:      expect(result.verified).toBe(false);
+backend/src/routes/debug.js:162:        s.is_active as shop_is_active,
+backend/src/routes/debug.js:165:        (i.expires_at > NOW()) as is_active_by_time,
+backend/src/routes/debug.js:166:        EXTRACT(EPOCH FROM (i.expires_at - NOW())) as seconds_until_expiry,
+backend/src/routes/debug.js:193:      isActiveByTime: invoice.is_active_by_time,
+backend/src/routes/debug.js:194:      expiresAt: invoice.expires_at,
+backend/src/routes/debug.js:198:      isExpiredByTime: invoice.expires_at < invoice.current_server_time,
+backend/src/routes/debug.js:202:        invoice.is_active_by_time,
+backend/src/routes/debug.js:330:        s.is_active as shop_is_active
+backend/src/routes/debug.js:355:        active: result.rows.filter(inv => inv.is_active && inv.status === 'pending').length,
+backend/src/routes/debug.js:456:        (i.expires_at > NOW()) as is_active
+backend/src/routes/debug.js:491:          active: invoicesResult.rows.filter(inv => inv.is_active && inv.status === 'pending').length,
+backend/src/services/invoicePayment/processors/orderProcessor.js:147:  if (new Date(preliminaryInvoice.expires_at) < new Date()) {
+backend/src/services/invoicePayment/processors/orderProcessor.js:248:  if (!verificationResult.verified) {
+backend/src/validators/orderValidator.js:92:  if (!shop.is_active) {
+backend/src/validators/orderValidator.js:110:    if (!product.is_active) {
+backend/src/models/shopFollowQueries.js:60:            AND p_source.is_active = true
+backend/src/models/shopFollowQueries.js:61:            AND p_synced.is_active = true
+backend/src/models/shopFollowQueries.js:67:            AND p.is_active = true
+backend/src/models/shopFollowQueries.js:99:            AND p_source.is_active = true
+backend/src/models/shopFollowQueries.js:100:            AND p_synced.is_active = true
+backend/src/models/shopFollowQueries.js:102:        (SELECT COUNT(*)::int FROM products p WHERE p.shop_id = sf.source_shop_id AND p.is_active = true) as source_products_count
+backend/src/models/syncedProductQueries.js:129:        p_synced.is_active as synced_product_active,
+backend/src/models/syncedProductQueries.js:133:        p_source.is_active as source_product_active
+backend/src/models/syncedProductQueries.js:156:        p_synced.is_active as synced_product_active,
+backend/src/models/syncedProductQueries.js:161:        p_source.is_active as source_product_active,
+backend/src/models/syncedProductQueries.js:168:         AND p_source.is_active = true
+backend/src/models/syncedProductQueries.js:169:         AND p_synced.is_active = true
+backend/src/models/syncedProductQueries.js:308:        p_source.is_active as source_active,
+backend/src/models/syncedProductQueries.js:311:        p_synced.is_active as synced_active
+backend/src/database/queries/shopQueries.js:104:      WHERE s.is_active = true
+backend/src/database/queries/shopQueries.js:173:       WHERE s.is_active = true
+backend/src/routes/webhooks.js:77:      if (invoice.expires_at && new Date(invoice.expires_at) < new Date()) {
+backend/src/routes/webhooks.js:82:          expiresAt: invoice.expires_at,
+backend/src/database/queries/adminQueries.js:149:        s.is_active,
+backend/src/database/queries/adminQueries.js:155:      LEFT JOIN products p ON s.id = p.shop_id AND p.is_active = true
+backend/src/database/queries/adminQueries.js:230:        whereClause += ` AND s.is_active = true AND s.subscription_status = 'active'`;
+backend/src/database/queries/adminQueries.js:232:        whereClause += ` AND s.is_active = false`;
+backend/src/database/queries/adminQueries.js:245:        s.is_active,
+backend/src/database/queries/adminQueries.js:258:      LEFT JOIN products p ON s.id = p.shop_id AND p.is_active = true
+backend/src/database/queries/adminQueries.js:328:        COUNT(DISTINCT CASE WHEN p.is_active = true THEN p.id END) as active_product_count,
+backend/src/workers/paymentVerificationWorker.js:270:           -- NOTE: Don't check i.expires_at here - CrystalPay gives 72h, our expires_at is only 1h
+backend/src/workers/paymentVerificationWorker.js:425:    verified: result.verified,
+backend/src/workers/paymentVerificationWorker.js:444:  if (result.verified) {
+backend/src/workers/paymentVerificationWorker.js:534:    const checkCount = countResult.rows[0]?.check_count || 0;
+backend/src/workers/paymentVerificationWorker.js:594:  if (result.resultStatus === blockchainVerificationService.VERIFICATION_STATUS.SUCCESS && !result.verified) {
+backend/src/workers/paymentVerificationWorker.js:608:    verified: result.verified,
+backend/src/database/queries/shopSubscriberQueries.js:52:        s.is_active as shop_is_active,
+backend/src/database/queries/productQueries.js:84:      whereClause += ` AND p.is_active = $${paramCount}`;
+backend/src/database/queries/productQueries.js:529:         AND p.is_active = true
+backend/src/database/queries/productQueries.js:530:         AND s.is_active = true
+backend/src/database/queries/refreshTokenQueries.js:35:      `SELECT rt.id, rt.user_id, rt.expires_at, rt.created_at,
+backend/src/database/queries/refreshTokenQueries.js:41:         AND rt.expires_at > timezone('UTC', NOW())`,
+backend/src/controllers/shopFollow/helpers.js:78:  is_active: product.is_active,
+backend/src/database/queries/orderItemQueries.js:49:      `SELECT oi.*, p.name as current_product_name, p.is_active as product_is_active
+backend/src/database/queries/orderItemQueries.js:87:         p.is_active,
+backend/src/database/queries/subscriptionQueries.js:43:       WHERE ss.user_id = $1 AND sh.is_active = true
+backend/src/database/queries/subscriptionQueries.js:82:       WHERE ss.user_id = $1 AND ss.shop_id = $2 AND sh.is_active = true
+backend/src/middleware/productLimits.js:135:       LEFT JOIN products p ON p.shop_id = s.id AND p.is_active = true
+backend/src/controllers/shopController.js:490:      if (!shop.is_active) {
+backend/src/controllers/workerController.js:256:          is_active: s.is_active,
+backend/src/controllers/workerController.js:286:          is_active: s.is_active,
+backend/src/controllers/shopSubscriberController.js:33:    if (!shop.is_active) {
+backend/src/controllers/subscription/handlers/upgradeHandlers.js:73:    const expiresAt = new Date(activeInvoice.expires_at);
+backend/src/controllers/subscription/handlers/upgradeHandlers.js:84:        expiresAt: activeInvoice.expires_at,
+backend/src/controllers/subscription/utils/invoice.js:6:  expiresAt: invoice.expires_at,
+backend/src/controllers/subscription/handlers/paymentHandlers.js:126:    const expiresAt = new Date(activeInvoice.expires_at);
+backend/src/controllers/subscription/handlers/paymentHandlers.js:136:        expiresAt: activeInvoice.expires_at,
+backend/src/middleware/auth.js:260:      if (!shop.is_active || shop.subscription_status === 'inactive' || shop.subscription_status === 'pending') {
+backend/src/middleware/auth.js:266:          isActive: shop.is_active,
+backend/src/controllers/order/handlers/paymentHandlers.js:258:    verified: verificationResult.verified,
+backend/src/controllers/order/handlers/paymentHandlers.js:449:      status: verificationResult.verified ? 'verified' : 'pending_confirmations',
+backend/src/controllers/order/handlers/paymentHandlers.js:454:        : verificationResult.verified

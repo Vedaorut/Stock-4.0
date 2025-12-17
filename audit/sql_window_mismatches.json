@@ -1,0 +1,517 @@
+[
+  {
+    "table": "orders",
+    "column": "status",
+    "value": "paid",
+    "allowed": [
+      "cancelled",
+      "confirmed",
+      "delivered",
+      "pending",
+      "shipped"
+    ],
+    "path": "backend/src/services/invoicePayment/processors/orderProcessor.js",
+    "line": 422,
+    "anchor_line": 421,
+    "anchor": "`UPDATE orders",
+    "code": "SET status = 'paid',",
+    "severity": "P0"
+  },
+  {
+    "table": "payments",
+    "column": "status",
+    "value": "cancelled",
+    "allowed": [
+      "confirmed",
+      "failed",
+      "needs_review",
+      "pending",
+      "processing"
+    ],
+    "path": "backend/src/controllers/admin/paymentReviewController.js",
+    "line": 229,
+    "anchor_line": 213,
+    "anchor": "`UPDATE payments",
+    "code": "SET status = 'cancelled',",
+    "severity": "P0"
+  },
+  {
+    "table": "invoices",
+    "column": "status",
+    "value": "active",
+    "allowed": [
+      "cancelled",
+      "expired",
+      "paid",
+      "pending"
+    ],
+    "path": "backend/src/controllers/admin/statsController.js",
+    "line": 29,
+    "anchor_line": 32,
+    "anchor": "(SELECT COALESCE(SUM(expected_amount), 0) FROM invoices WHERE status = 'paid' AND created_at >= CURRENT_DATE) as revenue_today,",
+    "code": "(SELECT COUNT(*) FROM shop_subscriptions WHERE status = 'active') as active_subscriptions,",
+    "severity": "P1"
+  },
+  {
+    "table": "invoices",
+    "column": "status",
+    "value": "active",
+    "allowed": [
+      "cancelled",
+      "expired",
+      "paid",
+      "pending"
+    ],
+    "path": "backend/src/controllers/admin/statsController.js",
+    "line": 30,
+    "anchor_line": 32,
+    "anchor": "(SELECT COALESCE(SUM(expected_amount), 0) FROM invoices WHERE status = 'paid' AND created_at >= CURRENT_DATE) as revenue_today,",
+    "code": "(SELECT COUNT(*) FROM shop_subscriptions WHERE tier = 'pro' AND status = 'active') as pro_subscriptions,",
+    "severity": "P1"
+  },
+  {
+    "table": "invoices",
+    "column": "status",
+    "value": "active",
+    "allowed": [
+      "cancelled",
+      "expired",
+      "paid",
+      "pending"
+    ],
+    "path": "backend/src/controllers/admin/statsController.js",
+    "line": 30,
+    "anchor_line": 33,
+    "anchor": "(SELECT COALESCE(SUM(expected_amount), 0) FROM invoices WHERE status = 'paid' AND created_at >= CURRENT_DATE - INTERVAL '7 days') as revenue_week,",
+    "code": "(SELECT COUNT(*) FROM shop_subscriptions WHERE tier = 'pro' AND status = 'active') as pro_subscriptions,",
+    "severity": "P1"
+  },
+  {
+    "table": "invoices",
+    "column": "status",
+    "value": "active",
+    "allowed": [
+      "cancelled",
+      "expired",
+      "paid",
+      "pending"
+    ],
+    "path": "backend/src/controllers/admin/statsController.js",
+    "line": 31,
+    "anchor_line": 32,
+    "anchor": "(SELECT COALESCE(SUM(expected_amount), 0) FROM invoices WHERE status = 'paid' AND created_at >= CURRENT_DATE) as revenue_today,",
+    "code": "(SELECT COUNT(*) FROM shop_subscriptions WHERE tier = 'max' AND status = 'active') as max_subscriptions,",
+    "severity": "P1"
+  },
+  {
+    "table": "invoices",
+    "column": "status",
+    "value": "active",
+    "allowed": [
+      "cancelled",
+      "expired",
+      "paid",
+      "pending"
+    ],
+    "path": "backend/src/controllers/admin/statsController.js",
+    "line": 31,
+    "anchor_line": 33,
+    "anchor": "(SELECT COALESCE(SUM(expected_amount), 0) FROM invoices WHERE status = 'paid' AND created_at >= CURRENT_DATE - INTERVAL '7 days') as revenue_week,",
+    "code": "(SELECT COUNT(*) FROM shop_subscriptions WHERE tier = 'max' AND status = 'active') as max_subscriptions,",
+    "severity": "P1"
+  },
+  {
+    "table": "invoices",
+    "column": "status",
+    "value": "active",
+    "allowed": [
+      "cancelled",
+      "expired",
+      "paid",
+      "pending"
+    ],
+    "path": "backend/src/controllers/admin/statsController.js",
+    "line": 31,
+    "anchor_line": 34,
+    "anchor": "(SELECT COALESCE(SUM(expected_amount), 0) FROM invoices WHERE status = 'paid' AND created_at >= CURRENT_DATE - INTERVAL '30 days') as revenue_month",
+    "code": "(SELECT COUNT(*) FROM shop_subscriptions WHERE tier = 'max' AND status = 'active') as max_subscriptions,",
+    "severity": "P1"
+  },
+  {
+    "table": "invoices",
+    "column": "status",
+    "value": "confirmed",
+    "allowed": [
+      "cancelled",
+      "expired",
+      "paid",
+      "pending"
+    ],
+    "path": "backend/src/services/subscriptionInvoiceService.js",
+    "line": 50,
+    "anchor_line": 44,
+    "anchor": "`SELECT * FROM invoices",
+    "code": "status IN ('paid', 'confirmed')",
+    "severity": "P1"
+  },
+  {
+    "table": "orders",
+    "column": "status",
+    "value": "active",
+    "allowed": [
+      "cancelled",
+      "confirmed",
+      "delivered",
+      "pending",
+      "shipped"
+    ],
+    "path": "backend/src/controllers/admin/statsController.js",
+    "line": 29,
+    "anchor_line": 25,
+    "anchor": "(SELECT COUNT(*) FROM orders) as total_orders,",
+    "code": "(SELECT COUNT(*) FROM shop_subscriptions WHERE status = 'active') as active_subscriptions,",
+    "severity": "P1"
+  },
+  {
+    "table": "orders",
+    "column": "status",
+    "value": "active",
+    "allowed": [
+      "cancelled",
+      "confirmed",
+      "delivered",
+      "pending",
+      "shipped"
+    ],
+    "path": "backend/src/controllers/admin/statsController.js",
+    "line": 29,
+    "anchor_line": 26,
+    "anchor": "(SELECT COUNT(*) FROM orders WHERE created_at >= CURRENT_DATE) as orders_today,",
+    "code": "(SELECT COUNT(*) FROM shop_subscriptions WHERE status = 'active') as active_subscriptions,",
+    "severity": "P1"
+  },
+  {
+    "table": "orders",
+    "column": "status",
+    "value": "active",
+    "allowed": [
+      "cancelled",
+      "confirmed",
+      "delivered",
+      "pending",
+      "shipped"
+    ],
+    "path": "backend/src/controllers/admin/statsController.js",
+    "line": 29,
+    "anchor_line": 27,
+    "anchor": "(SELECT COUNT(*) FROM orders WHERE created_at >= CURRENT_DATE - INTERVAL '7 days') as orders_week,",
+    "code": "(SELECT COUNT(*) FROM shop_subscriptions WHERE status = 'active') as active_subscriptions,",
+    "severity": "P1"
+  },
+  {
+    "table": "orders",
+    "column": "status",
+    "value": "active",
+    "allowed": [
+      "cancelled",
+      "confirmed",
+      "delivered",
+      "pending",
+      "shipped"
+    ],
+    "path": "backend/src/controllers/admin/statsController.js",
+    "line": 30,
+    "anchor_line": 25,
+    "anchor": "(SELECT COUNT(*) FROM orders) as total_orders,",
+    "code": "(SELECT COUNT(*) FROM shop_subscriptions WHERE tier = 'pro' AND status = 'active') as pro_subscriptions,",
+    "severity": "P1"
+  },
+  {
+    "table": "orders",
+    "column": "status",
+    "value": "active",
+    "allowed": [
+      "cancelled",
+      "confirmed",
+      "delivered",
+      "pending",
+      "shipped"
+    ],
+    "path": "backend/src/controllers/admin/statsController.js",
+    "line": 30,
+    "anchor_line": 26,
+    "anchor": "(SELECT COUNT(*) FROM orders WHERE created_at >= CURRENT_DATE) as orders_today,",
+    "code": "(SELECT COUNT(*) FROM shop_subscriptions WHERE tier = 'pro' AND status = 'active') as pro_subscriptions,",
+    "severity": "P1"
+  },
+  {
+    "table": "orders",
+    "column": "status",
+    "value": "active",
+    "allowed": [
+      "cancelled",
+      "confirmed",
+      "delivered",
+      "pending",
+      "shipped"
+    ],
+    "path": "backend/src/controllers/admin/statsController.js",
+    "line": 30,
+    "anchor_line": 27,
+    "anchor": "(SELECT COUNT(*) FROM orders WHERE created_at >= CURRENT_DATE - INTERVAL '7 days') as orders_week,",
+    "code": "(SELECT COUNT(*) FROM shop_subscriptions WHERE tier = 'pro' AND status = 'active') as pro_subscriptions,",
+    "severity": "P1"
+  },
+  {
+    "table": "orders",
+    "column": "status",
+    "value": "active",
+    "allowed": [
+      "cancelled",
+      "confirmed",
+      "delivered",
+      "pending",
+      "shipped"
+    ],
+    "path": "backend/src/controllers/admin/statsController.js",
+    "line": 31,
+    "anchor_line": 25,
+    "anchor": "(SELECT COUNT(*) FROM orders) as total_orders,",
+    "code": "(SELECT COUNT(*) FROM shop_subscriptions WHERE tier = 'max' AND status = 'active') as max_subscriptions,",
+    "severity": "P1"
+  },
+  {
+    "table": "orders",
+    "column": "status",
+    "value": "active",
+    "allowed": [
+      "cancelled",
+      "confirmed",
+      "delivered",
+      "pending",
+      "shipped"
+    ],
+    "path": "backend/src/controllers/admin/statsController.js",
+    "line": 31,
+    "anchor_line": 26,
+    "anchor": "(SELECT COUNT(*) FROM orders WHERE created_at >= CURRENT_DATE) as orders_today,",
+    "code": "(SELECT COUNT(*) FROM shop_subscriptions WHERE tier = 'max' AND status = 'active') as max_subscriptions,",
+    "severity": "P1"
+  },
+  {
+    "table": "orders",
+    "column": "status",
+    "value": "active",
+    "allowed": [
+      "cancelled",
+      "confirmed",
+      "delivered",
+      "pending",
+      "shipped"
+    ],
+    "path": "backend/src/controllers/admin/statsController.js",
+    "line": 31,
+    "anchor_line": 27,
+    "anchor": "(SELECT COUNT(*) FROM orders WHERE created_at >= CURRENT_DATE - INTERVAL '7 days') as orders_week,",
+    "code": "(SELECT COUNT(*) FROM shop_subscriptions WHERE tier = 'max' AND status = 'active') as max_subscriptions,",
+    "severity": "P1"
+  },
+  {
+    "table": "orders",
+    "column": "status",
+    "value": "paid",
+    "allowed": [
+      "cancelled",
+      "confirmed",
+      "delivered",
+      "pending",
+      "shipped"
+    ],
+    "path": "backend/src/controllers/admin/statsController.js",
+    "line": 32,
+    "anchor_line": 25,
+    "anchor": "(SELECT COUNT(*) FROM orders) as total_orders,",
+    "code": "(SELECT COALESCE(SUM(expected_amount), 0) FROM invoices WHERE status = 'paid' AND created_at >= CURRENT_DATE) as revenue_today,",
+    "severity": "P1"
+  },
+  {
+    "table": "orders",
+    "column": "status",
+    "value": "paid",
+    "allowed": [
+      "cancelled",
+      "confirmed",
+      "delivered",
+      "pending",
+      "shipped"
+    ],
+    "path": "backend/src/controllers/admin/statsController.js",
+    "line": 32,
+    "anchor_line": 26,
+    "anchor": "(SELECT COUNT(*) FROM orders WHERE created_at >= CURRENT_DATE) as orders_today,",
+    "code": "(SELECT COALESCE(SUM(expected_amount), 0) FROM invoices WHERE status = 'paid' AND created_at >= CURRENT_DATE) as revenue_today,",
+    "severity": "P1"
+  },
+  {
+    "table": "orders",
+    "column": "status",
+    "value": "paid",
+    "allowed": [
+      "cancelled",
+      "confirmed",
+      "delivered",
+      "pending",
+      "shipped"
+    ],
+    "path": "backend/src/controllers/admin/statsController.js",
+    "line": 32,
+    "anchor_line": 27,
+    "anchor": "(SELECT COUNT(*) FROM orders WHERE created_at >= CURRENT_DATE - INTERVAL '7 days') as orders_week,",
+    "code": "(SELECT COALESCE(SUM(expected_amount), 0) FROM invoices WHERE status = 'paid' AND created_at >= CURRENT_DATE) as revenue_today,",
+    "severity": "P1"
+  },
+  {
+    "table": "orders",
+    "column": "status",
+    "value": "paid",
+    "allowed": [
+      "cancelled",
+      "confirmed",
+      "delivered",
+      "pending",
+      "shipped"
+    ],
+    "path": "backend/src/controllers/admin/statsController.js",
+    "line": 33,
+    "anchor_line": 25,
+    "anchor": "(SELECT COUNT(*) FROM orders) as total_orders,",
+    "code": "(SELECT COALESCE(SUM(expected_amount), 0) FROM invoices WHERE status = 'paid' AND created_at >= CURRENT_DATE - INTERVAL '7 days') as revenue_week,",
+    "severity": "P1"
+  },
+  {
+    "table": "orders",
+    "column": "status",
+    "value": "paid",
+    "allowed": [
+      "cancelled",
+      "confirmed",
+      "delivered",
+      "pending",
+      "shipped"
+    ],
+    "path": "backend/src/controllers/admin/statsController.js",
+    "line": 33,
+    "anchor_line": 26,
+    "anchor": "(SELECT COUNT(*) FROM orders WHERE created_at >= CURRENT_DATE) as orders_today,",
+    "code": "(SELECT COALESCE(SUM(expected_amount), 0) FROM invoices WHERE status = 'paid' AND created_at >= CURRENT_DATE - INTERVAL '7 days') as revenue_week,",
+    "severity": "P1"
+  },
+  {
+    "table": "orders",
+    "column": "status",
+    "value": "paid",
+    "allowed": [
+      "cancelled",
+      "confirmed",
+      "delivered",
+      "pending",
+      "shipped"
+    ],
+    "path": "backend/src/controllers/admin/statsController.js",
+    "line": 33,
+    "anchor_line": 27,
+    "anchor": "(SELECT COUNT(*) FROM orders WHERE created_at >= CURRENT_DATE - INTERVAL '7 days') as orders_week,",
+    "code": "(SELECT COALESCE(SUM(expected_amount), 0) FROM invoices WHERE status = 'paid' AND created_at >= CURRENT_DATE - INTERVAL '7 days') as revenue_week,",
+    "severity": "P1"
+  },
+  {
+    "table": "orders",
+    "column": "status",
+    "value": "paid",
+    "allowed": [
+      "cancelled",
+      "confirmed",
+      "delivered",
+      "pending",
+      "shipped"
+    ],
+    "path": "backend/src/controllers/admin/statsController.js",
+    "line": 34,
+    "anchor_line": 25,
+    "anchor": "(SELECT COUNT(*) FROM orders) as total_orders,",
+    "code": "(SELECT COALESCE(SUM(expected_amount), 0) FROM invoices WHERE status = 'paid' AND created_at >= CURRENT_DATE - INTERVAL '30 days') as revenue_month",
+    "severity": "P1"
+  },
+  {
+    "table": "orders",
+    "column": "status",
+    "value": "paid",
+    "allowed": [
+      "cancelled",
+      "confirmed",
+      "delivered",
+      "pending",
+      "shipped"
+    ],
+    "path": "backend/src/controllers/admin/statsController.js",
+    "line": 34,
+    "anchor_line": 26,
+    "anchor": "(SELECT COUNT(*) FROM orders WHERE created_at >= CURRENT_DATE) as orders_today,",
+    "code": "(SELECT COALESCE(SUM(expected_amount), 0) FROM invoices WHERE status = 'paid' AND created_at >= CURRENT_DATE - INTERVAL '30 days') as revenue_month",
+    "severity": "P1"
+  },
+  {
+    "table": "orders",
+    "column": "status",
+    "value": "paid",
+    "allowed": [
+      "cancelled",
+      "confirmed",
+      "delivered",
+      "pending",
+      "shipped"
+    ],
+    "path": "backend/src/controllers/admin/statsController.js",
+    "line": 34,
+    "anchor_line": 27,
+    "anchor": "(SELECT COUNT(*) FROM orders WHERE created_at >= CURRENT_DATE - INTERVAL '7 days') as orders_week,",
+    "code": "(SELECT COALESCE(SUM(expected_amount), 0) FROM invoices WHERE status = 'paid' AND created_at >= CURRENT_DATE - INTERVAL '30 days') as revenue_month",
+    "severity": "P1"
+  },
+  {
+    "table": "orders",
+    "column": "status",
+    "value": "needs_review",
+    "allowed": [
+      "cancelled",
+      "confirmed",
+      "delivered",
+      "pending",
+      "shipped"
+    ],
+    "path": "backend/src/workers/paymentVerificationWorker.js",
+    "line": 460,
+    "anchor_line": 447,
+    "anchor": "`SELECT created_at FROM orders WHERE id = $1`,",
+    "code": "SET status = 'needs_review',",
+    "severity": "P1"
+  },
+  {
+    "table": "payments",
+    "column": "status",
+    "value": "cancelled",
+    "allowed": [
+      "confirmed",
+      "failed",
+      "needs_review",
+      "pending",
+      "processing"
+    ],
+    "path": "backend/src/services/orderCleanupService.js",
+    "line": 41,
+    "anchor_line": 22,
+    "anchor": "SELECT 1 FROM payments pay",
+    "code": "SET status = 'cancelled', updated_at = NOW()",
+    "severity": "P1"
+  }
+]

@@ -233,8 +233,9 @@ router.get('/invoices/:id/status', verifyToken, async (req, res) => {
     }
 
     // If not already set by CrystalPay fallback, use DB status
+    // invoices constraint: pending, paid, expired, cancelled (no 'confirmed')
     if (status === 'pending') {
-      if (invoice.status === 'paid' || invoice.status === 'confirmed') {
+      if (invoice.status === 'paid') {
         status = 'paid';
       } else if (invoice.status === 'expired' || invoice.status === 'cancelled') {
         status = 'expired';

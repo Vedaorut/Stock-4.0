@@ -1,0 +1,241 @@
+[
+  {
+    "table": "-",
+    "constraint": "yes_or_no_check",
+    "column": "VALUE",
+    "values": [
+      "NO",
+      "YES"
+    ],
+    "definition": "CHECK (((VALUE)::text = ANY ((ARRAY['YES'::character varying, 'NO'::character varying])::text[])))"
+  },
+  {
+    "table": "channel_migrations",
+    "constraint": "channel_migrations_status_check",
+    "column": "status",
+    "values": [
+      "completed",
+      "failed",
+      "pending",
+      "processing"
+    ],
+    "definition": "CHECK (((status)::text = ANY ((ARRAY['pending'::character varying, 'processing'::character varying, 'completed'::character varying, 'failed'::character varying])::text[])))"
+  },
+  {
+    "table": "invoices",
+    "constraint": "invoices_status_check",
+    "column": "status",
+    "values": [
+      "cancelled",
+      "expired",
+      "paid",
+      "pending"
+    ],
+    "definition": "CHECK (((status)::text = ANY ((ARRAY['pending'::character varying, 'paid'::character varying, 'expired'::character varying, 'cancelled'::character varying])::text[])))"
+  },
+  {
+    "table": "invoices",
+    "constraint": "invoices_chain_check",
+    "column": "chain",
+    "values": [
+      "BTC",
+      "CRYSTALPAY",
+      "ETH",
+      "LTC",
+      "USDT_ERC20",
+      "USDT_TRC20"
+    ],
+    "definition": "CHECK (((chain)::text = ANY ((ARRAY['BTC'::character varying, 'ETH'::character varying, 'USDT_ERC20'::character varying, 'USDT_TRC20'::character varying, 'LTC'::character varying, 'CRYSTALPAY'::character varying])::text[])))"
+  },
+  {
+    "table": "orders",
+    "constraint": "orders_status_check",
+    "column": "status",
+    "values": [
+      "cancelled",
+      "confirmed",
+      "delivered",
+      "pending",
+      "shipped"
+    ],
+    "definition": "CHECK (((status)::text = ANY ((ARRAY['pending'::character varying, 'confirmed'::character varying, 'shipped'::character varying, 'delivered'::character varying, 'cancelled'::character varying])::text[])))"
+  },
+  {
+    "table": "payments",
+    "constraint": "payments_verification_status_check",
+    "column": "verification_status",
+    "values": [
+      "confirmed",
+      "expired",
+      "failed",
+      "late_confirmed",
+      "pending",
+      "tx_not_found",
+      "verifying"
+    ],
+    "definition": "CHECK (((verification_status)::text = ANY ((ARRAY['pending'::character varying, 'verifying'::character varying, 'confirmed'::character varying, 'failed'::character varying, 'expired'::character varying, 'late_confirmed'::character varying, 'tx_not_found'::character varying])::text[])))"
+  },
+  {
+    "table": "payments",
+    "constraint": "payments_currency_check",
+    "column": "currency",
+    "values": [
+      "BTC",
+      "ETH",
+      "LTC",
+      "RUB",
+      "USD",
+      "USDT",
+      "USDT_TRC20"
+    ],
+    "definition": "CHECK (((currency)::text = ANY ((ARRAY['BTC'::character varying, 'ETH'::character varying, 'USDT'::character varying, 'LTC'::character varying, 'USDT_TRC20'::character varying, 'USD'::character varying, 'RUB'::character varying])::text[])))"
+  },
+  {
+    "table": "payments",
+    "constraint": "payments_status_check",
+    "column": "status",
+    "values": [
+      "confirmed",
+      "failed",
+      "needs_review",
+      "pending",
+      "processing"
+    ],
+    "definition": "CHECK (((status)::text = ANY ((ARRAY['pending'::character varying, 'processing'::character varying, 'confirmed'::character varying, 'failed'::character varying, 'needs_review'::character varying])::text[])))"
+  },
+  {
+    "table": "processed_webhooks",
+    "constraint": "processed_webhooks_source_check",
+    "column": "source",
+    "values": [
+      "blockcypher",
+      "crystalpay",
+      "etherscan",
+      "trongrid"
+    ],
+    "definition": "CHECK (((source)::text = ANY ((ARRAY['blockcypher'::character varying, 'etherscan'::character varying, 'trongrid'::character varying, 'crystalpay'::character varying])::text[])))"
+  },
+  {
+    "table": "promo_codes",
+    "constraint": "promo_codes_tier_check",
+    "column": "tier",
+    "values": [
+      "basic",
+      "max",
+      "pro"
+    ],
+    "definition": "CHECK (((tier)::text = ANY ((ARRAY['basic'::character varying, 'pro'::character varying, 'max'::character varying])::text[])))"
+  },
+  {
+    "table": "shop_follows",
+    "constraint": "shop_follows_mode_check",
+    "column": "mode",
+    "values": [
+      "monitor",
+      "resell"
+    ],
+    "definition": "CHECK (((mode)::text = ANY ((ARRAY['monitor'::character varying, 'resell'::character varying])::text[])))"
+  },
+  {
+    "table": "shop_follows",
+    "constraint": "shop_follows_status_check",
+    "column": "status",
+    "values": [
+      "active",
+      "cancelled",
+      "paused"
+    ],
+    "definition": "CHECK (((status)::text = ANY ((ARRAY['active'::character varying, 'paused'::character varying, 'cancelled'::character varying])::text[])))"
+  },
+  {
+    "table": "shops",
+    "constraint": "shops_subscription_status_check",
+    "column": "subscription_status",
+    "values": [
+      "active",
+      "grace_period",
+      "inactive",
+      "pending"
+    ],
+    "definition": "CHECK (((subscription_status)::text = ANY ((ARRAY['active'::character varying, 'pending'::character varying, 'grace_period'::character varying, 'inactive'::character varying])::text[])))"
+  },
+  {
+    "table": "shops",
+    "constraint": "shops_tier_check",
+    "column": "tier",
+    "values": [
+      "max",
+      "pro"
+    ],
+    "definition": "CHECK (((tier)::text = ANY ((ARRAY['pro'::character varying, 'max'::character varying])::text[])))"
+  },
+  {
+    "table": "shop_subscriptions",
+    "constraint": "shop_subscriptions_status_check",
+    "column": "status",
+    "values": [
+      "active",
+      "cancelled",
+      "expired",
+      "paid",
+      "pending"
+    ],
+    "definition": "CHECK (((status)::text = ANY ((ARRAY['active'::character varying, 'pending'::character varying, 'expired'::character varying, 'cancelled'::character varying, 'paid'::character varying])::text[])))"
+  },
+  {
+    "table": "shop_subscriptions",
+    "constraint": "shop_subscriptions_currency_check",
+    "column": "currency",
+    "values": [
+      "BTC",
+      "ETH",
+      "LTC",
+      "USD",
+      "USDT"
+    ],
+    "definition": "CHECK (((currency)::text = ANY ((ARRAY['BTC'::character varying, 'ETH'::character varying, 'USDT'::character varying, 'LTC'::character varying, 'USD'::character varying])::text[])))"
+  },
+  {
+    "table": "shop_subscriptions",
+    "constraint": "shop_subscriptions_tier_check",
+    "column": "tier",
+    "values": [
+      "basic",
+      "max",
+      "pro"
+    ],
+    "definition": "CHECK (((tier)::text = ANY (ARRAY['basic'::text, 'pro'::text, 'max'::text])))"
+  },
+  {
+    "table": "synced_products",
+    "constraint": "synced_products_conflict_status_check",
+    "column": "conflict_status",
+    "values": [
+      "conflict",
+      "manual_override",
+      "synced"
+    ],
+    "definition": "CHECK (((conflict_status)::text = ANY ((ARRAY['synced'::character varying, 'conflict'::character varying, 'manual_override'::character varying])::text[])))"
+  },
+  {
+    "table": "users",
+    "constraint": "users_language_check",
+    "column": "language",
+    "values": [
+      "en",
+      "ru"
+    ],
+    "definition": "CHECK (((language)::text = ANY ((ARRAY['ru'::character varying, 'en'::character varying])::text[])))"
+  },
+  {
+    "table": "users",
+    "constraint": "users_selected_role_check",
+    "column": "selected_role",
+    "values": [
+      "buyer",
+      "seller",
+      "worker"
+    ],
+    "definition": "CHECK (((selected_role)::text = ANY ((ARRAY['buyer'::character varying, 'seller'::character varying, 'worker'::character varying])::text[])))"
+  }
+]
