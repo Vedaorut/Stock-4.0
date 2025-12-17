@@ -34,13 +34,12 @@ const showPrompt = async (ctx) => {
 
     // Get active orders to show count
     const result = await orderApi.getShopOrders(ctx.session.shopId, ctx.session.token, {
-      status: 'confirmed',
+      status: 'confirmed',  // DB status for paid orders awaiting delivery
     });
     // Parse response correctly - API returns { success, data, pagination }
     const orders = result.success && Array.isArray(result.data) ? result.data : [];
-    const activeOrders = orders.filter((order) =>
-      ['confirmed', 'processing'].includes(order.status)
-    );
+    // DB constraint: pending, confirmed, shipped, delivered, cancelled
+    const activeOrders = orders.filter((order) => order.status === 'confirmed');
 
     if (activeOrders.length === 0) {
       await ctx.editMessageText(

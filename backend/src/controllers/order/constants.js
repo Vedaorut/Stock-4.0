@@ -1,23 +1,19 @@
+// DB constraint: pending, confirmed, shipped, delivered, cancelled
 export const VALID_ORDER_STATUSES = new Set([
   'pending',
-  'paid',
-  'completed',
+  'confirmed',  // Payment confirmed (buyer sees seller contact)
+  'shipped',    // Optional intermediate (not used for digital goods)
+  'delivered',  // Order completed / goods delivered
   'cancelled',
-  'expired',
-  // Legacy statuses for backward compatibility
-  'confirmed',
-  'shipped',
-  'delivered',
 ]);
 
 export const STATUS_ALIASES = new Map([
-  // Legacy → new mapping
-  ['confirmed', 'paid'],
-  ['shipped', 'paid'],
-  ['delivered', 'completed'],
-  // Common aliases
-  ['complete', 'completed'],
-  ['active', 'paid'],
+  // Map old/code names → valid DB statuses
+  ['paid', 'confirmed'],      // 'paid' in code → 'confirmed' in DB
+  ['completed', 'delivered'], // 'completed' in code → 'delivered' in DB
+  ['complete', 'delivered'],
+  ['active', 'confirmed'],
+  ['expired', 'cancelled'],   // Expired orders are cancelled
 ]);
 
 export const VALID_PAYMENT_CURRENCIES = ['BTC', 'ETH', 'LTC', 'USDT_TRC20'];

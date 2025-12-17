@@ -61,9 +61,10 @@ export const handleActiveOrders = async (ctx) => {
 
     // Parse response correctly - API returns { success, data, pagination }
     const orders = result.success && Array.isArray(result.data) ? result.data : [];
-    // Filter for active statuses (paid, confirmed, processing)
+    // Filter for active status (confirmed = paid, awaiting delivery)
+    // DB constraint: pending, confirmed, shipped, delivered, cancelled
     const activeOrders = orders.filter((order) =>
-      ['paid', 'confirmed', 'processing'].includes(order.status)
+      order.status === 'confirmed'
     );
 
     if (activeOrders.length === 0) {
