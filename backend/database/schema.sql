@@ -272,7 +272,7 @@ CREATE TABLE shop_subscriptions (
   tier VARCHAR(20) NOT NULL CHECK (tier IN ('basic', 'pro', 'max')),
   amount DECIMAL(10, 2) NOT NULL,
   tx_hash VARCHAR(255) UNIQUE NOT NULL,
-  currency VARCHAR(10) NOT NULL CHECK (currency IN ('BTC', 'ETH', 'USDT', 'LTC')),
+  currency VARCHAR(10) NOT NULL CHECK (currency IN ('BTC', 'ETH', 'USDT', 'LTC', 'USD')),
   period_start TIMESTAMP NOT NULL,
   period_end TIMESTAMP NOT NULL,
   status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('active', 'pending', 'expired', 'cancelled', 'paid')),
@@ -306,7 +306,7 @@ CREATE TABLE payments (
     subscription_id INTEGER REFERENCES shop_subscriptions(id) ON DELETE CASCADE,
     tx_hash VARCHAR(255),
     amount DECIMAL(18, 8) NOT NULL,
-    currency VARCHAR(10) NOT NULL CHECK (currency IN ('BTC', 'ETH', 'USDT', 'LTC', 'USDT_TRC20')),
+    currency VARCHAR(10) NOT NULL CHECK (currency IN ('BTC', 'ETH', 'USDT', 'LTC', 'USDT_TRC20', 'USD', 'RUB')),
     status VARCHAR(50) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'confirmed', 'failed', 'needs_review')),
     confirmations INTEGER NOT NULL DEFAULT 0,
     verified_at TIMESTAMP,
@@ -504,7 +504,7 @@ COMMENT ON COLUMN invoices.expires_at IS 'Invoice expiration time (30 minutes fo
 CREATE TABLE processed_webhooks (
   id SERIAL PRIMARY KEY,
   webhook_id VARCHAR(255) UNIQUE NOT NULL,
-  source VARCHAR(50) NOT NULL CHECK (source IN ('blockcypher', 'etherscan', 'trongrid')),
+  source VARCHAR(50) NOT NULL CHECK (source IN ('blockcypher', 'etherscan', 'trongrid', 'crystalpay')),
   tx_hash VARCHAR(255) NOT NULL,
   processed_at TIMESTAMP DEFAULT NOW(),
   payload JSONB
@@ -512,7 +512,7 @@ CREATE TABLE processed_webhooks (
 
 COMMENT ON TABLE processed_webhooks IS 'Webhook deduplication table to prevent replay attacks';
 COMMENT ON COLUMN processed_webhooks.webhook_id IS 'Unique identifier from webhook (tx_hash + source)';
-COMMENT ON COLUMN processed_webhooks.source IS 'Webhook source: blockcypher, etherscan, trongrid';
+COMMENT ON COLUMN processed_webhooks.source IS 'Webhook source: blockcypher, etherscan, trongrid, crystalpay';
 COMMENT ON COLUMN processed_webhooks.tx_hash IS 'Transaction hash from blockchain';
 
 CREATE INDEX idx_processed_webhooks_webhook_id ON processed_webhooks(webhook_id);
