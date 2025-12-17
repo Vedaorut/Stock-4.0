@@ -24,9 +24,10 @@ const normalizeStatus = (status) => {
 };
 
 // Status transitions for seller/worker actions (labels will be replaced with t() in component)
+// Note: API expects 'delivered' status, not 'completed' (CHECK constraint on orders.status)
 const STATUS_ACTIONS_CONFIG = {
   paid: [
-    { status: 'completed', key: 'shopOrders.actions.complete', color: 'bg-emerald-500' },
+    { status: 'delivered', key: 'shopOrders.actions.complete', color: 'bg-emerald-500' },
     { status: 'cancelled', key: 'shopOrders.actions.cancel', color: 'bg-red-500/20 text-red-400' },
   ],
 };

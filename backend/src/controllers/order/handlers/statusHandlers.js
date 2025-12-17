@@ -110,11 +110,11 @@ export const getActiveCount = asyncHandler(async (req, res) => {
   try {
     // P1-004 FIX: Use o.shop_id directly instead of JOIN products
     // This ensures orders remain visible even if product is deleted
-    // Include both legacy 'confirmed' and new 'paid' statuses
+    // Note: orders.status CHECK constraint: pending, confirmed, shipped, delivered, cancelled
     const result = await client.query(
       `SELECT COUNT(*) as count
          FROM orders o
-         WHERE o.shop_id = $1 AND o.status IN ('confirmed', 'paid')`,
+         WHERE o.shop_id = $1 AND o.status = 'confirmed'`,
       [shopId]
     );
 

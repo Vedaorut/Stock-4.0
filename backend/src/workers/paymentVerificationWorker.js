@@ -648,8 +648,9 @@ async function confirmOrderPayment(orderId, paymentId, verificationResult) {
           [paymentId]
         );
         logger.warn(`[PaymentWorker] Order ${orderId} not found, payment ${paymentId} returned to pending`);
-      } else if (order.status === 'paid' || order.status === 'confirmed') {
-        // Order already paid - sync payment status (backward compat: check both 'paid' and legacy 'confirmed')
+      } else if (order.status === 'confirmed') {
+        // Order already paid - sync payment status
+        // Note: orders.status uses 'confirmed' to indicate payment received
         await query(
           `UPDATE payments SET status = 'confirmed', verification_status = 'confirmed', updated_at = NOW() WHERE id = $1`,
           [paymentId]
@@ -722,10 +723,11 @@ async function confirmOrderPayment(orderId, paymentId, verificationResult) {
       );
     }
 
-    // 3. Update order status to 'paid'
+    // 3. Update order status to 'confirmed' (valid status in orders.status constraint)
+    // Note: orders.status CHECK constraint: pending, confirmed, shipped, delivered, cancelled
     await client.query(
       `UPDATE orders
-       SET status = 'paid',
+       SET status = 'confirmed',
            paid_at = NOW(),
            updated_at = NOW()
        WHERE id = $1`,

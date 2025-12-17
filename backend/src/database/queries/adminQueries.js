@@ -33,7 +33,7 @@ export const adminQueries = {
   },
 
   _isAdminActionLogsAvailable: async () => {
-    if (adminActionLogsAvailable !== null) return adminActionLogsAvailable;
+    if (adminActionLogsAvailable !== null) {return adminActionLogsAvailable;}
 
     try {
       const result = await query(`SELECT to_regclass('public.admin_action_logs') as name`);
