@@ -126,6 +126,16 @@ function SkeletonRow() {
   );
 }
 
+function formatFetchError(error) {
+  if (!error) return 'Request failed';
+  if (typeof error === 'string') return error;
+  if (typeof error === 'object') {
+    if (typeof error.message === 'string' && error.message) return error.message;
+    if (typeof error.error === 'string' && error.error) return error.error;
+  }
+  return 'Request failed';
+}
+
 // User Row Component
 function UserRow({ user, onClick }) {
   const { triggerHaptic } = useTelegram();
@@ -185,7 +195,7 @@ function UserRow({ user, onClick }) {
 // Shop Row Component
 function ShopRow({ shop, onClick }) {
   const { triggerHaptic } = useTelegram();
-  const tier = shop.subscription_tier?.toLowerCase() || 'free';
+  const tier = (shop.tier || shop.subscription_tier || '').toLowerCase() || 'free';
   const status = shop.subscription_status || 'inactive';
 
   const handleClick = () => {
@@ -339,6 +349,24 @@ function EmptyState({ type }) {
       </div>
       <p className="text-white font-medium mb-1">{config.title}</p>
       <p className="text-gray-500 text-sm">{config.subtitle}</p>
+    </motion.div>
+  );
+}
+
+function ErrorState({ message, onRetry }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.98 }}
+      animate={{ opacity: 1, scale: 1 }}
+      className="glass-card rounded-xl p-6 text-center"
+    >
+      <p className="text-red-400 text-sm mb-4">{message}</p>
+      <button
+        onClick={onRetry}
+        className="bg-orange-primary text-white px-5 py-2.5 rounded-xl text-sm font-medium"
+      >
+        Retry
+      </button>
     </motion.div>
   );
 }
@@ -679,6 +707,9 @@ export default function AdminPanelV2({ isOpen, onClose }) {
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
 
+  // Per-tab error state (prevents infinite "load more" loops on failures)
+  const [tabErrors, setTabErrors] = useState({ users: null, shops: null, activity: null });
+
   // Modal states for detail views
   const [selectedUserId, setSelectedUserId] = useState(null);
   const [selectedShopId, setSelectedShopId] = useState(null);
@@ -732,18 +763,44 @@ export default function AdminPanelV2({ isOpen, onClose }) {
   // Fetch data function
   const fetchData = useCallback(
     async (tab, page = 1, search = '', filter = 'all', append = false) => {
+      setTabErrors((prev) => ({ ...prev, [tab]: null }));
+
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }
       abortControllerRef.current = new AbortController();
 
       const signal = abortControllerRef.current.signal;
+      const limit = tab === 'activity' ? 100 : 50;
+
+      const getSetterForTab = () => {
+        switch (tab) {
+          case 'users':
+            return setUsersData;
+          case 'shops':
+            return setShopsData;
+          case 'activity':
+            return setActivityData;
+          default:
+            return null;
+        }
+      };
+
+      const applyFailure = (message) => {
+        setTabErrors((prev) => ({ ...prev, [tab]: message }));
+        const setter = getSetterForTab();
+        if (!setter) return;
+        setter((prev) => {
+          if (append) return { ...prev, hasMore: false };
+          return { items: [], total: 0, page: 1, hasMore: false };
+        });
+      };
 
       try {
         let endpoint = '';
         let params = new URLSearchParams();
         params.set('page', page.toString());
-        params.set('limit', '50');
+        params.set('limit', String(limit));
 
         if (search) {
           params.set('search', search);
@@ -766,7 +823,6 @@ export default function AdminPanelV2({ isOpen, onClose }) {
             break;
           case 'activity':
             endpoint = '/admin/activity';
-            params.set('limit', '100');
             if (filter !== 'all') {
               params.set('action', filter);
             }
@@ -783,41 +839,42 @@ export default function AdminPanelV2({ isOpen, onClose }) {
         if (signal.aborted) return;
 
         if (error) {
-          console.error(`Failed to fetch ${tab}:`, error);
+          applyFailure(formatFetchError(error));
           return;
         }
 
-        if (data?.success && data?.data) {
-          const responseData = data.data;
-          const items = responseData.users || responseData.shops || responseData.logs || [];
-          const pagination = responseData.pagination || {};
-
-          const newData = {
-            items: append ? [...currentData.items, ...items] : items,
-            total: pagination.total || items.length,
-            page: pagination.page || page,
-            hasMore: pagination.hasMore ?? (items.length >= (tab === 'activity' ? 100 : 50)),
-          };
-
-          switch (tab) {
-            case 'users':
-              setUsersData(newData);
-              break;
-            case 'shops':
-              setShopsData(newData);
-              break;
-            case 'activity':
-              setActivityData(newData);
-              break;
-          }
+        if (!data?.success || !data?.data) {
+          applyFailure('Unexpected API response');
+          return;
         }
+
+        const responseData = data.data;
+        const items = responseData.users || responseData.shops || responseData.logs || [];
+        const pagination = responseData.pagination || {};
+
+        const setter = getSetterForTab();
+        if (!setter) return;
+
+        setter((prev) => {
+            const mergedItems = append ? [...prev.items, ...items] : items;
+            const total = Number.isFinite(Number(pagination.total)) ? Number(pagination.total) : mergedItems.length;
+            const resolvedPage = Number.isFinite(Number(pagination.page)) ? Number(pagination.page) : page;
+            const hasMore = typeof pagination.hasMore === 'boolean' ? pagination.hasMore : items.length >= limit;
+
+            return {
+              items: mergedItems,
+              total,
+              page: resolvedPage,
+              hasMore,
+            };
+          });
       } catch (err) {
         if (!signal.aborted) {
-          console.error(`Error fetching ${tab}:`, err);
+          applyFailure(formatFetchError(err));
         }
       }
     },
-    [get, currentData.items]
+    [get]
   );
 
   // Fetch stats for overview tab
@@ -894,7 +951,14 @@ export default function AdminPanelV2({ isOpen, onClose }) {
     const observer = new IntersectionObserver(
       (entries) => {
         const entry = entries[0];
-        if (entry.isIntersecting && currentData.hasMore && !loading && !loadingMore) {
+        if (
+          entry.isIntersecting &&
+          currentData.items.length > 0 &&
+          currentData.hasMore &&
+          !tabErrors[activeTab] &&
+          !loading &&
+          !loadingMore
+        ) {
           setLoadingMore(true);
           const nextPage = currentData.page + 1;
           fetchData(activeTab, nextPage, debouncedSearch, currentFilter, true).finally(() => {
@@ -908,7 +972,7 @@ export default function AdminPanelV2({ isOpen, onClose }) {
     observer.observe(loadMoreRef.current);
 
     return () => observer.disconnect();
-  }, [isOpen, activeTab, currentData.hasMore, currentData.page, loading, loadingMore, debouncedSearch, currentFilter, fetchData]);
+  }, [isOpen, activeTab, currentData.hasMore, currentData.page, currentData.items.length, tabErrors, loading, loadingMore, debouncedSearch, currentFilter, fetchData]);
 
   // Handle tab change
   const handleTabChange = (tab) => {
@@ -939,6 +1003,13 @@ export default function AdminPanelV2({ isOpen, onClose }) {
         return [];
     }
   }, [activeTab]);
+
+  const handleRetryActiveTab = useCallback(() => {
+    triggerHaptic('light');
+    setLoading(true);
+    setTabErrors((prev) => ({ ...prev, [activeTab]: null }));
+    fetchData(activeTab, 1, debouncedSearch, currentFilter).finally(() => setLoading(false));
+  }, [activeTab, currentFilter, debouncedSearch, fetchData, triggerHaptic]);
 
   // Handle filter change
   const handleFilterChange = (filter) => {
@@ -1038,7 +1109,11 @@ export default function AdminPanelV2({ isOpen, onClose }) {
 
                   {/* Empty state */}
                   {!loading && currentData.items.length === 0 && (
-                    <EmptyState type={activeTab} />
+                    tabErrors[activeTab] ? (
+                      <ErrorState message={tabErrors[activeTab]} onRetry={handleRetryActiveTab} />
+                    ) : (
+                      <EmptyState type={activeTab} />
+                    )
                   )}
                 </>
               )}
@@ -1085,7 +1160,7 @@ export default function AdminPanelV2({ isOpen, onClose }) {
               )}
 
               {/* Load more trigger - only for non-overview tabs */}
-              {activeTab !== 'overview' && currentData.hasMore && (
+              {activeTab !== 'overview' && currentData.items.length > 0 && currentData.hasMore && !tabErrors[activeTab] && (
                 <div ref={loadMoreRef} className="py-4 flex justify-center">
                   {loadingMore && (
                     <div className="flex items-center gap-2 text-gray-500 text-sm">

@@ -12,10 +12,39 @@
 import { query } from '../../config/database.js';
 import logger from '../../utils/logger.js';
 
+let adminActionLogsAvailable = null;
+
 /**
  * Admin Queries Module
  */
 export const adminQueries = {
+  // ============================================
+  // INTERNAL HELPERS
+  // ============================================
+
+  /**
+   * Detect missing admin_action_logs table (migration may not be applied in some environments)
+   */
+  _isMissingAdminActionLogsTable: (error) => {
+    return (
+      error?.code === '42P01' ||
+      (typeof error?.message === 'string' && error.message.includes('admin_action_logs'))
+    );
+  },
+
+  _isAdminActionLogsAvailable: async () => {
+    if (adminActionLogsAvailable !== null) return adminActionLogsAvailable;
+
+    try {
+      const result = await query(`SELECT to_regclass('public.admin_action_logs') as name`);
+      adminActionLogsAvailable = !!result.rows?.[0]?.name;
+      return adminActionLogsAvailable;
+    } catch {
+      adminActionLogsAvailable = false;
+      return false;
+    }
+  },
+
   // ============================================
   // USERS QUERIES
   // ============================================
@@ -63,7 +92,7 @@ export const adminQueries = {
         u.updated_at,
         COUNT(DISTINCT s.id) as shop_count,
         COUNT(DISTINCT o.id) as order_count,
-        COALESCE(SUM(CASE WHEN o.status = 'completed' THEN o.total_price ELSE 0 END), 0) as total_spent
+        COALESCE(SUM(CASE WHEN o.status IN ('confirmed', 'shipped', 'delivered') THEN o.total_price ELSE 0 END), 0) as total_spent
       FROM users u
       LEFT JOIN shops s ON u.id = s.owner_id
       LEFT JOIN orders o ON u.id = o.buyer_id
@@ -104,7 +133,7 @@ export const adminQueries = {
         u.*,
         COUNT(DISTINCT s.id) as shop_count,
         COUNT(DISTINCT o.id) as order_count,
-        COALESCE(SUM(CASE WHEN o.status = 'completed' THEN o.total_price ELSE 0 END), 0) as total_spent
+        COALESCE(SUM(CASE WHEN o.status IN ('confirmed', 'shipped', 'delivered') THEN o.total_price ELSE 0 END), 0) as total_spent
       FROM users u
       LEFT JOIN shops s ON u.id = s.owner_id
       LEFT JOIN orders o ON u.id = o.buyer_id
@@ -123,7 +152,7 @@ export const adminQueries = {
         COUNT(DISTINCT p.id) as product_count,
         COUNT(DISTINCT o.id) as order_count
       FROM shops s
-      LEFT JOIN products p ON s.id = p.shop_id AND p.deleted_at IS NULL
+      LEFT JOIN products p ON s.id = p.shop_id AND p.is_active = true
       LEFT JOIN orders o ON s.id = o.shop_id
       WHERE s.owner_id = $1
       GROUP BY s.id
@@ -223,10 +252,10 @@ export const adminQueries = {
         u.telegram_id as owner_telegram_id,
         COUNT(DISTINCT p.id) as product_count,
         COUNT(DISTINCT o.id) as order_count,
-        COALESCE(SUM(CASE WHEN o.status = 'completed' THEN o.total_price ELSE 0 END), 0) as total_revenue
+        COALESCE(SUM(CASE WHEN o.status IN ('confirmed', 'shipped', 'delivered') THEN o.total_price ELSE 0 END), 0) as total_revenue
       FROM shops s
       JOIN users u ON s.owner_id = u.id
-      LEFT JOIN products p ON s.id = p.shop_id AND p.deleted_at IS NULL
+      LEFT JOIN products p ON s.id = p.shop_id AND p.is_active = true
       LEFT JOIN orders o ON s.id = o.shop_id
       ${whereClause}
       GROUP BY s.id, u.id
@@ -273,9 +302,9 @@ export const adminQueries = {
     `;
 
     const productsQuery = `
-      SELECT id, name, price, stock, is_active, created_at
+      SELECT id, name, price, stock_quantity as stock, is_active, created_at
       FROM products
-      WHERE shop_id = $1 AND deleted_at IS NULL
+      WHERE shop_id = $1
       ORDER BY created_at DESC
       LIMIT 10
     `;
@@ -296,10 +325,10 @@ export const adminQueries = {
 
     const statsQuery = `
       SELECT
-        COUNT(DISTINCT CASE WHEN p.deleted_at IS NULL THEN p.id END) as active_product_count,
+        COUNT(DISTINCT CASE WHEN p.is_active = true THEN p.id END) as active_product_count,
         COUNT(DISTINCT o.id) as total_order_count,
-        COUNT(DISTINCT CASE WHEN o.status = 'completed' THEN o.id END) as completed_order_count,
-        COALESCE(SUM(CASE WHEN o.status = 'completed' THEN o.total_price ELSE 0 END), 0) as total_revenue
+        COUNT(DISTINCT CASE WHEN o.status IN ('confirmed', 'shipped', 'delivered') THEN o.id END) as completed_order_count,
+        COALESCE(SUM(CASE WHEN o.status IN ('confirmed', 'shipped', 'delivered') THEN o.total_price ELSE 0 END), 0) as total_revenue
       FROM shops s
       LEFT JOIN products p ON s.id = p.shop_id
       LEFT JOIN orders o ON s.id = o.shop_id
@@ -339,6 +368,10 @@ export const adminQueries = {
    * @returns {Promise<{logs: Array, total: number}>}
    */
   getActivityLogs: async ({ action = 'all', adminId = null, limit = 100, offset = 0 }) => {
+    if (!(await adminQueries._isAdminActionLogsAvailable())) {
+      return { logs: [], total: 0 };
+    }
+
     let whereClause = 'WHERE 1=1';
     const params = [];
     let paramIndex = 1;
@@ -375,15 +408,24 @@ export const adminQueries = {
       ${whereClause}
     `;
 
-    const [result, countResult] = await Promise.all([
-      query(queryText, params),
-      query(countQuery, params.slice(0, -2))
-    ]);
+    try {
+      const [result, countResult] = await Promise.all([
+        query(queryText, params),
+        query(countQuery, params.slice(0, -2))
+      ]);
 
-    return {
-      logs: result.rows,
-      total: parseInt(countResult.rows[0]?.total || 0, 10)
-    };
+      return {
+        logs: result.rows,
+        total: parseInt(countResult.rows[0]?.total || 0, 10)
+      };
+    } catch (error) {
+      // If migration 076 isn't applied yet, let admin panel work without activity logs.
+      if (adminQueries._isMissingAdminActionLogsTable(error)) {
+        adminActionLogsAvailable = false;
+        return { logs: [], total: 0 };
+      }
+      throw error;
+    }
   },
 
   /**
@@ -401,6 +443,10 @@ export const adminQueries = {
    * @returns {Promise<Object>} Created log entry
    */
   logAction: async ({ adminId, action, targetType, targetId, reason, notes, metadata, ipAddress, userAgent }) => {
+    if (!(await adminQueries._isAdminActionLogsAvailable())) {
+      return null;
+    }
+
     const queryText = `
       INSERT INTO admin_action_logs (
         admin_id, action, target_type, target_id, reason, notes, metadata, ip_address, user_agent
@@ -424,6 +470,11 @@ export const adminQueries = {
 
       return result.rows[0];
     } catch (error) {
+      // In some dev DBs the audit table may not exist yet; don't break admin UX.
+      if (adminQueries._isMissingAdminActionLogsTable(error)) {
+        adminActionLogsAvailable = false;
+        return null;
+      }
       logger.error('[AdminQueries] Failed to log action:', error);
       throw error;
     }

@@ -84,6 +84,7 @@ class MetricsCollector {
   recordWorkerError() { this.workerErrors.add(); }
   recordWebhookFailure() { this.webhookFailures.add(); }
   recordNeedsReview() { this.needsReviewOrders.add(); }
+  recordNeedsReviewOrder() { this.needsReviewOrders.add(); } // Alias for worker compatibility
   recordRequest(latencyMs) { this.requests.add(); this.latency.record(latencyMs); }
   connectionStart() { this.activeConnections++; }
   connectionEnd() { this.activeConnections = Math.max(0, this.activeConnections - 1); }
