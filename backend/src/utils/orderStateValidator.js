@@ -4,21 +4,21 @@ import logger from './logger.js';
  * Order State Machine Definition
  * Defines valid status transitions based on business logic
  *
- * Simplified flow:
+ * DB constraint: pending, confirmed, shipped, delivered, cancelled
+ *
+ * Flow:
  * - pending: Awaiting payment
- * - paid: Payment confirmed, buyer sees seller contact
- * - completed: Order fulfilled (internal "выдан" status)
+ * - confirmed: Payment confirmed (buyer sees seller contact)
+ * - shipped: Order shipped (optional intermediate)
+ * - delivered: Order fulfilled / completed
+ * - cancelled: Order cancelled
  */
 const ORDER_STATE_MACHINE = {
-  pending: ['paid', 'cancelled', 'expired'],
-  paid: ['completed', 'cancelled'],
-  completed: [],
-  cancelled: [],
-  expired: [],
-  // Legacy statuses (map to new equivalents for backward compatibility)
-  confirmed: ['completed', 'cancelled'], // Legacy → treat as 'paid'
-  shipped: ['completed'],                 // Legacy → treat as 'paid'
-  delivered: [],                          // Legacy → treat as 'completed'
+  pending: ['confirmed', 'cancelled'],
+  confirmed: ['shipped', 'delivered', 'cancelled'],
+  shipped: ['delivered', 'cancelled'],
+  delivered: [],  // Terminal state
+  cancelled: [],  // Terminal state
 };
 
 /**
