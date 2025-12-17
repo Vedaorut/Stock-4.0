@@ -2,21 +2,19 @@ import logger from './logger.js';
 
 /**
  * Order State Machine Definition
- * Defines valid status transitions based on business logic
+ * Digital goods - no shipping, instant delivery
  *
  * DB constraint: pending, confirmed, shipped, delivered, cancelled
  *
  * Flow:
  * - pending: Awaiting payment
  * - confirmed: Payment confirmed (buyer sees seller contact)
- * - shipped: Order shipped (optional intermediate)
- * - delivered: Order fulfilled / completed
+ * - delivered: Goods delivered / order completed
  * - cancelled: Order cancelled
  */
 const ORDER_STATE_MACHINE = {
   pending: ['confirmed', 'cancelled'],
-  confirmed: ['shipped', 'delivered', 'cancelled'],
-  shipped: ['delivered', 'cancelled'],
+  confirmed: ['delivered', 'cancelled'],
   delivered: [],  // Terminal state
   cancelled: [],  // Terminal state
 };
