@@ -249,10 +249,11 @@ export const updateOrderStatusWithStockLogic = async (orderId, newStatus, curren
     }
 
     // Handle stock on cancellation based on current status
+    // DB constraint: pending, confirmed, shipped, delivered, cancelled
     if (newStatus === 'cancelled') {
-      if (currentStatus === 'confirmed' || currentStatus === 'paid') {
-        // Paid/confirmed order = stock was deducted, need to return it
-        logger.info('Cancelling paid order - returning deducted stock', { orderId, currentStatus });
+      if (currentStatus === 'confirmed') {
+        // Confirmed order = stock was deducted, need to return it
+        logger.info('Cancelling confirmed order - returning deducted stock', { orderId, currentStatus });
         await returnStockForCancelledOrder(orderId, client);
       } else if (currentStatus === 'pending') {
         // Pending order = stock was only reserved, need to unreserve it
@@ -266,11 +267,8 @@ export const updateOrderStatusWithStockLogic = async (orderId, newStatus, curren
       }
     }
 
-    // Handle stock on expiration (same as pending cancellation)
-    if (newStatus === 'expired' && currentStatus === 'pending') {
-      logger.info('Expiring pending order - unreserving stock', { orderId });
-      await unreserveStockForOrder(orderId, client);
-    }
+    // Note: 'expired' status doesn't exist in DB constraint
+    // Expiration is handled via 'cancelled' status by orderCleanupService
 
     // Update order status
     await client.query('UPDATE orders SET status = $1, updated_at = NOW() WHERE id = $2', [

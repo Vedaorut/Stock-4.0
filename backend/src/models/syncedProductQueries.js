@@ -316,10 +316,10 @@ export const syncedProductQueries = {
        WHERE sf.mode = 'resell' 
          AND sf.status = 'active'
          AND sp.conflict_status IN ('synced', 'conflict')
-         AND sp.last_synced_at < NOW() - INTERVAL '${staleMinutes} minutes'
+         AND sp.last_synced_at < NOW() - ($1 * INTERVAL '1 minute')
        ORDER BY sp.last_synced_at ASC
        LIMIT 100`,
-      []
+      [staleMinutes]
     );
     return result.rows;
   },

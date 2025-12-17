@@ -53,8 +53,8 @@ export const updateStatus = asyncHandler(async (req, res) => {
       shopId: order.shop_id,
     });
 
-    // Notify buyer about status change (except 'completed' which is internal)
-    if (newStatus !== 'completed') {
+    // Notify buyer about status change (except 'delivered' which has separate notification)
+    if (newStatus !== 'delivered') {
       try {
         await telegramService.notifyOrderStatusUpdate(order.buyer_telegram_id, {
           id: updatedOrder.id,
@@ -66,8 +66,8 @@ export const updateStatus = asyncHandler(async (req, res) => {
       }
     }
 
-    // For 'completed' status, notify shop team (not buyer)
-    if (newStatus === 'completed') {
+    // For 'delivered' status, notify shop team
+    if (newStatus === 'delivered') {
       notifyOrderCompleted(updatedOrder.id, userId).catch((err) => {
         logger.error('Order completion notification error', { error: err.message, orderId: id });
       });
