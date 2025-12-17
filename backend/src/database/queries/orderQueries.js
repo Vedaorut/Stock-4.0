@@ -50,8 +50,9 @@ export const orderQueries = {
     const MAX_LIMIT = 1000;
     const safeLimit = Math.min(limit, MAX_LIMIT);
 
-    // Default: show only active/completed orders, exclude cancelled/expired
-    const defaultStatuses = ['pending', 'paid', 'confirmed', 'completed', 'delivered', 'shipped'];
+    // Default: show only active/completed orders, exclude cancelled
+    // DB constraint: pending, confirmed, shipped, delivered, cancelled
+    const defaultStatuses = ['pending', 'confirmed', 'shipped', 'delivered'];
     const statusFilter = statuses && statuses.length > 0 ? statuses : defaultStatuses;
 
     const result = await query(

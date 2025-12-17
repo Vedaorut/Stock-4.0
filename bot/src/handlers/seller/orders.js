@@ -334,9 +334,9 @@ export const handleOrderHistory = async (ctx, page = 1) => {
 };
 
 /**
- * Mark order as completed (single order)
+ * Mark order as delivered/completed (single order)
  * SECURITY FIX: Verify order belongs to user's shop via backend before update
- * Note: This replaces the old shipped/delivered flow with a single 'completed' status
+ * DB constraint: pending, confirmed, shipped, delivered, cancelled
  */
 export const handleMarkCompleted = async (ctx) => {
   try {
@@ -360,7 +360,7 @@ export const handleMarkCompleted = async (ctx) => {
       throw error;
     }
 
-    await orderApi.updateOrderStatus(orderId, 'completed', token);
+    await orderApi.updateOrderStatus(orderId, 'delivered', token);
 
     await ctx.answerCbQuery(ctx.t('orders.orderCompleted'));
 
@@ -403,8 +403,8 @@ export const handleMarkShipped = async (ctx) => {
       throw error;
     }
 
-    // Use 'completed' instead of 'shipped' for new flow
-    await orderApi.updateOrderStatus(orderId, 'completed', token);
+    // Use 'delivered' - valid DB status
+    await orderApi.updateOrderStatus(orderId, 'delivered', token);
 
     await ctx.answerCbQuery(ctx.t('orders.orderCompleted'));
 
@@ -413,7 +413,7 @@ export const handleMarkShipped = async (ctx) => {
     const newMessage = ctx.callbackQuery.message.text + '\n\n' + completedText;
     await ctx.editMessageText(newMessage);
 
-    logger.info(`Order ${orderId} marked as completed (via legacy shipped) by user ${ctx.from.id}`);
+    logger.info(`Order ${orderId} marked as delivered by user ${ctx.from.id}`);
   } catch (error) {
     logger.error('Error marking order as shipped:', error);
     await ctx.answerCbQuery(ctx.t('orders.statusUpdateError'));
@@ -447,7 +447,7 @@ export const handleMarkDelivered = async (ctx) => {
       throw error;
     }
 
-    await orderApi.updateOrderStatus(orderId, 'completed', token);
+    await orderApi.updateOrderStatus(orderId, 'delivered', token);
 
     await ctx.answerCbQuery(ctx.t('orders.orderCompleted'));
 
@@ -456,7 +456,7 @@ export const handleMarkDelivered = async (ctx) => {
     const newMessage = ctx.callbackQuery.message.text + '\n\n' + completedText;
     await ctx.editMessageText(newMessage);
 
-    logger.info(`Order ${orderId} marked as completed (via legacy delivered) by user ${ctx.from.id}`);
+    logger.info(`Order ${orderId} marked as delivered by user ${ctx.from.id}`);
   } catch (error) {
     logger.error('Error marking order as delivered:', error);
     await ctx.answerCbQuery(ctx.t('orders.statusUpdateError'));

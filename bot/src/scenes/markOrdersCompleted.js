@@ -214,9 +214,9 @@ const handleConfirmation = async (ctx) => {
       // Get order IDs
       const orderIds = selectedOrders.map((o) => o.id);
 
-      // Update orders via API - use 'completed' status (new)
+      // Update orders via API - use 'delivered' status (DB constraint valid)
       try {
-        await orderApi.bulkUpdateOrderStatus(orderIds, 'completed', token);
+        await orderApi.bulkUpdateOrderStatus(orderIds, 'delivered', token);
 
         logger.info('mark_orders_completed:success', {
           userId: ctx.from.id,
