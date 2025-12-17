@@ -36,6 +36,7 @@ export function paymentStateMessage(state, extra = {}, lang = 'ru') {
     case 'paid':
     case 'completed':
     // Legacy statuses for backward compatibility
+    // falls through
     case 'confirmed':
       return `${label}\n\n${t('paymentUi.allDone', {}, lang)}`;
     case 'expired':
@@ -53,6 +54,7 @@ export function paymentStateKeyboard(state, { retryCb = 'payment:retry', cancelC
     case 'paid':
     case 'completed':
     // Legacy status for backward compatibility
+    // falls through
     case 'confirmed':
       return Markup.inlineKeyboard([[Markup.button.callback(t('buttons.mainMenu', {}, lang), 'seller:menu')]]);
     case 'expired':

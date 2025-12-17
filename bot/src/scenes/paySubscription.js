@@ -12,7 +12,7 @@
  */
 
 import { Scenes, Markup } from 'telegraf';
-import { subscriptionApi, shopApi } from '../utils/api.js';
+import { subscriptionApi } from '../utils/api.js';
 import logger from '../utils/logger.js';
 import * as smartMessage from '../utils/smartMessage.js';
 import { reply as cleanReply, replyHTML as cleanReplyHTML } from '../utils/cleanReply.js';
@@ -365,7 +365,7 @@ const paySubscriptionScene = new Scenes.WizardScene(
   // Step 4: Handle payment status check via CrystalPay
   async (ctx) => {
     const lang = ctx.lang || ctx.session?.language || 'ru';
-    const { general: generalMessages, subscription: subMessages } = getMessages(lang);
+    const { subscription: subMessages } = getMessages(lang);
 
     if (!ctx.callbackQuery) {
       await ctx.reply(t('subscription.checkStatusPrompt', {}, lang));
