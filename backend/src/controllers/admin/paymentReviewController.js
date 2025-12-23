@@ -4,10 +4,11 @@
  * Handles review of late payments marked as needs_review
  */
 
-import { query } from '../../config/database.js';
+import { getClient, query } from '../../config/database.js';
 import logger from '../../utils/logger.js';
 import { logPaymentStatusChange, logOrderStatusChange } from '../../utils/statusLogger.js';
 import { alertInfo } from '../../utils/alerts.js';
+import { updateOrderStatusWithStockLogic } from '../../services/orderService.js';
 
 /**
  * Get all payments needing review
@@ -76,10 +77,12 @@ export async function approvePayment(req, res) {
   const { paymentId } = req.params;
   const { notes } = req.body;
   const adminId = req.user?.id;
+  const client = await getClient();
 
   try {
     // Get payment and order info
-    const paymentResult = await query(
+    await client.query('BEGIN');
+    const paymentResult = await client.query(
       `SELECT p.*, o.id as order_id, o.status as order_status, o.created_at as order_created_at
        FROM payments p
        JOIN orders o ON p.order_id = o.id
@@ -89,6 +92,7 @@ export async function approvePayment(req, res) {
     );
 
     if (paymentResult.rows.length === 0) {
+      await client.query('ROLLBACK');
       return res.status(404).json({
         success: false,
         error: 'Payment not found or not in needs_review status',
@@ -98,6 +102,7 @@ export async function approvePayment(req, res) {
     const payment = paymentResult.rows[0];
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
     if (payment.order_created_at && new Date(payment.order_created_at) < sevenDaysAgo) {
+      await client.query('ROLLBACK');
       return res.status(400).json({
         success: false,
         error: 'Payment too old for approval',
@@ -105,7 +110,7 @@ export async function approvePayment(req, res) {
     }
 
     // Update payment to confirmed
-    await query(
+    await client.query(
       `UPDATE payments
        SET status = 'confirmed',
            verification_status = 'confirmed',
@@ -119,10 +124,10 @@ export async function approvePayment(req, res) {
 
     // Update order to confirmed if still pending
     if (payment.order_status === 'pending') {
-      await query(
+      await updateOrderStatusWithStockLogic(payment.order_id, 'confirmed', payment.order_status, client);
+      await client.query(
         `UPDATE orders
-         SET status = 'confirmed',
-             paid_at = NOW(),
+         SET paid_at = NOW(),
              updated_at = NOW()
          WHERE id = $1`,
         [payment.order_id]
@@ -136,6 +141,8 @@ export async function approvePayment(req, res) {
         requestId: req.requestId,
       });
     }
+
+    await client.query('COMMIT');
 
     logPaymentStatusChange({
       paymentId: parseInt(paymentId),
@@ -166,11 +173,14 @@ export async function approvePayment(req, res) {
       data: { paymentId, orderId: payment.order_id },
     });
   } catch (error) {
+    await client.query('ROLLBACK');
     logger.error('[Admin] Failed to approve payment:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to approve payment',
     });
+  } finally {
+    client.release();
   }
 }
 
@@ -182,9 +192,11 @@ export async function rejectPayment(req, res) {
   const { paymentId } = req.params;
   const { notes } = req.body;
   const adminId = req.user?.id;
+  const client = await getClient();
 
   try {
-    const paymentResult = await query(
+    await client.query('BEGIN');
+    const paymentResult = await client.query(
       `SELECT p.*, o.id as order_id, o.status as order_status, o.created_at as order_created_at
        FROM payments p
        JOIN orders o ON p.order_id = o.id
@@ -193,6 +205,7 @@ export async function rejectPayment(req, res) {
     );
 
     if (paymentResult.rows.length === 0) {
+      await client.query('ROLLBACK');
       return res.status(404).json({
         success: false,
         error: 'Payment not found or not in needs_review status',
@@ -202,6 +215,7 @@ export async function rejectPayment(req, res) {
     const payment = paymentResult.rows[0];
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
     if (payment.order_created_at && new Date(payment.order_created_at) < sevenDaysAgo) {
+      await client.query('ROLLBACK');
       return res.status(400).json({
         success: false,
         error: 'Payment too old for approval',
@@ -209,7 +223,7 @@ export async function rejectPayment(req, res) {
     }
 
     // Update payment to failed with refund note
-    await query(
+    await client.query(
       `UPDATE payments
        SET status = 'failed',
            verification_status = 'failed',
@@ -224,13 +238,7 @@ export async function rejectPayment(req, res) {
 
     // Cancel order if still pending
     if (payment.order_status === 'pending') {
-      await query(
-        `UPDATE orders
-         SET status = 'cancelled',
-             updated_at = NOW()
-         WHERE id = $1`,
-        [payment.order_id]
-      );
+      await updateOrderStatusWithStockLogic(payment.order_id, 'cancelled', payment.order_status, client);
 
       logOrderStatusChange({
         orderId: payment.order_id,
@@ -240,6 +248,8 @@ export async function rejectPayment(req, res) {
         requestId: req.requestId,
       });
     }
+
+    await client.query('COMMIT');
 
     logPaymentStatusChange({
       paymentId: parseInt(paymentId),
@@ -264,11 +274,14 @@ export async function rejectPayment(req, res) {
       data: { paymentId, orderId: payment.order_id },
     });
   } catch (error) {
+    await client.query('ROLLBACK');
     logger.error('[Admin] Failed to reject payment:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to reject payment',
     });
+  } finally {
+    client.release();
   }
 }
 

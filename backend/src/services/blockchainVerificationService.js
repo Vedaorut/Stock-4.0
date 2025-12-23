@@ -102,13 +102,14 @@ function normalizeTronAddress(address, tronWeb) {
     return null;
   }
 
-  const trimmed = String(address).replace(/^0x/, '');
-  if (trimmed.startsWith('41') && trimmed.length === 42) {
+  const trimmed = String(address).replace(/^0x/, '').toLowerCase();
+  const hexAddress = trimmed.length === 40 ? `41${trimmed}` : trimmed;
+  if (hexAddress.startsWith('41') && hexAddress.length === 42) {
     try {
-      return tronWeb.address.fromHex(trimmed);
+      return tronWeb.address.fromHex(hexAddress);
     } catch (error) {
       logger.warn('[BlockchainVerification] Failed to normalize TRON hex address', {
-        address: trimmed,
+        address: hexAddress,
         error: error.message,
       });
       return null;
@@ -396,7 +397,18 @@ export async function verifyBitcoinPayment(txHash, expectedAddress, expectedAmou
   }
 
   // Find ALL outputs to our address (Blockstream uses scriptpubkey_address)
-  const outputs = tx.vout?.filter((o) => o.scriptpubkey_address === expectedAddress) || [];
+  // Normalize bech32 (bc1) addresses to lowercase for safe comparison.
+  const normalizeBtcAddress = (address) => {
+    if (!address) {
+      return '';
+    }
+    const value = String(address);
+    return value.toLowerCase().startsWith('bc1') ? value.toLowerCase() : value;
+  };
+  const expectedBtcAddress = normalizeBtcAddress(expectedAddress);
+  const outputs = tx.vout?.filter(
+    (o) => normalizeBtcAddress(o.scriptpubkey_address) === expectedBtcAddress
+  ) || [];
   const amountSats = outputs.reduce((sum, o) => sum + (o.value || 0), 0);
 
   if (outputs.length === 0) {
@@ -531,7 +543,20 @@ export async function verifyLitecoinPayment(txHash, expectedAddress, expectedAmo
   }
 
   // Find ALL outputs to our address (BlockCypher uses addresses array)
-  const outputs = tx.outputs?.filter((o) => o.addresses?.includes(expectedAddress)) || [];
+  // Normalize bech32 (ltc1) addresses to lowercase for safe comparison.
+  const normalizeLtcAddress = (address) => {
+    if (!address) {
+      return '';
+    }
+    const value = String(address);
+    return value.toLowerCase().startsWith('ltc1') ? value.toLowerCase() : value;
+  };
+  const expectedLtcAddress = normalizeLtcAddress(expectedAddress);
+  const outputs = tx.outputs?.filter(
+    (o) =>
+      Array.isArray(o.addresses) &&
+      o.addresses.some((addr) => normalizeLtcAddress(addr) === expectedLtcAddress)
+  ) || [];
   const amountLitoshi = outputs.reduce((sum, o) => sum + (o.value || 0), 0);
 
   if (outputs.length === 0) {
@@ -624,13 +649,15 @@ export async function verifyEthereumPayment(txHash, expectedAddress, expectedAmo
     };
   }
 
+  const isEtherscanNotOk = (data) => data?.status === '0' && data?.message === 'NOTOK';
+
   // Get transaction details (may throw BlockchainAPIError)
   // V2 API requires chainid parameter
   const txUrl = `${config.baseUrl}?chainid=${config.chainId}&module=proxy&action=eth_getTransactionByHash&txhash=${txHash}&apikey=${apiKey}`;
   const txData = await fetchWithRetry(txUrl);
 
   // PAY-P1-4 FIX: Detect Etherscan API errors (rate limit / invalid key)
-  if (txData.status === '0' && txData.message === 'NOTOK') {
+  if (isEtherscanNotOk(txData)) {
     throw new BlockchainAPIError(txData.result || 'Etherscan API error');
   }
 
@@ -708,6 +735,12 @@ export async function verifyEthereumPayment(txHash, expectedAddress, expectedAmo
     fetchWithRetry(receiptUrl),
     fetchWithRetry(currentBlockUrl),
   ]);
+
+  if (isEtherscanNotOk(receiptData) || isEtherscanNotOk(currentBlockData)) {
+    throw new BlockchainAPIError(
+      receiptData?.result || currentBlockData?.result || 'Etherscan API error'
+    );
+  }
 
   const receipt = receiptData.result;
   if (!receipt) {
@@ -882,6 +915,7 @@ export async function verifyUSDTTRC20Payment(txHash, expectedAddress, expectedAm
       const contractAddressRaw = String(transfer.contract_address || '');
       const contractAddressHex = contractAddressRaw.replace(/^0x/, '').toLowerCase();
       return contractAddressHex === contractHex ||
+        contractAddressHex === contractHexWithout41 ||
         contractAddressRaw === config.contractAddress;
     });
 

@@ -41,6 +41,7 @@ CREATE INDEX IF NOT EXISTS idx_products_name_trgm ON products USING gin(name gin
 -- ============================================
 CREATE INDEX IF NOT EXISTS idx_orders_buyer_id ON orders(buyer_id);
 CREATE INDEX IF NOT EXISTS idx_orders_product_id ON orders(product_id);
+CREATE INDEX IF NOT EXISTS idx_orders_shop_id ON orders(shop_id);
 CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
 CREATE INDEX IF NOT EXISTS idx_orders_payment_hash ON orders(payment_hash);
 CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders(created_at DESC);

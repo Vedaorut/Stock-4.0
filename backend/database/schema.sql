@@ -603,6 +603,7 @@ CREATE INDEX IF NOT EXISTS idx_products_preorder ON products(shop_id, is_preorde
 -- shop_subscribers indexes are created with table definition above
 CREATE INDEX IF NOT EXISTS idx_orders_buyer ON orders(buyer_id);
 CREATE INDEX IF NOT EXISTS idx_orders_product ON orders(product_id);
+CREATE INDEX IF NOT EXISTS idx_orders_shop ON orders(shop_id);
 CREATE INDEX IF NOT EXISTS idx_payments_order_status ON payments(order_id, status);
 CREATE INDEX IF NOT EXISTS idx_payments_subscription_id ON payments(subscription_id);
 -- Payment verification optimization: tx_hash lookup (40-60ms faster)
