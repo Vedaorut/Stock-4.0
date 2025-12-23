@@ -26,12 +26,14 @@ import { NotFoundError, UnauthorizedError } from '../../../utils/errors.js';
  */
 export async function validateAndLockOrder(client, orderId, actorUserId, { allowSeller = false } = {}) {
   const orderResult = await client.query(
-    `SELECT o.*, s.owner_id
+    `SELECT o.*,
+            COALESCE(s.owner_id, ps.owner_id) AS owner_id
        FROM orders o
-       JOIN products p ON o.product_id = p.id
-       JOIN shops s ON p.shop_id = s.id
+       LEFT JOIN shops s ON s.id = o.shop_id
+       LEFT JOIN products p ON o.product_id = p.id
+       LEFT JOIN shops ps ON ps.id = p.shop_id
       WHERE o.id = $1
-      FOR UPDATE`,
+      FOR UPDATE OF o`,
     [orderId]
   );
 

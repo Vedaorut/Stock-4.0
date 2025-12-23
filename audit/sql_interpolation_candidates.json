@@ -1,0 +1,167 @@
+[
+  {
+    "file": "backend/database/queries/promoCodeQueries.js",
+    "line": 224,
+    "first_lines": "UPDATE promo_codes\n    SET ${fields.join(', ')}, updated_at = NOW()\n    WHERE id = $${paramIndex}\n    RETURNING *"
+  },
+  {
+    "file": "backend/database/queries/promoCodeQueries.js",
+    "line": 261,
+    "first_lines": "(string concatenation to build SQL)"
+  },
+  {
+    "file": "backend/database/queries/promoCodeQueries.js",
+    "line": 267,
+    "first_lines": "(string concatenation to build SQL)"
+  },
+  {
+    "file": "backend/src/controllers/order/handlers/statusHandlers.js",
+    "line": 34,
+    "first_lines": "Idempotent status update for order ${id}: already in status ${newStatus}"
+  },
+  {
+    "file": "backend/src/controllers/product/handlers/bulkUpdateHandlers.js",
+    "line": 149,
+    "first_lines": "Failed to update product ${productId}"
+  },
+  {
+    "file": "backend/src/controllers/product/handlers/bulkUpdateHandlers.js",
+    "line": 184,
+    "first_lines": "Bulk update failed: ${error.message}"
+  },
+  {
+    "file": "backend/src/controllers/shopController.js",
+    "line": 923,
+    "first_lines": "SELECT id, name FROM shops WHERE ${field} = $1 AND id != $2"
+  },
+  {
+    "file": "backend/src/database/queries/adminQueries.js",
+    "line": 81,
+    "first_lines": "SELECT\n        u.id,\n        u.telegram_id,\n        u.username,\n        u.first_name,\n        u.last_name,\n        u.selected_role,\n        u.language,"
+  },
+  {
+    "file": "backend/src/database/queries/adminQueries.js",
+    "line": 108,
+    "first_lines": "SELECT COUNT(DISTINCT u.id) as total\n      FROM users u\n      ${whereClause}"
+  },
+  {
+    "file": "backend/src/database/queries/adminQueries.js",
+    "line": 240,
+    "first_lines": "SELECT\n        s.id,\n        s.name,\n        s.tier,\n        s.is_active,\n        s.is_trial,\n        s.subscription_status,\n        s.next_payment_due,"
+  },
+  {
+    "file": "backend/src/database/queries/adminQueries.js",
+    "line": 268,
+    "first_lines": "SELECT COUNT(DISTINCT s.id) as total\n      FROM shops s\n      JOIN users u ON s.owner_id = u.id\n      ${whereClause}"
+  },
+  {
+    "file": "backend/src/database/queries/adminQueries.js",
+    "line": 391,
+    "first_lines": "SELECT\n        aal.*,\n        u.username as admin_username,\n        u.first_name as admin_first_name\n      FROM admin_action_logs aal\n      JOIN users u ON aal.admin_id = u.id\n      ${whereClause}\n      ORDER BY aal.created_at DESC"
+  },
+  {
+    "file": "backend/src/database/queries/adminQueries.js",
+    "line": 405,
+    "first_lines": "SELECT COUNT(*) as total\n      FROM admin_action_logs aal\n      ${whereClause}"
+  },
+  {
+    "file": "backend/src/database/queries/aiUsageQueries.js",
+    "line": 123,
+    "first_lines": "SELECT\n        DATE(created_at) as date,\n        SUM(prompt_tokens) as prompt_tokens,\n        SUM(completion_tokens) as completion_tokens,\n        SUM(total_tokens) as total_tokens,\n        SUM(cost_usd) as total_cost,\n        COUNT(*) as request_count\n       FROM ai_usage_log"
+  },
+  {
+    "file": "backend/src/database/queries/orderItemQueries.js",
+    "line": 37,
+    "first_lines": "INSERT INTO order_items (order_id, product_id, product_name, quantity, price, currency)\n       VALUES ${values.join(', ')}\n       RETURNING *"
+  },
+  {
+    "file": "backend/src/database/queries/orderQueries.js",
+    "line": 97,
+    "first_lines": "SELECT o.*,\n              COALESCE(p.name, (SELECT oi.product_name FROM order_items oi WHERE oi.order_id = o.id LIMIT 1)) as product_name,\n              s.name as shop_name,\n              u.username as buyer_username,\n              u.first_name as buyer_first_name,\n              u.last_name as buyer_last_name\n       FROM orders o\n       LEFT JOIN products p ON o.product_id = p.id"
+  },
+  {
+    "file": "backend/src/database/queries/orderQueries.js",
+    "line": 138,
+    "first_lines": "SELECT o.*,\n              COALESCE(p.name, (SELECT oi.product_name FROM order_items oi WHERE oi.order_id = o.id LIMIT 1)) as product_name,\n              s.name as shop_name,\n              u.username as buyer_username,\n              u.first_name as buyer_first_name,\n              u.last_name as buyer_last_name\n       FROM orders o\n       LEFT JOIN products p ON o.product_id = p.id"
+  },
+  {
+    "file": "backend/src/database/queries/orderQueries.js",
+    "line": 173,
+    "first_lines": "SELECT o.*,\n              p.name as product_name,\n              s.name as shop_name,\n              u.username as buyer_username,\n              u.first_name as buyer_first_name,\n              u.last_name as buyer_last_name\n       FROM orders o\n       LEFT JOIN products p ON o.product_id = p.id"
+  },
+  {
+    "file": "backend/src/database/queries/orderQueries.js",
+    "line": 280,
+    "first_lines": "SELECT COUNT(*) as total \n       FROM orders o\n       WHERE o.shop_id = $1${statusFilter}"
+  },
+  {
+    "file": "backend/src/database/queries/productQueries.js",
+    "line": 90,
+    "first_lines": "SELECT COUNT(*) as total\n      FROM products p\n      ${whereClause}"
+  },
+  {
+    "file": "backend/src/database/queries/productQueries.js",
+    "line": 99,
+    "first_lines": "SELECT p.*,\n             s.name as shop_name,\n             CASE WHEN sp.id IS NOT NULL THEN true ELSE false END AS is_synced,\n             source_shop.name as source_shop_name\n      FROM products p\n      JOIN shops s ON p.shop_id = s.id\n      LEFT JOIN synced_products sp ON sp.synced_product_id = p.id\n      LEFT JOIN shop_follows sf ON sf.id = sp.follow_id"
+  },
+  {
+    "file": "backend/src/database/queries/productQueries.js",
+    "line": 222,
+    "first_lines": "UPDATE products\n       SET stock_quantity = stock_quantity + $2,\n           updated_at = NOW()\n       ${whereClause}\n       RETURNING id, shop_id, name, stock_quantity, reserved_quantity, is_active, updated_at"
+  },
+  {
+    "file": "backend/src/database/queries/productQueries.js",
+    "line": 344,
+    "first_lines": "SELECT id FROM products WHERE ${selectWhereClause} FOR UPDATE"
+  },
+  {
+    "file": "backend/src/database/queries/productQueries.js",
+    "line": 351,
+    "first_lines": "UPDATE products\n         SET\n           discount_percentage = $1::DECIMAL,\n           original_price = CASE\n             WHEN discount_percentage = 0 THEN price\n             ELSE COALESCE(original_price, price)\n           END,\n           price = CASE"
+  },
+  {
+    "file": "backend/src/database/queries/shopQueries.js",
+    "line": 88,
+    "first_lines": "SELECT\n        s.*,\n        u.username as seller_username,\n        u.first_name as seller_first_name,\n        u.last_name as seller_last_name,\n        ${\n          userId\n            ? `EXISTS("
+  },
+  {
+    "file": "backend/src/models/syncedProductQueries.js",
+    "line": 295,
+    "first_lines": "SELECT \n        sp.*,\n        sp.conflict_status,\n        sp.custom_markup_type,\n        sp.custom_markup_percentage,\n        sp.custom_markup_fixed,\n        sf.follower_shop_id,\n        sf.markup_percentage,"
+  },
+  {
+    "file": "backend/src/services/broadcastService.js",
+    "line": 198,
+    "first_lines": "UPDATE channel_migrations\n      SET ${fields.join(', ')}\n      WHERE id = $${paramIndex}"
+  },
+  {
+    "file": "backend/src/services/broadcastService.js",
+    "line": 222,
+    "first_lines": "UPDATE channel_migrations\n       SET ${field} = ${field} + 1\n       WHERE id = $1"
+  },
+  {
+    "file": "backend/src/services/invoicePayment/processors/subscriptionProcessor.js",
+    "line": 84,
+    "first_lines": "SELECT * FROM invoices WHERE ${invoiceFilter} ORDER BY created_at DESC LIMIT 1"
+  },
+  {
+    "file": "backend/src/services/subscriptionInvoiceService.js",
+    "line": 44,
+    "first_lines": "SELECT * FROM invoices\n       WHERE subscription_id = $1\n       ${purposeFilter}\n       AND (\n        (status = 'pending' AND expires_at > timezone('utc', NOW()))\n         OR\n         status = 'paid'  -- invoices constraint: pending, paid, expired, cancelled (no 'confirmed')\n       )"
+  },
+  {
+    "file": "backend/src/services/subscriptionInvoiceService.js",
+    "line": 64,
+    "first_lines": "SELECT \n          id, \n          status, \n          expires_at, \n          NOW() as current_time,\n          (expires_at > NOW()) as is_valid,\n          EXTRACT(EPOCH FROM (expires_at - NOW())) as seconds_until_expiry,\n          created_at"
+  },
+  {
+    "file": "backend/src/validators/orderValidator.js",
+    "line": 205,
+    "first_lines": "Sellers can only update status to: ${allowedStatuses.join(', ')}"
+  },
+  {
+    "file": "backend/src/validators/orderValidator.js",
+    "line": 217,
+    "first_lines": "Workers can only update status to: ${allowedStatuses.join(', ')}"
+  }
+]

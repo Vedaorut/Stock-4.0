@@ -1,0 +1,58 @@
+     table_name     |     column_name     |          data_type          | column_default 
+--------------------+---------------------+-----------------------------+----------------
+ admin_action_logs  | admin_id            | integer                     | 
+ admin_action_logs  | action              | character varying           | 
+ ai_usage_log       | user_id             | integer                     | 
+ ai_user_settings   | user_id             | integer                     | 
+ channel_migrations | shop_id             | integer                     | 
+ channel_migrations | new_channel_url     | text                        | 
+ invoices           | chain               | character varying           | 
+ invoices           | expected_amount     | numeric                     | 
+ invoices           | currency            | character varying           | 
+ invoices           | expires_at          | timestamp without time zone | 
+ order_items        | order_id            | integer                     | 
+ order_items        | product_name        | character varying           | 
+ order_items        | price               | numeric                     | 
+ order_items        | currency            | character varying           | 
+ orders             | total_price         | numeric                     | 
+ orders             | currency            | character varying           | 
+ payments           | amount              | numeric                     | 
+ payments           | currency            | character varying           | 
+ processed_webhooks | webhook_id          | character varying           | 
+ processed_webhooks | source              | character varying           | 
+ processed_webhooks | tx_hash             | character varying           | 
+ products           | shop_id             | integer                     | 
+ products           | name                | character varying           | 
+ products           | price               | numeric                     | 
+ promo_activations  | user_id             | integer                     | 
+ promo_activations  | shop_id             | integer                     | 
+ promo_activations  | promo_code          | character varying           | 
+ promo_codes        | code                | character varying           | 
+ promo_codes        | discount_percentage | numeric                     | 
+ promo_codes        | tier                | character varying           | 
+ refresh_tokens     | user_id             | integer                     | 
+ refresh_tokens     | token_hash          | character varying           | 
+ refresh_tokens     | expires_at          | timestamp with time zone    | 
+ shop_follows       | follower_shop_id    | integer                     | 
+ shop_follows       | source_shop_id      | integer                     | 
+ shop_follows       | mode                | character varying           | 
+ shop_subscribers   | user_id             | integer                     | 
+ shop_subscribers   | shop_id             | integer                     | 
+ shop_subscriptions | user_id             | integer                     | 
+ shop_subscriptions | tier                | character varying           | 
+ shop_subscriptions | amount              | numeric                     | 
+ shop_subscriptions | tx_hash             | character varying           | 
+ shop_subscriptions | currency            | character varying           | 
+ shop_workers       | shop_id             | integer                     | 
+ shop_workers       | worker_user_id      | integer                     | 
+ shop_workers       | added_by            | integer                     | 
+ shops              | owner_id            | integer                     | 
+ shops              | name                | character varying           | 
+ subscriptions      | user_id             | integer                     | 
+ subscriptions      | shop_id             | integer                     | 
+ synced_products    | follow_id           | integer                     | 
+ synced_products    | synced_product_id   | integer                     | 
+ synced_products    | source_product_id   | integer                     | 
+ users              | telegram_id         | bigint                      | 
+(54 rows)
+

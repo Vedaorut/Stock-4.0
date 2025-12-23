@@ -180,14 +180,30 @@ export async function finalizeOrderPayment(client, { order, invoice, verificatio
       order.product_id,
     ]);
     if (preorderCheck.rows.length > 0 && !preorderCheck.rows[0].is_preorder) {
+      // Release reservation before deducting stock
+      await productQueries.unreserveStock(order.product_id, order.quantity, client);
       await productQueries.updateStock(order.product_id, -order.quantity, client);
     }
   } else {
     // Multi-item: deduct stock for each non-preorder item
     for (const item of orderItems) {
       if (!item.is_preorder) {
+        // Release reservation before deducting stock
+        await productQueries.unreserveStock(item.product_id, item.ordered_quantity, client);
         await productQueries.updateStock(item.product_id, -item.ordered_quantity, client);
       }
+    }
+
+    // Mark only non-preorder items as stock_deducted for accurate cancellation handling
+    const deductedItemIds = orderItems
+      .filter((item) => !item.is_preorder && item.id)
+      .map((item) => item.id);
+
+    if (deductedItemIds.length > 0) {
+      await client.query(
+        `UPDATE order_items SET stock_deducted = true WHERE id = ANY($1::int[])`,
+        [deductedItemIds]
+      );
     }
   }
 

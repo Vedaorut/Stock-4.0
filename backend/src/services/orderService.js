@@ -248,6 +248,48 @@ export const updateOrderStatusWithStockLogic = async (orderId, newStatus, curren
       throw new Error(`Order status changed from ${currentStatus} to ${actualCurrentStatus}`);
     }
 
+    // Handle stock on manual confirmation (pending -> confirmed)
+    // DB constraint: pending, confirmed, shipped, delivered, cancelled
+    if (newStatus === 'confirmed' && currentStatus === 'pending') {
+      let orderItems = await orderQueries.getOrderItems(orderId, client);
+
+      // Legacy fallback: single-item orders without order_items
+      if (orderItems.length === 0) {
+        const legacyResult = await client.query(
+          `SELECT o.product_id, o.quantity, p.is_preorder
+           FROM orders o
+           JOIN products p ON o.product_id = p.id
+           WHERE o.id = $1
+           FOR UPDATE OF p`,
+          [orderId]
+        );
+        orderItems = legacyResult.rows.map((row) => ({
+          product_id: row.product_id,
+          quantity: row.quantity,
+          is_preorder: row.is_preorder,
+          stock_deducted: false,
+        }));
+      }
+
+      for (const item of orderItems) {
+        if (item.is_preorder || item.stock_deducted) {
+          continue;
+        }
+
+        // Release reservation then deduct actual stock
+        await productQueries.unreserveStock(item.product_id, item.quantity, client);
+        const updated = await productQueries.updateStock(item.product_id, -item.quantity, client);
+
+        if (!updated) {
+          throw new Error(
+            `Insufficient stock for product ${item.product_id} during confirmation`
+          );
+        }
+      }
+
+      await orderQueries.markStockDeducted(orderId, client);
+    }
+
     // Handle stock on cancellation based on current status
     // DB constraint: pending, confirmed, shipped, delivered, cancelled
     if (newStatus === 'cancelled') {

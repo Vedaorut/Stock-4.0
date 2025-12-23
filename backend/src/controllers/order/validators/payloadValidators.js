@@ -2,13 +2,22 @@ import { ValidationError } from '../../../utils/errors.js';
 import { VALID_PAYMENT_CURRENCIES } from '../constants.js';
 
 export function validateCurrencyParam(currency) {
-  if (!currency || !VALID_PAYMENT_CURRENCIES.includes(currency.toUpperCase())) {
+  if (!currency) {
     throw new ValidationError(
       `Invalid currency. Valid options: ${VALID_PAYMENT_CURRENCIES.join(', ')}`
     );
   }
 
-  return currency.toUpperCase();
+  const rawCurrency = currency.toUpperCase();
+  const normalized = rawCurrency === 'USDT' ? 'USDT_TRC20' : rawCurrency;
+
+  if (!VALID_PAYMENT_CURRENCIES.includes(normalized)) {
+    throw new ValidationError(
+      `Invalid currency. Valid options: ${VALID_PAYMENT_CURRENCIES.join(', ')}`
+    );
+  }
+
+  return normalized;
 }
 
 /**

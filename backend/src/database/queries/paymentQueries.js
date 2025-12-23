@@ -73,6 +73,7 @@ export const paymentQueries = {
       `UPDATE payments
        SET status = $2::VARCHAR,
            confirmations = COALESCE($3::INT, confirmations),
+           blockchain_confirmations = COALESCE($3::INT, blockchain_confirmations),
            verified_at = CASE WHEN $2 = 'confirmed' THEN NOW() ELSE verified_at END,
            updated_at = NOW()
        WHERE id = $1

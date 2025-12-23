@@ -266,6 +266,34 @@ export const orderQueries = {
     return result.rows[0];
   },
 
+  // Get order items for stock operations (optionally with row locks)
+  getOrderItems: async (orderId, client = null) => {
+    const queryFn = client ? client.query.bind(client) : query;
+    const lockClause = client ? 'FOR UPDATE OF p' : '';
+    const result = await queryFn(
+      `SELECT oi.product_id, oi.quantity, oi.stock_deducted, p.is_preorder
+       FROM order_items oi
+       JOIN products p ON oi.product_id = p.id
+       WHERE oi.order_id = $1
+       ${lockClause}`,
+      [orderId]
+    );
+    return result.rows;
+  },
+
+  // Mark order items as stock_deducted (used when confirming manually)
+  markStockDeducted: async (orderId, client = null) => {
+    const queryFn = client ? client.query.bind(client) : query;
+    const result = await queryFn(
+      `UPDATE order_items
+       SET stock_deducted = true
+       WHERE order_id = $1
+       RETURNING id`,
+      [orderId]
+    );
+    return result.rows;
+  },
+
   // Count orders by shop ID with optional status filter
   countByShopId: async (shopId, statuses = null) => {
     const params = [shopId];

@@ -2,8 +2,10 @@ import { paymentQueries, orderQueries, productQueries, shopQueries } from '../da
 import { asyncHandler } from '../middleware/errorHandler.js';
 import { NotFoundError, UnauthorizedError, ValidationError } from '../utils/errors.js';
 import invoicePaymentService from '../services/invoicePaymentService.js';
+import { USDT_TRC20 } from '../config/blockchain.js';
 import logger from '../utils/logger.js';
 import QRCode from 'qrcode';
+import { extractTxHashFromUrl } from './order/validators/payloadValidators.js';
 
 /**
  * Payment Controller
@@ -15,10 +17,12 @@ export const paymentController = {
   verify: asyncHandler(async (req, res) => {
     const { orderId, txHash, paymentLink, txLink, transactionUrl } = req.body;
     const proofLink = paymentLink || txLink || transactionUrl || null;
+    const proofSource = txHash || proofLink;
+    const cleanTxHash = proofSource ? extractTxHashFromUrl(proofSource) : txHash;
 
     const result = await invoicePaymentService.processOrderPayment({
       orderId,
-      txHash,
+      txHash: cleanTxHash,
       paymentLink: proofLink,
       actorUserId: req.user.id,
     });
@@ -93,12 +97,15 @@ export const paymentController = {
   */
   checkStatus: asyncHandler(async (req, res) => {
     const { txHash, paymentLink, txLink, transactionUrl } = req.query;
+    const proofLink = paymentLink || txLink || transactionUrl || null;
+    const proofSource = txHash || proofLink;
+    const cleanTxHash = proofSource ? extractTxHashFromUrl(proofSource) : txHash;
 
-    if (!txHash) {
+    if (!cleanTxHash) {
       throw new ValidationError('Transaction hash required');
     }
 
-    const payment = await paymentQueries.findByTxHash(txHash);
+    const payment = await paymentQueries.findByTxHash(cleanTxHash);
     if (!payment) {
       throw new NotFoundError('Payment');
     }
@@ -120,8 +127,8 @@ export const paymentController = {
 
     const result = await invoicePaymentService.processOrderPayment({
       orderId: order.id,
-      txHash,
-      paymentLink: paymentLink || txLink || transactionUrl || null,
+      txHash: cleanTxHash,
+      paymentLink: proofLink,
       actorUserId: req.user.id,
       allowSeller: true,
     });
@@ -165,8 +172,9 @@ export const paymentController = {
       }
 
       // Validate currency
-      const supportedCurrencies = ['BTC', 'ETH', 'USDT', 'LTC'];
-      if (!supportedCurrencies.includes(currency.toUpperCase())) {
+      const supportedCurrencies = ['BTC', 'ETH', 'USDT', 'USDT_TRC20', 'LTC'];
+      const normalizedCurrency = currency.toUpperCase() === 'USDT_TRC20' ? 'USDT' : currency.toUpperCase();
+      if (!supportedCurrencies.includes(normalizedCurrency)) {
         throw new ValidationError(`Unsupported currency. Supported: ${supportedCurrencies.join(', ')}`);
       }
 
@@ -174,7 +182,7 @@ export const paymentController = {
       // When amount is 0, generate address-only URI (for displaying seller wallet)
       const hasAmount = parsedAmount > 0;
       let paymentURI;
-      switch (currency.toUpperCase()) {
+      switch (normalizedCurrency) {
         case 'BTC':
           // BIP-21: bitcoin:address?amount=X (or just bitcoin:address)
           paymentURI = hasAmount ? `bitcoin:${address}?amount=${parsedAmount}` : `bitcoin:${address}`;
@@ -192,7 +200,7 @@ export const paymentController = {
         case 'USDT':
           // TRC-20 Tron format - for amount=0, just use address
           paymentURI = hasAmount
-            ? `tronlink://send?token=TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t&to=${address}&amount=${parsedAmount}`
+            ? `tronlink://send?token=${USDT_TRC20.contractAddress}&to=${address}&amount=${parsedAmount}`
             : address;
           break;
         case 'LTC':

@@ -1,0 +1,292 @@
+[
+  {
+    "table": "users",
+    "column": "selected_role",
+    "values": [
+      "buyer",
+      "seller",
+      "worker"
+    ],
+    "raw": "(selected_role IN ('buyer', 'seller', 'worker')),",
+    "source": "backend/database/schema.sql",
+    "version": 0,
+    "line": 36
+  },
+  {
+    "table": "shops",
+    "column": "tier",
+    "values": [
+      "basic",
+      "max",
+      "pro"
+    ],
+    "raw": "(tier::text = ANY (ARRAY['basic', 'pro', 'max']::text[]));",
+    "source": "backend/database/migrations/057_fix_all_schema_mismatches.sql",
+    "version": 57,
+    "line": 17
+  },
+  {
+    "table": "shops",
+    "column": "subscription_status",
+    "values": [
+      "active",
+      "grace_period",
+      "inactive",
+      "pending"
+    ],
+    "raw": "(subscription_status IN ('active', 'pending', 'grace_period', 'inactive'));",
+    "source": "backend/database/migrations/015_add_pending_to_shops_status.sql",
+    "version": 15,
+    "line": 14
+  },
+  {
+    "table": "shop_follows",
+    "column": "mode",
+    "values": [
+      "monitor",
+      "resell"
+    ],
+    "raw": "(mode IN ('monitor', 'resell')),",
+    "source": "backend/database/schema.sql",
+    "version": 0,
+    "line": 125
+  },
+  {
+    "table": "shop_follows",
+    "column": "markup_type",
+    "values": [
+      "fixed",
+      "percentage"
+    ],
+    "raw": "(markup_type IN ('percentage', 'fixed'));",
+    "source": "backend/database/migrations/044_add_markup_type.sql",
+    "version": 44,
+    "line": 14
+  },
+  {
+    "table": "shop_follows",
+    "column": "status",
+    "values": [
+      "active",
+      "cancelled",
+      "paused"
+    ],
+    "raw": "(status IN ('active', 'paused', 'cancelled')),",
+    "source": "backend/database/schema.sql",
+    "version": 0,
+    "line": 129
+  },
+  {
+    "table": "synced_products",
+    "column": "conflict_status",
+    "values": [
+      "conflict",
+      "manual_override",
+      "synced"
+    ],
+    "raw": "(conflict_status IN ('synced', 'conflict', 'manual_override')),",
+    "source": "backend/database/schema.sql",
+    "version": 0,
+    "line": 154
+  },
+  {
+    "table": "orders",
+    "column": "status",
+    "values": [
+      "cancelled",
+      "confirmed",
+      "delivered",
+      "expired",
+      "pending",
+      "shipped"
+    ],
+    "raw": "(status IN ('pending', 'confirmed', 'shipped', 'delivered', 'cancelled', 'expired'));",
+    "source": "backend/database/migrations/032_add_expired_status.sql",
+    "version": 32,
+    "line": 9
+  },
+  {
+    "table": "shop_subscriptions",
+    "column": "tier",
+    "values": [
+      "basic",
+      "max",
+      "pro"
+    ],
+    "raw": "(tier::text = ANY (ARRAY['basic', 'pro', 'max']::text[]));",
+    "source": "backend/database/migrations/055_add_max_tier.sql",
+    "version": 55,
+    "line": 12
+  },
+  {
+    "table": "shop_subscriptions",
+    "column": "currency",
+    "values": [
+      "BTC",
+      "ETH",
+      "LTC",
+      "USDT"
+    ],
+    "raw": "(currency IN ('BTC', 'ETH', 'USDT', 'LTC'));",
+    "source": "backend/database/migrations/018_add_ltc_to_payments_currency.sql",
+    "version": 18,
+    "line": 28
+  },
+  {
+    "table": "shop_subscriptions",
+    "column": "status",
+    "values": [
+      "active",
+      "cancelled",
+      "expired",
+      "paid",
+      "pending"
+    ],
+    "raw": "(status IN ('active', 'pending', 'expired', 'cancelled', 'paid'));",
+    "source": "backend/database/migrations/037_add_paid_status_to_shop_subscriptions.sql",
+    "version": 37,
+    "line": 12
+  },
+  {
+    "table": "payments",
+    "column": "currency",
+    "values": [
+      "BTC",
+      "ETH",
+      "LTC",
+      "USDT",
+      "USDT_TRC20"
+    ],
+    "raw": "(currency IN ('BTC', 'ETH', 'USDT', 'LTC', 'USDT_TRC20'));",
+    "source": "backend/database/migrations/047_add_order_payment_columns.sql",
+    "version": 47,
+    "line": 14
+  },
+  {
+    "table": "payments",
+    "column": "status",
+    "values": [
+      "confirmed",
+      "failed",
+      "needs_review",
+      "pending",
+      "processing"
+    ],
+    "raw": "(status IN ('pending', 'processing', 'confirmed', 'failed', 'needs_review'));",
+    "source": "backend/database/migrations/062_add_needs_review_status.sql",
+    "version": 62,
+    "line": 11
+  },
+  {
+    "table": "payments",
+    "column": "verification_status",
+    "values": [
+      "confirmed",
+      "expired",
+      "failed",
+      "late_confirmed",
+      "pending",
+      "tx_not_found",
+      "verifying"
+    ],
+    "raw": "(verification_status IN ('pending', 'verifying', 'confirmed', 'failed', 'expired', 'late_confirmed', 'tx_not_found'));",
+    "source": "backend/database/migrations/073_add_payment_check_count.sql",
+    "version": 73,
+    "line": 16
+  },
+  {
+    "table": "promo_codes",
+    "column": "tier",
+    "values": [
+      "basic",
+      "pro"
+    ],
+    "raw": "(tier IN ('basic', 'pro')),",
+    "source": "backend/database/migrations/022_add_promo_codes_table.sql",
+    "version": 22,
+    "line": 10
+  },
+  {
+    "table": "channel_migrations",
+    "column": "status",
+    "values": [
+      "completed",
+      "failed",
+      "pending",
+      "processing"
+    ],
+    "raw": "(status IN ('pending', 'processing', 'completed', 'failed')),",
+    "source": "backend/database/schema.sql",
+    "version": 0,
+    "line": 427
+  },
+  {
+    "table": "invoices",
+    "column": "chain",
+    "values": [
+      "BTC",
+      "CRYSTALPAY",
+      "ETH",
+      "LTC",
+      "USDT_TRC20"
+    ],
+    "raw": "(chain IN ('BTC', 'ETH', 'LTC', 'USDT_TRC20', 'CRYSTALPAY'));",
+    "source": "backend/database/migrations/042_crystalpay_invoice_support.sql",
+    "version": 42,
+    "line": 7
+  },
+  {
+    "table": "invoices",
+    "column": "status",
+    "values": [
+      "cancelled",
+      "expired",
+      "paid",
+      "pending"
+    ],
+    "raw": "(status IN ('pending', 'paid', 'expired', 'cancelled')),",
+    "source": "backend/database/migrations/031_legacy_hd_wallet_payment_system.sql",
+    "version": 31,
+    "line": 14
+  },
+  {
+    "table": "processed_webhooks",
+    "column": "source",
+    "values": [
+      "blockcypher",
+      "etherscan",
+      "trongrid"
+    ],
+    "raw": "(source IN ('blockcypher', 'etherscan', 'trongrid')),",
+    "source": "backend/database/migrations/006_add_processed_webhooks.sql",
+    "version": 6,
+    "line": 15
+  },
+  {
+    "table": "invoices",
+    "column": "purpose",
+    "values": [
+      "order",
+      "subscription",
+      "subscription_new",
+      "subscription_renewal",
+      "subscription_upgrade"
+    ],
+    "raw": "(purpose IN (\n    'order',\n    'subscription',\n    'subscription_upgrade',\n    'subscription_new',\n    'subscription_renewal'\n  ));",
+    "source": "backend/database/migrations/042_crystalpay_invoice_support.sql",
+    "version": 42,
+    "line": 25
+  },
+  {
+    "table": "users",
+    "column": "language",
+    "values": [
+      "en",
+      "ru"
+    ],
+    "raw": "(language IN ('ru', 'en'));",
+    "source": "backend/database/migrations/050_add_user_language.sql",
+    "version": 50,
+    "line": 13
+  }
+]

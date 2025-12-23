@@ -1,0 +1,74 @@
+[
+  {
+    "table": "shops",
+    "column": "tier",
+    "schema_values": [
+      "max",
+      "pro"
+    ],
+    "effective_values": [
+      "basic",
+      "max",
+      "pro"
+    ],
+    "effective_source": "backend/database/migrations/057_fix_all_schema_mismatches.sql",
+    "effective_version": 57
+  },
+  {
+    "table": "orders",
+    "column": "status",
+    "schema_values": [
+      "cancelled",
+      "confirmed",
+      "delivered",
+      "pending",
+      "shipped"
+    ],
+    "effective_values": [
+      "cancelled",
+      "confirmed",
+      "delivered",
+      "expired",
+      "pending",
+      "shipped"
+    ],
+    "effective_source": "backend/database/migrations/032_add_expired_status.sql",
+    "effective_version": 32
+  },
+  {
+    "table": "promo_codes",
+    "column": "tier",
+    "schema_values": [
+      "basic",
+      "max",
+      "pro"
+    ],
+    "effective_values": [
+      "basic",
+      "pro"
+    ],
+    "effective_source": "backend/database/migrations/022_add_promo_codes_table.sql",
+    "effective_version": 22
+  },
+  {
+    "table": "invoices",
+    "column": "chain",
+    "schema_values": [
+      "BTC",
+      "CRYSTALPAY",
+      "ETH",
+      "LTC",
+      "USDT_ERC20",
+      "USDT_TRC20"
+    ],
+    "effective_values": [
+      "BTC",
+      "CRYSTALPAY",
+      "ETH",
+      "LTC",
+      "USDT_TRC20"
+    ],
+    "effective_source": "backend/database/migrations/042_crystalpay_invoice_support.sql",
+    "effective_version": 42
+  }
+]

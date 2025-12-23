@@ -1,8 +1,9 @@
 import { pool } from '../config/database.js';
+import { INVOICE_EXPIRY_SECONDS } from '../config/payments.js';
 import logger from '../utils/logger.js';
 
 /**
- * Auto-cancel unpaid orders after 20 minutes and free reserved stock
+ * Auto-cancel unpaid orders after invoice expiry and free reserved stock
  * IMPORTANT: Only cancels orders WITHOUT a submitted payment (tx_hash)
  */
 async function cancelUnpaidOrders() {
@@ -11,18 +12,19 @@ async function cancelUnpaidOrders() {
   try {
     await client.query('BEGIN');
 
-    // Find orders pending for > 20 minutes that have NO payment with tx_hash
+    // Find orders pending past invoice expiry that have NO payment with tx_hash
     // Orders with submitted tx_hash should NOT be cancelled - they're awaiting blockchain confirmation
     const result = await client.query(
       `SELECT o.id
        FROM orders o
        WHERE o.status = 'pending'
-       AND o.created_at < NOW() - INTERVAL '20 minutes'
+       AND COALESCE(o.updated_at, o.created_at) < NOW() - make_interval(secs => $1)
        AND NOT EXISTS (
          SELECT 1 FROM payments pay
          WHERE pay.order_id = o.id
          AND pay.tx_hash IS NOT NULL
-       )`
+       )`,
+      [INVOICE_EXPIRY_SECONDS]
     );
 
     const orderIds = result.rows.map(o => o.id);
@@ -70,6 +72,19 @@ async function cancelUnpaidOrders() {
            GROUP BY oi.product_id
          ) sub
          WHERE p.id = sub.product_id`,
+        [cancelledIds]
+      );
+
+      // Legacy fallback: unreserve for orders without order_items
+      await client.query(
+        `UPDATE products p
+         SET reserved_quantity = GREATEST(0, p.reserved_quantity - o.quantity),
+             updated_at = NOW()
+         FROM orders o
+         WHERE o.id = ANY($1)
+           AND o.product_id = p.id
+           AND NOT EXISTS (SELECT 1 FROM order_items oi WHERE oi.order_id = o.id)
+           AND p.is_preorder = false`,
         [cancelledIds]
       );
 
@@ -129,6 +144,19 @@ async function expireOldOrders() {
            GROUP BY oi.product_id
          ) sub
          WHERE p.id = sub.product_id`,
+        [orderIds]
+      );
+
+      // Legacy fallback: unreserve for orders without order_items
+      await client.query(
+        `UPDATE products p
+         SET reserved_quantity = GREATEST(0, p.reserved_quantity - o.quantity),
+             updated_at = NOW()
+         FROM orders o
+         WHERE o.id = ANY($1)
+           AND o.product_id = p.id
+           AND NOT EXISTS (SELECT 1 FROM order_items oi WHERE oi.order_id = o.id)
+           AND p.is_preorder = false`,
         [orderIds]
       );
 

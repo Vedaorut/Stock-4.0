@@ -1,0 +1,38 @@
+                fk_name                 |     table_name     |    column_name    |     ref_table      | ref_column | on_delete 
+----------------------------------------+--------------------+-------------------+--------------------+------------+-----------
+ admin_action_logs_admin_id_fkey        | admin_action_logs  | admin_id          | users              | id         | r
+ ai_usage_log_shop_id_fkey              | ai_usage_log       | shop_id           | shops              | id         | n
+ ai_usage_log_user_id_fkey              | ai_usage_log       | user_id           | users              | id         | c
+ ai_user_settings_user_id_fkey          | ai_user_settings   | user_id           | users              | id         | c
+ channel_migrations_shop_id_fkey        | channel_migrations | shop_id           | shops              | id         | c
+ invoices_order_id_fkey                 | invoices           | order_id          | orders             | id         | c
+ invoices_subscription_id_fkey          | invoices           | subscription_id   | shop_subscriptions | id         | c
+ order_items_order_id_fkey              | order_items        | order_id          | orders             | id         | c
+ order_items_product_id_fkey            | order_items        | product_id        | products           | id         | n
+ orders_buyer_id_fkey                   | orders             | buyer_id          | users              | id         | n
+ orders_product_id_fkey                 | orders             | product_id        | products           | id         | n
+ orders_shop_id_fkey                    | orders             | shop_id           | shops              | id         | n
+ payments_order_id_fkey                 | payments           | order_id          | orders             | id         | c
+ payments_reviewed_by_fkey              | payments           | reviewed_by       | users              | id         | a
+ payments_subscription_id_fkey          | payments           | subscription_id   | shop_subscriptions | id         | c
+ products_shop_id_fkey                  | products           | shop_id           | shops              | id         | c
+ promo_activations_shop_id_fkey         | promo_activations  | shop_id           | shops              | id         | c
+ promo_activations_user_id_fkey         | promo_activations  | user_id           | users              | id         | c
+ refresh_tokens_user_id_fkey            | refresh_tokens     | user_id           | users              | id         | c
+ shop_follows_follower_shop_id_fkey     | shop_follows       | follower_shop_id  | shops              | id         | c
+ shop_follows_source_shop_id_fkey       | shop_follows       | source_shop_id    | shops              | id         | c
+ shops_owner_id_fkey                    | shops              | owner_id          | users              | id         | r
+ shop_subscribers_shop_id_fkey          | shop_subscribers   | shop_id           | shops              | id         | c
+ shop_subscribers_user_id_fkey          | shop_subscribers   | user_id           | users              | id         | c
+ shop_subscriptions_shop_id_fkey        | shop_subscriptions | shop_id           | shops              | id         | c
+ shop_subscriptions_user_id_fkey        | shop_subscriptions | user_id           | users              | id         | c
+ shop_workers_added_by_fkey             | shop_workers       | added_by          | users              | id         | c
+ shop_workers_shop_id_fkey              | shop_workers       | shop_id           | shops              | id         | c
+ shop_workers_worker_user_id_fkey       | shop_workers       | worker_user_id    | users              | id         | c
+ subscriptions_shop_id_fkey             | subscriptions      | shop_id           | shops              | id         | c
+ subscriptions_user_id_fkey             | subscriptions      | user_id           | users              | id         | c
+ synced_products_follow_id_fkey         | synced_products    | follow_id         | shop_follows       | id         | c
+ synced_products_source_product_id_fkey | synced_products    | source_product_id | products           | id         | c
+ synced_products_synced_product_id_fkey | synced_products    | synced_product_id | products           | id         | c
+(34 rows)
+

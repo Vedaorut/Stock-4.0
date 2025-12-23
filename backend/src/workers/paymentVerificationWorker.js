@@ -413,12 +413,61 @@ async function verifyAndProcessPaymentSafe(payment) {
     currency
   });
 
+  let orderInfo = null;
+  let effectiveRecipient = recipientAddress;
+  let effectiveCurrency = currency;
+  let effectiveExpected = expectedAmount;
+  const expectedParsed = parseFloat(expectedAmount);
+  const needsFallback = !effectiveRecipient || !effectiveCurrency || !Number.isFinite(expectedParsed);
+
+  if (needsFallback) {
+    const orderInfoResult = await query(
+      `SELECT payment_address, crypto_amount, crypto_currency, created_at, updated_at
+       FROM orders
+       WHERE id = $1`,
+      [orderId]
+    );
+    if (orderInfoResult.rows.length > 0) {
+      orderInfo = orderInfoResult.rows[0];
+      if (!effectiveRecipient) {
+        effectiveRecipient = orderInfo.payment_address;
+      }
+      if (!effectiveCurrency) {
+        effectiveCurrency = orderInfo.crypto_currency;
+      }
+      if (!Number.isFinite(expectedParsed)) {
+        effectiveExpected = orderInfo.crypto_amount;
+      }
+    }
+  }
+
+  const expectedNumeric = parseFloat(effectiveExpected);
+  if (!effectiveRecipient || !effectiveCurrency || !Number.isFinite(expectedNumeric)) {
+    logger.error('[PaymentWorker] Missing payment metadata for verification', {
+      paymentId,
+      orderId,
+      hasRecipient: !!effectiveRecipient,
+      hasCurrency: !!effectiveCurrency,
+      expectedAmount: effectiveExpected,
+    });
+    await query(
+      `UPDATE payments
+       SET status = 'pending',
+           verification_status = 'failed',
+           verification_error = $2,
+           updated_at = NOW()
+       WHERE id = $1`,
+      [paymentId, 'Missing payment metadata for verification']
+    );
+    return;
+  }
+
   // Call blockchain verification service
   const result = await blockchainVerificationService.verifyPayment(
     txHash,
-    currency,
-    recipientAddress,
-    parseFloat(expectedAmount)
+    effectiveCurrency,
+    effectiveRecipient,
+    expectedNumeric
   );
 
   logger.debug(`[PaymentWorker] Verification result for ${paymentId}:`, {
@@ -443,13 +492,17 @@ async function verifyAndProcessPaymentSafe(payment) {
   // If verified - check invoice expiry before confirming
   if (result.verified) {
     // Check if invoice has expired (late payment protection)
-    const orderInfo = await query(
-      `SELECT created_at FROM orders WHERE id = $1`,
-      [orderId]
-    );
+    if (!orderInfo) {
+      const orderInfoResult = await query(
+        `SELECT created_at, updated_at FROM orders WHERE id = $1`,
+        [orderId]
+      );
+      orderInfo = orderInfoResult.rows[0] || null;
+    }
 
-    if (orderInfo.rows.length > 0) {
-      const invoiceAge = (Date.now() - new Date(orderInfo.rows[0].created_at).getTime()) / 1000;
+    if (orderInfo) {
+      const referenceTime = orderInfo.updated_at || orderInfo.created_at;
+      const invoiceAge = (Date.now() - new Date(referenceTime).getTime()) / 1000;
 
       if (invoiceAge > INVOICE_EXPIRY_SECONDS) {
         const requestId = `worker-${orderId}-${Date.now()}`;

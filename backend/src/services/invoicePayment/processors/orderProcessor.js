@@ -47,6 +47,7 @@ const TX_HASH_PATTERNS = {
   LTC: /^[a-fA-F0-9]{64}$/,
   ETH: /^0x[a-fA-F0-9]{64}$/,
   USDT: /^[a-fA-F0-9]{64}$/,  // TRC20
+  USDT_TRC20: /^[a-fA-F0-9]{64}$/,  // Alias for TRC20
 };
 
 /**
@@ -115,7 +116,7 @@ export async function processOrderPayment({
   }
 
   // 1.3. Authorization check (before expensive operations)
-  const isOwner = actorUserId && preliminaryOrder.user_id === actorUserId;
+  const isOwner = actorUserId && preliminaryOrder.buyer_id === actorUserId;
   const isSeller = allowSeller && actorUserId && preliminaryOrder.shop_owner_id === actorUserId;
   if (actorUserId && !isOwner && !isSeller) {
     throw new ValidationError('Not authorized to process this payment');

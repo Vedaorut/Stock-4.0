@@ -308,8 +308,8 @@ export const paymentValidation = {
       return true;
     }),
     body('currency')
-      .isIn(['BTC', 'ETH', 'USDT', 'LTC'])
-      .withMessage('Currency must be BTC, ETH, USDT, or LTC'),
+      .isIn(['BTC', 'ETH', 'USDT', 'USDT_TRC20', 'LTC'])
+      .withMessage('Currency must be BTC, ETH, USDT, USDT_TRC20, or LTC'),
     validate,
   ],
 

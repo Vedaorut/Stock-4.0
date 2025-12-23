@@ -25,8 +25,9 @@
  */
 
 import axios from 'axios';
-import crypto from 'crypto';
+import TronWeb from 'tronweb';
 import logger from '../utils/logger.js';
+import { USDT_TRC20 } from '../config/blockchain.js';
 import { SUPPORTED_CURRENCIES } from '../utils/constants.js';
 
 /**
@@ -65,19 +66,57 @@ const BLOCKCHAIN_CONFIG = {
     provider: 'trongrid',
     baseUrl: 'https://api.trongrid.io',
     minConfirmations: SUPPORTED_CURRENCIES.USDT.confirmations,
-    decimals: SUPPORTED_CURRENCIES.USDT.decimals,
+    decimals: USDT_TRC20.decimals,
     // PAY-P0-001 FIX: Hardcode official USDT TRC20 contract - DO NOT allow env override (security)
-    contractAddress: 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t',
+    contractAddress: USDT_TRC20.contractAddress,
   },
   USDT_TRC20: {
     provider: 'trongrid',
     baseUrl: 'https://api.trongrid.io',
     minConfirmations: SUPPORTED_CURRENCIES.USDT.confirmations,
-    decimals: SUPPORTED_CURRENCIES.USDT.decimals,
+    decimals: USDT_TRC20.decimals,
     // PAY-P0-001 FIX: Hardcode official USDT TRC20 contract - DO NOT allow env override (security)
-    contractAddress: 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t',
+    contractAddress: USDT_TRC20.contractAddress,
   },
 };
+
+// PAY-P0-001 FIX: TronWeb instance for safe TRON address conversions
+let tronWebInstance = null;
+
+function getTronWeb() {
+  if (tronWebInstance) {
+    return tronWebInstance;
+  }
+
+  const apiKey = process.env.TRONGRID_API_KEY;
+  tronWebInstance = new TronWeb({
+    fullHost: BLOCKCHAIN_CONFIG.USDT.baseUrl,
+    ...(apiKey ? { headers: { 'TRON-PRO-API-KEY': apiKey } } : {}),
+  });
+
+  return tronWebInstance;
+}
+
+function normalizeTronAddress(address, tronWeb) {
+  if (!address) {
+    return null;
+  }
+
+  const trimmed = String(address).replace(/^0x/, '');
+  if (trimmed.startsWith('41') && trimmed.length === 42) {
+    try {
+      return tronWeb.address.fromHex(trimmed);
+    } catch (error) {
+      logger.warn('[BlockchainVerification] Failed to normalize TRON hex address', {
+        address: trimmed,
+        error: error.message,
+      });
+      return null;
+    }
+  }
+
+  return String(address);
+}
 
 // PAY-P2-1 FIX: Centralized tolerance configuration
 // Amount tolerance for network fees (1% capped at $0.10)
@@ -356,10 +395,11 @@ export async function verifyBitcoinPayment(txHash, expectedAddress, expectedAmou
     };
   }
 
-  // Find output to our address (Blockstream uses scriptpubkey_address)
-  const output = tx.vout?.find((o) => o.scriptpubkey_address === expectedAddress);
+  // Find ALL outputs to our address (Blockstream uses scriptpubkey_address)
+  const outputs = tx.vout?.filter((o) => o.scriptpubkey_address === expectedAddress) || [];
+  const amountSats = outputs.reduce((sum, o) => sum + (o.value || 0), 0);
 
-  if (!output) {
+  if (outputs.length === 0) {
     return {
       verified: false,
       status: 'failed',
@@ -371,7 +411,7 @@ export async function verifyBitcoinPayment(txHash, expectedAddress, expectedAmou
   }
 
   // Blockstream returns value in satoshi
-  const amountBTC = (output.value / Math.pow(10, config.decimals)).toFixed(config.decimals);
+  const amountBTC = (amountSats / Math.pow(10, config.decimals)).toFixed(config.decimals);
   const expectedBTC = parseFloat(expectedAmount);
 
   // P0 SECURITY: Validate expectedAmount to prevent NaN bypass
@@ -453,6 +493,20 @@ export async function verifyLitecoinPayment(txHash, expectedAddress, expectedAmo
   // Fetch transaction data from BlockCypher (may throw BlockchainAPIError)
   const tx = await fetchWithRetry(url);
 
+  // PAY-P1-6 FIX: Handle BlockCypher API error payloads returned with 200 OK
+  if (tx?.error || Array.isArray(tx?.errors)) {
+    const errorMsg = tx.error || tx.errors?.[0]?.error || tx.errors?.[0]?.message || 'BlockCypher API error';
+    const notFound = /not found|does not exist/i.test(errorMsg);
+    return {
+      verified: false,
+      status: 'failed',
+      resultStatus: notFound ? VERIFICATION_STATUS.TX_NOT_FOUND : VERIFICATION_STATUS.API_ERROR,
+      confirmations: 0,
+      amount: '0',
+      error: errorMsg,
+    };
+  }
+
   if (!tx || !tx.hash) {
     return {
       verified: false,
@@ -476,10 +530,11 @@ export async function verifyLitecoinPayment(txHash, expectedAddress, expectedAmo
     };
   }
 
-  // Find output to our address (BlockCypher uses addresses array)
-  const output = tx.outputs?.find((o) => o.addresses?.includes(expectedAddress));
+  // Find ALL outputs to our address (BlockCypher uses addresses array)
+  const outputs = tx.outputs?.filter((o) => o.addresses?.includes(expectedAddress)) || [];
+  const amountLitoshi = outputs.reduce((sum, o) => sum + (o.value || 0), 0);
 
-  if (!output) {
+  if (outputs.length === 0) {
     return {
       verified: false,
       status: 'failed',
@@ -491,7 +546,7 @@ export async function verifyLitecoinPayment(txHash, expectedAddress, expectedAmo
   }
 
   // BlockCypher returns value in litoshi (smallest unit)
-  const amountLTC = (output.value / Math.pow(10, config.decimals)).toFixed(config.decimals);
+  const amountLTC = (amountLitoshi / Math.pow(10, config.decimals)).toFixed(config.decimals);
   const expectedLTC = parseFloat(expectedAmount);
 
   // P0 SECURITY: Validate expectedAmount to prevent NaN bypass
@@ -573,6 +628,11 @@ export async function verifyEthereumPayment(txHash, expectedAddress, expectedAmo
   // V2 API requires chainid parameter
   const txUrl = `${config.baseUrl}?chainid=${config.chainId}&module=proxy&action=eth_getTransactionByHash&txhash=${txHash}&apikey=${apiKey}`;
   const txData = await fetchWithRetry(txUrl);
+
+  // PAY-P1-4 FIX: Detect Etherscan API errors (rate limit / invalid key)
+  if (txData.status === '0' && txData.message === 'NOTOK') {
+    throw new BlockchainAPIError(txData.result || 'Etherscan API error');
+  }
 
   if (!txData.result) {
     return {
@@ -761,6 +821,30 @@ export async function verifyUSDTTRC20Payment(txHash, expectedAddress, expectedAm
     };
   }
 
+  // PAY-P1-5 FIX: Detect TRON API errors and pending txs before receipt checks
+  if (txInfo.Error || txInfo.code) {
+    return {
+      verified: false,
+      status: 'failed',
+      resultStatus: VERIFICATION_STATUS.API_ERROR,
+      confirmations: 0,
+      amount: '0',
+      error: txInfo.Error || txInfo.message || 'TRON API error',
+    };
+  }
+
+  // Pending transaction (no receipt yet)
+  if (!txInfo.receipt) {
+    return {
+      verified: false,
+      status: 'pending',
+      resultStatus: VERIFICATION_STATUS.SUCCESS,
+      confirmations: 0,
+      amount: '0',
+      error: 'Transaction pending confirmation',
+    };
+  }
+
   // Check transaction receipt (0 = failed, 1 = success)
   if (txInfo.receipt?.result !== 'SUCCESS') {
     return {
@@ -773,13 +857,27 @@ export async function verifyUSDTTRC20Payment(txHash, expectedAddress, expectedAm
     };
   }
 
-  // Parse Transfer event from logs
-  const transferEvent = txInfo.log?.find(
-    (log) =>
-      log.address === config.contractAddress &&
-      log.topics &&
-      log.topics[0] === 'ddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef' // Transfer event signature
-  );
+  // PAY-P0 FIX: TronGrid returns log.address in hex, config is base58
+  const tronWeb = getTronWeb();
+  const expectedTronAddress = normalizeTronAddress(expectedAddress, tronWeb) || expectedAddress;
+  const transferSig = 'ddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
+  const contractHex = tronWeb.address
+    .toHex(config.contractAddress)
+    .replace(/^0x/, '')
+    .toLowerCase();
+
+  const transferEvent =
+    txInfo.log?.find((log) => {
+      const logAddress = (log.address || '').replace(/^0x/, '').toLowerCase();
+      const topic0 = (log.topics?.[0] || '').replace(/^0x/, '').toLowerCase();
+      return logAddress === contractHex && topic0 === transferSig;
+    }) ||
+    txInfo.trc20TransferInfo?.find((transfer) => {
+      const contractAddressRaw = String(transfer.contract_address || '');
+      const contractAddressHex = contractAddressRaw.replace(/^0x/, '').toLowerCase();
+      return contractAddressHex === contractHex ||
+        contractAddressRaw === config.contractAddress;
+    });
 
   if (!transferEvent) {
     return {
@@ -792,11 +890,64 @@ export async function verifyUSDTTRC20Payment(txHash, expectedAddress, expectedAm
     };
   }
 
-  // Decode recipient address from topics[2] (topics[1] is sender)
-  const recipientHex = '41' + transferEvent.topics[2].substring(24); // Add TRON prefix, remove padding
-  const recipientAddress = hexToBase58(recipientHex);
+  // PAY-P1 FIX: Decode recipient address using TronWeb (handles hex/base58)
+  let recipientAddress = null;
+  let amountRaw = null;
 
-  if (recipientAddress !== expectedAddress) {
+  if (transferEvent.topics?.length) {
+    const topicTo = (transferEvent.topics?.[2] || '').replace(/^0x/, '');
+    const recipientHex = `41${topicTo.slice(24)}`;
+    try {
+      recipientAddress = tronWeb.address.fromHex(recipientHex);
+    } catch (error) {
+      logger.warn('[BlockchainVerification] Failed to decode TRON recipient from event topics', {
+        txHash: txHash.substring(0, 20),
+        recipientHex,
+        error: error.message,
+      });
+    }
+
+    const amountHex = (transferEvent.data || '').replace(/^0x/, '');
+    if (amountHex) {
+      amountRaw = BigInt(`0x${amountHex}`);
+    }
+  } else {
+    const rawRecipient =
+      transferEvent.to ||
+      transferEvent.to_address ||
+      transferEvent.toAddress ||
+      transferEvent.to_address_hex;
+    recipientAddress = normalizeTronAddress(rawRecipient, tronWeb);
+
+    const rawAmount =
+      transferEvent.value ??
+      transferEvent.amount ??
+      transferEvent.amount_str ??
+      transferEvent.quant;
+    if (rawAmount !== undefined && rawAmount !== null && rawAmount !== '') {
+      try {
+        amountRaw = BigInt(rawAmount);
+      } catch (parseError) {
+        const parsed = Number(rawAmount);
+        if (Number.isFinite(parsed)) {
+          amountRaw = BigInt(Math.round(parsed * Math.pow(10, config.decimals)));
+        }
+      }
+    }
+  }
+
+  if (!recipientAddress) {
+    return {
+      verified: false,
+      status: 'failed',
+      resultStatus: VERIFICATION_STATUS.TX_INVALID,
+      confirmations: 0,
+      amount: '0',
+      error: 'Payment recipient not found in transaction',
+    };
+  }
+
+  if (recipientAddress !== expectedTronAddress) {
     return {
       verified: false,
       status: 'failed',
@@ -807,10 +958,19 @@ export async function verifyUSDTTRC20Payment(txHash, expectedAddress, expectedAm
     };
   }
 
+  if (amountRaw === null) {
+    return {
+      verified: false,
+      status: 'failed',
+      resultStatus: VERIFICATION_STATUS.TX_INVALID,
+      confirmations: txInfo.confirmations || 0,
+      amount: '0',
+      error: 'Unable to parse transfer amount',
+    };
+  }
+
   // Decode amount from data field
   // PAY-P1-1 FIX: Use BigInt to handle large values without precision loss
-  const amountHex = transferEvent.data;
-  const amountRaw = BigInt('0x' + amountHex);
   const amountUSDT = (Number(amountRaw) / Math.pow(10, config.decimals)).toFixed(config.decimals);
 
   // Safety check for extremely large values
@@ -919,45 +1079,6 @@ async function getTronConfirmations(blockNumber) {
   const currentBlockNumber = currentBlock.block_header?.raw_data?.number || 0;
   // PAY-P0-1 FIX: Add +1 for consistency with BTC/ETH confirmation calculation
   return currentBlockNumber - blockNumber + 1;
-}
-
-/**
- * Convert TRON hex address to Base58 format
- * Simplified version for address conversion
- *
- * @param {string} hexAddress - Hex address (with 41 prefix)
- * @returns {string} Base58 address
- */
-const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
-
-function encodeBase58(buffer) {
-  let x = BigInt('0x' + buffer.toString('hex'));
-  let output = '';
-  while (x > 0) {
-    const mod = x % 58n;
-    output = BASE58_ALPHABET[Number(mod)] + output;
-    x = x / 58n;
-  }
-
-  // Preserve leading zeros
-  for (const byte of buffer.values()) {
-    if (byte === 0) {
-      output = '1' + output;
-    } else {
-      break;
-    }
-  }
-  return output;
-}
-
-function hexToBase58(hexAddress) {
-  // Convert TRON hex (41 + address) to Base58Check
-  const payload = Buffer.from(hexAddress, 'hex');
-  const hash0 = crypto.createHash('sha256').update(payload).digest();
-  const hash1 = crypto.createHash('sha256').update(hash0).digest();
-  const checksum = hash1.slice(0, 4);
-  const full = Buffer.concat([payload, checksum]);
-  return encodeBase58(full);
 }
 
 export default {

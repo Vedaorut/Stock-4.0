@@ -100,7 +100,7 @@ export const invoiceQueries = {
          -- Order invoice ownership
          o.buyer_id,
          u_buyer.telegram_id as buyer_telegram_id,
-         s_order.owner_id as order_shop_owner_id,
+         COALESCE(s_order.owner_id, ps_order.owner_id) as order_shop_owner_id,
          -- Subscription invoice ownership
          -- Use COALESCE: prefer shop owner, fallback to subscription user_id (for subscriptions without shop yet)
          COALESCE(s_sub.owner_id, ss.user_id) as subscription_owner_id,
@@ -109,8 +109,9 @@ export const invoiceQueries = {
        -- Join for order invoices
        LEFT JOIN orders o ON i.order_id = o.id
        LEFT JOIN users u_buyer ON o.buyer_id = u_buyer.id
+       LEFT JOIN shops s_order ON o.shop_id = s_order.id
        LEFT JOIN products p ON o.product_id = p.id
-       LEFT JOIN shops s_order ON p.shop_id = s_order.id
+       LEFT JOIN shops ps_order ON p.shop_id = ps_order.id
        -- Join for subscription invoices
        LEFT JOIN shop_subscriptions ss ON i.subscription_id = ss.id
        LEFT JOIN shops s_sub ON ss.shop_id = s_sub.id
