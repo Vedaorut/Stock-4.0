@@ -866,11 +866,17 @@ export async function verifyUSDTTRC20Payment(txHash, expectedAddress, expectedAm
     .replace(/^0x/, '')
     .toLowerCase();
 
+  // TronGrid returns address WITHOUT '41' prefix, but TronWeb.toHex includes it
+  // So we need to compare both with and without the prefix
+  const contractHexWithout41 = contractHex.replace(/^41/, '');
+
   const transferEvent =
     txInfo.log?.find((log) => {
       const logAddress = (log.address || '').replace(/^0x/, '').toLowerCase();
       const topic0 = (log.topics?.[0] || '').replace(/^0x/, '').toLowerCase();
-      return logAddress === contractHex && topic0 === transferSig;
+      // Match with OR without 41 prefix
+      const addressMatch = logAddress === contractHex || logAddress === contractHexWithout41;
+      return addressMatch && topic0 === transferSig;
     }) ||
     txInfo.trc20TransferInfo?.find((transfer) => {
       const contractAddressRaw = String(transfer.contract_address || '');
