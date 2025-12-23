@@ -207,7 +207,8 @@
       "preorder": "Preorder"
     },
     "preorderEmpty": "No preorder products",
-    "preorderEmptyDesc": "We will notify you when new preorder items become available"
+    "preorderEmptyDesc": "We will notify you when new preorder items become available",
+    "outOfStock": "Out of stock"
   },
   "cart": {
     "title": "Cart",
@@ -280,6 +281,19 @@
     "confirmPayment": "Confirm payment",
     "waitingConfirmation": "Waiting for confirmation",
     "orderAccepted": "Your order has been accepted and awaiting payment verification",
+    "pendingOrderTitle": "Pending payment",
+    "pendingOrderProduct": "Unpaid order for {product}",
+    "pendingOrderNotice": "You already have a pending order. Continue payment or cancel it.",
+    "timeRemaining": "Time left: {time}",
+    "resumePayment": "Continue payment",
+    "cancelOrder": "Cancel order",
+    "cancelOrderMessage": "What would you like to do with this order?",
+    "orderCancelled": "Order cancelled",
+    "cancelOrderFailed": "Failed to cancel order",
+    "orderExpired": "Order has expired",
+    "cannotResume": "Cannot resume payment",
+    "resumeFailed": "Failed to resume payment",
+    "tapToResume": "Tap to resume payment",
     "orderNumber": "Order number",
     "checkingPayment": "Checking payment",
     "checkingDesc": "This may take a few minutes",

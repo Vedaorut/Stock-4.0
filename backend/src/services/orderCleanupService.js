@@ -1,6 +1,7 @@
 import { pool } from '../config/database.js';
 import { INVOICE_EXPIRY_SECONDS } from '../config/payments.js';
 import logger from '../utils/logger.js';
+import { broadcast } from '../utils/websocket.js';
 
 /**
  * Auto-cancel unpaid orders after invoice expiry and free reserved stock
@@ -8,6 +9,8 @@ import logger from '../utils/logger.js';
  */
 async function cancelUnpaidOrders() {
   const client = await pool.connect();
+  let cancelledIds = [];
+  let didCommit = false;
 
   try {
     await client.query('BEGIN');
@@ -52,7 +55,7 @@ async function cancelUnpaidOrders() {
       [orderIds]
     );
 
-    const cancelledIds = cancelResult.rows.map(r => r.id);
+    cancelledIds = cancelResult.rows.map(r => r.id);
     const skippedCount = orderIds.length - cancelledIds.length;
 
     if (cancelledIds.length > 0) {
@@ -96,12 +99,22 @@ async function cancelUnpaidOrders() {
     }
 
     await client.query('COMMIT');
+    didCommit = true;
     logger.info(`Successfully processed ${orderIds.length} unpaid orders`);
   } catch (error) {
     await client.query('ROLLBACK');
     logger.error('Error in cancelUnpaidOrders:', error);
   } finally {
     client.release();
+  }
+
+  if (didCommit && cancelledIds.length > 0) {
+    cancelledIds.forEach((orderId) => {
+      broadcast('order_status', {
+        orderId,
+        status: 'cancelled',
+      });
+    });
   }
 }
 

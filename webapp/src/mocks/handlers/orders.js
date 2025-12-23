@@ -8,6 +8,26 @@ const BASE_URL = 'http://localhost:3000';
 const TEST_USER_TELEGRAM_ID = 123456789;
 
 export const ordersHandlers = [
+  // GET /api/orders/pending - latest pending order (buyer)
+  http.get(`${BASE_URL}/api/orders/pending`, () => {
+    const pending = ordersData.find((o) => o.status === 'pending') || null;
+
+    if (!pending) {
+      return HttpResponse.json({ success: true, data: null });
+    }
+
+    return HttpResponse.json({
+      success: true,
+      data: {
+        orderId: pending.id,
+        payment_address: pending.wallet_address || null,
+        currency: pending.payment_method || null,
+        amount: pending.crypto_amount || 0.001,
+        expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+      },
+    });
+  }),
+
   // GET /api/orders - user orders (buyer by default)
   http.get(`${BASE_URL}/api/orders`, ({ request }) => {
     const url = new URL(request.url);

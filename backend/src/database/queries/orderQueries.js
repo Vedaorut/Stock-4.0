@@ -313,6 +313,118 @@ export const orderQueries = {
 
     return parseInt(result.rows[0]?.total || 0, 10);
   },
+
+  // Count pending orders for buyer (active within invoice expiry or with submitted payment hash)
+  countPendingByBuyer: async (buyerId, expirySeconds, client = null) => {
+    const queryFn = client ? client.query.bind(client) : query;
+    const result = await queryFn(
+      `SELECT COUNT(*) as total
+       FROM orders o
+       WHERE o.buyer_id = $1
+         AND o.status = 'pending'
+         AND (
+           o.payment_hash IS NOT NULL
+           OR COALESCE(o.updated_at, o.created_at) >= NOW() - make_interval(secs => $2)
+         )`,
+      [buyerId, expirySeconds]
+    );
+    return parseInt(result.rows[0]?.total || 0, 10);
+  },
+
+  // Find pending order with submitted payment hash (verification in progress)
+  findPendingWithPaymentHashByBuyer: async (buyerId, client = null) => {
+    const queryFn = client ? client.query.bind(client) : query;
+    const result = await queryFn(
+      `SELECT o.*,
+              s.name as shop_name,
+              COALESCE(p.name, (SELECT oi.product_name FROM order_items oi WHERE oi.order_id = o.id LIMIT 1)) as product_name
+       FROM orders o
+       LEFT JOIN shops s ON o.shop_id = s.id
+       LEFT JOIN products p ON o.product_id = p.id
+       WHERE o.buyer_id = $1
+         AND o.status = 'pending'
+         AND o.payment_hash IS NOT NULL
+       ORDER BY o.updated_at DESC
+       LIMIT 1`,
+      [buyerId]
+    );
+    return result.rows[0];
+  },
+
+  // Find cancellable pending orders without submitted payment hash
+  findCancellablePendingByBuyer: async (buyerId, client = null) => {
+    const queryFn = client ? client.query.bind(client) : query;
+    const result = await queryFn(
+      `SELECT o.id, o.status
+       FROM orders o
+       WHERE o.buyer_id = $1
+         AND o.status = 'pending'
+         AND o.payment_hash IS NULL`,
+      [buyerId]
+    );
+    return result.rows;
+  },
+
+  // Find a buyer's pending order that includes any of the given products
+  findPendingOrderByBuyerAndProducts: async (buyerId, productIds, expirySeconds, client = null) => {
+    if (!Array.isArray(productIds) || productIds.length === 0) {
+      return null;
+    }
+
+    const queryFn = client ? client.query.bind(client) : query;
+    const result = await queryFn(
+      `SELECT o.*,
+              s.name as shop_name,
+              COALESCE(p.name, (SELECT oi.product_name FROM order_items oi WHERE oi.order_id = o.id LIMIT 1)) as product_name
+       FROM orders o
+       LEFT JOIN shops s ON o.shop_id = s.id
+       LEFT JOIN products p ON o.product_id = p.id
+       WHERE o.buyer_id = $1
+         AND o.status = 'pending'
+         AND (
+           o.payment_hash IS NOT NULL
+           OR COALESCE(o.updated_at, o.created_at) >= NOW() - make_interval(secs => $3)
+         )
+         AND (
+           o.product_id = ANY($2)
+           OR EXISTS (
+             SELECT 1 FROM order_items oi
+             WHERE oi.order_id = o.id
+               AND oi.product_id = ANY($2)
+           )
+         )
+       ORDER BY o.updated_at DESC
+       LIMIT 1`,
+      [buyerId, productIds, expirySeconds]
+    );
+    return result.rows[0];
+  },
+
+  // Find pending orders for buyer with payment info (used for resume/payment banner)
+  findPendingByBuyer: async (buyerId, expirySeconds, limit = 20, client = null) => {
+    const queryFn = client ? client.query.bind(client) : query;
+    const result = await queryFn(
+      `SELECT o.*,
+              s.name as shop_name,
+              COALESCE(p.name, (SELECT oi.product_name FROM order_items oi WHERE oi.order_id = o.id LIMIT 1)) as product_name
+       FROM orders o
+       LEFT JOIN shops s ON o.shop_id = s.id
+       LEFT JOIN products p ON o.product_id = p.id
+       WHERE o.buyer_id = $1
+         AND o.status = 'pending'
+         AND o.payment_address IS NOT NULL
+         AND o.crypto_amount IS NOT NULL
+         AND o.crypto_currency IS NOT NULL
+         AND (
+           o.payment_hash IS NOT NULL
+           OR COALESCE(o.updated_at, o.created_at) >= NOW() - make_interval(secs => $2)
+         )
+       ORDER BY o.updated_at DESC
+       LIMIT $3`,
+      [buyerId, expirySeconds, limit]
+    );
+    return result.rows;
+  },
 };
 
 export default orderQueries;

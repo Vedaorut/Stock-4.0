@@ -22,6 +22,20 @@ router.post('/', verifyToken, orderValidation.create, orderController.create);
 router.get('/my', verifyToken, orderController.getMyOrders);
 
 /**
+ * @route   GET /api/orders/my/pending
+ * @desc    Get current user's pending orders with payment info
+ * @access  Private (WebApp)
+ */
+router.get('/my/pending', verifyToken, orderController.getMyPendingOrders);
+
+/**
+ * @route   GET /api/orders/pending
+ * @desc    Get latest pending order for current user
+ * @access  Private (WebApp)
+ */
+router.get('/pending', verifyToken, orderController.getPendingOrder);
+
+/**
  * @route   GET /api/orders/sales
  * @desc    Get current user's sales (as seller)
  * @access  Private (WebApp)
@@ -66,6 +80,13 @@ router.get('/', verifyToken, (req, res, next) => {
  * @access  Private (WebApp)
  */
 router.get('/:id/payment-info', verifyToken, requirePaymentsEnabled, orderPaymentLimiter, orderController.getPaymentInfo);
+
+/**
+ * @route   POST /api/orders/:id/cancel
+ * @desc    Cancel pending order (buyer only)
+ * @access  Private (WebApp)
+ */
+router.post('/:id/cancel', verifyToken, orderController.cancelPendingOrder);
 
 /**
  * @route   POST /api/orders/:id/submit-payment

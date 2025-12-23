@@ -18,18 +18,27 @@ import {
  */
 export const normalizeProduct = (product) => {
   const rawStock = product?.stock_quantity ?? product?.stock ?? 0;
+  const rawReserved = product?.reserved_quantity ?? 0;
+  const reservedQuantity = Number.isFinite(Number(rawReserved)) ? Number(rawReserved) : 0;
   const price = typeof product?.price === 'number' ? product.price : Number(product?.price) || 0;
   const isAvailable = product?.is_available ?? product?.isActive ?? true;
-  const isPreorder = isAvailable && rawStock <= 0;
+  const isPreorder = product?.is_preorder ?? product?.isPreorder ?? false;
   const availability = !isAvailable ? 'unavailable' : isPreorder ? 'preorder' : 'stock';
+  const rawAvailable = product?.available;
+  const available = Number.isFinite(Number(rawAvailable))
+    ? Number(rawAvailable)
+    : Math.max(Number(rawStock) - reservedQuantity, 0);
 
   return {
     ...product,
     price,
     stock: rawStock,
     stock_quantity: rawStock,
+    reserved_quantity: reservedQuantity,
+    available,
     is_available: isAvailable,
     isAvailable,
+    is_preorder: isPreorder,
     currency: product?.currency || 'USD',
     image: product?.image || product?.images?.[0] || null,
     isPreorder,

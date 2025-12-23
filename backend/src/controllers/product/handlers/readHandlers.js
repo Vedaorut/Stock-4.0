@@ -41,6 +41,44 @@ export const getById = asyncHandler(async (req, res) => {
 });
 
 /**
+ * Get product availability (stock - reserved)
+ */
+export const getAvailability = asyncHandler(async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const product = await productQueries.findById(id);
+
+    if (!product) {
+      throw new NotFoundError('Product');
+    }
+
+    const stockQuantity = Number(product.stock_quantity || 0);
+    const reservedQuantity = Number(product.reserved_quantity || 0);
+    const available = Math.max(stockQuantity - reservedQuantity, 0);
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        product_id: product.id,
+        available,
+        stock_quantity: stockQuantity,
+        reserved_quantity: reservedQuantity,
+        is_preorder: product.is_preorder,
+        is_active: product.is_active,
+      },
+    });
+  } catch (error) {
+    if (respondWithDbError(res, error)) {
+      return;
+    }
+
+    logger.error('Get product availability error', { error: error.message, stack: error.stack });
+    throw error;
+  }
+});
+
+/**
  * List products with filters
  */
 export const list = asyncHandler(async (req, res) => {

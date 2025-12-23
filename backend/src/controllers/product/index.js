@@ -1,5 +1,5 @@
 import { create } from './handlers/createHandlers.js';
-import { getById, list, search } from './handlers/readHandlers.js';
+import { getById, getAvailability, list, search } from './handlers/readHandlers.js';
 import { update } from './handlers/updateHandlers.js';
 import {
   deleteProduct,
@@ -12,6 +12,7 @@ import { bulkUpdateProducts } from './handlers/bulkUpdateHandlers.js';
 export const productController = {
   create,
   getById,
+  getAvailability,
   list,
   search,
   update,
@@ -26,6 +27,7 @@ export const productController = {
 export {
   create,
   getById,
+  getAvailability,
   list,
   search,
   update,

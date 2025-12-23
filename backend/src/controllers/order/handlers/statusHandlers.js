@@ -6,6 +6,7 @@ import logger from '../../../utils/logger.js';
 import { validateStatusUpdate } from '../../../validators/orderValidator.js';
 import { NotFoundError, UnauthorizedError, ValidationError } from '../../../utils/errors.js';
 import { updateOrderStatusWithStockLogic } from '../../../services/orderService.js';
+import { recordCancellation } from '../../../services/orderAbuseService.js';
 import { broadcast } from '../../../utils/websocket.js';
 import { notifyOrderCompleted } from '../../../services/invoicePayment/notifications/orderNotifications.js';
 
@@ -76,6 +77,65 @@ export const updateStatus = asyncHandler(async (req, res) => {
     return res.json({
       success: true,
       data: updatedOrder,
+    });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+});
+
+/**
+ * Cancel pending order (buyer only)
+ * POST /api/orders/:id/cancel
+ */
+export const cancelPendingOrder = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const userId = req.user.id;
+
+  const client = await getClient();
+  try {
+    await client.query('BEGIN ISOLATION LEVEL SERIALIZABLE');
+
+    const order = await orderQueries.findById(id, client);
+    if (!order) {
+      throw new NotFoundError('Order');
+    }
+
+    if (order.buyer_id !== userId) {
+      throw new UnauthorizedError('Only buyer can cancel this order');
+    }
+
+    if (order.status !== 'pending') {
+      throw new ValidationError('Only pending orders can be cancelled');
+    }
+
+    await updateOrderStatusWithStockLogic(id, 'cancelled', order.status, client);
+
+    await client.query('COMMIT');
+
+    broadcast('order_status', {
+      orderId: parseInt(id, 10),
+      status: 'cancelled',
+      shopId: order.shop_id,
+    });
+
+    // Track cancellation for abuse protection (best-effort)
+    const cooldown = await recordCancellation(userId);
+
+    return res.json({
+      success: true,
+      data: {
+        orderId: parseInt(id, 10),
+        status: 'cancelled',
+      },
+      cooldown: cooldown?.blocked
+        ? {
+            blocked: true,
+            remainingMinutes: cooldown.remainingMinutes,
+          }
+        : { blocked: false },
     });
   } catch (error) {
     await client.query('ROLLBACK');

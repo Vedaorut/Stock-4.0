@@ -15,6 +15,7 @@ import OfflineBanner from './components/common/OfflineBanner';
 import { useToastStore, useToast } from './hooks/useToast';
 import './styles/globals.css';
 import { useApi, invalidateCache } from './hooks/useApi';
+import { clearActivePayment, getActivePayment } from './utils/paymentStorage';
 
 // DEBUG: Expose store for console access
 if (import.meta.env.VITE_DEMO_MODE === 'true') {
@@ -48,6 +49,8 @@ function App() {
   const hasFollows = useStore((state) => state.hasFollows);
   const isI18nReady = useStore((state) => state.isI18nReady);
   const setCartOpen = useStore((state) => state.setCartOpen);
+  const setPendingOrders = useStore((state) => state.setPendingOrders);
+  const resumePayment = useStore((state) => state.resumePayment);
   const { user, isReady, isValidating, error, startParam } = useTelegram();
   const { isConnected } = useWebSocket();
   const platform = usePlatform();
@@ -312,6 +315,48 @@ function App() {
       useStore.getState().setUser(user);
     }
   }, [isReady, user]);
+
+  useEffect(() => {
+    if (!isReady || !token) return;
+
+    const controller = new AbortController();
+
+    const loadPendingOrders = async () => {
+      const { data, error: apiError } = await get('/orders/pending', {
+        signal: controller.signal,
+      });
+
+      if (controller.signal.aborted) return;
+
+      if (apiError) {
+        if (import.meta.env.DEV) {
+          console.error('[App] Failed to load pending orders:', apiError);
+        }
+        return;
+      }
+
+      const pendingOrder = data?.data || null;
+      const normalizedId = pendingOrder?.orderId ?? pendingOrder?.id ?? null;
+      const orders = pendingOrder ? [{ ...pendingOrder, id: normalizedId }] : [];
+      setPendingOrders(orders);
+
+      const activePayment = getActivePayment();
+      const resumeId = activePayment?.orderId || normalizedId;
+      if (!resumeId) {
+        clearActivePayment();
+        return;
+      }
+
+      const resumeResult = resumePayment(resumeId);
+      if (resumeResult && !resumeResult.success) {
+        clearActivePayment();
+      }
+    };
+
+    loadPendingOrders();
+
+    return () => controller.abort();
+  }, [get, isReady, resumePayment, setPendingOrders, token]);
 
   // ✅ Fix: Wait for token before checking follows (prevents race condition)
   useEffect(() => {

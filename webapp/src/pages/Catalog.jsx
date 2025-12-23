@@ -8,6 +8,7 @@ import { useTelegram } from '../hooks/useTelegram';
 import { useBackButton } from '../hooks/useBackButton';
 import { useTranslation } from '../i18n/useTranslation';
 import { useApi } from '../hooks/useApi';
+import { useToast } from '../hooks/useToast';
 // normalizeProduct import removed - not used
 
 // Skeleton loader component
@@ -101,6 +102,9 @@ export default function Catalog() {
     myShops,
     setMyShops,
     setActiveTab,
+    pendingOrders,
+    resumePayment,
+    cancelPendingOrder,
   } = useStore(
     useShallow((state) => ({
       products: state.products,
@@ -112,16 +116,42 @@ export default function Catalog() {
       myShops: state.myShops,
       setMyShops: state.setMyShops,
       setActiveTab: state.setActiveTab,
+      pendingOrders: state.pendingOrders,
+      resumePayment: state.resumePayment,
+      cancelPendingOrder: state.cancelPendingOrder,
     }))
   );
 
   const { triggerHaptic } = useTelegram();
   const { t } = useTranslation();
   const { get } = useApi();
+  const toast = useToast();
 
   // Derived State (moved up to fix ReferenceError - used in searchProducts)
   const displayShop = currentShop || myShop;
   const isProductsForDisplayShop = displayShop && productsShopId === displayShop.id;
+  const pendingOrder = pendingOrders?.[0] || null;
+  const pendingExpiresInMinutes = useMemo(() => {
+    if (!pendingOrder?.expiresAt) return null;
+    const remainingMs = new Date(pendingOrder.expiresAt).getTime() - Date.now();
+    if (remainingMs <= 0) return 0;
+    return Math.ceil(remainingMs / (60 * 1000));
+  }, [pendingOrder?.expiresAt]);
+
+  const handleResumePending = useCallback(() => {
+    if (!pendingOrder) return;
+    triggerHaptic('medium');
+    const result = resumePayment(pendingOrder.id);
+    if (result && !result.success) {
+      toast.error(t('payment.resumeFailed'));
+    }
+  }, [pendingOrder, resumePayment, t, toast, triggerHaptic]);
+
+  const handleCancelPending = useCallback(async () => {
+    if (!pendingOrder) return;
+    triggerHaptic('light');
+    await cancelPendingOrder(pendingOrder.id);
+  }, [cancelPendingOrder, pendingOrder, triggerHaptic]);
 
   // Data Loading Logic
   const loadMyShop = useCallback(
@@ -718,6 +748,57 @@ export default function Catalog() {
       }}
     >
       <Header title={t('catalog.title')} />
+
+      {pendingOrder && (
+        <motion.div
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.2 }}
+          className="px-4 pt-3"
+        >
+          <div
+            className="rounded-2xl p-4 border border-orange-500/20"
+            style={{ background: 'linear-gradient(135deg, rgba(255, 107, 0, 0.08), rgba(255, 107, 0, 0.02))' }}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-white font-semibold text-sm">
+                  {t('payment.pendingOrderTitle')}
+                </p>
+                <p className="text-gray-400 text-xs mt-1">
+                  {pendingOrder.product_name || pendingOrder.productName
+                    ? t('payment.pendingOrderProduct', {
+                      product: pendingOrder.product_name || pendingOrder.productName,
+                    })
+                    : t('payment.pendingOrderNotice')}
+                </p>
+                {pendingExpiresInMinutes !== null && (
+                  <p className="text-orange-300 text-xs mt-1">
+                    {t('payment.timeRemaining', { time: `${pendingExpiresInMinutes}m` })}
+                  </p>
+                )}
+              </div>
+
+              <div className="flex flex-col gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={handleResumePending}
+                  className="px-3 py-1.5 rounded-xl text-xs font-semibold text-white bg-orange-primary"
+                >
+                  {t('payment.resumePayment')}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCancelPending}
+                  className="px-3 py-1.5 rounded-xl text-xs font-semibold text-white/70 bg-white/10"
+                >
+                  {t('payment.cancelOrder')}
+                </button>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+      )}
 
       {/* Shop Info & Search - Premium E-commerce Header */}
       <div className="relative z-10">

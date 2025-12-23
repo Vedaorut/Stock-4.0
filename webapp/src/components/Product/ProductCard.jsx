@@ -147,6 +147,12 @@ const StockBadge = ({ stock, lowStock, pcsLabel }) => (
   </div>
 );
 
+const OutOfStockBadge = ({ label }) => (
+  <div className="px-2.5 py-1 rounded-lg text-[10px] font-semibold bg-red-500/10 text-red-300 border border-red-500/20">
+    {label}
+  </div>
+);
+
 const CartIcon = () => (
   <svg
     className="relative w-5 h-5"
@@ -189,10 +195,16 @@ const ProductCard = memo(function ProductCard({ product, onPreorder: _onPreorder
   // Derived State
   const isAvailable = product.isAvailable ?? product.is_available ?? true;
   const stock = product.stock ?? product.stock_quantity ?? 0;
-  const availability = product.availability || (isAvailable && stock <= 0 ? 'preorder' : 'stock');
+  const reserved = product.reserved_quantity ?? 0;
+  const available = Number.isFinite(Number(product.available))
+    ? Number(product.available)
+    : Math.max(Number(stock) - Number(reserved), 0);
+  const availability =
+    product.availability ||
+    (!isAvailable ? 'unavailable' : product.isPreorder || product.is_preorder ? 'preorder' : 'stock');
   const isPreorder = availability === 'preorder';
-  const isDisabled = !isAvailable || (!isPreorder && stock <= 0);
-  const lowStock = stock > 0 && stock <= 3;
+  const isDisabled = !isAvailable || (!isPreorder && available <= 0);
+  const lowStock = available > 0 && available <= 3;
 
   // Price Logic
   const {
@@ -294,8 +306,8 @@ const ProductCard = memo(function ProductCard({ product, onPreorder: _onPreorder
       <div className="absolute top-3 left-3 z-10 flex flex-col gap-2">
         {product.isPremium && <PremiumIcon />}
         {/* Stock badge moves to left when timer discount is active */}
-        {isTimerDiscount && !isPreorder && stock > 0 && (
-          <StockBadge stock={stock} lowStock={lowStock} pcsLabel={t('shopOrders.labels.pcs')} />
+        {isTimerDiscount && !isPreorder && available > 0 && (
+          <StockBadge stock={available} lowStock={lowStock} pcsLabel={t('shopOrders.labels.pcs')} />
         )}
       </div>
 
@@ -308,9 +320,13 @@ const ProductCard = memo(function ProductCard({ product, onPreorder: _onPreorder
         )}
         {isPreorder ? (
           <PreorderIcon />
+        ) : available <= 0 && isAvailable ? (
+          <OutOfStockBadge label={t('catalog.outOfStock')} />
         ) : (
           /* Stock badge in right corner only when NO timer discount */
-          !isTimerDiscount && stock > 0 && <StockBadge stock={stock} lowStock={lowStock} pcsLabel={t('shopOrders.labels.pcs')} />
+          !isTimerDiscount && available > 0 && (
+            <StockBadge stock={available} lowStock={lowStock} pcsLabel={t('shopOrders.labels.pcs')} />
+          )
         )}
       </div>
 

@@ -381,7 +381,7 @@ const TabBar = memo(function TabBar() {
 
     // Refs for popup callback to avoid stale closures
     const resumePaymentRef = useRef(null);
-    const removePendingOrderRef = useRef(null);
+    const cancelPendingOrderRef = useRef(null);
     const toastRef = useRef(null);
     const tRef = useRef(null);
     const triggerHapticRef = useRef(null);
@@ -397,7 +397,7 @@ const TabBar = memo(function TabBar() {
         viewMode,
         pendingOrders,
         resumePayment,
-        removePendingOrder
+        cancelPendingOrder
     } = useStore(
         useShallow((state) => ({
             activeTab: state.activeTab,
@@ -410,7 +410,7 @@ const TabBar = memo(function TabBar() {
             viewMode: state.viewMode,
             pendingOrders: state.pendingOrders,
             resumePayment: state.resumePayment,
-            removePendingOrder: state.removePendingOrder,
+            cancelPendingOrder: state.cancelPendingOrder,
         }))
     );
 
@@ -436,7 +436,7 @@ const TabBar = memo(function TabBar() {
 
     // Keep refs in sync for popup callback (avoid stale closures)
     resumePaymentRef.current = resumePayment;
-    removePendingOrderRef.current = removePendingOrder;
+    cancelPendingOrderRef.current = cancelPendingOrder;
     toastRef.current = toast;
     tRef.current = t;
     triggerHapticRef.current = triggerHaptic;
@@ -510,10 +510,18 @@ const TabBar = memo(function TabBar() {
                             triggerHapticRef.current?.('error');
                         }
                     } else if (buttonId === 'cancel') {
-                        // Cancel order - remove from pending
-                        removePendingOrderRef.current?.(orderId);
-                        triggerHapticRef.current?.('success');
-                        toastRef.current?.success(tRef.current?.('payment.orderCancelled') || 'Заказ отменён');
+                        // Cancel order - update backend and remove from pending
+                        Promise.resolve(cancelPendingOrderRef.current?.(orderId))
+                            .then((result) => {
+                                if (result?.success) {
+                                    triggerHapticRef.current?.('success');
+                                } else {
+                                    triggerHapticRef.current?.('error');
+                                }
+                            })
+                            .catch(() => {
+                                triggerHapticRef.current?.('error');
+                            });
                     }
                 } catch (error) {
                     console.error('[TabBar] Popup callback error:', error);

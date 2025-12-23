@@ -3,8 +3,51 @@ import { useToastStore } from '../../hooks/useToast';
 import { getApiBaseUrl } from '../../utils/apiBase';
 import { normalizeOrder } from '../useStore';
 import { t } from '../../i18n';
+import { clearActivePayment, getActivePayment, setActivePayment } from '../../utils/paymentStorage';
 
 const API_URL = getApiBaseUrl();
+
+const toNumber = (value, fallback = 0) => {
+  const num = Number(value);
+  return Number.isFinite(num) ? num : fallback;
+};
+
+const normalizePendingOrder = (order) => {
+  if (!order) return null;
+  const resolvedId = order.id ?? order.orderId;
+  const normalized = normalizeOrder({ ...order, id: resolvedId });
+  const walletAddress = order.walletAddress || order.payment_address || order.paymentAddress || null;
+  const cryptoAmount = toNumber(order.cryptoAmount ?? order.crypto_amount ?? order.amount, 0);
+  const crypto = order.crypto || order.crypto_currency || order.cryptoCurrency || order.currency || null;
+  const expiresAt = order.expiresAt || order.expires_at || null;
+  const expiresIn = order.expiresIn || order.expires_in || null;
+
+  return {
+    ...normalized,
+    walletAddress,
+    cryptoAmount,
+    crypto: typeof crypto === 'string' ? crypto.toUpperCase() : crypto,
+    expiresAt,
+    expiresIn,
+  };
+};
+
+const buildActivePayment = ({ orderId, address, amount, currency, expiresAt }) => ({
+  orderId,
+  address,
+  amount,
+  currency,
+  expiresAt,
+  updatedAt: new Date().toISOString(),
+});
+
+const clearActivePaymentIfMatches = (orderId) => {
+  const activePayment = getActivePayment();
+  if (!activePayment?.orderId) return;
+  if (String(activePayment.orderId) === String(orderId)) {
+    clearActivePayment();
+  }
+};
 
 export const createPaymentSlice = (set, get) => ({
   // Payment State
@@ -198,6 +241,12 @@ export const createPaymentSlice = (set, get) => ({
         currentOrder: order,
       });
 
+      setActivePayment(
+        buildActivePayment({
+          orderId: order.id,
+        })
+      );
+
       return order;
     } catch (error) {
       if (import.meta.env.DEV) {
@@ -212,6 +261,15 @@ export const createPaymentSlice = (set, get) => ({
 
       if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
       } else if (error.response?.status === 401) {
+      } else if (error.response?.status === 409 && error.response?.data?.order) {
+        const existingOrder = normalizePendingOrder(error.response.data.order);
+        if (existingOrder) {
+          set({
+            currentOrder: existingOrder,
+          });
+          get().setPendingOrders([existingOrder]);
+          return { ...existingOrder, __existingPending: true };
+        }
       } else if (error.response?.status === 400) {
         // FIX: Parse specific 400 error messages from backend
         const errorData = error.response.data;
@@ -308,6 +366,36 @@ export const createPaymentSlice = (set, get) => ({
           }
         }
 
+        if (order.__existingPending && order.walletAddress && order.cryptoAmount && order.crypto) {
+          const resolvedCrypto = order.crypto.toUpperCase();
+          const expiresAt = order.expiresAt || null;
+
+          if (resolvedCrypto !== normalizedCrypto) {
+            toast({ type: 'info', message: t('payment.pendingOrderNotice'), duration: 3500 });
+          }
+
+          set({
+            selectedCrypto: resolvedCrypto,
+            paymentWallet: order.walletAddress,
+            cryptoAmount: order.cryptoAmount,
+            invoiceExpiresAt: expiresAt,
+            paymentStep: 'details',
+            verifyError: null,
+          });
+
+          setActivePayment(
+            buildActivePayment({
+              orderId: order.id,
+              address: order.walletAddress,
+              amount: order.cryptoAmount,
+              currency: resolvedCrypto,
+              expiresAt,
+            })
+          );
+
+          return;
+        }
+
         // FIX: Get token for authorization
         const { token } = get();
 
@@ -351,6 +439,16 @@ export const createPaymentSlice = (set, get) => ({
           paymentStep: 'details',
           verifyError: null,
         });
+
+        setActivePayment(
+          buildActivePayment({
+            orderId: order.id,
+            address: paymentInfo.address,
+            amount: cryptoAmount,
+            currency: normalizedCrypto,
+            expiresAt,
+          })
+        );
       } catch (error) {
         if (import.meta.env.DEV) {
           console.error('[selectCrypto] API ERROR:', {
@@ -541,6 +639,10 @@ export const createPaymentSlice = (set, get) => ({
       get().clearCart();
     }
 
+    if (clearPendingOrders) {
+      clearActivePayment();
+    }
+
     // Full payment state cleanup
     set({
       // Order data
@@ -575,9 +677,53 @@ export const createPaymentSlice = (set, get) => ({
 
   setPaymentStep: (step) => set({ paymentStep: step }),
 
+  setPendingOrders: (orders = []) => {
+    const normalized = Array.isArray(orders)
+      ? orders.map(normalizePendingOrder).filter(Boolean)
+      : [];
+    set({ pendingOrders: normalized });
+  },
+
+  cancelPendingOrder: async (orderId) => {
+    const normalizedId = typeof orderId === 'string' ? parseInt(orderId, 10) : orderId;
+    const { token } = get();
+    const toast = useToastStore.getState().addToast;
+
+    if (!normalizedId) {
+      return { success: false, error: 'INVALID_ORDER_ID' };
+    }
+
+    try {
+      await axios.post(
+        `${API_URL}/orders/${normalizedId}/cancel`,
+        {},
+        {
+          headers: {
+            ...(token && { Authorization: `Bearer ${token}` }),
+          },
+        }
+      );
+
+      get().removePendingOrder(normalizedId);
+      const currentOrder = get().currentOrder;
+      if (currentOrder && String(currentOrder.id) === String(normalizedId)) {
+        get().resetPaymentFlow({ reason: 'cancel' });
+      }
+      toast({ type: 'success', message: t('payment.orderCancelled'), duration: 2500 });
+      return { success: true };
+    } catch (error) {
+      if (import.meta.env.DEV) {
+        console.error('[cancelPendingOrder] Error:', error);
+      }
+      toast({ type: 'error', message: t('payment.cancelOrderFailed'), duration: 3000 });
+      return { success: false, error };
+    }
+  },
+
   // FIX BUG-WEBAPP-003: Normalize orderId to ensure consistent comparison
   removePendingOrder: (orderId) => {
     const normalizedId = typeof orderId === 'string' ? parseInt(orderId, 10) : orderId;
+    clearActivePaymentIfMatches(normalizedId);
     set({
       pendingOrders: get().pendingOrders.filter((order) => {
         const orderIdNum = typeof order.id === 'string' ? parseInt(order.id, 10) : order.id;
@@ -591,6 +737,10 @@ export const createPaymentSlice = (set, get) => ({
     const normalizedId = typeof orderId === 'string' ? parseInt(orderId, 10) : orderId;
     const terminalStatuses = ['paid', 'confirmed', 'completed', 'failed', 'cancelled', 'expired'];
     const isTerminal = terminalStatuses.includes(status);
+
+    if (isTerminal) {
+      clearActivePaymentIfMatches(normalizedId);
+    }
 
     // Helper to normalize and compare order IDs
     const matchesId = (order) => {
@@ -670,6 +820,16 @@ export const createPaymentSlice = (set, get) => ({
       isCreatingOrder: false,
       isGeneratingInvoice: false,
     });
+
+    setActivePayment(
+      buildActivePayment({
+        orderId: pendingOrder.id,
+        address: pendingOrder.walletAddress,
+        amount: pendingOrder.cryptoAmount,
+        currency: pendingOrder.crypto,
+        expiresAt: pendingOrder.expiresAt || null,
+      })
+    );
 
     return { success: true };
   },

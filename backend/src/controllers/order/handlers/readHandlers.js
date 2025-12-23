@@ -3,6 +3,7 @@ import { asyncHandler } from '../../../middleware/errorHandler.js';
 import { NotFoundError } from '../../../utils/errors.js';
 import { validateOrderAccess } from '../../../validators/orderValidator.js';
 import { parseStatusFilter } from '../utils/filters.js';
+import { INVOICE_EXPIRY_SECONDS } from '../../../config/payments.js';
 
 /**
  * Get order by ID
@@ -131,6 +132,83 @@ export const getMyOrders = asyncHandler(async (req, res) => {
       limit,
       maxLimit: MAX_LIMIT,
       hasMore: orders.length === limit,
+    },
+  });
+});
+
+/**
+ * Get pending orders for current user (with payment info)
+ */
+export const getMyPendingOrders = asyncHandler(async (req, res) => {
+  const userId = req.user.id;
+  const limit = Math.min(parseInt(req.query.limit, 10) || 10, 50);
+
+  const orders = await orderQueries.findPendingByBuyer(
+    userId,
+    INVOICE_EXPIRY_SECONDS,
+    limit
+  );
+
+  const now = Date.now();
+  const mapped = orders.map((order) => {
+    const baseTime = order.updated_at || order.created_at;
+    const expiresAt = baseTime
+      ? new Date(new Date(baseTime).getTime() + INVOICE_EXPIRY_SECONDS * 1000).toISOString()
+      : null;
+    const expiresIn = baseTime
+      ? Math.max(0, Math.floor((new Date(expiresAt).getTime() - now) / 1000))
+      : null;
+
+    return {
+      ...order,
+      expiresAt,
+      expiresIn,
+    };
+  });
+
+  return res.json({
+    success: true,
+    data: mapped,
+  });
+});
+
+/**
+ * Get the latest pending order for current user (single order response)
+ */
+export const getPendingOrder = asyncHandler(async (req, res) => {
+  const userId = req.user.id;
+
+  const orders = await orderQueries.findPendingByBuyer(
+    userId,
+    INVOICE_EXPIRY_SECONDS,
+    1
+  );
+
+  if (!orders.length) {
+    return res.json({
+      success: true,
+      data: null,
+    });
+  }
+
+  const order = orders[0];
+  const baseTime = order.updated_at || order.created_at;
+  const expiresAt = baseTime
+    ? new Date(new Date(baseTime).getTime() + INVOICE_EXPIRY_SECONDS * 1000).toISOString()
+    : null;
+
+  return res.json({
+    success: true,
+    data: {
+      orderId: order.id,
+      payment_address: order.payment_address,
+      currency: order.crypto_currency,
+      amount: order.crypto_amount,
+      expires_at: expiresAt,
+      expiresAt,
+      shop_id: order.shop_id,
+      shop_name: order.shop_name,
+      product_name: order.product_name,
     },
   });
 });

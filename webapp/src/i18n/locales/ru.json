@@ -207,7 +207,8 @@
       "preorder": "Предзаказ"
     },
     "preorderEmpty": "Нет товаров в предзаказе",
-    "preorderEmptyDesc": "Мы сообщим, как только появятся новые позиции для предзаказа"
+    "preorderEmptyDesc": "Мы сообщим, как только появятся новые позиции для предзаказа",
+    "outOfStock": "Нет в наличии"
   },
   "cart": {
     "title": "Корзина",
@@ -280,6 +281,19 @@
     "confirmPayment": "Подтвердить оплату",
     "waitingConfirmation": "Ожидает подтверждения",
     "orderAccepted": "Ваш заказ принят и ожидает проверки платежа",
+    "pendingOrderTitle": "Ожидает оплаты",
+    "pendingOrderProduct": "Неоплаченный заказ: {product}",
+    "pendingOrderNotice": "У вас уже есть неоплаченный заказ. Продолжите оплату или отмените его.",
+    "timeRemaining": "Осталось: {time}",
+    "resumePayment": "Продолжить оплату",
+    "cancelOrder": "Отменить заказ",
+    "cancelOrderMessage": "Что вы хотите сделать с этим заказом?",
+    "orderCancelled": "Заказ отменён",
+    "cancelOrderFailed": "Не удалось отменить заказ",
+    "orderExpired": "Срок оплаты истёк",
+    "cannotResume": "Не удалось продолжить оплату",
+    "resumeFailed": "Не удалось продолжить оплату",
+    "tapToResume": "Нажмите, чтобы продолжить оплату",
     "orderNumber": "Номер заказа",
     "checkingPayment": "Проверяем оплату",
     "checkingDesc": "Это может занять несколько минут",

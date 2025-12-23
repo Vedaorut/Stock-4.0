@@ -4,9 +4,9 @@ import { useStore } from '../../store/useStore';
 import { useShallow } from 'zustand/react/shallow';
 import { useTelegram } from '../../hooks/useTelegram';
 import { useTranslation } from '../../i18n/useTranslation';
-import { useToast } from '../../hooks/useToast';
 import { CRYPTO_OPTIONS, formatCryptoAmount, generatePaymentQRValue } from '../../utils/paymentUtils';
 import { usePlatform } from '../../hooks/usePlatform';
+import { useGlobalTimer } from '../../hooks/useGlobalTimer';
 import {
   getSpringPreset,
   getSurfaceStyle,
@@ -29,8 +29,10 @@ export default function PaymentDetailsModal() {
     paymentWallet,
     currentOrder,
     cryptoAmount,
+    invoiceExpiresAt,
     setPaymentStep,
     isGeneratingInvoice,
+    cancelPendingOrder,
   } = useStore(
     useShallow((state) => ({
       paymentStep: state.paymentStep,
@@ -38,13 +40,14 @@ export default function PaymentDetailsModal() {
       paymentWallet: state.paymentWallet,
       currentOrder: state.currentOrder,
       cryptoAmount: state.cryptoAmount,
+      invoiceExpiresAt: state.invoiceExpiresAt,
       setPaymentStep: state.setPaymentStep,
       isGeneratingInvoice: state.isGeneratingInvoice,
+      cancelPendingOrder: state.cancelPendingOrder,
     }))
   );
   const { triggerHaptic } = useTelegram();
   const { t } = useTranslation();
-  const _toast = useToast(); // Reserved for future notifications
   const platform = usePlatform();
   const android = isAndroid(platform);
   const ios = isIOS(platform);
@@ -53,6 +56,20 @@ export default function PaymentDetailsModal() {
   const [loadingTimeout, setLoadingTimeout] = useState(false);
   const copiedTimeoutRef = useRef(null);
   const copiedAmountTimeoutRef = useRef(null);
+  const tick = useGlobalTimer();
+
+  const timeLeftLabel = useMemo(() => {
+    if (!invoiceExpiresAt) return null;
+    const remainingMs = new Date(invoiceExpiresAt).getTime() - Date.now();
+    if (remainingMs <= 0) return null;
+    const totalSeconds = Math.floor(remainingMs / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    if (minutes <= 0) {
+      return `${seconds}s`;
+    }
+    return `${minutes}m ${seconds}s`;
+  }, [invoiceExpiresAt, tick]);
 
   // Log render state
 
@@ -178,6 +195,12 @@ export default function PaymentDetailsModal() {
   const handlePaid = () => {
     triggerHaptic('medium');
     setPaymentStep('hash');
+  };
+
+  const handleCancelOrder = async () => {
+    if (!currentOrder?.id) return;
+    triggerHaptic('light');
+    await cancelPendingOrder(currentOrder.id);
   };
 
   const cryptoInfo = CRYPTO_OPTIONS.find((c) => c.id === selectedCrypto);
@@ -482,6 +505,14 @@ export default function PaymentDetailsModal() {
                 className="flex-1 overflow-y-auto p-4 space-y-3"
                 style={{ paddingBottom: 'calc(var(--tabbar-total) + 32px)' }}
               >
+                {timeLeftLabel && (
+                  <div className="flex justify-center">
+                    <div className="px-3 py-1 rounded-full text-xs font-semibold text-orange-200 bg-white/5 border border-white/10">
+                      {t('payment.timeRemaining', { time: timeLeftLabel })}
+                    </div>
+                  </div>
+                )}
+
                 {/* QR Code - Compact */}
                 <div className="flex justify-center">
                   <motion.div
@@ -659,6 +690,15 @@ export default function PaymentDetailsModal() {
                   transition={controlSpring}
                 >
                   {t('payment.iPaid')}
+                </motion.button>
+                <motion.button
+                  onClick={handleCancelOrder}
+                  className="w-full h-11 mt-3 text-white/80 font-semibold rounded-xl border border-white/10"
+                  style={{ background: 'rgba(255, 255, 255, 0.04)' }}
+                  whileTap={{ scale: android ? 0.985 : 0.98 }}
+                  transition={controlSpring}
+                >
+                  {t('payment.cancelOrder')}
                 </motion.button>
               </div>
             </div>

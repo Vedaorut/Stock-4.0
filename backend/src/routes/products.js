@@ -65,6 +65,13 @@ router.get('/search', verifyToken, productController.search);
 router.get('/', apiLimiter, productValidation.list, productController.list);
 
 /**
+ * @route   GET /api/products/:id/availability
+ * @desc    Get real-time availability (stock - reserved)
+ * @access  Public (rate limited)
+ */
+router.get('/:id/availability', apiLimiter, productValidation.getById, productController.getAvailability);
+
+/**
  * @route   GET /api/products/:id
  * @desc    Get product by ID
  * @access  Public (rate limited)

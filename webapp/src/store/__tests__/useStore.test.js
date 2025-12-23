@@ -218,14 +218,20 @@ describe('normalizeProduct', () => {
   });
 
   describe('availability and preorder', () => {
-    it('should detect preorder when available but no stock', () => {
-      const result = normalizeProduct({ is_available: true, stock_quantity: 0 });
+    it('should detect preorder when flag is set', () => {
+      const result = normalizeProduct({ is_available: true, stock_quantity: 0, is_preorder: true });
       expect(result.isPreorder).toBe(true);
       expect(result.availability).toBe('preorder');
     });
 
     it('should detect regular stock when available with stock', () => {
       const result = normalizeProduct({ is_available: true, stock_quantity: 5 });
+      expect(result.isPreorder).toBe(false);
+      expect(result.availability).toBe('stock');
+    });
+
+    it('should not mark preorder when stock is zero but flag is false', () => {
+      const result = normalizeProduct({ is_available: true, stock_quantity: 0, is_preorder: false });
       expect(result.isPreorder).toBe(false);
       expect(result.availability).toBe('stock');
     });
@@ -246,6 +252,18 @@ describe('normalizeProduct', () => {
       const result = normalizeProduct({});
       expect(result.is_available).toBe(true);
       expect(result.isAvailable).toBe(true);
+    });
+  });
+
+  describe('available quantity', () => {
+    it('should compute available from reserved_quantity', () => {
+      const result = normalizeProduct({ stock_quantity: 10, reserved_quantity: 3 });
+      expect(result.available).toBe(7);
+    });
+
+    it('should prefer provided available when present', () => {
+      const result = normalizeProduct({ stock_quantity: 10, reserved_quantity: 8, available: 6 });
+      expect(result.available).toBe(6);
     });
   });
 
@@ -1196,17 +1214,16 @@ describe('Payment Flow', () => {
       expect(pending[0].status).toBe('pending');
     });
 
-    it('should set paymentStep - clearCart resets to idle after success', async () => {
-      // Note: submitPaymentHash sets paymentStep to 'success' but then
-      // calls clearCart() which resets to 'idle'. This is expected behavior.
+    it('should set paymentStep to success after submitPaymentHash', async () => {
+      // submitPaymentHash sets paymentStep to 'success' to show confirmation UI
       mockAxiosPost.mockResolvedValueOnce({
         data: { success: true, data: { paymentId: 999 } },
       });
 
       await useStore.getState().submitPaymentHash('0xabc123');
 
-      // After clearCart, paymentStep resets to 'idle'
-      expect(useStore.getState().paymentStep).toBe('idle');
+      // paymentStep stays at 'success' to show confirmation UI
+      expect(useStore.getState().paymentStep).toBe('success');
     });
 
     it('should clear cart on success', async () => {
@@ -1455,7 +1472,7 @@ describe('Products', () => {
     it('should normalize and set products', () => {
       const rawProducts = [
         { id: 1, name: 'Product 1', price: '10.00', stock_quantity: 5 },
-        { id: 2, name: 'Product 2', price: 25, stock: 0, is_available: true },
+        { id: 2, name: 'Product 2', price: 25, stock: 0, is_available: true, is_preorder: true },
       ];
 
       useStore.getState().setProducts(rawProducts, 100);
@@ -1631,7 +1648,7 @@ describe('WebSocket Actions', () => {
     it('should fetch and normalize products', async () => {
       const mockProducts = [
         { id: 1, price: '10.00', stock_quantity: 5 },
-        { id: 2, price: '20.00', stock_quantity: 0, is_available: true },
+        { id: 2, price: '20.00', stock_quantity: 0, is_available: true, is_preorder: true },
       ];
 
       mockAxiosGet.mockResolvedValueOnce({ data: { data: mockProducts } });

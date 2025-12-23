@@ -1,6 +1,14 @@
 import { useToastStore } from '../../hooks/useToast';
 import { t } from '../../i18n';
 
+const resolveAvailable = (item) => {
+  const available = Number(item?.available);
+  if (Number.isFinite(available)) return available;
+  const stock = Number(item?.stock_quantity ?? item?.stock ?? 0);
+  const reserved = Number(item?.reserved_quantity ?? 0);
+  return Math.max(stock - reserved, 0);
+};
+
 export const createCartSlice = (set, get) => ({
   // Cart
   cart: [],
@@ -23,7 +31,7 @@ export const createCartSlice = (set, get) => ({
     if (existingItem) {
       // STOCK VALIDATION: Check if can increase quantity
       const newQuantity = existingItem.quantity + 1;
-      const stock = existingItem.stock_quantity || existingItem.stock || 0;
+      const stock = resolveAvailable(existingItem);
       const isPreorder = existingItem.isPreorder || existingItem.availability === 'preorder';
 
       // Allow unlimited quantity for preorders
@@ -81,7 +89,7 @@ export const createCartSlice = (set, get) => ({
 
     if (item) {
       // STOCK VALIDATION: Check if quantity exceeds stock
-      const stock = item.stock_quantity || item.stock || 0;
+      const stock = resolveAvailable(item);
       const isPreorder = item.isPreorder || item.availability === 'preorder';
 
       // Allow unlimited quantity for preorders
@@ -141,7 +149,7 @@ export const createCartSlice = (set, get) => ({
 
       // Check stock (for non-preorder items)
       const isPreorder = item.isPreorder || item.availability === 'preorder';
-      const stock = item.stock_quantity || item.stock || 0;
+      const stock = resolveAvailable(item);
 
       if (!isPreorder && item.quantity > stock) {
         itemErrors.push(t('cart.stockLimited', { count: stock }));
